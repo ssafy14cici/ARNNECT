@@ -1,0 +1,176 @@
+/* =========================================================
+   Codrops Exhibition CSS 가져오기 (원본 스타일)
+   ========================================================= */
+@import url("https://fonts.googleapis.com/css?family=Josefin+Sans:400,700");
+@import url("https://tympanus.net/Development/Exhibition/css/normalize.css");
+@import url("https://tympanus.net/Development/Exhibition/css/demo.css");
+
+/* =========================================================
+   Vite/React 기본 리셋 + 안전장치
+   (원본 demo.css가 대부분 잡지만, SPA 환경에서 깨지는 것 방지)
+   ========================================================= */
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden; /* 원본처럼 스크롤 숨김 */
+}
+
+/* React에서 class="no-js" 같은 걸 안 쓰므로,
+   js 클래스가 없는 상태에서 깨지는 걸 방지하는 안전값 */
+html:not(.js) .overlay--loader {
+  display: none;
+}
+
+/* =========================================================
+   overlay open 상태 클래스 (React에서 overlay--open을 쓸 때)
+   demo.css가 open용 클래스를 안 갖고 있는 경우를 대비해서 보강
+   ========================================================= */
+.overlay {
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.overlay.overlay--open {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+/* 메뉴/정보 오버레이가 보이는 동안 클릭 가능하게 */
+.overlay--menu.overlay--open,
+.overlay--info.overlay--open {
+  pointer-events: auto;
+}
+
+/* =========================================================
+   Loader overlay (React에서 overlay--active 토글)
+   ========================================================= */
+.overlay--loader {
+  position: fixed;
+  inset: 0;
+  background: rgba(215, 215, 215, 0.96);
+  display: grid;
+  place-items: center;
+  z-index: 9999;
+}
+
+.overlay--loader:not(.overlay--active) {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+/* loader dots (원본 demo.css가 있다면 겹치지 않게 최소한만) */
+.loader {
+  display: flex;
+  gap: 10px;
+}
+.loader > div {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  animation: loaderPulse 900ms infinite ease-in-out;
+}
+.loader > div:nth-child(2) {
+  animation-delay: 150ms;
+}
+.loader > div:nth-child(3) {
+  animation-delay: 300ms;
+}
+@keyframes loaderPulse {
+  0%,
+  100% {
+    transform: scale(0.75);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+/* =========================================================
+   “현재 슬라이드/룸” 토글용 보강
+   demo.css에서 이미 처리하지만, React에서 class만 바꿀 때
+   확실히 보이도록 최소한의 안전장치 추가
+   ========================================================= */
+.room {
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+
+.room--current {
+  opacity: 1;
+}
+
+.slide {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.slide--current {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* =========================================================
+   버튼 active 상태(React에서 btn--active 토글) 보강
+   ========================================================= */
+.btn--toggle.btn--active .icon--cross {
+  opacity: 1;
+  transform: scale(1);
+}
+.btn--toggle.btn--active .icon--menu,
+.btn--toggle.btn--active .icon--info {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+/* 기본값: cross는 숨김, info/menu는 표시 */
+.btn--toggle .icon--cross {
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.btn--toggle .icon--menu,
+.btn--toggle .icon--info {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+/* =========================================================
+   SVG use가 React에서 잘 보이도록 (가끔 크기/정렬 이슈)
+   ========================================================= */
+.icon {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* =========================================================
+   Vite에서 anchor 기본 스타일이 demo.css와 충돌할 때 보정
+   ========================================================= */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* =========================================================
+   모바일에서 텍스트 너무 커지는 것 방지(선택)
+   ========================================================= */
+@media (max-width: 900px) {
+  body {
+    overflow: hidden;
+  }
+}

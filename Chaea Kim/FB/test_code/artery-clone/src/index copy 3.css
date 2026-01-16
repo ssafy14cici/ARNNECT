@@ -1,0 +1,132 @@
+@import url("https://fonts.googleapis.com/css?family=Josefin+Sans:400,700&display=swap");
+@import url("https://tympanus.net/Development/Exhibition/css/normalize.css");
+@import url("https://tympanus.net/Development/Exhibition/css/demo.css");
+
+html, body, #root { height: 100%; }
+body { margin: 0; overflow: hidden; }
+
+/* =========================================================
+   공간(3D) 안에서만 움직이기: scroller만 변형
+   ========================================================= */
+.scroller{
+  --camX: 0px;
+  --camY: 0px;
+  --camRotX: 0deg;
+  --camRotY: 0deg;
+
+  --navX: 0px;
+  --navZ: 0px;
+  --navRotY: 0deg;
+
+  will-change: transform;
+  transform-style: preserve-3d;
+
+  transform:
+    translate3d(calc(var(--camX) + var(--navX)), var(--camY), var(--navZ))
+    rotateX(var(--camRotX))
+    rotateY(calc(var(--camRotY) + var(--navRotY)));
+
+  transition: transform 140ms cubic-bezier(.2,.9,.2,1);
+}
+
+.scroller.is-pointer{
+  transition: transform 60ms linear;
+}
+
+/* 전시실 이동은 “멈칫 없이” 짧게 시점만 바꿈 */
+.scroller.nav-next{ --navX: -140px; --navZ: 120px; --navRotY: -10deg; }
+.scroller.nav-prev{ --navX:  140px; --navZ: 120px; --navRotY:  10deg; }
+
+/* 이미지 클릭 가능 */
+.room__img{ cursor: pointer; }
+
+/* 성능(멈칫 방지) */
+.scroller, .room__side, .room__img { backface-visibility: hidden; transform-style: preserve-3d; }
+
+/* =========================================================
+   햄버거 메뉴: 풀스크린 레드 오버레이 + X 닫기
+   ========================================================= */
+.overlay--menu{
+  position: fixed;
+  inset: 0;
+  background: rgba(214, 64, 64, 0.92);
+  display: grid;
+  place-items: center;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms linear;
+}
+.overlay--menu.overlay--open{
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.menuClose{
+  position: fixed;
+  top: 34px;
+  right: 34px;
+  z-index: 10000;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.menuClose svg{
+  width: 28px;
+  height: 28px;
+  fill: #fff;
+}
+
+.overlay--menu .menu{
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+}
+.overlay--menu .menu__item{ margin: 18px 0; }
+.overlay--menu .menu__link{
+  font-family: "Josefin Sans", system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: lowercase;
+  font-size: clamp(40px, 6vw, 88px);
+  color: rgba(255,255,255,0.95);
+  cursor: pointer;
+}
+.overlay--menu .menu__link:hover{ color: #fff; }
+
+/* =========================================================
+   페이지(라우트)용 최소 스타일 (discover/visit/shop)
+   ========================================================= */
+.simplePage{
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  background: rgba(215,215,215,0.92);
+  padding: 30px;
+}
+.simpleCard{
+  width: min(980px, 92vw);
+  background: rgba(255,255,255,0.85);
+  border: 1px solid rgba(0,0,0,0.12);
+  box-shadow: 0 20px 70px rgba(0,0,0,0.18);
+  padding: 24px;
+}
+.simpleTop{
+  display:flex;
+  justify-content: space-between;
+  align-items:center;
+  gap: 12px;
+}
+.simpleBtn{
+  border: 1px solid rgba(0,0,0,0.18);
+  background: rgba(255,255,255,0.85);
+  padding: 10px 12px;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+}
+.simpleBtn:hover{ background: rgba(0,0,0,0.78); color: #fff; }
