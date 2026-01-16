@@ -1,0 +1,148 @@
+@import url("https://fonts.googleapis.com/css?family=Josefin+Sans:400,700&display=swap");
+@import url("https://tympanus.net/Development/Exhibition/css/normalize.css");
+@import url("https://tympanus.net/Development/Exhibition/css/demo.css");
+
+html, body, #root { height: 100%; }
+body { margin: 0; overflow: hidden; }
+
+/* =========================================================
+   1) “공간 안에서만” 움직이기: scroller에만 카메라 변형 적용
+   - 헤더/텍스트(UI)는 content 레이어라 그대로 고정
+   ========================================================= */
+.scroller{
+  /* 커서 카메라 변수(React가 세팅) */
+  --camX: 0px;
+  --camY: 0px;
+  --camRotX: 0deg;
+  --camRotY: 0deg;
+
+  /* 전시실 이동(좌/우) 변수 */
+  --navX: 0px;
+  --navZ: 0px;
+  --navRotY: 0deg;
+
+  will-change: transform;
+  transform-style: preserve-3d;
+
+  /* demo.css의 기존 transform이 있더라도, 이 한 줄이 우선됩니다.
+     그래서 “demo.css가 scroller를 transform으로 쓰면” 깨질 수 있음.
+     -> codrops는 보통 room에 transform을 주고 scroller는 wrapper라 괜찮습니다. */
+  transform:
+    translate3d(calc(var(--camX) + var(--navX)), var(--camY), var(--navZ))
+    rotateX(var(--camRotX))
+    rotateY(calc(var(--camRotY) + var(--navRotY)));
+
+  transition: transform 220ms cubic-bezier(.2,.9,.2,1);
+}
+
+/* 커서 이동은 너무 딱딱하지 않게 */
+.scroller.is-pointer{
+  transition: transform 60ms linear;
+}
+
+/* 전시실 이동(멈춤 없이) out/in 체감용 프리셋 */
+.scroller.nav-out-next{ --navX: -120px; --navZ: 140px; --navRotY: -12deg; }
+.scroller.nav-in-next { --navX:  120px; --navZ: -110px; --navRotY:  10deg; }
+
+.scroller.nav-out-prev{ --navX:  120px; --navZ: 140px; --navRotY:  12deg; }
+.scroller.nav-in-prev { --navX: -120px; --navZ: -110px; --navRotY: -10deg; }
+
+/* 현재 room만 클릭 가능하게(나머지는 클릭 막기) */
+.room { pointer-events: none; opacity: 0; transition: opacity 120ms linear; }
+.room--current { pointer-events: auto; opacity: 1; }
+
+/* 이미지 클릭 가능 */
+.room__img{ cursor: pointer; }
+
+/* =========================================================
+   2) 햄버거 메뉴: 첨부처럼 “풀스크린 레드 오버레이 + 중앙 큰 메뉴”
+   - demo.css의 overlay를 덮어써서 동일하게 만듦
+   ========================================================= */
+.overlay--menu{
+  position: fixed;
+  inset: 0;
+  background: rgba(214, 64, 64, 0.92);
+  display: grid;
+  place-items: center;
+  z-index: 9999;
+
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms linear;
+}
+
+.overlay--menu.overlay--open{
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.overlay--menu .menu{
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+}
+
+.overlay--menu .menu__item{
+  margin: 18px 0;
+}
+
+.overlay--menu .menu__link{
+  font-family: "Josefin Sans", system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: lowercase;
+
+  font-size: clamp(40px, 6vw, 88px);
+  color: rgba(255,255,255,0.95);
+}
+
+.overlay--menu .menu__item--current .menu__link{
+  color: #fff;
+}
+
+/* info 오버레이는 기존 느낌 유지(필요하면 여기서도 조정 가능) */
+.overlay--info{
+  z-index: 9999;
+}
+
+/* =========================================================
+   3) 상세 페이지(선택): 기존 라우팅을 유지할 경우를 위한 최소 스타일
+   ========================================================= */
+.detailOverlay{
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(215,215,215,0.92);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.detailCard{
+  width: min(1100px, 92vw);
+  height: min(720px, 88vh);
+  background: rgba(255,255,255,0.85);
+  border: 1px solid rgba(0,0,0,0.14);
+  box-shadow: 0 20px 70px rgba(0,0,0,0.18);
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 18px;
+  padding: 18px;
+}
+.detailImgWrap{
+  background: rgba(255,255,255,0.75);
+  border: 1px solid rgba(0,0,0,0.10);
+  overflow: hidden;
+}
+.detailImg{
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.detailBtn{
+  border: 1px solid rgba(0,0,0,0.18);
+  background: rgba(255,255,255,0.85);
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.detailBtn:hover{ background: rgba(0,0,0,0.78); color: #fff; }
