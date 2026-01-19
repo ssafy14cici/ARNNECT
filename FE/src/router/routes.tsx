@@ -11,7 +11,7 @@ import ArtworkDetail from "../pages/artwork/ArtworkDetail";
 import Login from "../pages/auth/Login";
 import Signup from "../pages/auth/Signup";
 import NotFound from "../pages/notfound/NotFound";
-
+import Recover from "../pages/auth/Recover";
 import Guard from "../components/common/Guard";
 
 export const routes: RouteObject[] = [
@@ -22,6 +22,8 @@ export const routes: RouteObject[] = [
       { path: "/artist-go", element: <ArtistGo /> },
       { path: "/search", element: <Search /> },
       { path: "/feed", element: <Feed /> },
+      { path: "/recover", element: <Recover /> },
+
 
       // ✅ 로그인 필요(상세/라운지/프로필 등) :contentReference[oaicite:3]{index=3}
       {
