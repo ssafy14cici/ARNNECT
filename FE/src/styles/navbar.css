@@ -1,0 +1,249 @@
+/* =========================
+   NAVBAR (Top)
+========================= */
+.nav{
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 5000;
+  background: transparent;
+  padding: 18px 24px;
+  display: flex;
+  justify-content: center; /* Center align items */
+  font-family: 'Playfair Display', 'Didot', 'Bodoni MT', serif; /* Elegant serif font */
+  .nav { outline: 3px solid red !important; }
+  
+}
+
+.navInner{
+  width: min(1320px, 92vw);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.navBrand{
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 10px 10px;
+}
+
+.navRight{
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.navLogin{
+  border: none;
+  background: rgba(255,255,255,0.02);
+  color: var(--fg);
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* =========================
+   Hamburger (menu4) -> X
+   - 메인페이지 햄버거 애니메이션 그대로
+========================= */
+.menu-trigger,
+.menu-trigger span{
+  display:inline-block;
+  transition: all .4s;
+  box-sizing: border-box;
+}
+
+.menu-trigger{
+  position: relative;
+  z-index: 6000; /* ✅ 오버레이보다 위 */
+  width: 44px;
+  height: 36px;
+
+  display: inline-flex;       /* ✅ 어떤 환경에서도 중앙 정렬 안정 */
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.02);
+  cursor: pointer;
+  padding: 0;
+
+  -webkit-tap-highlight-color: transparent;
+}
+
+.menu-trigger span{
+  position:absolute;
+  left:10px;
+  right:10px;
+  height:2px;
+  background-color: var(--fg);
+  border-radius:999px;
+}
+
+.menu-trigger span:nth-of-type(1){ top:10px; }
+.menu-trigger span:nth-of-type(2){ top:17px; }
+.menu-trigger span:nth-of-type(3){ top:24px; }
+
+#menu4.menu-trigger.active span:nth-of-type(1){
+  transform: translateY(7px) rotate(-45deg);
+}
+#menu4.menu-trigger.active span:nth-of-type(2){
+  left:200%;
+  opacity:0;
+}
+#menu4.menu-trigger.active span:nth-of-type(3){
+  transform: translateY(-7px) rotate(45deg);
+}
+
+/* =========================
+   Reference Menu (2x4 Grid)
+   - 둥근거 없음, '격자'만
+   - 기본 모드: 밝은 톤
+========================= */
+:root{
+  --menu-bg: #F8F6F2;                 /* 배경(아이보리/화이트펄) */
+  --menu-line: rgba(43,42,40,0.18);   /* 라인(#2B2A28 기반) */
+  --menu-text: rgba(43,42,40,0.92);   /* 텍스트 */
+  --menu-text-dim: rgba(43,42,40,0.62);
+}
+
+.refMenu{
+  position: fixed;
+  inset: 0;
+  z-index: 5500; /* nav 위, 햄버거 아래 */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease; /* 조금 더 부드럽게 */
+}
+
+.refMenu.open{
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 배경 클릭용: 레퍼런스처럼 투명 유지 */
+.refMenuBackdrop{
+  position:absolute;
+  inset:0;
+  border:0;
+  padding:0;
+  background: transparent;
+  cursor: default;
+}
+
+/* 패널 전체 */
+.refMenuPanel{
+  position:absolute;
+  inset:0;
+  background: var(--menu-bg);
+}
+
+/* 2행 4열 그리드 */
+.refMenuGrid{
+  position:absolute;
+  inset:0;
+
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+
+  border-top: 1px solid var(--menu-line);
+  border-left: 1px solid var(--menu-line);
+}
+
+/* 셀: "박스" 느낌 없이 라인만 */
+.refCell{
+  border:0;
+  background: transparent;   /* ✅ 박스 배경 없음 */
+  cursor:pointer;
+
+  border-right: 1px solid var(--menu-line);
+  border-bottom: 1px solid var(--menu-line);
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  padding: clamp(28px, 4vw, 56px);
+
+  border-radius: 0;          /* ✅ 둥근거 제거 */
+}
+
+.refCell:hover{
+  /* ✅ 밝은톤 hover */
+  background: rgba(43,42,40,0.035);
+}
+
+.refLabel{
+  white-space: pre-line; /* \n 줄바꿈 */
+  color: var(--menu-text);
+  font-size: clamp(18px, 2.2vw, 34px);
+  font-weight: 300;
+  letter-spacing: 0.01em;
+  text-align: center;
+  font-family: 'Playfair Display', 'Didot', 'Bodoni MT', serif;
+}
+
+/* 우상단 X */
+.refCellClose{
+  position: fixed;
+  top: 24px;
+  right: 80px;
+  z-index: 6001;
+  width: 44px;
+  height: 36px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.refCellClose .refLabel{
+  color: var(--menu-text-dim);
+  font-size: clamp(12px, 1.5vw, 18px);
+}
+
+/* 로고 칸(로고는 이미지로 넣을 예정) */
+.refCellLogo{
+  align-items:center;
+  justify-content:center;
+}
+.refLogoBox{
+  width: 42%;
+  aspect-ratio: 1 / 1;
+  border: 0;                 /* ✅ 박스 제거 */
+  display:grid;
+  place-items:center;
+  color: var(--menu-text-dim);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+}
+
+.refLogoImg{
+  width: 42%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+
+
+/* 반응형: 2열 4행 */
+@media (max-width: 900px){
+  .refMenuGrid{
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+  }
+}
