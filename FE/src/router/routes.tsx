@@ -1,7 +1,10 @@
 import type { RouteObject } from "react-router-dom";
-import RootLayout from "../layouts/RootLayout";
+// import RootLayout from "../layouts/RootLayout";
 
-import Home from "../pages/home/Home";
+// import Home from "../pages/home/Home";
+import AppLayout from "../layouts/AppLayout";
+
+
 import ArtistGo from "../pages/artistGo/ArtistGo";
 import Search from "../pages/search/Search";
 import Feed from "../pages/feed/Feed";
@@ -13,12 +16,12 @@ import Signup from "../pages/auth/Signup";
 import NotFound from "../pages/notfound/NotFound";
 import Recover from "../pages/auth/Recover";
 import Guard from "../components/common/Guard";
-
+import MainPage from "../pages/main/MainPage";
 export const routes: RouteObject[] = [
   {
-    element: <RootLayout />,
+    element: <AppLayout />,
     children: [
-      { path: "/", element: <Home /> },
+      { path: "/", element: <MainPage /> },
       { path: "/artist-go", element: <ArtistGo /> },
       { path: "/search", element: <Search /> },
       { path: "/feed", element: <Feed /> },
