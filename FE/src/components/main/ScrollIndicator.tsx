@@ -1,6 +1,7 @@
+// src/components/common/ScrollIndicator.tsx
 import React from "react";
 
-export default function ScrollIndicator() {
+const ScrollIndicator: React.FC = () => {
   return (
     <div
       style={{
@@ -19,4 +20,6 @@ export default function ScrollIndicator() {
       Scroll <span style={{ transform: "translateY(1px)" }}>↓</span>
     </div>
   );
-}
+};
+
+export default ScrollIndicator;

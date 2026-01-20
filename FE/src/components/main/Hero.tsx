@@ -1,4 +1,4 @@
-import ScrollIndicator from "./jsx/ScrollIndicator";
+import ScrollIndicator from "../main/ScrollIndicator";
 import { artworks } from "../../data/artworks";
 import "../../styles/home.css";
 
