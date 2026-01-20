@@ -7,20 +7,24 @@
   z-index: 5000;
   background: transparent;
   padding: 18px 24px;
+
   display: flex;
-  justify-content: center; /* Center align items */
-  font-family: 'Playfair Display', 'Didot', 'Bodoni MT', serif; /* Elegant serif font */
-  .nav { outline: 3px solid red !important; }
-  
+  justify-content: space-between; /* ✅ 좌/우 끝으로 */
+  align-items: center;
+
+  font-family: 'Playfair Display', 'Didot', 'Bodoni MT', serif;
 }
 
+/* ✅ 중앙 박스(1320px 제한) 제거: 화면 전체 폭 사용 */
 .navInner{
-  width: min(1320px, 92vw);
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
+
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
+
 
 .navBrand{
   border: 0;
@@ -247,3 +251,43 @@
     grid-template-rows: repeat(4, 1fr);
   }
 }
+
+/* ✅ 오버레이에서 햄버거 자리 그대로 쓰는 Close 버튼 */
+.refMenuCloseBtn{
+  position: fixed;
+  z-index: 6001;
+
+  /* ✅ nav의 padding(18px 24px)과 동일하게 맞춤 */
+  top: 18px;
+  right: 24px;
+
+  width: 44px;
+  height: 36px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ✅ close 버튼도 햄버거 span 스타일 재사용 */
+.refMenuCloseBtn span{
+  position:absolute;
+  left:10px;
+  right:10px;
+  height:2px;
+  background-color: var(--fg);
+  border-radius:999px;
+  transition: all .4s;
+}
+
+/* ✅ 닫기 상태는 X 모양으로 고정 */
+.refMenuCloseBtn span:nth-of-type(1){ top:10px; transform: translateY(7px) rotate(-45deg); }
+.refMenuCloseBtn span:nth-of-type(2){ top:17px; left:200%; opacity:0; }
+.refMenuCloseBtn span:nth-of-type(3){ top:24px; transform: translateY(-7px) rotate(45deg); }
