@@ -158,7 +158,7 @@ def train():
             
             if acc >= best_acc:
                 best_acc = acc
-                torch.save(model.state_dict(), "best_sasrec_model.pth")
+                torch.save(model.state_dict(), "BEST_SASRec_model.pth")
                 print(f"✨ 최고 정확도 갱신 ({acc:.4f}), 모델 저장 완료!")
 
     print(f"\n✅ 학습 완료! 최상위 정확도: {best_acc:.4f}")
