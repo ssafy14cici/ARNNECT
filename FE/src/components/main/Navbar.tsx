@@ -34,13 +34,13 @@ export default function Navbar() {
   const items: MenuItem[] = [
     { key: "logo", label: "LOGO", type: "logo", image: "/arnnect_logo_ver1.png", path: "/" },
     { key: "artist", label: "예술인\nGo", path: "/artist-go" },
-    { key: "search", label: "search", path : "/search" },
+    { key: "Search", label: "Search", path : "/search" },
     { key: "close", label: "X", type: "close" },
     { key: "empty", label: "", type: "empty" },
     { key: "feed", label: "Feed", path: "/feed" },
-    // { key: "lounge", label: "Lounge", path: "/lounge" },
-    { key: "mypage", label: "mypage", path: "/profile/1" },
-    { key: "setting", label: "option", type: "empty" },
+    { key: "lounge", label: "Lounge", path: "/lounge" },
+    { key: "Profile", label: "Profile", path: "/profile/1" },
+    // { key: "setting", label: "option", type: "empty" },
     { key: "dark", label: "다크모드\nguidelines", type: "empty" },
   ];
 

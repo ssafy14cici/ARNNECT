@@ -25,7 +25,7 @@ body {
 }
 
 .page {
-  padding: 16px;
+  padding-top: 90px; /* nav 높이에 맞춰 조정 (예: 72~120px 사이) */
 }
 
 .menu-btn {
