@@ -12,8 +12,14 @@ export default function Guard({ requireAuth, requireRole }: GuardProps) {
   const location = useLocation();
 
   if (requireAuth && !isLoggedIn) {
-    // 상세 페이지는 로그인 필요 :contentReference[oaicite:4]{index=4}
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    // 원래 가려던 전체 경로(path + query)를 만든다.
+    const fullPath = location.pathname + location.search;
+
+    // URL 파라미터에 넣기 전에 인코딩해야 안전함(슬래시/물음표/한글 등).
+    const returnUrl = encodeURIComponent(fullPath);
+
+    // ✅ 로그인 페이지로 보내되, returnUrl을 쿼리로 전달
+    return <Navigate to={`/login?returnUrl=${returnUrl}`} replace />;
   }
 
   if (requireRole && role !== requireRole) {
