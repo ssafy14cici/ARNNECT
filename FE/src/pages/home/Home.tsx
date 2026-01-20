@@ -6,7 +6,7 @@ import AboutSection from "../../components/main/AboutSection";
 import ShowcaseStage from "../../components/main/ShowcaseStage";
 import HerRingLoader from "../../components/main/HerRingLoader";
 
-import { preloadImages, fetchWithProgress } from "../../utils/networkProgress.js";
+import { preloadImages, fetchWithProgress } from "../../utils/networkProgress";
 
 export default function Home() {
   const [progress, setProgress] = useState(0);
