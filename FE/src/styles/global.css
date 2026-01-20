@@ -1,4 +1,5 @@
 :root {
+  --bg: #F8F6F2; 
   --fg: #111;
   --line: rgba(0,0,0,0.2);
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;

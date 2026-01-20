@@ -6,12 +6,15 @@ import type { UserRole } from "../../types/auth";
 import { useAuthStore } from "../../stores/authStore";
 import "../../styles/auth.css";
 
+const toStoreRole = (r: UserRole) => (r === "USER" ? "general" : "artist");
+
+
 export default function Login() {
   const nav = useNavigate();
   const [sp] = useSearchParams();
   const returnUrl = sp.get("returnUrl");
 
-  const setAuth = useAuthStore((s) => s.setAuth);
+  const login = useAuthStore((s) => s.login);
 
   const [role, setRole] = useState<UserRole>("USER");
   const [email, setEmail] = useState("");
@@ -33,7 +36,7 @@ export default function Login() {
 
     try {
       const res = await apiLogin({ email, password, role, remember });
-      setAuth(res, remember);
+      login({ token: res.token, role: toStoreRole(res.role), remember });
 
       if (returnUrl) nav(returnUrl);
       else nav("/");

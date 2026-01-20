@@ -1,4 +1,5 @@
 // src/types/auth.ts
+
 export type UserRole = "USER" | "ARTIST";
 
 export type LoginRequest = {
