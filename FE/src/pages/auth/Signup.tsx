@@ -1,38 +1,52 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import "../../styles/auth.css";
+import UserSignup from "./UserSignup";
+import ArtistSignup from "./ArtistSignup";
+
+type SignupType = "TYPE" | "USER" | "ARTIST";
 
 export default function Signup() {
-  const nav = useNavigate();
-  const [email, setEmail] = useState("");
-  const [pw, setPw] = useState("");
-  const [pw2, setPw2] = useState("");
+  const [sp, setSp] = useSearchParams();
+  const initial = (sp.get("type")?.toUpperCase() as SignupType) || "TYPE";
+  const [mode, setMode] = useState<SignupType>(initial);
 
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (pw !== pw2) {
-      alert("비밀번호가 일치하지 않습니다.");
-      return;
-    }
+  useEffect(() => {
+    if (mode === "TYPE") setSp({}, { replace: true });
+    else setSp({ type: mode.toLowerCase() }, { replace: true });
+  }, [mode, setSp]);
 
-    // TODO: API 붙이면 여기서 회원가입 요청
-    alert("회원가입 완료! 로그인 해주세요.");
-    nav("/login");
-  };
+  if (mode === "USER") return <UserSignup onBack={() => setMode("TYPE")} />;
+  if (mode === "ARTIST") return <ArtistSignup onBack={() => setMode("TYPE")} />;
 
   return (
-    <div>
-      <h2>Signup</h2>
+    <div className="auth-page auth-type">
+      <div className="auth-type-head">
+        <div className="auth-type-title">회원가입</div>
+        <div className="auth-type-sub">숨겨진 예술가를 발굴하고, 당신의 취향을 완성하세요</div>
+      </div>
 
-      <form onSubmit={onSubmit} style={{ display: "grid", gap: 10, maxWidth: 360 }}>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="이메일" required />
-        <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder="비밀번호" type="password" required />
-        <input value={pw2} onChange={(e) => setPw2(e.target.value)} placeholder="비밀번호 확인" type="password" required />
-        <button type="submit">회원가입</button>
-
-        <div style={{ fontSize: 14 }}>
-          <Link to="/login">로그인으로</Link>
+      <div className="auth-type-grid">
+        <div className="auth-type-card">
+          <div className="auth-type-card-title">일반 회원가입</div>
+          <div className="auth-type-card-desc">
+            숨겨진 예술가를 발굴하고<br />당신의 취향을 완성하세요
+          </div>
+          <button className="auth-type-btn" onClick={() => setMode("USER")}>
+            일반 회원으로 시작하기
+          </button>
         </div>
-      </form>
+
+        <div className="auth-type-card">
+          <div className="auth-type-card-title">예술인 회원가입</div>
+          <div className="auth-type-card-desc">
+            나만 아는 예술가가 아닌<br />누구나 아는 예술가로 나아갑니다.
+          </div>
+          <button className="auth-type-btn" onClick={() => setMode("ARTIST")}>
+            예술인으로 시작하기
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

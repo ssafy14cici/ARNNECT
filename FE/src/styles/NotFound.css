@@ -1,0 +1,74 @@
+/* AppLayout의 Navbar가 fixed이고, main.page에 padding-top이 있을 수 있어서
+   여기서는 "페이지 영역 안에서" 가운데 정렬되는 방식으로 구성합니다. */
+
+.nf {
+  /* ✅ 스크롤 방지: 화면 높이를 고정하고 넘치면 숨김 */
+  height: calc(100vh - 90px);   /* page padding-top이 90px일 때 */
+  overflow: hidden;
+
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.nfCard {
+  width: min(720px, 100%);
+  text-align: center;
+}
+
+/* ✅ 이미지가 화면을 넘지 않도록: 높이 제한 추가 */
+.nfImg {
+  width: min(640px, 90vw);
+  max-height: 45vh;             /* ✅ 이 값이 스크롤 방지 핵심 */
+  height: auto;
+
+  display: block;
+  margin: 0 auto 18px;
+
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.nfTitle {
+  margin: 10px 0 0;
+  font-size: 28px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--fg, #2B2A28);
+}
+
+.nfDesc {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted, rgba(43, 42, 40, 0.68));
+}
+
+.nfBtn {
+  display: inline-block;
+  margin-top: 18px;
+  padding: 12px 16px;
+  border-radius: 999px;
+  text-decoration: none;
+
+  /* border: 1px solid var(--line, rgba(43, 42, 40, 0.18)); */
+  color: var(--fg, #2B2A28);
+  background: transparent;
+
+  transition: transform 180ms ease, background 180ms ease;
+}
+
+.nfBtn:hover {
+  transform: translateY(-1px);
+  background: rgba(43, 42, 40, 0.04);
+}
+
+/* ✅ 화면이 작은 경우: 글/간격을 줄여서 더더욱 스크롤 방지 */
+@media (max-width: 600px) {
+  .nf { padding: 16px; }
+  .nfImg { max-height: 38vh; margin-bottom: 12px; }
+  .nfTitle { font-size: 22px; }
+  .nfDesc { font-size: 13px; }
+  .nfBtn { margin-top: 14px; }
+}

@@ -1,10 +1,6 @@
 import type { RouteObject } from "react-router-dom";
-// import RootLayout from "../layouts/RootLayout";
-
 import Home from "../pages/home/Home";
 import AppLayout from "../layouts/AppLayout";
-
-
 import ArtistGo from "../pages/artistGo/ArtistGo";
 import Search from "../pages/search/Search";
 import Feed from "../pages/feed/Feed";
