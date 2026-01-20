@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import { useAuthStore } from "../../stores/authStore";
 import "../../styles/navbar.css";
 
 type MenuItem = {
@@ -14,6 +14,8 @@ type MenuItem = {
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+  const logout = useAuthStore((s) => s.logout);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -37,9 +39,9 @@ export default function Navbar() {
     { key: "empty", label: "", type: "empty" },
     { key: "feed", label: "Feed", path: "/feed" },
     // { key: "lounge", label: "Lounge", path: "/lounge" },
-    { key: "mypage", label: "mypage", path: "/profile/me" },
-    { key: "setting", label: "option" },
-    { key: "dark", label: "다크모드\nguidelines" },
+    { key: "mypage", label: "mypage", path: "/profile/1" },
+    { key: "setting", label: "option", type: "empty" },
+    { key: "dark", label: "다크모드\nguidelines", type: "empty" },
   ];
 
   const handleItemClick = (item: MenuItem) => {
@@ -74,9 +76,28 @@ export default function Navbar() {
           </button>
 
           <div className="navRight">
-            <button className="navLogin" type="button" onClick={() => navigate("/login")}>
+            {/* <button className="navLogin" type="button" onClick={() => navigate("/login")}>
               LOGIN
+            </button> */}
+            <button
+              className="navLogin"
+              type="button"
+              onClick={() => {
+                if (!isLoggedIn) {
+                  // 로그인 안 됨 → 로그인 페이지로 이동
+                  navigate("/login");
+                  return;
+                }
+
+                // 로그인 됨 → 로그아웃 처리 후 홈으로
+                logout();
+                setOpen(false);
+                navigate("/", { replace: true });
+              }}
+            >
+              {isLoggedIn ? "LOGOUT" : "LOGIN"}
             </button>
+
 
             <button
               id="menu4"
