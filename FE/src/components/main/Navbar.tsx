@@ -52,10 +52,10 @@ export default function Navbar() {
 
       { key: "feed", label: "Feed", path: "/feed" },
       { key: "lounge", label: "Lounge", path: "/lounge" },
-      { key: "profile", label: "Profile", path: "/profile/1" },
+      { key: "profile", label: "Profile", path: "/profile/1/feed" },
 
       // ✅ 사용 안 하는 칸은 empty로 두기
-      { key: "empty2", label: "", type: "empty" },
+      { key: "guidelines", label: "Guidelines" },
     ],
     []
   );

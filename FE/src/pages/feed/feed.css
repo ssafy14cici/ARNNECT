@@ -1,0 +1,156 @@
+/* 페이지 전체 */
+.feed{
+  min-height: 100vh;
+  padding: 120px 72px 72px; /* navbar fixed 고려 */
+  background: var(--bg, #F8F6F2);
+}
+
+@media (max-width: 900px){
+  .feed{ padding: 96px 20px 56px; }
+}
+
+/* 상단 헤더(예시 이미지 느낌) */
+.feedHeader{
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: start;
+  margin-bottom: 34px;
+}
+
+.feedLeft{
+  display: flex;
+  align-items: flex-start;
+}
+
+.feedNav{
+  display: grid;
+  gap: 6px;
+}
+
+.feedNavItem{
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+
+  color: var(--fg, #2B2A28);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.feedTitle{
+  grid-column: 2 / 3;
+  text-align: center;
+  color: rgba(43,42,40,0.45);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: clamp(16px, 2vw, 28px);
+}
+
+/* 그리드 */
+.feedGrid{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(18px, 2.2vw, 28px);
+}
+
+@media (max-width: 1100px){
+  .feedGrid{ grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px){
+  .feedGrid{ grid-template-columns: 1fr; }
+}
+
+/* 카드 */
+.feedCard{
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+/* 이미지 래퍼 */
+.feedImgWrap{
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3; /* 예시 이미지 느낌 */
+  overflow: hidden;
+
+  border: 1px solid var(--line, rgba(43,42,40,0.18));
+  background: rgba(255,255,255,0.02);
+}
+
+/* 기본 흑백 */
+.feedImg{
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+
+  filter: grayscale(1) contrast(1.05);
+  transform: scale(1.001); /* 서브픽셀 깨짐 방지 */
+  transition: filter 280ms ease, transform 420ms ease;
+}
+
+/* hover 시 컬러 */
+.feedCard:hover .feedImg{
+  filter: grayscale(0) contrast(1.02);
+  transform: scale(1.03);
+}
+
+/* 오버레이 (hover 시 이름/제목 뜸) */
+.feedOverlay{
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+
+  opacity: 0;
+  transition: opacity 220ms ease;
+  background: radial-gradient(
+    circle at center,
+    rgba(0,0,0,0.30) 0%,
+    rgba(0,0,0,0.14) 40%,
+    rgba(0,0,0,0.00) 72%
+  );
+}
+
+.feedCard:hover .feedOverlay{
+  opacity: 1;
+}
+
+.feedOverlayText{
+  text-align: center;
+  color: #fff;
+  padding: 16px 18px;
+}
+
+.feedOverlayTitle{
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.feedOverlayMeta{
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.9;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* 센티넬/로딩 */
+.feedSentinel{
+  height: 1px;
+}
+
+.feedLoading{
+  margin-top: 18px;
+  text-align: center;
+  color: var(--muted, rgba(43,42,40,0.62));
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
