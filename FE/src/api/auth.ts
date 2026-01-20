@@ -4,7 +4,7 @@ import type {
   LoginResponse,
   SignupArtistRequest,
   SignupUserRequest,
-} from "../../types/auth";
+} from "@/types/auth";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
