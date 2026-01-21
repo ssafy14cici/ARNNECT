@@ -79,8 +79,8 @@ export default function ShowcaseStage() {
 
         <div className="showcaseType">
           <div>
-            <div className="typeSmall">curated selection</div>
-            <div className="typeBig">Showcase</div>
+            <div className="typeSmall">ARNNECT</div>
+            <div className="typeBig">Find your taste</div>
             <div className="typeHint">scroll to reveal</div>
           </div>
         </div>

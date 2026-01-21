@@ -1,0 +1,90 @@
+.postCreate {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 12px 16px 24px;
+}
+
+.postCreateTop {
+  display: grid;
+  grid-template-columns: 44px 1fr 64px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.postCreateBack {
+  width: 44px;
+  height: 36px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: transparent;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.postCreateTitle {
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.postCreateSubmit {
+  height: 36px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.postCreateBody {
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pcLabel {
+  font-size: 13px;
+  opacity: 0.75;
+  margin-top: 6px;
+}
+
+.pcInput {
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  padding: 0 12px;
+  outline: none;
+}
+
+.pcTextarea {
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  padding: 10px 12px;
+  outline: none;
+  resize: vertical;
+}
+
+.pcGrid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.pcTagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.pcTag {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+}

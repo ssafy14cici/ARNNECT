@@ -1,0 +1,287 @@
+/* FE/src/pages/feed/feed.css */
+
+/* ===== Page ===== */
+.feed {
+  min-height: 100vh;
+  padding: 120px 72px 72px; /* navbar fixed 고려 */
+  background: var(--bg, #f8f6f2);
+  color: var(--fg, #2b2a28);
+}
+
+@media (max-width: 900px) {
+  .feed {
+    padding: 96px 20px 56px;
+  }
+}
+
+/* ===== Header ===== */
+.feedHeader {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: start;
+  margin-bottom: 34px;
+}
+
+.feedLeft {
+  display: flex;
+  align-items: flex-start;
+}
+
+.feedNav {
+  display: grid;
+  gap: 6px;
+}
+
+.feedNavItem {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+
+  color: var(--fg, #2b2a28);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.feedNavItem:hover {
+  opacity: 0.85;
+}
+
+.feedTitle {
+  grid-column: 2 / 3;
+  text-align: center;
+  color: rgba(43, 42, 40, 0.45);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: clamp(16px, 2vw, 28px);
+}
+
+/* ===== Grid ===== */
+.feedGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(18px, 2.2vw, 28px);
+}
+
+@media (max-width: 1100px) {
+  .feedGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .feedGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* item wrapper (optional) */
+.feedItem {
+  min-width: 0;
+}
+
+/* ===== Card ===== */
+/* Feed.tsx에서 <article role="button"> 사용하므로 border/button reset은 여기서 처리 */
+.feedCard {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+
+  /* a11y */
+  outline: none;
+  user-select: none;
+}
+
+.feedCard:focus-visible {
+  box-shadow: 0 0 0 3px rgba(43, 42, 40, 0.22);
+  border-radius: 10px;
+}
+
+/* ===== Image Wrap ===== */
+.feedImgWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+
+  border: 1px solid var(--line, rgba(43, 42, 40, 0.18));
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* 기본: 컬러 유지 */
+.feedImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+
+  /* ✅ grayscale 제거 */
+  filter: none;
+
+  /* 기본 톤은 살짝 부드럽게(선택) */
+  opacity: 0.96;
+
+  transition: filter 240ms ease, opacity 240ms ease, transform 420ms ease;
+}
+
+/* hover: 컬러는 그대로, 선명도/대비만 살짝 업 + 확대 */
+.feedCard:hover .feedImg {
+  filter: contrast(1.08) saturate(1.08);
+  opacity: 1;
+  transform: scale(1.02);
+}
+
+
+/* ===== Badge (top-right) ===== */
+.feedBadge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+
+  display: grid;
+  place-items: center;
+
+  border: 1px solid var(--line, rgba(43, 42, 40, 0.18));
+  background: rgba(248, 246, 242, 0.75);
+  color: rgba(43, 42, 40, 0.9);
+
+  backdrop-filter: blur(6px);
+}
+
+.feedBadge svg {
+  fill: currentColor;
+}
+
+.feedBadge.artist {
+  /* 필요하면 변주 */
+}
+
+.feedBadge.user {
+  /* 필요하면 변주 */
+}
+
+/* ===== Hover Overlay ===== */
+.feedOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+
+  opacity: 0;
+  transition: opacity 220ms ease;
+
+  background: radial-gradient(
+    circle at center,
+    rgba(0, 0, 0, 0.30) 0%,
+    rgba(0, 0, 0, 0.14) 40%,
+    rgba(0, 0, 0, 0.00) 72%
+  );
+}
+
+.feedCard:hover .feedOverlay {
+  opacity: 1;
+}
+
+.feedOverlayText {
+  text-align: center;
+  color: #fff;
+  padding: 16px 18px;
+}
+
+.feedOverlayTitle {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.feedOverlayMeta {
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.9;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ===== Author button (inside overlay) ===== */
+.feedAuthor {
+  margin-top: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  pointer-events: auto; /* overlay가 pointer-events none이므로 author는 클릭되게 */
+}
+
+.feedAuthor:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* ===== Text clamp ===== */
+.feedTextClamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2; /* 정책에 맞게 1~3으로 조정 */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ===== Text-only Post Card ===== */
+.feedCardTextOnly .feedImgWrap {
+  background: rgba(248, 246, 242, 0.55);
+}
+
+.feedTextOnly {
+  position: absolute;
+  inset: 0;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.feedTextOnlyTop {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.feedTextOnlyBody {
+  display: grid;
+  gap: 10px;
+  color: var(--fg, #2b2a28);
+  text-align: left;
+}
+
+.feedTextOnlyBody .feedTextClamp {
+  color: var(--fg, #2b2a28);
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* ===== Sentinel / Loading ===== */
+.feedSentinel {
+  height: 1px;
+}
+
+.feedLoading {
+  margin-top: 18px;
+  text-align: center;
+  color: var(--muted, rgba(43, 42, 40, 0.62));
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}

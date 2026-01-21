@@ -1,6 +1,6 @@
 import { Outlet } from "react-router-dom";
 import { useEffect } from "react";
-import Navbar from "../components/main/Navbar";
+import Navbar from "../layouts/Navbar";
 import { useAuthStore } from "../stores/authStore";
 
 export default function AppLayout() {
