@@ -12,6 +12,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // ✅ 로컬 mock DB 키는 딱 1개만 사용
 const KEY_USERS = "comet_mock_users_v1";
 
+// -----------------------
+// TYPES
+// -----------------------
 type StoredUser = {
   email: string;
   password: string;
@@ -19,7 +22,14 @@ type StoredUser = {
   createdAt: string;
 };
 
-function readUsers(): StoredUser[] {
+// -----------------------
+// HELPERS (storage)
+// -----------------------
+function normEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+function loadUsers(): StoredUser[] {
   try {
     const raw = localStorage.getItem(KEY_USERS);
     return raw ? (JSON.parse(raw) as StoredUser[]) : [];
@@ -28,21 +38,21 @@ function readUsers(): StoredUser[] {
   }
 }
 
-function writeUsers(list: StoredUser[]) {
-  localStorage.setItem(KEY_USERS, JSON.stringify(list));
+function saveUsers(users: StoredUser[]) {
+  localStorage.setItem(KEY_USERS, JSON.stringify(users));
 }
 
-function normEmail(email: string) {
-  return email.trim().toLowerCase();
-}
-
+// -----------------------
+// HELPERS (validation)
+// -----------------------
 function isEmailLike(v: string) {
-  return v.includes("@"); // 필요하면 regex로 강화
+  // 필요하면 regex로 강화 가능. 지금은 최소 조건.
+  return v.includes("@");
 }
 
 function findUserByEmail(email: string) {
   const e = normEmail(email);
-  return readUsers().find((u) => normEmail(u.email) === e);
+  return loadUsers().find((u) => normEmail(u.email) === e);
 }
 
 function assertEmailUnique(email: string) {
@@ -52,10 +62,20 @@ function assertEmailUnique(email: string) {
 // -----------------------
 // EMAIL DUP CHECK
 // -----------------------
-export async function apiCheckEmailDup(email: string): Promise<{ available: boolean }> {
+export async function apiCheckEmailDup(
+  email: string
+): Promise<{ available: boolean; reason?: string }> {
   await sleep(200);
-  if (!isEmailLike(email)) return { available: false };
-  return { available: !Boolean(findUserByEmail(email)) };
+
+  const e = email.trim();
+  if (!e) return { available: false, reason: "이메일을 입력해주세요." };
+  if (!isEmailLike(e)) return { available: false, reason: "이메일 형식을 확인해주세요." };
+
+  const exists = !!findUserByEmail(e);
+  return {
+    available: !exists,
+    reason: exists ? "이미 사용 중인 이메일입니다." : "사용 가능한 이메일입니다.",
+  };
 }
 
 // -----------------------
@@ -67,24 +87,25 @@ export async function apiSignupUser(payload: SignupUserRequest): Promise<void> {
   const email = payload.email.trim();
 
   if (!isEmailLike(email)) throw new Error("이메일을 확인해주세요.");
-  if (payload.password.length < 8) throw new Error("비밀번호는 8자 이상 입력해주세요.");
-  if (payload.password !== payload.passwordConfirm) throw new Error("비밀번호 확인이 일치하지 않습니다.");
   if (!payload.name.trim()) throw new Error("이름을 입력해주세요.");
   if (!payload.phone.trim()) throw new Error("전화번호를 입력해주세요.");
-  if (!payload.agreements.terms || !payload.agreements.privacy) {
+  if (payload.password.trim().length < 8) throw new Error("비밀번호는 8자 이상 입력해주세요.");
+  if (payload.password !== payload.passwordConfirm) throw new Error("비밀번호 확인이 일치하지 않습니다.");
+  if (!payload.agreements?.terms || !payload.agreements?.privacy) {
     throw new Error("필수 약관에 동의해주세요.");
   }
 
+  // ✅ 공통 DB에서 이메일 중복 체크
   assertEmailUnique(email);
 
-  const list = readUsers();
+  const list = loadUsers();
   list.push({
     email,
     password: payload.password,
     role: "USER",
     createdAt: new Date().toISOString(),
   });
-  writeUsers(list);
+  saveUsers(list);
 }
 
 // -----------------------
@@ -96,9 +117,9 @@ export async function apiSignupArtist(payload: SignupArtistRequest): Promise<voi
   const email = payload.email.trim();
 
   if (!isEmailLike(email)) throw new Error("이메일을 확인해주세요.");
-  if (payload.password.trim().length < 8) throw new Error("비밀번호는 8자 이상 입력해주세요.");
   if (!payload.name.trim()) throw new Error("이름을 입력해주세요.");
   if (!payload.phone.trim()) throw new Error("전화번호를 입력해주세요.");
+  if (payload.password.trim().length < 8) throw new Error("비밀번호는 8자 이상 입력해주세요.");
 
   if (!payload.displayName?.trim()) throw new Error("성명(활동명)을 입력해주세요.");
   if (!payload.artMain || !payload.artSub) throw new Error("예술활동분야를 선택해주세요.");
@@ -109,22 +130,22 @@ export async function apiSignupArtist(payload: SignupArtistRequest): Promise<voi
     throw new Error("예술활동증명 서류를 업로드해주세요.");
   }
 
-  // ✅ intro/profileImage는 선택(요구사항 반영)
-  // portfolioFile은 지금 정책상 필요하면 아래 주석 해제
+  // ✅ intro/profileImage/portfolioFile은 요구사항상 선택
   // if (!payload.portfolioFile) throw new Error("포트폴리오 파일을 업로드해주세요.");
 
   if (!payload.privacyConsent) throw new Error("개인정보 수집·이용에 동의해주세요.");
 
+  // ✅ 공통 DB에서 이메일 중복 체크
   assertEmailUnique(email);
 
-  const list = readUsers();
+  const list = loadUsers();
   list.push({
     email,
     password: payload.password,
     role: "ARTIST",
     createdAt: new Date().toISOString(),
   });
-  writeUsers(list);
+  saveUsers(list);
 }
 
 // -----------------------
@@ -143,14 +164,18 @@ export async function apiLogin(payload: LoginRequest): Promise<LoginResponse> {
   if (!user) throw new Error("가입되지 않은 이메일입니다.");
 
   // ✅ 가입 역할과 선택 역할 일치
-  if (user.role !== payload.role) throw new Error("선택한 역할과 가입된 계정 역할이 일치하지 않습니다.");
+  if (user.role !== payload.role) {
+    throw new Error("선택한 역할과 가입된 계정 역할이 일치하지 않습니다.");
+  }
 
   // ✅ 비밀번호 일치
-  if (user.password !== payload.password) throw new Error("이메일 또는 비밀번호를 확인해주세요.");
+  if (user.password !== payload.password) {
+    throw new Error("이메일 또는 비밀번호를 확인해주세요.");
+  }
 
   return {
     token: `mock_${payload.role}_${Date.now()}`,
-    email,
+    email: user.email,
     role: payload.role,
   };
 }

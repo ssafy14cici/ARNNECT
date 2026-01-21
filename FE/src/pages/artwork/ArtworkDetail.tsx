@@ -385,7 +385,6 @@ export default function ArtworkDetail() {
                   e.currentTarget.style.transform = "scale(1)";
                   const img = e.currentTarget.querySelector('img');
                   const overlay = e.currentTarget.querySelector('div');
-                  if (img) (img as HTMLElement).style.filter = "grayscale(1)";
                   if (overlay) (overlay as HTMLElement).style.opacity = "0";
                 }}
               >
@@ -440,7 +439,6 @@ export default function ArtworkDetail() {
                 e.currentTarget.style.transform = "scale(1)";
                 const img = e.currentTarget.querySelector('img');
                 const overlay = e.currentTarget.querySelector('div');
-                if (img) (img as HTMLElement).style.filter = "grayscale(1)";
                 if (overlay) (overlay as HTMLElement).style.opacity = "0";
               }}
             >

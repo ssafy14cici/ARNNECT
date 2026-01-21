@@ -39,9 +39,20 @@ export const routes: RouteObject[] = [
       { path: "search", element: <Search /> },
       { path: "recover", element: <Recover /> },
 
-      // ✅ Auth (공개)
-      { path: "login", element: <Login /> },
-      { path: "signup", element: <Signup /> },
+      // ✅ Auth (게스트만 접근 가능)
+      {
+        element: <Guard guestOnly redirectTo="/feed" />,
+        children: [
+          { path: "login", element: <Login /> },
+          { path: "signup", element: <Signup /> },
+          // 필요하면 recover도 게스트 전용으로 같이 묶어도 됨
+          // { path: "recover", element: <Recover /> },
+        ],
+      },
+
+      // recover를 로그인 상태에서도 허용할지 정책에 따라 여기(공개)로 둘 수도 있음
+      { path: "recover", element: <Recover /> },
+
 
       // 🔒 보호 (로그인 필요)
       {
