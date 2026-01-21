@@ -1,9 +1,20 @@
+import { useParams } from "react-router-dom";
 
-export default function CollectionTab({ profileId }: { profileId: string }) {
+export default function CollectionTab() {
+  const { id } = useParams();
+  const profileId = id ?? "me";
+
   return (
-    <section style={{ padding: 16 }}>
-      <h3 style={{ margin: "0 0 8px" }}>콜렉션</h3>
+    <div style={{ padding: 12 }}>
+      <h3 style={{ marginTop: 0 }}>콜렉션</h3>
+      <div style={{ color: "#666" }}>
+        TODO: /api/users/{profileId}/collections 같은 엔드포인트로 연결
+      </div>
 
+      {/* 임시 확인용 */}
+      <div style={{ marginTop: 8, fontSize: 12, color: "#999" }}>
+        profileId: {profileId}
+      </div>
       <div
         style={{
           marginTop: 12,
@@ -21,7 +32,6 @@ export default function CollectionTab({ profileId }: { profileId: string }) {
           엔드포인트가 확정되면 연결합니다.
         </div>
       </div>
-    </section>
+    </div>
   );
 }
-

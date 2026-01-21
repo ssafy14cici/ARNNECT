@@ -1,255 +1,141 @@
+/* FE/src/pages/feed/feed.css */
 
-.feed{
+/* ===== Page ===== */
+.feed {
   min-height: 100vh;
   padding: 120px 72px 72px; /* navbar fixed 고려 */
-  background: var(--bg, #F8F6F2);
+  background: var(--bg, #f8f6f2);
+  color: var(--fg, #2b2a28);
 }
 
-@media (max-width: 900px){
-  .feed{ padding: 96px 20px 56px; }
+@media (max-width: 900px) {
+  .feed {
+    padding: 96px 20px 56px;
+  }
 }
 
-/* 상단 헤더(예시 이미지 느낌) */
-.feedHeader{
+/* ===== Header ===== */
+.feedHeader {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   align-items: start;
   margin-bottom: 34px;
 }
 
-.feedLeft{
+.feedLeft {
   display: flex;
   align-items: flex-start;
 }
 
-.feedNav{
+.feedNav {
   display: grid;
   gap: 6px;
 }
 
-.feedNavItem{
+.feedNavItem {
   border: 0;
   background: transparent;
   padding: 0;
   cursor: pointer;
 
-  color: var(--fg, #2B2A28);
+  color: var(--fg, #2b2a28);
   font-size: 12px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-.feedTitle{
+.feedNavItem:hover {
+  opacity: 0.85;
+}
+
+.feedTitle {
   grid-column: 2 / 3;
   text-align: center;
-  color: rgba(43,42,40,0.45);
+  color: rgba(43, 42, 40, 0.45);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   font-size: clamp(16px, 2vw, 28px);
 }
 
-/* 그리드 */
-.feedGrid{
+/* ===== Grid ===== */
+.feedGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: clamp(18px, 2.2vw, 28px);
 }
 
-@media (max-width: 1100px){
-  .feedGrid{ grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 640px){
-  .feedGrid{ grid-template-columns: 1fr; }
+@media (max-width: 1100px) {
+  .feedGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
-/* 카드 */
-.feedCard{
+@media (max-width: 640px) {
+  .feedGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* item wrapper (optional) */
+.feedItem {
+  min-width: 0;
+}
+
+/* ===== Card ===== */
+/* Feed.tsx에서 <article role="button"> 사용하므로 border/button reset은 여기서 처리 */
+.feedCard {
   border: 0;
   background: transparent;
   padding: 0;
   cursor: pointer;
   text-align: left;
+
+  /* a11y */
+  outline: none;
+  user-select: none;
 }
 
-/* 이미지 래퍼 */
-.feedImgWrap{
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3; /* 예시 이미지 느낌 */
-  overflow: hidden;
-
-  border: 1px solid var(--line, rgba(43,42,40,0.18));
-  background: rgba(255,255,255,0.02);
+.feedCard:focus-visible {
+  box-shadow: 0 0 0 3px rgba(43, 42, 40, 0.22);
+  border-radius: 10px;
 }
 
-/* 기본 흑백 */
-.feedImg{
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-
-  filter: grayscale(1) contrast(1.05);
-  transform: scale(1.001); /* 서브픽셀 깨짐 방지 */
-  transition: filter 280ms ease, transform 420ms ease;
-}
-
-/* hover 시 컬러 */
-.feedCard:hover .feedImg{
-  filter: grayscale(0) contrast(1.02);
-  transform: scale(1.03);
-}
-
-/* 오버레이 (hover 시 이름/제목 뜸) */
-.feedOverlay{
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-
-  opacity: 0;
-  transition: opacity 220ms ease;
-  background: radial-gradient(
-    circle at center,
-    rgba(0,0,0,0.30) 0%,
-    rgba(0,0,0,0.14) 40%,
-    rgba(0,0,0,0.00) 72%
-  );
-}
-
-.feedCard:hover .feedOverlay{
-  opacity: 1;
-}
-
-.feedOverlayText{
-  text-align: center;
-  color: #fff;
-  padding: 16px 18px;
-}
-
-.feedOverlayTitle{
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
-.feedOverlayMeta{
-  margin-top: 8px;
-  font-size: 12px;
-  opacity: 0.9;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-/* 센티넬/로딩 */
-.feedSentinel{
-  height: 1px;
-}
-
-.feedLoading{
-  margin-top: 18px;
-  text-align: center;
-  color: var(--muted, rgba(43,42,40,0.62));
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-} */
-
-
-/* src/pages/feed/feed.css */
-
-/* 기본 래퍼 */
-.feed {
-  padding: 120px 24px 80px; /* navbar fixed 겹침 방지(필요시 값 조정) */
-}
-
-.feedHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.feedLeft {
-  display: flex;
-  align-items: center;
-}
-
-.feedNav {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.feedNavItem {
-  border: 1px solid var(--line, rgba(43,42,40,0.18));
-  background: transparent;
-  color: var(--fg, #2B2A28);
-  padding: 8px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  cursor: pointer;
-}
-
-.feedTitle {
-  font-family: ui-serif, Georgia, "Times New Roman", Times, serif;
-  font-size: 18px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--fg, #2B2A28);
-}
-
-/* 그리드 */
-.feedGrid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-}
-
-@media (max-width: 1100px) {
-  .feedGrid { grid-template-columns: repeat(3, 1fr); }
-}
-@media (max-width: 740px) {
-  .feedGrid { grid-template-columns: repeat(2, 1fr); }
-}
-
-.feedCard {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
+/* ===== Image Wrap ===== */
 .feedImgWrap {
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 4 / 3;
   overflow: hidden;
-  border: 1px solid var(--line, rgba(43,42,40,0.18));
-  background: var(--card, rgba(255,255,255,0.02));
-  box-shadow: var(--shadow, 0 10px 30px rgba(0,0,0,0.06));
+
+  border: 1px solid var(--line, rgba(43, 42, 40, 0.18));
+  background: rgba(255, 255, 255, 0.02);
 }
 
+/* 기본: 컬러 유지 */
 .feedImg {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 
-  filter: grayscale(1) contrast(1.05) saturate(0.9);
-  opacity: 0.94;
+  /* ✅ grayscale 제거 */
+  filter: none;
+
+  /* 기본 톤은 살짝 부드럽게(선택) */
+  opacity: 0.96;
+
   transition: filter 240ms ease, opacity 240ms ease, transform 420ms ease;
 }
 
+/* hover: 컬러는 그대로, 선명도/대비만 살짝 업 + 확대 */
 .feedCard:hover .feedImg {
-  filter: grayscale(0) contrast(1.05) saturate(1);
+  filter: contrast(1.08) saturate(1.08);
   opacity: 1;
   transform: scale(1.02);
 }
 
-/* 우측 상단 배지(아이콘) */
+
+/* ===== Badge (top-right) ===== */
 .feedBadge {
   position: absolute;
   top: 10px;
@@ -263,9 +149,9 @@
   display: grid;
   place-items: center;
 
-  border: 1px solid var(--line, rgba(43,42,40,0.18));
-  background: rgba(248,246,242,0.75);
-  color: rgba(43,42,40,0.9);
+  border: 1px solid var(--line, rgba(43, 42, 40, 0.18));
+  background: rgba(248, 246, 242, 0.75);
+  color: rgba(43, 42, 40, 0.9);
 
   backdrop-filter: blur(6px);
 }
@@ -274,18 +160,33 @@
   fill: currentColor;
 }
 
-/* hover overlay */
+.feedBadge.artist {
+  /* 필요하면 변주 */
+}
+
+.feedBadge.user {
+  /* 필요하면 변주 */
+}
+
+/* ===== Hover Overlay ===== */
 .feedOverlay {
   position: absolute;
   inset: 0;
   z-index: 2;
-  opacity: 0;
-  transition: opacity 220ms ease;
-  background: rgba(0,0,0,0.28);
+
   display: grid;
   place-items: center;
-  text-align: center;
-  padding: 14px;
+  pointer-events: none;
+
+  opacity: 0;
+  transition: opacity 220ms ease;
+
+  background: radial-gradient(
+    circle at center,
+    rgba(0, 0, 0, 0.30) 0%,
+    rgba(0, 0, 0, 0.14) 40%,
+    rgba(0, 0, 0, 0.00) 72%
+  );
 }
 
 .feedCard:hover .feedOverlay {
@@ -293,50 +194,54 @@
 }
 
 .feedOverlayText {
-  display: grid;
-  gap: 6px;
+  text-align: center;
   color: #fff;
+  padding: 16px 18px;
 }
 
 .feedOverlayTitle {
-  font-weight: 700;
-  font-size: 13px;
-  text-shadow: 0 2px 10px rgba(0,0,0,0.35);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
 .feedOverlayMeta {
-  font-size: 11px;
-  opacity: 0.92;
-  letter-spacing: 0.06em;
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.9;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-/* 작성자 클릭(공통) */
+/* ===== Author button (inside overlay) ===== */
 .feedAuthor {
-  margin: 10px auto 0;
-  border: 1px solid rgba(255,255,255,0.35);
-  background: rgba(255,255,255,0.08);
+  margin-top: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
   color: #fff;
   border-radius: 999px;
   padding: 8px 12px;
   font-size: 12px;
   cursor: pointer;
+  pointer-events: auto; /* overlay가 pointer-events none이므로 author는 클릭되게 */
 }
 
 .feedAuthor:hover {
-  background: rgba(255,255,255,0.14);
+  background: rgba(255, 255, 255, 0.14);
 }
 
-/* 텍스트 clamp */
+/* ===== Text clamp ===== */
 .feedTextClamp {
   display: -webkit-box;
-  -webkit-line-clamp: 2;     /* ✅ 텍스트는 나중에 “10자/2줄” 같은 정책으로 조정 가능 */
+  -webkit-line-clamp: 2; /* 정책에 맞게 1~3으로 조정 */
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-/* 이미지 없는 post 카드 */
+/* ===== Text-only Post Card ===== */
 .feedCardTextOnly .feedImgWrap {
-  background: rgba(248,246,242,0.55);
+  background: rgba(248, 246, 242, 0.55);
 }
 
 .feedTextOnly {
@@ -356,18 +261,18 @@
 .feedTextOnlyBody {
   display: grid;
   gap: 10px;
-  color: var(--fg, #2B2A28);
+  color: var(--fg, #2b2a28);
   text-align: left;
 }
 
 .feedTextOnlyBody .feedTextClamp {
-  color: var(--fg, #2B2A28);
+  color: var(--fg, #2b2a28);
   font-weight: 600;
   font-size: 13px;
   line-height: 1.45;
 }
 
-/* 센티넬/로딩 */
+/* ===== Sentinel / Loading ===== */
 .feedSentinel {
   height: 1px;
 }
@@ -375,7 +280,8 @@
 .feedLoading {
   margin-top: 18px;
   text-align: center;
-  color: var(--muted, rgba(43,42,40,0.68));
+  color: var(--muted, rgba(43, 42, 40, 0.62));
   font-size: 12px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }

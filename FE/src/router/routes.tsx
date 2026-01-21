@@ -1,4 +1,4 @@
-// src/router/router.tsx
+// src/router/routes.tsx
 import type { RouteObject } from "react-router-dom";
 import { Navigate } from "react-router-dom";
 
@@ -63,9 +63,11 @@ export const routes: RouteObject[] = [
           // ✅ 메인 혼합 피드
           {path: "feed", element: <Feed /> },
 
-          // ✅ 글쓰기
-          { path: "posts/new", element: <PostCreateRedirect /> },
-          { path: "posts/new/:writerRole", element: <PostCreate /> },
+          // ✅ 글쓰기 (역할에 따라 폼 분기)
+          { path: "posts/create", element: <PostCreateRedirect /> },
+          { path: "posts/create/artist", element: <PostCreate mode="ARTIST" /> },
+          { path: "posts/create/user", element: <PostCreate mode="USER" /> },
+
 
           // ✅ 게시글 상세
           { path: "posts/:id", element: <PostDetail /> },

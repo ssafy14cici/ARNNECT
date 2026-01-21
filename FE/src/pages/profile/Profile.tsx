@@ -73,7 +73,7 @@ export default function Profile() {
 
   const goWrite = () => {
     // role은 ProfileRole("ARTIST" | "USER")
-    navigate(role === "ARTIST" ? "/posts/new/artist" : "/posts/new/user");
+    navigate("/posts/create");
   };
 
   if (error) return <div style={{ padding: 16 }}>{error}</div>;
