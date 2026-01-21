@@ -7,16 +7,8 @@
 
 body{
   margin: 0;
-<<<<<<< Updated upstream
-  scrollbar-width: none;
-}
-
-body::-webkit-scrollbar {
-  display: none;
-=======
   background: var(--bg);
   color: var(--fg);
->>>>>>> Stashed changes
 }
 
 

@@ -1,5 +1,8 @@
+// FE/src/layouts/Navbar.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuthStore } from "../stores/authStore";
+import "../styles/navbar.css";
 
 
 type MenuItem = {
@@ -51,7 +54,7 @@ export default function Navbar() {
 
       { key: "feed", label: "Feed", path: "/feed" },
       { key: "lounge", label: "Lounge", path: "/lounge" },
-      { key: "profile", label: "Profile", path: "/profile/1/feed" },
+      { key: "profile", label: "Profile", path: "/profile/me/feed" },
 
       // ✅ 사용 안 하는 칸은 empty로 두기
       { key: "guidelines", label: "Guidelines" },

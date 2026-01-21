@@ -410,14 +410,28 @@ html[data-theme="dark"] .auth-page{
    ARTIST (split wizard)
    - 구조는 유지하면서 컬러만 토큰 기반
    --------------------------------------------------------- */
+/* ✅ Split layout: LEFT(가변 1fr) + RIGHT(폼 고정폭) */
 .auth-artist{
-  width: min(1200px, 100%);
+  width: min(1440px, 100%);                 /* 필요하면 1200 유지해도 됨 */
   display: grid;
-  grid-template-columns: minmax(360px, 520px) minmax(0, 560px);
-  gap: 36px;
-  justify-content: start;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 560px);
+  gap: clamp(16px, 3vw, 40px);
   align-items: start;
+
+  /* ✅ 모바일/재배치용 */
+  grid-template-areas: "left right";
 }
+
+.auth-artist-left{ grid-area: left; min-width: 0; }
+.auth-artist-right{ grid-area: right; min-width: 0; }
+
+/* ✅ 왼쪽 카드가 '왼쪽 영역'을 더 잘 채우게 */
+.auth-artist-left .auth-preview-card{
+  width: 100%;
+  max-width: none;                           /* 필요하면 max-width: 720px; 같은 상한을 두면 더 안정적 */
+}
+
+
 
 .auth-page.auth-artist{
   justify-content: flex-start; /* ✅ 가로 왼쪽 */
@@ -674,15 +688,13 @@ html[data-theme="dark"] .auth-toggle.on{ border-color: rgba(230,208,138,.45); }
   }
 
   .auth-artist{
-    flex-direction: column;
-    gap: 18px;
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "left"
+      "right";     /* ✅ 미리보기 먼저, 그 다음 폼 */
   }
 
-  /* 왼쪽 카드(프로필 카드) => 위로 */
-  .auth-artist-left{ order: -1; }
-
-  /* 고정 높이 제거(작은 화면에서 잘림 방지) */
+  /* 왼쪽 카드 고정 높이/제약 제거(잘림 방지) */
   .auth-artist-left-card{
     height: auto;
     padding: 18px;
@@ -691,6 +703,11 @@ html[data-theme="dark"] .auth-toggle.on{ border-color: rgba(230,208,138,.45); }
   .auth-artist-right{
     max-width: 100%;
   }
+
+
+
+
+  
 }
 
 /* ===== Artist Preview Card (Left) ===== */

@@ -1,105 +1,133 @@
-// import { useParams } from "react-router-dom";
-// export default function Profile() {
-//   const { id } = useParams();
-//   return <div>Profile: {id}</div>;
-// }
+// FE/src/pages/profile/Profile.tsx
+import { useEffect, useMemo, useState } from "react";
+import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
+import ProfileHeader from "./components/ProfileHeader";
+import { profileApi } from "./api";
+import type { ArtistProfile, UserProfile, ProfileRole } from "./types";
+import { useAuthStore } from "../../stores/authStore";
+import "./profile.css"
 
-// src/pages/profile/Profile.tsx
-import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
+type ProfileModel = ArtistProfile | UserProfile;
 
-type TabKey = "feed" | "collection";
+function toProfileRole(role: "general" | "artist"): ProfileRole {
+  return role === "artist" ? "ARTIST" : "USER";
+}
 
 export default function Profile() {
-  const nav = useNavigate();
-  const loc = useLocation();
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams(); // "me" or 실제 id
+  const profileId = id ?? "";
 
-  const base = `/profile/${id ?? "me"}`;
+  const { role: authRole } = useAuthStore();
+  const role = toProfileRole(authRole);
 
-  const tabs: { key: TabKey; label: string; path: string }[] = [
-    { key: "feed", label: "Feed", path: `${base}/feed` },
-    { key: "collection", label: "Collection book", path: `${base}/collection` },
-  ];
+  const isOwner = useMemo(() => profileId === "me", [profileId]);
 
-  const activePath = loc.pathname;
+  const [profile, setProfile] = useState<ProfileModel | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    queueMicrotask(() => {
+      if (!mounted) return;
+      setError(null);
+      setProfile(null);
+    });
+
+    (async () => {
+      try {
+        // ✅ 내 프로필
+        if (profileId === "me") {
+          const p =
+            role === "ARTIST"
+              ? await profileApi.getArtistProfile("me")
+              : await profileApi.getUserProfile("me");
+
+          if (!mounted) return;
+          setProfile(p);
+          return;
+        }
+
+        // ✅ 타인 프로필: fallback 전략(artist 실패 → user)
+        try {
+          const a = await profileApi.getArtistProfile(profileId);
+          if (!mounted) return;
+          setProfile(a);
+        } catch {
+          const u = await profileApi.getUserProfile(profileId);
+          if (!mounted) return;
+          setProfile(u);
+        }
+      } catch (e) {
+        if (!mounted) return;
+        setError(e instanceof Error ? e.message : "프로필 로딩 실패");
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [profileId, role]);
+
+  const navigate = useNavigate();
+
+  const goWrite = () => {
+    // role은 ProfileRole("ARTIST" | "USER")
+    navigate(role === "ARTIST" ? "/posts/new/artist" : "/posts/new/user");
+  };
+
+  if (error) return <div style={{ padding: 16 }}>{error}</div>;
+  if (!profile) return <div style={{ padding: 16 }}>로딩중...</div>;
 
   return (
-    <div style={{ width: "min(980px, 92vw)", margin: "0 auto", paddingBottom: 64 }}>
-      {/* ===== 공개 프로필 헤더 ===== */}
-      <section style={{ textAlign: "center", padding: "32px 0" }}>
-        <div
-          style={{
-            width: 140,
-            height: 140,
-            borderRadius: "50%",
-            margin: "0 auto",
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.10)",
-            boxShadow: "0 24px 90px rgba(0,0,0,0.35)",
-            overflow: "hidden",
-          }}
-        >
-          <img
-            src="/avatar.png"   // ✅ 실제 아바타 이미지 경로
-            alt="profile avatar"
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              display: "block",
-            }}
-          />
-        </div>
-        <div style={{ marginTop: 16, fontSize: 22 }}>public_user_{id}</div>
+      <div className="profilePage">
+        {/* ✅ 헤더 먼저 */}
+        <ProfileHeader
+          profile={profile}
+          isOwner={isOwner}
+          onProfileUpdated={setProfile}
+        />
 
-        <div style={{ display: "flex", justifyContent: "center", gap: 42, marginTop: 12 }}>
-          <div>
-            <div style={{ fontSize: 12, opacity: 0.6 }}>following</div>
-            <div>123</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 12, opacity: 0.6 }}>followers</div>
-            <div>45</div>
-          </div>
-        </div>
-      </section>
+        {/* ✅ 탭 바 */}
+        <div className="profileTabs">
+          <NavLink
+            to="feed"
+            className={({ isActive }) =>
+              isActive ? "profileTab profileTabActive" : "profileTab"
+            }
+          >
+            피드
+          </NavLink>
 
-      {/* ===== 탭(2개만) ===== */}
-      <nav
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2, 1fr)",
-          gap: 14,
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
-          paddingBottom: 14,
-        }}
-      >
-        {tabs.map((t) => {
-          const active = activePath.startsWith(t.path);
-          return (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => nav(t.path)}
-              style={{
-                padding: "12px 10px",
-                borderRadius: 12,
-                border: active
-                  ? "1px solid rgba(120,165,255,0.75)"
-                  : "1px solid rgba(255,255,255,0.12)",
-                background: active ? "rgba(120,165,255,0.10)" : "transparent",
-                cursor: "pointer",
-              }}
+          {/* 유저만 콜렉션 노출 */}
+          {role === "USER" && (
+            <NavLink
+              to="collection"
+              className={({ isActive }) =>
+                isActive ? "profileTab profileTabActive" : "profileTab"
+              }
             >
-              {t.label}
-            </button>
-          );
-        })}
-      </nav>
+              콜렉션
+            </NavLink>
+          )}
+        </div>
 
-      <section style={{ marginTop: 24 }}>
-        <Outlet />
-      </section>
-    </div>
-  );
-}
+        {/* ✅ 탭 화면(FeedTab/CollectionTab) 출력 위치 */}
+        <div className="profileTabPanel">
+          <Outlet context={{ role }} />
+        </div>
+
+        {/* ✅ 글쓰기 버튼: 내 프로필일 때만 */}
+        {isOwner && (
+          <button
+            type="button"
+            className="profileFab"
+            aria-label="글쓰기"
+            onClick={goWrite}
+          >
+            +
+          </button>
+        )}
+      </div>
+    );
+  }

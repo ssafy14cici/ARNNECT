@@ -6,7 +6,7 @@ import AppLayout from "../layouts/AppLayout";
 import Guard from "../components/common/Guard";
 
 import Home from "../pages/home/Home";
-import ArtistGo from "../pages/artistGo/ArtistGo";
+import ArtistGo from "../pages/asc/ASC";
 import Search from "../pages/search/Search";
 import Recover from "../pages/auth/Recover";
 
@@ -17,16 +17,18 @@ import MyTaste from "../pages/lounge/MyTaste";
 import MyQuiz from "../pages/lounge/MyQuiz";
 import Feed from "../pages/feed/Feed";
 import Profile from "../pages/profile/Profile";
-import ProfileFeed from "../pages/profile/ProfileFeed";
-import ProfileCollection from "../pages/profile/ProfileCollection";
+import FeedTab from "../pages/profile/tabs/FeedTab";
+import CollectionTab from "../pages/profile/tabs/CollectionTab";
 
 import ArtworkDetail from "../pages/artwork/ArtworkDetail";
 
 import PostDetail from "../pages/posts/PostDetail";
-
+import PostCreate from "../pages/posts/PostCreate";
+import PostCreateRedirect from "../pages/posts/PostCreateRedirect";
 import Login from "../pages/auth/Login";
 import Signup from "../pages/auth/Signup";
 import NotFound from "../pages/notfound/NotFound";
+
 
 export const routes: RouteObject[] = [
   {
@@ -61,6 +63,10 @@ export const routes: RouteObject[] = [
           // ✅ 메인 혼합 피드
           {path: "feed", element: <Feed /> },
 
+          // ✅ 글쓰기
+          { path: "posts/new", element: <PostCreateRedirect /> },
+          { path: "posts/new/:writerRole", element: <PostCreate /> },
+
           // ✅ 게시글 상세
           { path: "posts/:id", element: <PostDetail /> },
 
@@ -83,10 +89,11 @@ export const routes: RouteObject[] = [
             element: <Profile />,
             children: [
               { index: true, element: <Navigate to="feed" relative="path" replace /> },
-              { path: "feed", element: <ProfileFeed /> },
-              { path: "collection", element: <ProfileCollection /> },
+              { path: "feed", element: <FeedTab /> },
+              { path: "collection", element: <CollectionTab /> },
             ],
           },
+
 
           // Artwork Detail
           { path: "artworks/:id", element: <ArtworkDetail /> },
