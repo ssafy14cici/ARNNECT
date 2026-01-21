@@ -5,14 +5,20 @@
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
 }
 
-body {
+body{
   margin: 0;
+<<<<<<< Updated upstream
   scrollbar-width: none;
 }
 
 body::-webkit-scrollbar {
   display: none;
+=======
+  background: var(--bg);
+  color: var(--fg);
+>>>>>>> Stashed changes
 }
+
 
 .app-shell {
   min-height: 100vh;

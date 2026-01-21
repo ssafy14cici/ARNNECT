@@ -36,7 +36,11 @@ export default function Login() {
 
     try {
       const res = await apiLogin({ email, password, role, remember });
-      login({ token: res.token, role: toStoreRole(res.role), remember });
+      login({
+        token: res.token,
+        role: res.role === "USER" ? "general" : "artist",
+        remember,
+      });
 
       if (returnUrl) nav(returnUrl);
       else nav("/");
@@ -68,7 +72,7 @@ export default function Login() {
             className={`auth-pill-btn ${role === "ARTIST" ? "on" : ""}`}
             onClick={() => setRole("ARTIST")}
           >
-            관리자
+            예술인
           </button>
         </div>
 
@@ -134,14 +138,19 @@ export default function Login() {
           </button>
 
           {role === "ARTIST" ? (
-            <div className="auth-artist-contact">예술인 계정 문의: <span className="accent">artist@ssaty.com</span></div>
+            <>
+              <div className="auth-artist-contact">
+                예술인 계정 문의: <span className="accent">artist@ssaty.com</span>
+              </div>
+
+              <div className="auth-divider">
+                <span />
+                <div>또는</div>
+                <span />
+              </div>
+            </>
           ) : null}
 
-          <div className="auth-divider">
-            <span />
-            <div>또는</div>
-            <span />
-          </div>
 
           <div className="auth-bottom">
             계정이 없으신가요? <Link className="accent" to="/signup">회원가입</Link>

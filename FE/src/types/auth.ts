@@ -37,15 +37,17 @@ export type ArtistStep1 = {
 };
 
 export type ArtistStep2 = {
-  displayName: string; // 성명(활동명)
-  affiliation: string; // 소속(선택)
-  artMain: string; // 대분류
-  artSub: string; // 소분류
-  verified: "YES" | "NO"; // 예술활동증명 여부
+  displayName: string;
+  affiliation: string;
+  artMain: string;
+  artSub: string;
+  verified: "YES" | "NO";
+  verifiedFile: File | null;   // ✅ 추가
   gender: "M" | "F";
   birthYear: string;
-  birthYearPublic: boolean; // 공개 토글
+  birthYearPublic: boolean;
 };
+
 
 export type ArtistStep3 = {
   contact: string; // 소통창구
