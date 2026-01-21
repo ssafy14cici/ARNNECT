@@ -1,301 +1,369 @@
+# infer_hybrid_9.py
 import json
-import random
+import math
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
+from typing import Dict, List, Tuple
 
 import numpy as np
 import torch
 import torch.nn as nn
+from tqdm import tqdm
 
+# -----------------------------
+# Paths
+# -----------------------------
+SASREC_CKPT = "BEST_SASRec_model.pth"
+TWO_TOWER_CKPT = "BEST_UserRecommend_model.pth"
+CLIP_VEC_JSON = "artwork_vector.json"
 
-# =========================
-# Config
-# =========================
-MODEL_PATH = Path("best_recommend_model.pth")
-EMB_PATH = Path("artwork_embedding.json")                 # ✅ 학습 때 사용한 "작품 임베딩" 목록
-LOG_PATH = Path("validation_dummy_user_timestamp.jsonl")  # 유저 로그
-ARTWORK_META_PATH = Path("artwork_data.jsonl")            # 출력용 메타 (artist/url 등)
+USER_LOG_JSONL = "test_user_logs.json"
+OUT_JSON = "inference_out.json"
 
-VECTOR_DIM = 512
-MAX_SEQ_LEN = 120
-NHEAD = 4
-FF_DIM = 768
-N_LAYERS = 2
-DROPOUT = 0.1
+# -----------------------------
+# Inference config
+# -----------------------------
 TOPK = 20
+PRINT_TOPK = 5
+MAXLEN = 50          # SASRec ckpt maxlen과 동일해야 함
+CHUNK = 4096         # 전체 아이템 스코어링 chunk size (GPU/CPU 상황에 맞게 조절)
 
 SEED = 42
-random.seed(SEED)
+torch.manual_seed(SEED)
+np.random.seed(SEED)
 
-# 유저 그룹 기준(원하면 조정)
-COLD_MAX = 5
-HEAVY_MIN = 50
+# -----------------------------
+# Weight policy
+# -----------------------------
+def alpha_policy(hist_len: int) -> Tuple[float, float]:
+    # return (alpha_clip, alpha_log)
+    if hist_len <= 1:
+        return 1.0, 0.0  # ✅ len==1: 작품 임베딩 100%
+    if hist_len <= 5:
+        return 0.9, 0.1
+    if hist_len <= 20:
+        return 0.7, 0.3
+    return 0.4, 0.6
 
+def parse_ts(ts: str) -> int:
+    if not ts:
+        return 0
+    ts = str(ts).strip()
+    fmts = ["%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M", "%Y/%m/%d %H:%M:%S"]
+    for fmt in fmts:
+        try:
+            return int(datetime.strptime(ts, fmt).timestamp())
+        except ValueError:
+            pass
+    try:
+        return int(datetime.fromisoformat(ts).timestamp())
+    except Exception:
+        return 0
 
-# =========================
-# Model (학습 코드와 동일 구조)
-# =========================
-class TwoTowerSASRec(nn.Module):
-    def __init__(self, pretrained_vecs: np.ndarray):
+def right_align(seq_idx: List[int], maxlen: int) -> List[int]:
+    seq_idx = seq_idx[-maxlen:]
+    return [0] * (maxlen - len(seq_idx)) + seq_idx
+
+# -----------------------------
+# Models (must match training)
+# -----------------------------
+class PointWiseFeedForward(nn.Module):
+    def __init__(self, hidden: int, dropout: float):
         super().__init__()
-        self.pretrained_emb = nn.Embedding.from_pretrained(
-            torch.from_numpy(pretrained_vecs).float(),
-            freeze=True,
-            padding_idx=0,
+        self.conv1 = nn.Conv1d(hidden, hidden, kernel_size=1)
+        self.conv2 = nn.Conv1d(hidden, hidden, kernel_size=1)
+        self.dropout = nn.Dropout(dropout)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        y = x.transpose(1, 2)
+        y = self.dropout(self.relu(self.conv1(y)))
+        y = self.dropout(self.conv2(y))
+        y = y.transpose(1, 2)
+        return y
+
+class SASRecBlock(nn.Module):
+    def __init__(self, hidden: int, heads: int, dropout: float):
+        super().__init__()
+        self.ln1 = nn.LayerNorm(hidden, eps=1e-12)
+        self.attn = nn.MultiheadAttention(embed_dim=hidden, num_heads=heads, dropout=dropout, batch_first=True)
+        self.dropout = nn.Dropout(dropout)
+        self.ln2 = nn.LayerNorm(hidden, eps=1e-12)
+        self.ff = PointWiseFeedForward(hidden, dropout=dropout)
+
+    def forward(self, x, attn_mask):
+        h = self.ln1(x)
+        attn_out, _ = self.attn(h, h, h, attn_mask=attn_mask, need_weights=False)
+        x = x + self.dropout(attn_out)
+        h2 = self.ln2(x)
+        x = x + self.dropout(self.ff(h2))
+        return x
+
+class SASRec(nn.Module):
+    def __init__(self, num_items: int, maxlen: int, hidden: int, layers: int, heads: int, dropout: float):
+        super().__init__()
+        self.num_items = num_items
+        self.maxlen = maxlen
+        self.hidden = hidden
+        self.item_emb = nn.Embedding(num_items + 1, hidden, padding_idx=0)
+        self.pos_emb = nn.Embedding(maxlen, hidden)
+        self.dropout = nn.Dropout(dropout)
+        self.ln = nn.LayerNorm(hidden, eps=1e-12)
+        self.blocks = nn.ModuleList([SASRecBlock(hidden, heads, dropout) for _ in range(layers)])
+        self.register_buffer("causal_mask", torch.triu(torch.ones(maxlen, maxlen, dtype=torch.bool), diagonal=1))
+
+    def forward(self, seq):
+        B, T = seq.size()
+        pos = torch.arange(T, device=seq.device).unsqueeze(0).expand(B, T)
+        x = self.item_emb(seq) + self.pos_emb(pos)
+        x = self.dropout(self.ln(x))
+        attn_mask = self.causal_mask[:T, :T]
+        for blk in self.blocks:
+            x = blk(x, attn_mask)
+        return x
+
+    @torch.no_grad()
+    def predict_last(self, seq):
+        h = self.forward(seq)
+        return h[:, -1, :]
+
+class TwoTowerAlign(nn.Module):
+    def __init__(self, dim: int = 512, dropout: float = 0.1):
+        super().__init__()
+        self.user_proj = nn.Sequential(
+            nn.Linear(dim, dim),
+            nn.LayerNorm(dim),
+            nn.Dropout(dropout),
         )
-        self.item_adapter = nn.Sequential(
-            nn.Linear(VECTOR_DIM, VECTOR_DIM),
-            nn.LayerNorm(VECTOR_DIM),
-            nn.GELU(),
+        self.item_proj = nn.Sequential(
+            nn.Linear(dim, dim),
+            nn.LayerNorm(dim),
+            nn.Dropout(dropout),
         )
-        self.position_embedding = nn.Embedding(MAX_SEQ_LEN, VECTOR_DIM)
 
-        enc_layer = nn.TransformerEncoderLayer(
-            d_model=VECTOR_DIM,
-            nhead=NHEAD,
-            dim_feedforward=FF_DIM,
-            dropout=DROPOUT,
-            batch_first=True,
-            norm_first=True,
-        )
-        self.transformer_encoder = nn.TransformerEncoder(enc_layer, num_layers=N_LAYERS)
-        self.ln_f = nn.LayerNorm(VECTOR_DIM)
+    def forward(self, user_vec, item_vec):
+        zu = self.user_proj(user_vec)
+        zi = self.item_proj(item_vec)
+        zu = zu / (zu.norm(dim=-1, keepdim=True) + 1e-12)
+        zi = zi / (zi.norm(dim=-1, keepdim=True) + 1e-12)
+        return (zu * zi).sum(dim=-1)
 
-    def get_item_vector(self, item_indices: torch.Tensor) -> torch.Tensor:
-        raw = self.pretrained_emb(item_indices)
-        adapted = self.item_adapter(raw)
-        return raw + adapted
+# -----------------------------
+# Loaders
+# -----------------------------
+from pathlib import Path
+import json
 
-    def get_user_vector(self, sequence: torch.Tensor) -> torch.Tensor:
-        seq_emb = self.get_item_vector(sequence)
-        positions = torch.arange(sequence.size(1), device=sequence.device).unsqueeze(0)
-        x = seq_emb + self.position_embedding(positions)
-        pad_mask = (sequence == 0)
-        out = self.transformer_encoder(x, src_key_padding_mask=pad_mask)
-        u = self.ln_f(out[:, -1, :])
-        u = u / (u.norm(dim=-1, keepdim=True) + 1e-8)
-        return u
+def load_logs_auto(path: str):
+    """
+    - JSON array: [ {...}, {...} ]
+    - JSONL: 한 줄에 {...}
+    둘 다 자동으로 읽는다.
+    """
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"로그 파일이 없습니다: {p.resolve()}")
 
+    text = p.read_text(encoding="utf-8").lstrip("\ufeff").strip()
+    if not text:
+        return []
 
-# =========================
-# Helpers
-# =========================
-def load_jsonl(path: Path):
-    rows = []
-    with path.open("r", encoding="utf-8") as f:
+    # 1) JSON 배열이면 통째로 로드
+    if text.startswith("["):
+        obj = json.loads(text)
+        if not isinstance(obj, list):
+            raise ValueError("JSON array 형식이어야 합니다. (리스트)")
+        return obj
+
+    # 2) 아니면 JSONL로 처리
+    out = []
+    with p.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
-            if line:
-                rows.append(json.loads(line))
-    return rows
+            if not line:
+                continue
+            # 혹시 마지막에 쉼표가 붙어있으면 제거 (",")
+            if line.endswith(","):
+                line = line[:-1].rstrip()
+            # 대괄호 라인 방어
+            if line in ("[", "]"):
+                continue
+            out.append(json.loads(line))
+    return out
 
+def load_clip_matrix(clip_vec_json: str, num_items: int, idx2artwork: List[str], device: str) -> torch.Tensor:
+    raw = json.loads(Path(clip_vec_json).read_text(encoding="utf-8"))
+    m = {r["artwork_id"]: r["artwork_vector"] for r in raw if isinstance(r, dict) and "artwork_id" in r and "artwork_vector" in r}
 
-def build_item_index_from_embedding(emb_path: Path):
-    """
-    ✅ 가장 중요:
-    학습 때 사용한 item index 기준을 "artwork_embedding.json"으로 고정.
-    """
-    data = json.loads(emb_path.read_text(encoding="utf-8"))
-
-    item_to_idx = {"<PAD>": 0}
-    idx_to_item = {0: "<PAD>"}
-    vecs = [np.zeros((VECTOR_DIM,), dtype=np.float32)]
-
-    for r in data:
-        iid = r.get("idx") or r.get("item_id") or r.get("artwork_id")
-        v = r.get("vector")
-        if not iid or v is None:
+    dim = 512
+    mat = torch.zeros((num_items + 1, dim), dtype=torch.float16)
+    filled = 0
+    for i in range(1, num_items + 1):
+        aid = idx2artwork[i]
+        v = m.get(aid)
+        if v is None:
             continue
-        if iid in item_to_idx:
+        if isinstance(v, list) and len(v) == dim:
+            mat[i] = torch.tensor(v, dtype=torch.float16)
+            filled += 1
+
+    mat = mat / (mat.norm(dim=-1, keepdim=True) + 1e-12)
+    print(f"[CLIP] filled {filled}/{num_items} (dim={dim})")
+    return mat.to(device)
+
+def load_sasrec(ckpt_path: str, device: str):
+    ckpt = torch.load(ckpt_path, map_location="cpu")
+    num_items = int(ckpt["num_items"])
+    idx2artwork = ckpt["idx2artwork"]
+
+    # meta는 ckpt에 있을 수도/없을 수도 있어서 안전하게 처리
+    cfg = ckpt.get("config", {})
+    maxlen = int(ckpt.get("maxlen", cfg.get("maxlen", MAXLEN)))
+    hidden = int(ckpt.get("hidden", cfg.get("hidden", 512)))
+    layers = int(ckpt.get("layers", cfg.get("layers", 4)))
+    heads = int(ckpt.get("heads", cfg.get("heads", 8)))
+    dropout = float(ckpt.get("dropout", cfg.get("dropout", 0.2)))
+
+    model = SASRec(num_items=num_items, maxlen=maxlen, hidden=hidden, layers=layers, heads=heads, dropout=dropout)
+    model.load_state_dict(ckpt["state_dict"], strict=True)
+    model.to(device).eval()
+    for p in model.parameters():
+        p.requires_grad = False
+
+    # artwork2idx도 ckpt에 있으면 사용, 없으면 idx2artwork로 복원
+    artwork2idx = ckpt.get("artwork2idx")
+    if artwork2idx is None:
+        artwork2idx = {aid: i for i, aid in enumerate(idx2artwork) if i > 0}
+
+    meta = {"num_items": num_items, "maxlen": maxlen, "hidden": hidden, "layers": layers, "heads": heads, "dropout": dropout}
+    print("[SASRec meta]", meta)
+    return model, artwork2idx, idx2artwork, meta
+
+def load_two_tower(ckpt_path: str, device: str):
+    ckpt = torch.load(ckpt_path, map_location="cpu")
+    sd = ckpt.get("two_tower_state_dict", ckpt.get("state_dict"))
+    if sd is None:
+        raise ValueError("two_tower_align.pth에서 state dict를 찾지 못했습니다. key: two_tower_state_dict / state_dict 확인")
+    model = TwoTowerAlign(dim=512, dropout=0.1).to(device).eval()
+    model.load_state_dict(sd, strict=True)
+    for p in model.parameters():
+        p.requires_grad = False
+    return model
+
+def build_user_seq(logs: List[dict], artwork2idx: Dict[str, int]) -> Dict[str, List[int]]:
+    by_user = defaultdict(list)
+    for r in logs:
+        uid = str(r.get("user_id", "")).strip()
+        aid = r.get("artwork_id") or r.get("item_id")
+        if not uid or aid is None:
             continue
-
-        v = np.asarray(v, dtype=np.float32)
-        if v.shape[0] != VECTOR_DIM:
+        aid = str(aid).strip()
+        if aid not in artwork2idx:
             continue
+        t = parse_ts(r.get("timestamp", ""))
+        by_user[uid].append((t, artwork2idx[aid]))
 
-        new_i = len(item_to_idx)
-        item_to_idx[iid] = new_i
-        idx_to_item[new_i] = iid
-        vecs.append(v)
+    out = {}
+    for uid, arr in by_user.items():
+        arr.sort(key=lambda x: x[0])
+        out[uid] = [i for _, i in arr]
+    return out
 
-    mat = np.stack(vecs, axis=0)  # (N, 512)
-    return item_to_idx, idx_to_item, mat
-
-
-def build_meta_lookup(meta_path: Path):
-    """
-    출력용: item_id -> (artist_id, artwork_url/image_path)
-    meta에 없는 작품도 있을 수 있으니 fallback 고려.
-    """
-    rows = load_jsonl(meta_path)
-    m = {}
-    for r in rows:
-        iid = r.get("idx") or r.get("item_id") or r.get("artwork_id")
-        if not iid:
-            continue
-        m[iid] = r
-    return m, rows
-
-
-def left_pad(seq_idx, max_len):
-    seq_idx = seq_idx[-max_len:]
-    if len(seq_idx) < max_len:
-        seq_idx = [0] * (max_len - len(seq_idx)) + seq_idx
-    return seq_idx
-
-
+# -----------------------------
+# Inference scoring
+# -----------------------------
 @torch.no_grad()
-def recommend_topk(model, user_seq_idx, item_vecs_torch, topk=20, device="cuda"):
-    seq = torch.tensor([user_seq_idx], dtype=torch.long, device=device)  # (1,L)
-    u = model.get_user_vector(seq)  # (1,D)
+def infer_one_user(
+    uid: str,
+    seq: List[int],
+    sas: SASRec,
+    tt: TwoTowerAlign,
+    clip_mat: torch.Tensor,
+    idx2artwork: List[str],
+    device: str,
+    topk: int
+):
+    hist_len = len(seq)
+    a_clip, a_log = alpha_policy(hist_len)
 
-    scores = (u @ item_vecs_torch.t()).squeeze(0)  # (N,)
-    scores[0] = -1e9  # PAD 제외
+    seen = set(seq)
 
-    topv, topi = torch.topk(scores, k=topk)
-    return topi.cpu().tolist(), topv.cpu().tolist()
+    # ----- content profile (최근 K개 평균: cold/normal에서 "비슷한 작품" 성향 강화) -----
+    K = min(10, hist_len)
+    u_content = clip_mat[torch.tensor(seq[-K:], device=device)].to(torch.float32).mean(dim=0)
+    u_content = u_content / (u_content.norm(dim=-1, keepdim=True) + 1e-12)
 
+    # content scores: (N+1,512) @ (512)
+    score_content = (clip_mat.to(torch.float32) @ u_content)  # [num_items+1]
 
-@torch.no_grad()
-def hit10_leave_one_out(model, user_hist_idx, gt_idx, item_vecs_torch, device="cuda"):
-    seq = torch.tensor([user_hist_idx], dtype=torch.long, device=device)
-    u = model.get_user_vector(seq)
-    scores = (u @ item_vecs_torch.t()).squeeze(0)
-    scores[0] = -1e9
+    # ----- log scores (len==1이면 a_log=0 이라 자동 무시) -----
+    if a_log > 0.0 and hist_len >= 2:
+        seq_pad = torch.tensor([right_align(seq[:-1], sas.maxlen)], dtype=torch.long, device=device)
+        u_log = sas.predict_last(seq_pad).squeeze(0)
+        u_log = u_log / (u_log.norm(dim=-1, keepdim=True) + 1e-12)
 
-    gt_score = scores[gt_idx].item()
-    rank = int((scores > gt_score).sum().item()) + 1
-    hit10 = 1.0 if rank <= 10 else 0.0
-    return hit10, rank
+        # item side precompute는 여기선 간단히 chunk로 계산
+        score_log = torch.empty((clip_mat.size(0),), dtype=torch.float32, device=device)
+        start = 0
+        while start < clip_mat.size(0):
+            end = min(start + CHUNK, clip_mat.size(0))
+            items = clip_mat[start:end].to(torch.float32)
+            u_rep = u_log.unsqueeze(0).expand(end - start, -1)
+            score_log[start:end] = tt(u_rep, items)
+            start = end
+    else:
+        score_log = torch.zeros_like(score_content)
 
+    score = a_clip * score_content + a_log * score_log
 
-def group_users(by_user):
-    cold, normal, heavy = [], [], []
-    for u, ev in by_user.items():
-        n = len(ev)
-        if n <= COLD_MAX:
-            cold.append(u)
-        elif n >= HEAVY_MIN:
-            heavy.append(u)
-        else:
-            normal.append(u)
-    return cold, normal, heavy
+    # seen 제외
+    for s in seen:
+        score[s] = -1e9
 
+    # PAD(0) 제외
+    score[0] = -1e9
 
-def pick(lst, n=3):
-    if len(lst) <= n:
-        return lst
-    return random.sample(lst, n)
+    topv, topi = torch.topk(score, k=min(topk, score.numel()-1))
+    recs = []
+    for sc, ix in zip(topv.tolist(), topi.tolist()):
+        recs.append({"artwork_id": idx2artwork[ix], "score": float(sc), "item_idx": int(ix)})
 
+    return {
+        "user_id": uid,
+        "history_len": hist_len,
+        "alpha_clip": float(a_clip),
+        "alpha_log": float(a_log),
+        "history_artwork_ids": [idx2artwork[i] for i in seq],
+        "recommendations": recs
+    }
 
-# =========================
-# Main
-# =========================
 def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"[System] device={device}")
+    print("[System] device =", device)
 
-    for p in [MODEL_PATH, EMB_PATH, LOG_PATH, ARTWORK_META_PATH]:
-        if not p.exists():
-            raise FileNotFoundError(f"Missing file: {p}")
+    sas, artwork2idx, idx2artwork, meta = load_sasrec(SASREC_CKPT, device=device)
+    tt = load_two_tower(TWO_TOWER_CKPT, device=device)
 
-    # ✅ 1) item index + pretrained matrix는 embedding 파일 기준으로 생성
-    item_to_idx, idx_to_item, pretrained = build_item_index_from_embedding(EMB_PATH)
+    # clip_mat is aligned to idx2artwork indices
+    clip_mat = load_clip_matrix(CLIP_VEC_JSON, num_items=meta["num_items"], idx2artwork=idx2artwork, device=device)
 
-    # 모델 체크포인트가 기대하는 N 확인
-    ckpt = torch.load(MODEL_PATH, map_location="cpu")
-    ckpt_n = ckpt["pretrained_emb.weight"].shape[0] if "pretrained_emb.weight" in ckpt else None
+    logs = load_logs_auto(USER_LOG_JSONL)
+    user_seq = build_user_seq(logs, artwork2idx)
 
-    print(f"[INFO] items(from embedding)={len(item_to_idx)} | pretrained_shape={pretrained.shape}")
-    if ckpt_n is not None and ckpt_n != pretrained.shape[0]:
-        print(f"[WARN] checkpoint expects num_items={ckpt_n}, but embedding has {pretrained.shape[0]}")
-        print("       => 학습 때 사용한 artwork_embedding.json이 지금 파일과 다를 가능성이 큼.")
-        print("       => 학습 당시 embedding 파일 그대로 inference 폴더에 가져와야 100% 일치합니다.")
+    # 추론
+    outs = []
+    for uid in sorted(user_seq.keys()):
+        out = infer_one_user(uid, user_seq[uid], sas, tt, clip_mat, idx2artwork, device, TOPK)
+        outs.append(out)
 
-    # ✅ 2) meta는 출력용으로만
-    meta_lookup, meta_rows = build_meta_lookup(ARTWORK_META_PATH)
-    print(f"[INFO] meta_rows={len(meta_rows)}")
+        # 콘솔 Top5
+        print(f"\n=== {uid} len={out['history_len']} | alpha_clip={out['alpha_clip']:.2f} alpha_log={out['alpha_log']:.2f} ===")
+        for r in out["recommendations"][:PRINT_TOPK]:
+            print(f"- {r['artwork_id']}  score={r['score']:.4f}")
 
-    # ✅ 3) model 생성/로드
-    model = TwoTowerSASRec(pretrained_vecs=pretrained).to(device)
-    model.load_state_dict(torch.load(MODEL_PATH, map_location=device), strict=True)
-    model.eval()
-    print(f"[OK] loaded weight: {MODEL_PATH}")
-
-    # ✅ 4) item vecs normalize once
-    item_vecs = torch.from_numpy(pretrained).to(device)
-    item_vecs = item_vecs / (item_vecs.norm(dim=1, keepdim=True) + 1e-8)
-    print(f"[OK] precomputed item vecs: shape={tuple(item_vecs.shape)}")
-
-    # ✅ 5) user logs (user_id, artwork_id, timestamp) -> item_idx 시퀀스
-    rows = load_jsonl(LOG_PATH)
-    print(f"[INFO] log_rows={len(rows)}")
-
-    by_user = defaultdict(list)
-    skipped = 0
-
-    for r in rows:
-        uid = r.get("user_id")
-        iid = r.get("item_id") or r.get("artwork_id") or r.get("idx")
-        ts = r.get("timestamp", 0)
-
-        if not uid or not iid:
-            skipped += 1
-            continue
-        if iid not in item_to_idx:
-            # meta에는 있는데 embedding엔 없는 작품일 수 있음
-            skipped += 1
-            continue
-
-        by_user[uid].append((ts, item_to_idx[iid], iid))
-
-    for u in by_user:
-        by_user[u].sort(key=lambda x: x[0])
-
-    print(f"[INFO] users={len(by_user)} | skipped_logs={skipped}")
-
-    cold, normal, heavy = group_users(by_user)
-    picked = {
-        "COLD": pick(cold, 3),
-        "NORMAL": pick(normal, 3),
-        "HEAVY": pick(heavy, 3),
-    }
-    print("[INFO] picked users:", picked)
-
-    # ✅ 6) validate + recommend top20 출력
-    for g, users in picked.items():
-        if not users:
-            print(f"\n[{g}] no users found (threshold too strict?)")
-            continue
-
-        print(f"\n========== [{g}] ==========")
-        for uid in users:
-            events = by_user[uid]
-            hist = [idx for _, idx, _ in events]
-            if len(hist) < 2:
-                print(f"- {uid}: not enough history")
-                continue
-
-            gt_idx = hist[-1]
-            seq_idx = left_pad(hist[:-1], MAX_SEQ_LEN)
-
-            hit10, rank = hit10_leave_one_out(model, seq_idx, gt_idx, item_vecs, device=device)
-            gt_item_id = idx_to_item[gt_idx]
-
-            top_idx, top_scores = recommend_topk(model, seq_idx, item_vecs, topk=TOPK, device=device)
-
-            print(f"\n[USER] {uid} | n_logs={len(hist)} | GT={gt_item_id} | Hit@10={int(hit10)} | GT_rank={rank}")
-            print(f"[TOP{TOPK}] artwork_id | artist_id | artwork_url/image_path | score")
-
-            for i, (it_i, sc) in enumerate(zip(top_idx, top_scores), start=1):
-                item_id = idx_to_item[it_i]
-                m = meta_lookup.get(item_id, {})
-
-                artist_id = m.get("artist_id") or m.get("artist") or ""
-                artwork_url = m.get("artwork_url") or m.get("url") or m.get("image_path") or ""
-
-                print(f"{i:2d} {item_id} {artist_id} {artwork_url} {sc:.4f}")
-
+    Path(OUT_JSON).write_text(json.dumps(outs, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\n[OK] saved -> {OUT_JSON}")
 
 if __name__ == "__main__":
     main()

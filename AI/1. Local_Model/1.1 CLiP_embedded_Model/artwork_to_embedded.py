@@ -6,18 +6,21 @@ from PIL import Image
 from pathlib import Path
 from tqdm import tqdm
 import numpy as np
+import contextlib  # ✅ 추가
 
 # ==========================================
-# 1. 설정 (요청하신 설정값 그대로 유지)
+# 1. 설정
 # ==========================================
-# IMAGE_SUB_DIRS에 이미지가 담긴 폴더 이름을 입력 ㄱㄱ
-IMAGE_SUB_DIRS = ["artwork_image"] 
-MODEL_NAME = "ViT-B-32" # 512차원으로 벡터를 임베딩
-PRETRAINED_DATA = "datacomp_xl_s13b_b90k" # 원래는 openai 데이터를 썻지만, 최근에는 datacomp 이 데이터셋이 더 좋은 성능을 낸다고 함.
+IMAGE_DIR = Path("artwork_image")  # ✅ 여기만 믿고 파일 찾기
+MODEL_NAME = "ViT-B-32"
+PRETRAINED_DATA = "datacomp_xl_s13b_b90k"
 
 def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"\n[System] 현재 디바이스: {device.upper()}")
+
+    # ✅ CPU에서는 autocast 안 씀 (버전/호환 문제 방지)
+    autocast_ctx = torch.cuda.amp.autocast if device == "cuda" else contextlib.nullcontext
 
     # --- [Step 1] 모델 로딩 ---
     print(f"\n[1/4] 모델 로딩 중... ({MODEL_NAME} / {PRETRAINED_DATA})")
@@ -31,126 +34,148 @@ def main():
         print(f"❌ 모델 로딩 실패: {e}")
         return
 
-    # --- [Step 2] 데이터 로드 (JSON 방식 수정됨) ---
-    # [수정] 이전에 만든 파일명으로 변경
-    input_json_file = "artwork.json" 
+    # --- [Step 2] 데이터 로드 ---
+    input_json_file = "artwork.json"
     print(f"\n[2/4] '{input_json_file}' 데이터 읽는 중...")
-    
-    items = []
+
     meta_path = Path(input_json_file)
-    
     if not meta_path.exists():
         print(f"❌ '{input_json_file}' 파일이 없습니다. 파일명을 확인해주세요.")
         return
 
-    # [수정 핵심] 한 줄씩(Loop) 읽지 않고, 통째로(json.load) 읽습니다.
     try:
         with open(meta_path, "r", encoding="utf-8") as f:
             items = json.load(f)
     except json.JSONDecodeError as e:
         print(f"❌ JSON 문법 오류: {e}")
         return
-    
+
     print(f" -> 총 {len(items)}개의 후보 데이터를 찾았습니다.")
     if len(items) > 0:
         print(f" -> 데이터 키 확인: {list(items[0].keys())}")
+
+    # ✅ 이미지 폴더 존재 확인
+    if not IMAGE_DIR.exists():
+        print(f"❌ 이미지 폴더가 없습니다: {IMAGE_DIR.resolve()}")
+        return
+    else:
+        # 폴더 안 파일이 실제 있는지도 한 번 확인
+        sample_files = list(IMAGE_DIR.glob("*"))
+        print(f" -> 이미지 폴더 확인: {IMAGE_DIR.resolve()} (파일 {len(sample_files)}개)")
 
     # --- [Step 3] 임베딩 생성 ---
     results = []
     skipped_unknown = 0
     missing_image = 0
+    failed_embed = 0
     success_count = 0
-    
+
+    # ✅ 누락 이미지 로그 (최초 몇 개만 기록)
+    missing_examples = []
+
     print(f"\n[3/4] 임베딩 생성 및 필터링 시작...")
-    
+
     for item in tqdm(items, desc="Embedding"):
-        # 1. 작가 필터링 (Unknown 제외)
+        # 1) 작가 필터링
         artist_id = item.get("artist_id") or item.get("artist_name")
         if not artist_id or str(artist_id).strip().lower() == "unknown":
             skipped_unknown += 1
             continue
 
-        # 2. 이미지 파일 찾기
-        # [수정] processed_artwork.json은 'image_path' 키를 사용합니다.
-        # (기존 코드의 'file_name'을 'image_path'로 변경하여 호환성 확보)
-        json_path_str = item.get("image_path", "")
-        if not json_path_str:
-            missing_image += 1
+        # 2) artwork_id 확보
+        artwork_id = item.get("artwork_id") or item.get("item_id")
+        if not artwork_id:
+            # artwork_id까지 없으면 의미가 없어서 스킵
+            failed_embed += 1
             continue
-            
-        # 우선 JSON에 적힌 경로 그대로 확인
-        img_path = Path(json_path_str)
-        
-        # 만약 그대로 없으면, 설정된 SUB_DIR과 결합 시도
-        if not img_path.exists():
-            filename = os.path.basename(json_path_str)
-            found = False
-            for sub in IMAGE_SUB_DIRS:
-                target = Path(sub) / filename
-                if target.exists():
-                    img_path = target
-                    found = True
-                    break
-            
-            if not found:
-                missing_image += 1
-                continue
 
-        # 3. 임베딩 연산
+        # 3) 이미지 파일명만 뽑아서 artwork_image에서만 찾기
+        #    ✅ image_path / image_url 둘 다 지원
+        path_str = item.get("image_path") or item.get("image_url") or ""
+        if not path_str:
+            missing_image += 1
+            if len(missing_examples) < 20:
+                missing_examples.append({"artwork_id": artwork_id, "reason": "no image_path/image_url"})
+            continue
+
+        filename = os.path.basename(str(path_str).replace("\\", "/"))
+        img_path = IMAGE_DIR / filename  # ✅ 핵심: 무조건 여기서만 찾음
+
+        # 혹시 확장자만 다른 케이스(.png/.jpg) 대비: 같은 stem으로 탐색
+        if not img_path.exists():
+            stem = Path(filename).stem
+            candidates = list(IMAGE_DIR.glob(stem + ".*"))
+            if candidates:
+                img_path = candidates[0]
+
+        if not img_path.exists():
+            missing_image += 1
+            if len(missing_examples) < 20:
+                missing_examples.append({
+                    "artwork_id": artwork_id,
+                    "filename": filename,
+                    "expected": str(img_path)
+                })
+            continue
+
+        # 4) 임베딩
         try:
-            # 이미지 인코딩
             image_obj = Image.open(img_path).convert("RGB")
             image_input = preprocess(image_obj).unsqueeze(0).to(device)
-            
-            # Autocast 문법 (PyTorch 버전에 따라 경고가 뜰 수 있어 안전한 방식으로 작성)
-            with torch.no_grad(), torch.amp.autocast('cuda' if device=='cuda' else 'cpu'):
-                image_features = model.encode_image(image_input)
-                image_features /= image_features.norm(dim=-1, keepdim=True)
+
+            with torch.no_grad():
+                with autocast_ctx():
+                    image_features = model.encode_image(image_input)
+                image_features = image_features / image_features.norm(dim=-1, keepdim=True)
 
             final_vec = image_features
 
-            # 텍스트(설명) 결합 (5% 비중)
             description = item.get("description", "")
             if description:
-                # [수정] CLIP은 최대 77토큰까지만 처리 가능 (200 -> 77)
-                text_input = tokenizer([description[:77]]).to(device)
-                
-                with torch.no_grad(), torch.amp.autocast('cuda' if device=='cuda' else 'cpu'):
-                    text_features = model.encode_text(text_input)
-                    text_features /= text_features.norm(dim=-1, keepdim=True)
-                
-                # 가중치 결합 (0.95 : 0.05)
+                text_input = tokenizer([description]).to(device)
+                with torch.no_grad():
+                    with autocast_ctx():
+                        text_features = model.encode_text(text_input)
+                    text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+
                 combined = (image_features * 0.95) + (text_features * 0.05)
-                combined /= combined.norm(dim=-1, keepdim=True)
+                combined = combined / combined.norm(dim=-1, keepdim=True)
                 final_vec = combined
 
-            # 4. 결과 리스트 추가
             results.append({
                 "artist_id": artist_id,
-                "artwork_id": item.get("artwork_id", item.get("item_id", img_path.stem)),
-                "artwork_vector": final_vec.cpu().float().numpy().flatten().tolist()
+                "artwork_id": artwork_id,
+                "artwork_vector": final_vec.detach().cpu().float().numpy().flatten().tolist()
             })
             success_count += 1
 
-        except Exception as e:
-            # 이미지 손상 등의 에러
-            missing_image += 1
+        except Exception:
+            failed_embed += 1
             continue
 
-    # --- [Step 4] 결과 저장 (JSON Format) ---
+    # --- [Step 4] 저장 ---
     output_file = Path("artwork_vector.json")
-    print(f"\n[4/4] 결과 저장 중 (Prettified Format)...")
+    print(f"\n[4/4] 결과 저장 중...")
 
     try:
         with open(output_file, "w", encoding="utf-8") as f:
-            # indent=4: 4칸 들여쓰기 적용
-            json.dump(results, f, ensure_ascii=False, indent=4, sort_keys=True)
-            
+            json.dump(results, f, ensure_ascii=False, indent=2)
+
+        # ✅ 누락 예시도 파일로 저장
+        with open("missing_images_preview.json", "w", encoding="utf-8") as f:
+            json.dump(missing_examples, f, ensure_ascii=False, indent=2)
+
         print(f"\n" + "="*45)
-        print(f"✅ 가독성 높은 JSON 파일 저장 완료!")
-        print(f" - 파일 경로: {output_file.absolute()}")
-        print(f" - 데이터 구조: [ {{ 'artist_id': ..., 'artwork_id': ..., 'artwork_vector': [...] }}, ... ]")
+        print(f"✅ 저장 완료!")
+        print(f"- 총 입력: {len(items)}")
+        print(f"- 성공: {success_count}")
+        print(f"- artist_id Unknown 스킵: {skipped_unknown}")
+        print(f"- 이미지 누락: {missing_image}")
+        print(f"- 임베딩 실패: {failed_embed}")
+        print(f"- 출력 파일: {output_file.resolve()}")
+        print(f"- 누락 예시 파일: {Path('missing_images_preview.json').resolve()}")
         print("="*45)
+
     except Exception as e:
         print(f"❌ 저장 중 오류 발생: {e}")
 
