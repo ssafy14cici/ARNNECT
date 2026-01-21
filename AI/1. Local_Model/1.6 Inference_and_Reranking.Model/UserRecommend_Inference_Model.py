@@ -339,7 +339,7 @@ def infer_one_user(
     }
 
 def main():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cpu"
     print("[System] device =", device)
 
     sas, artwork2idx, idx2artwork, meta = load_sasrec(SASREC_CKPT, device=device)
