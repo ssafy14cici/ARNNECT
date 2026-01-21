@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { CommentForm } from "./CommentForm.tsx";
-import { ReplyList } from "../../pages/artwork/ReplyList";
+import { CommentForm } from "./CommentForm";
+import { ReplyList } from "./ReplyList";
 
 export const CommentItem = ({ comment, allComments, onDelete, onUpdate, onAddReply }: any) => {
   const [isEditing, setIsEditing] = useState(false);
