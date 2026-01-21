@@ -1,5 +1,6 @@
 // src/pages/home/Home.tsx
 import { useEffect, useState } from "react";
+import { useAuthStore } from "../../stores/authStore";
 
 import Hero from "../../components/main/Hero";
 import AboutSection from "../../components/main/AboutSection";
@@ -7,10 +8,13 @@ import ShowcaseStage from "../../components/main/ShowcaseStage";
 import HerRingLoader from "../../components/main/HerRingLoader";
 
 import { preloadImages, fetchWithProgress } from "../../utils/networkProgress";
+import { useNavigate } from "react-router-dom";
 
 export default function Home() {
   const [progress, setProgress] = useState(0);
   const [isReady, setIsReady] = useState(false);
+  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+  const navigate = useNavigate();
 
   useEffect(() => {
     let imgP = 0;
@@ -70,6 +74,22 @@ export default function Home() {
   return (
     <>
       <Hero />
+
+      {/* ✅ 로그인 후에만 보이는 "내 피드 바로가기" */}
+      {isLoggedIn && (
+        <section className="section" style={{ minHeight: "auto", paddingTop: 0 }}>
+          <div style={{ display: "grid", placeItems: "center", gap: 12 }}>
+            <button
+              type="button"
+              className="ctaBtn"
+              onClick={() => navigate("/feed")}
+            >
+              내 피드 바로가기 →
+            </button>
+          </div>
+        </section>
+      )}
+D
       <AboutSection />
       <ShowcaseStage />
     </>
