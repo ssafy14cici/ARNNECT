@@ -1,5 +1,6 @@
 // src/router/router.tsx
 import type { RouteObject } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 
 import AppLayout from "../layouts/AppLayout";
 import Guard from "../components/common/Guard";
@@ -20,6 +21,8 @@ import ProfileFeed from "../pages/profile/ProfileFeed";
 import ProfileCollection from "../pages/profile/ProfileCollection";
 
 import ArtworkDetail from "../pages/artwork/ArtworkDetail";
+
+import PostDetail from "../pages/posts/PostDetail";
 
 import Login from "../pages/auth/Login";
 import Signup from "../pages/auth/Signup";
@@ -46,7 +49,10 @@ export const routes: RouteObject[] = [
         children: [
           // ✅ 메인 혼합 피드
           {path: "feed", element: <Feed /> },
-          
+
+          // ✅ 게시글 상세
+          { path: "posts/:id", element: <PostDetail /> },
+
           // ✅ Lounge (내 전용 공간)
           {
             path: "lounge",
@@ -65,7 +71,7 @@ export const routes: RouteObject[] = [
             path: "profile/:id",
             element: <Profile />,
             children: [
-              { index: true, element: <ProfileFeed /> },
+              { index: true, element: <Navigate to="feed" relative="path" replace /> },
               { path: "feed", element: <ProfileFeed /> },
               { path: "collection", element: <ProfileCollection /> },
             ],
