@@ -74,22 +74,6 @@ export default function Home() {
   return (
     <>
       <Hero />
-
-      {/* ✅ 로그인 후에만 보이는 "내 피드 바로가기" */}
-      {isLoggedIn && (
-        <section className="section" style={{ minHeight: "auto", paddingTop: 0 }}>
-          <div style={{ display: "grid", placeItems: "center", gap: 12 }}>
-            <button
-              type="button"
-              className="ctaBtn"
-              onClick={() => navigate("/feed")}
-            >
-              내 피드 바로가기 →
-            </button>
-          </div>
-        </section>
-      )}
-D
       <AboutSection />
       <ShowcaseStage />
     </>

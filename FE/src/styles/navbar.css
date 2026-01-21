@@ -3,16 +3,20 @@
 ========================= */
 .nav{
   position: fixed;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 5000;
-  background: transparent;
+  background: var(--bg);
   padding: 18px 24px;
+  border-bottom: 1px solid var(--line);
 
   display: flex;
   justify-content: space-between; /* ✅ 좌/우 끝으로 */
   align-items: center;
 
   font-family: 'Playfair Display', 'Didot', 'Bodoni MT', serif;
+  backdrop-filter: blur(10px);
 }
 
 /* ✅ 중앙 박스(1320px 제한) 제거: 화면 전체 폭 사용 */
