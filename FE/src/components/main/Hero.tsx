@@ -1,6 +1,9 @@
 import ScrollIndicator from "../main/ScrollIndicator";
 import { artworks } from "../../data/artworks";
 import "../../styles/home.css";
+import { useAuthStore } from '../../stores/authStore';
+import { useNavigate } from "react-router-dom";
+
 
 type ArtworkLike = { src?: string; imageUrl?: string };
 
