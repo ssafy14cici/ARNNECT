@@ -10,80 +10,105 @@ import ArtistGo from "../pages/asc/ASC";
 import Search from "../pages/search/Search";
 import Recover from "../pages/auth/Recover";
 
-import Lounge from "../pages/lounge/Lounge";
-import MyCollection from "../pages/lounge/MyCollection";
-import MyTaste from "../pages/lounge/MyTaste";
-import MyQuiz from "../pages/lounge/MyQuiz";
+import Login from "../pages/auth/Login";
+import Signup from "../pages/auth/Signup";
+
 import Feed from "../pages/feed/Feed";
+
+import Lounge from "../pages/lounge/Lounge";
+import CollectBook from "../pages/lounge/user/CollectBook";
+import CollectBookScan from "../pages/lounge/user/CollectBookScan";
+import Taste from "../pages/lounge/user/Taste";
+import Quiz from "../pages/lounge/user/Quiz";
+import TicketQr from "../pages/lounge/artist/TicketQr";
+import Portfolio from "../pages/lounge/artist/Portfolio";
+import FanLetter from "../pages/lounge/artist/FanLetter";
+
+import PostDetail from "../pages/posts/PostDetail";
+import PostCreate from "../pages/posts/PostCreate";
+import PostCreateRedirect from "../pages/posts/PostCreateRedirect";
+
 import Profile from "../pages/profile/Profile";
 import FeedTab from "../pages/profile/tabs/FeedTab";
 import CollectionTab from "../pages/profile/tabs/CollectionTab";
 
 import ArtworkDetail from "../pages/artwork/ArtworkDetail";
-
-import PostDetail from "../pages/posts/PostDetail";
-import PostCreate from "../pages/posts/PostCreate";
-import PostCreateRedirect from "../pages/posts/PostCreateRedirect";
-import Login from "../pages/auth/Login";
-import Signup from "../pages/auth/Signup";
 import NotFound from "../pages/notfound/NotFound";
-
 
 export const routes: RouteObject[] = [
   {
     element: <AppLayout />,
     children: [
-      // ✅ 공개
+      /* =========================
+       * ✅ Public (비로그인 접근)
+       * ========================= */
       { path: "/", element: <Home /> },
-      {path: "home", element: <Home /> },
+      { path: "home", element: <Home /> },
       { path: "artist-go", element: <ArtistGo /> },
       { path: "search", element: <Search /> },
+
+      // 정책: recover를 로그인 상태에도 허용
       { path: "recover", element: <Recover /> },
 
-      // ✅ Auth (게스트만 접근 가능)
+      /* =========================
+       * ✅ Guest Only (게스트만)
+       * ========================= */
       {
         element: <Guard guestOnly redirectTo="/feed" />,
         children: [
           { path: "login", element: <Login /> },
           { path: "signup", element: <Signup /> },
-          // 필요하면 recover도 게스트 전용으로 같이 묶어도 됨
-          // { path: "recover", element: <Recover /> },
         ],
       },
 
-      // recover를 로그인 상태에서도 허용할지 정책에 따라 여기(공개)로 둘 수도 있음
-      { path: "recover", element: <Recover /> },
-
-
-      // 🔒 보호 (로그인 필요)
+      /* =========================
+       * 🔒 Protected (로그인 필요)
+       * ========================= */
       {
         element: <Guard requireAuth />,
         children: [
-          // ✅ 메인 혼합 피드
-          {path: "feed", element: <Feed /> },
+          { path: "feed", element: <Feed /> },
 
-          // ✅ 글쓰기 (역할에 따라 폼 분기)
+          /* ---------- Posts ---------- */
           { path: "posts/create", element: <PostCreateRedirect /> },
           { path: "posts/create/artist", element: <PostCreate mode="ARTIST" /> },
           { path: "posts/create/user", element: <PostCreate mode="USER" /> },
-
-
-          // ✅ 게시글 상세
           { path: "posts/:id", element: <PostDetail /> },
 
-          // ✅ Lounge (내 전용 공간)
+          /* ---------- Lounge ---------- */
           {
             path: "lounge",
-            element: <Lounge />,
             children: [
-              { index: true, element: <MyTaste /> }, //lounge
-              { path: "collection", element: <MyCollection /> },
-              { path: "taste", element: <MyTaste /> },
-              { path: "quiz", element: <MyQuiz /> },
+              // /lounge = 허브
+              { index: true, element: <Lounge /> },
+
+              // USER 전용
+              {
+                element: <Guard requireAuth requireRole={"general"} />,
+                children: [
+                  { path: "collectbook", element: <CollectBook /> },
+                  { path: "collectbook/scan", element: <CollectBookScan /> }, 
+                  { path: "taste", element: <Taste /> },
+                  { path: "quiz", element: <Quiz /> },
+                ],
+              },
+
+              // ARTIST 전용
+              {
+                element: <Guard requireAuth requireRole={"artist"} />,
+                children: [
+                  { path: "qr", element: <TicketQr /> },
+                  { path: "portfolio", element: <Portfolio /> },
+                  { path: "fanletter", element: <FanLetter /> },
+                ],
+              },
+
+              // 선택: /lounge 로 들어왔는데 index 대신 특정 탭으로 보내고 싶으면 이걸 사용
+              // { path: "*", element: <Navigate to="taste" replace /> },
             ],
           },
 
-          // Profile (타인이 보는 공개 프로필도 지금은 로그인 필요라고 했으니 여기 둠)
+          /* ---------- Profile ---------- */
           {
             path: "profile/:id",
             element: <Profile />,
@@ -94,14 +119,14 @@ export const routes: RouteObject[] = [
             ],
           },
 
-
-          // Artwork Detail
-          
+          /* ---------- Artworks ---------- */
           { path: "artworks/:id", element: <ArtworkDetail /> },
         ],
       },
 
-      // 404
+      /* =========================
+       * 404
+       * ========================= */
       { path: "*", element: <NotFound /> },
     ],
   },
