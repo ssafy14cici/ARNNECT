@@ -1,3 +1,4 @@
+// FE\src\pages\search\Search.tsx
 import { useState } from "react";
 import { useAuthStore } from "../../stores/authStore";
 

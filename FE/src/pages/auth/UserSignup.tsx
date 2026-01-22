@@ -1,7 +1,7 @@
 // src/pages/auth/UserSignup.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import "../../styles/auth.css";
+import "./auth.css";
 
 import Step1Account from "./components/Step1Account";
 import SignupPreviewCard from "./components/SignupPreviewCard";

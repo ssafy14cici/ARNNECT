@@ -1,3 +1,4 @@
+// FE\src\data\artworks.ts
 export const artworks = [
   { id: "a1", src: "/art/a1.jpg" },
   { id: "a2", src: "/art/a2.jpg" },

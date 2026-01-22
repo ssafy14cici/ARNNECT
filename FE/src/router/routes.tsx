@@ -11,7 +11,6 @@ import Search from "../pages/search/Search";
 import Recover from "../pages/auth/Recover";
 
 import Lounge from "../pages/lounge/Lounge";
-import MyFeed from "../pages/lounge/MyFeed";
 import MyCollection from "../pages/lounge/MyCollection";
 import MyTaste from "../pages/lounge/MyTaste";
 import MyQuiz from "../pages/lounge/MyQuiz";
@@ -77,8 +76,7 @@ export const routes: RouteObject[] = [
             path: "lounge",
             element: <Lounge />,
             children: [
-              { index: true, element: <MyFeed /> }, //lounge
-              { path: "feed", element: <MyFeed /> }, //lounge/feed
+              { index: true, element: <MyTaste /> }, //lounge
               { path: "collection", element: <MyCollection /> },
               { path: "taste", element: <MyTaste /> },
               { path: "quiz", element: <MyQuiz /> },

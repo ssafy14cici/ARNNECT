@@ -1,10 +1,9 @@
 // src/pages/lounge/Lounge.tsx
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
-type TabKey = "feed" | "collection" | "taste" | "quiz";
+type TabKey = "collection" | "taste" | "quiz";
 
 const TABS: { key: TabKey; label: string; path: string }[] = [
-  { key: "feed", label: "My Feed", path: "/lounge/feed" },
   { key: "collection", label: "My collection book", path: "/lounge/collection" },
   { key: "taste", label: "My Taste", path: "/lounge/taste" },
   { key: "quiz", label: "My Quiz", path: "/lounge/quiz" },

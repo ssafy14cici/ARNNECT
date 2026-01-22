@@ -1,7 +1,7 @@
 // src/pages/auth/ArtistSignup.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import "../../styles/auth.css";
+import "./auth.css";
 
 import Step1Account from "./components/Step1Account";
 import SignupPreviewCard from "./components/SignupPreviewCard";
@@ -19,15 +19,13 @@ import {
 } from "./utils/validation";
 import { checkEmailDupMock } from "./utils/emailDupCheck";
 
-// ====== (너 프로젝트에 맞게 옵션 유지) ======
-const ART_MAIN = ["미술", "사진", "공예", "디자인", "음악", "문학"];
+
+const ART_MAIN = ["미술", "사진", "공예", "디자인"];
 const ART_SUB: Record<string, string[]> = {
   미술: ["회화", "조각", "일러스트"],
   사진: ["인물", "풍경", "스트릿"],
   공예: ["도자", "금속", "목공"],
   디자인: ["그래픽", "UI/UX", "브랜딩"],
-  음악: ["작곡", "연주", "보컬"],
-  문학: ["시", "소설", "에세이"],
 };
 
 type ArtistStep2Value = {
@@ -36,6 +34,7 @@ type ArtistStep2Value = {
   artMain: string;
   artSub: string;
   verified: "YES" | "NO";
+  verifiedFile: File | null;
   gender: "M" | "F";
   birthYear: string;
   birthYearPublic: boolean;

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import "../../styles/auth.css";
+import "./auth.css";
 import UserSignup from "./UserSignup";
 import ArtistSignup from "./ArtistSignup";
 
