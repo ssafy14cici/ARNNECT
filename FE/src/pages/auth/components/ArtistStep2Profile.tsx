@@ -1,20 +1,29 @@
 // src/pages/auth/components/ArtistStep2Profile.tsx
+import type React from "react";
 import type { ArtistStep2 } from "../../../types/auth";
 
 type Props = {
   value: ArtistStep2;
-  onChange: (next: ArtistStep2) => void;
+  onChange: React.Dispatch<React.SetStateAction<ArtistStep2>>;
   birthYears: string[];
-  artMainOptions: string[];
-  artSubOptions: string[];
+  mainOptions: string[];
+  subOptions: string[];
+  error?: string | null;
+  loading?: boolean;
+  onPrev: () => void;
+  onNext: () => void;
 };
 
 export default function ArtistStep2Profile({
   value,
   onChange,
   birthYears,
-  artMainOptions,
-  artSubOptions,
+  mainOptions,
+  subOptions,
+  error,
+  loading,
+  onPrev,
+  onNext,
 }: Props) {
   return (
     <div className="auth-artist-panel">
@@ -50,7 +59,7 @@ export default function ArtistStep2Profile({
           required
         >
           <option value="">대분류 선택</option>
-          {artMainOptions.map((x) => (
+          {mainOptions.map((x) => (
             <option key={x} value={x}>
               {x}
             </option>
@@ -65,7 +74,7 @@ export default function ArtistStep2Profile({
           required
         >
           <option value="">소분류 선택</option>
-          {artSubOptions.map((x) => (
+          {subOptions.map((x) => (
             <option key={x} value={x}>
               {x}
             </option>
@@ -99,7 +108,6 @@ export default function ArtistStep2Profile({
           해당없음
         </label>
 
-        {/* ✅ YES일 때만 증빙 파일 업로드 노출 */}
         {value.verified === "YES" ? (
           <div className="auth-upload">
             <div className="auth-label">
@@ -116,9 +124,7 @@ export default function ArtistStep2Profile({
                 }
               />
               <div>클릭하여 파일 선택</div>
-              {value.verifiedFile ? (
-                <div className="auth-file">{value.verifiedFile.name}</div>
-              ) : null}
+              {value.verifiedFile ? <div className="auth-file">{value.verifiedFile.name}</div> : null}
             </label>
 
             <div className="auth-help">PDF 또는 이미지 파일을 첨부해주세요.</div>
@@ -153,7 +159,7 @@ export default function ArtistStep2Profile({
         </label>
       </div>
 
-      {/* 출생연도 + 공개/비공개 토글 */}
+      {/* 출생연도 + 공개/비공개 */}
       <label className="auth-label">
         출생연도 <span className="req">*</span>
       </label>
@@ -172,7 +178,6 @@ export default function ArtistStep2Profile({
           ))}
         </select>
 
-        {/* ✅ 텍스트가 공개/비공개로 바뀌게 */}
         <label className={`auth-toggle ${value.birthYearPublic ? "on" : ""}`}>
           <input
             type="checkbox"
@@ -181,6 +186,19 @@ export default function ArtistStep2Profile({
           />
           {value.birthYearPublic ? "공개" : "비공개"}
         </label>
+      </div>
+
+      {/* 에러 표시(선택) */}
+      {error ? <div className="auth-error">{error}</div> : null}
+
+      {/* 하단 네비게이션 */}
+      <div className="auth-artist-actions">
+        <button type="button" onClick={onPrev} disabled={!!loading}>
+          이전
+        </button>
+        <button type="button" onClick={onNext} disabled={!!loading}>
+          다음 &gt;
+        </button>
       </div>
     </div>
   );

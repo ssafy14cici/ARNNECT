@@ -54,6 +54,8 @@ npm run preview
 
 ```bash
 npm i react-router-dom zustand
+npm i gsap @studio-freight/lenis
+
 ```
 
 ---

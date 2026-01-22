@@ -1,0 +1,170 @@
+/* FE/src/pages/lounge/lounge.css */
+
+.loungePage {
+  min-height: 100vh;
+  padding: 24px 16px 48px;
+}
+
+.loungeWrap {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.loungeHeader {
+  padding: 16px 0 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.loungeHeaderTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.loungeTitle {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+}
+
+.loungeRoleBadge {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+}
+
+.loungeRoleBadge.user {
+  opacity: 0.95;
+}
+
+.loungeRoleBadge.artist {
+  opacity: 0.95;
+}
+
+.loungeRoleBadge.unknown {
+  opacity: 0.8;
+}
+
+.loungeSubtitle {
+  margin: 8px 0 0;
+  opacity: 0.85;
+  line-height: 1.4;
+}
+
+.loungeNotice {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.loungeSection {
+  padding: 18px 0 0;
+}
+
+.loungeSectionTitle {
+  margin: 0 0 10px;
+  font-size: 16px;
+  opacity: 0.9;
+}
+
+.loungeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 860px) {
+  .loungeGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 540px) {
+  .loungeGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.loungeCard {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.05);
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.loungeCard:hover {
+  transform: translateY(-2px);
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.22);
+}
+
+.loungeCard.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.loungeCard.disabled:hover {
+  transform: none;
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.14);
+}
+
+.loungeCardBody {
+  padding: 14px 14px 16px;
+}
+
+.loungeCardTitleRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.loungeCardTitle {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+.loungeChevron {
+  opacity: 0.7;
+}
+
+.loungeCardDesc {
+  margin: 8px 0 0;
+  font-size: 13px;
+  opacity: 0.8;
+  line-height: 1.45;
+}
+
+.loungePanel {
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.04);
+  padding: 14px;
+}
+
+.loungePanelText {
+  margin: 0 0 10px;
+  font-size: 13px;
+  opacity: 0.85;
+  line-height: 1.5;
+}
+
+.loungeEmpty {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255,255,255,0.18);
+  opacity: 0.75;
+  font-size: 13px;
+}

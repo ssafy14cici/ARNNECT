@@ -1,4 +1,6 @@
 // FE/src/pages/auth/components/ArtistStep3Optional.tsx
+import type React from "react";
+
 type ArtistStep3Value = {
   contact: string;
   intro: string;              // ✅ 선택
@@ -8,7 +10,9 @@ type ArtistStep3Value = {
 
 type Props = {
   value: ArtistStep3Value;
-  onChange: (next: ArtistStep3Value) => void;
+
+  // ✅ 부모에서 setA3 그대로 넘겨도 타입이 맞도록 Dispatch로 통일
+  onChange: React.Dispatch<React.SetStateAction<ArtistStep3Value>>;
 
   error?: string | null;
   loading?: boolean;
@@ -47,7 +51,9 @@ export default function ArtistStep3Optional({
         onChange={(e) => onChange({ ...value, contact: e.target.value })}
         placeholder="이메일, 인스타그램, 웹사이트 등"
       />
-      <div className="auth-help">이메일, SNS 주소, 웹사이트 URL 등을 입력하세요 (선택)</div>
+      <div className="auth-help">
+        이메일, SNS 주소, 웹사이트 URL 등을 입력하세요 (선택)
+      </div>
 
       <label className="auth-label">예술활동 소개</label>
       <textarea
@@ -68,8 +74,11 @@ export default function ArtistStep3Optional({
             hidden
           />
           <div>클릭하여 이미지 선택</div>
-          {value.profileImage ? <div className="auth-file">{value.profileImage.name}</div> : null}
+          {value.profileImage ? (
+            <div className="auth-file">{value.profileImage.name}</div>
+          ) : null}
         </label>
+
         {value.profileImage ? (
           <button
             type="button"
@@ -86,7 +95,8 @@ export default function ArtistStep3Optional({
       {/* ✅ 포트폴리오: 옵션에 따라 필수 */}
       <div className="auth-upload">
         <div className="auth-label">
-          포트폴리오 첨부파일 {portfolioRequired ? <span className="req">*</span> : null}
+          포트폴리오 첨부파일{" "}
+          {portfolioRequired ? <span className="req">*</span> : null}
         </div>
         <label className="auth-drop">
           <input
@@ -97,8 +107,11 @@ export default function ArtistStep3Optional({
           />
           <div>클릭하여 파일 선택</div>
           <div className="auth-help">PDF, PPT, 이미지 등</div>
-          {value.portfolioFile ? <div className="auth-file">{value.portfolioFile.name}</div> : null}
+          {value.portfolioFile ? (
+            <div className="auth-file">{value.portfolioFile.name}</div>
+          ) : null}
         </label>
+
         {value.portfolioFile ? (
           <button
             type="button"
@@ -115,10 +128,20 @@ export default function ArtistStep3Optional({
       {error ? <div className="auth-error">{error}</div> : null}
 
       <div className="auth-nav">
-        <button type="button" className="auth-artist-prev" onClick={onPrev} disabled={loading}>
+        <button
+          type="button"
+          className="auth-artist-prev"
+          onClick={onPrev}
+          disabled={loading}
+        >
           &lt; 이전
         </button>
-        <button type="button" className="auth-artist-next" onClick={onNext} disabled={loading}>
+        <button
+          type="button"
+          className="auth-artist-next"
+          onClick={onNext}
+          disabled={loading}
+        >
           다음 &gt;
         </button>
       </div>

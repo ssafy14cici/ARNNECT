@@ -1,0 +1,370 @@
+/* FE/src/pages/search/search.css */
+
+/* ===== page base ===== */
+.searchPage {
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.searchPage img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* ===== top area ===== */
+.searchTop {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(6px);
+  padding: 14px 16px;
+}
+
+.searchTitle {
+  margin: 0 0 10px;
+  font-size: 20px;
+  letter-spacing: 0.4px;
+}
+
+.searchTabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.searchTab {
+  padding: 8px 10px;
+  border: 1px solid #333;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.searchTab.is-active {
+  opacity: 1;
+  font-weight: 700;
+}
+
+.searchTab:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.searchControls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.searchForm {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: 1;
+  min-width: 240px;
+}
+
+.searchInput {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #333;
+  background: transparent;
+  color: inherit;
+}
+
+.searchBtn {
+  padding: 10px 12px;
+  border: 1px solid #333;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.searchBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.searchSelect {
+  padding: 10px;
+  border: 1px solid #333;
+  background: transparent;
+  color: inherit;
+}
+
+.searchPanel {
+  padding: 14px 16px;
+  margin: 16px;
+}
+
+.searchPanel--dashed {
+  border: 1px dashed #555;
+}
+
+/* ===== fixed hero text (like your sample) ===== */
+.searchHeroText {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.28;
+  mix-blend-mode: overlay;
+}
+
+.searchHeroText h1 {
+  font-family: "Times New Roman", serif;
+  font-size: 18vw;
+  font-weight: 100;
+  margin: 0;
+  line-height: 1;
+  color: #333;
+}
+
+.searchHeroText p {
+  font-size: 1.1rem;
+  letter-spacing: 10px;
+  text-transform: uppercase;
+  color: #666;
+  margin-top: -2vw;
+}
+
+/* ===== 3-col grid (same layout concept) ===== */
+.search-gallery-grid {
+  position: relative;
+  width: 90%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding-top: 12vh;
+  padding-bottom: 120px;
+  z-index: 1;
+
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+}
+
+@media (max-width: 1100px) {
+  .search-gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+    width: 92%;
+  }
+}
+
+@media (max-width: 768px) {
+  .search-gallery-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+}
+
+.search-gallery-col {
+  display: flex;
+  flex-direction: column;
+  gap: 80px;
+}
+
+/* 가운데 열 리듬(원하면 제거) */
+.search-col-2 {
+  margin-top: 150px;
+}
+
+/* ===== card ===== */
+.search-gallery-item {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  width: 100%;
+  transition: transform 0.3s ease;
+}
+
+/* .search-gallery-item:hover {
+  transform: scale(0.985);
+} */
+
+.search-img-box {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 18px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.search-img-box img {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: none;
+  transition: transform 0.45s ease;
+}
+
+.search-gallery-item:hover .search-img-box img {
+  transform: scale(1.03);
+}
+
+
+
+/* ===== hover info overlay ===== */
+.search-hoverInfo {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 14px 14px 12px;
+
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 18px;
+}
+
+.search-gallery-item:hover .search-hoverInfo {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.search-hoverTitle {
+  font-family: serif;
+  font-size: 1.05rem;
+  color: #fff;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-hoverMeta {
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.search-hoverArtist {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  color: #cfcfcf;
+  letter-spacing: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-hoverStats {
+  font-size: 0.75rem;
+  color: #bdbdbd;
+  white-space: nowrap;
+}
+
+.search-hoverDate {
+  margin-top: 6px;
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+
+/* ===== optional bottom info (keep or remove) ===== */
+.search-item-info {
+  margin-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  opacity: 0.5;
+  transition: opacity 0.3s;
+  padding: 0 4px;
+}
+
+.search-gallery-item:hover .search-item-info {
+  opacity: 1;
+}
+
+.search-info-title {
+  font-family: serif;
+  font-size: 1.05rem;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-info-artist {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  color: #888;
+  letter-spacing: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* ===== controls polish ===== */
+.searchTop {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(248, 246, 242, 0.75); /* 배경 톤 맞춤(원하면 제거) */
+}
+
+.searchTabs {
+  gap: 10px;
+}
+
+/* 탭 버튼 */
+.searchTab {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,0.14);
+  background: rgba(255,255,255,0.45);
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.searchTab:hover:not(:disabled) {
+  background: rgba(255,255,255,0.7);
+  border-color: rgba(0,0,0,0.22);
+  transform: translateY(-1px);
+}
+
+.searchTab.is-active {
+  background: rgba(0,0,0,0.85);
+  color: #fff;
+  border-color: rgba(0,0,0,0.85);
+  opacity: 1;
+  font-weight: 600;
+}
+
+/* 입력/버튼/셀렉트 통일 */
+.searchInput,
+.searchBtn,
+.searchSelect {
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.14);
+  background: rgba(255,255,255,0.55);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: rgba(0,0,0,0.35);
+  background: rgba(255,255,255,0.75);
+}
+
+.searchBtn {
+  padding: 0 14px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.searchBtn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.8);
+  border-color: rgba(0,0,0,0.22);
+}
+
+.searchSelect {
+  padding: 0 12px;
+}

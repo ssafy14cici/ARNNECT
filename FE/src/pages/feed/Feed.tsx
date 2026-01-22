@@ -1,3 +1,4 @@
+// FE/src/pages/feed/Feed.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./feed.css";
@@ -5,7 +6,7 @@ import "./feed.css";
 /**
  * 라우팅 경로는 프로젝트에 맞게 수정하세요.
  */
-const DETAIL_PATH = (id: string) => `/feed/${id}`;
+const DETAIL_PATH = (id: string) => `/artworks/${id}`;
 const PROFILE_PATH = (authorId: string) => `/profile/${authorId}`;
 
 type FeedRole = "ARTIST" | "USER";
@@ -20,6 +21,10 @@ type FeedItem = {
   createdAt: string; // ISO
   imageUrl?: string | null;
   category?: string;
+
+  // 있으면 UI에 붙여도 됨(원하면 제거 가능)
+  likes?: number;
+  views?: number;
 };
 
 type FeedFilterKey = "ALL" | "ARTIST" | "USER";
@@ -30,62 +35,10 @@ const FILTERS: Array<{ key: FeedFilterKey; label: string }> = [
   { key: "USER", label: "User" },
 ];
 
-// 무한 스크롤 데모용 페이지 사이즈
 const PAGE_SIZE = 12;
 
-/**
- * TODO: API 붙이기 전 임시 데이터
- * - imageUrl이 없으면 "텍스트-only 카드"
- */
-const MOCK_FEEDS: FeedItem[] = [
-  {
-    id: "1",
-    role: "ARTIST",
-    title: "Nocturne Study",
-    excerpt: "A short note about the painting concept and composition.",
-    authorName: "A. Kim",
-    authorId: "artist-1",
-    createdAt: "2026-01-22T09:00:00.000Z",
-    imageUrl:
-      "https://images.unsplash.com/photo-1541963463532-d68292c34b19?auto=format&fit=crop&w=1200&q=80",
-    category: "Painting",
-  },
-  {
-    id: "2",
-    role: "USER",
-    title: "My First Gallery Visit",
-    excerpt: "I discovered a new artist today and wanted to share the mood.",
-    authorName: "U. Park",
-    authorId: "user-9",
-    createdAt: "2026-01-22T10:20:00.000Z",
-    imageUrl: null,
-    category: "Essay",
-  },
-  {
-    id: "3",
-    role: "ARTIST",
-    title: "Ceramic Form #12",
-    excerpt: "Texture experiments with layered glazing.",
-    authorName: "S. Lee",
-    authorId: "artist-2",
-    createdAt: "2026-01-21T15:40:00.000Z",
-    imageUrl:
-      "https://images.unsplash.com/photo-1526318472351-c75fcf070305?auto=format&fit=crop&w=1200&q=80",
-    category: "Craft",
-  },
-  {
-    id: "4",
-    role: "USER",
-    title: "CollectBook Note",
-    excerpt: "Saving inspirations and curating my own small collection.",
-    authorName: "U. Choi",
-    authorId: "user-3",
-    createdAt: "2026-01-21T12:05:00.000Z",
-    imageUrl:
-      "https://images.unsplash.com/photo-1520697222860-7a90cbf31d82?auto=format&fit=crop&w=1200&q=80",
-    category: "Collection",
-  },
-];
+/** ✅ public/art 폴더 이미지 풀 */
+const ART_IMAGES = Array.from({ length: 12 }).map((_, i) => `/art/a${i + 1}.jpg`);
 
 function formatDate(iso: string) {
   const d = new Date(iso);
@@ -120,11 +73,53 @@ function BadgeIcon({ role }: { role: FeedRole }) {
   );
 }
 
+/** ✅ 더미 피드 자동 생성 (이미지 10~12장 반복 사용) */
+function buildMockFeeds(total = 48): FeedItem[] {
+  const artistNames = ["A. KIM", "S. LEE", "J. PARK", "H. CHOI"];
+  const userNames = ["U. PARK", "U. CHOI", "U. KANG", "U. HAN"];
+  const cats = ["Painting", "Photo", "Craft", "Design", "Essay", "Collection"];
+
+  return Array.from({ length: total }).map((_, idx) => {
+    const role: FeedRole = idx % 2 === 0 ? "ARTIST" : "USER";
+    const isTextOnly = idx % 6 === 0; // 6개 중 1개는 텍스트-only
+
+    const authorName =
+      role === "ARTIST"
+        ? artistNames[idx % artistNames.length]
+        : userNames[idx % userNames.length];
+
+    const authorId =
+      role === "ARTIST" ? `artist-${(idx % 6) + 1}` : `user-${(idx % 10) + 1}`;
+
+    const imageUrl = isTextOnly ? null : ART_IMAGES[idx % ART_IMAGES.length];
+
+    // 최근 날짜로 분산
+    const createdAt = new Date(Date.now() - idx * 6 * 60 * 60 * 1000).toISOString();
+
+    return {
+      id: String(idx + 1),
+      role,
+      title: role === "ARTIST" ? `Artwork #${idx + 1}` : `User Log #${idx + 1}`,
+      excerpt:
+        role === "USER"
+          ? "유저 기록/리뷰 더미 텍스트입니다."
+          : "작품 소개 더미 텍스트입니다.",
+      authorName,
+      authorId,
+      createdAt,
+      imageUrl,
+      category: cats[idx % cats.length],
+      likes: Math.floor(Math.random() * 500),
+      views: 100 + Math.floor(Math.random() * 9000),
+    };
+  });
+}
+
 export default function Feed() {
   const navigate = useNavigate();
 
-  // TODO: API 붙이면 feeds를 fetch 결과로 교체
-  const [feeds] = useState<FeedItem[]>(MOCK_FEEDS);
+  /** ✅ 기존처럼 컴포넌트 내부에서 바로 더미 사용 */
+  const [feeds] = useState<FeedItem[]>(() => buildMockFeeds(60));
 
   const [filter, setFilter] = useState<FeedFilterKey>("ALL");
   const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
@@ -138,20 +133,14 @@ export default function Feed() {
     return feeds.filter((f) => f.role === "USER");
   }, [feeds, filter]);
 
-  const visibleFeeds = useMemo(() => {
-    return filteredFeeds.slice(0, visibleCount);
-  }, [filteredFeeds, visibleCount]);
-
+  const visibleFeeds = useMemo(() => filteredFeeds.slice(0, visibleCount), [filteredFeeds, visibleCount]);
   const hasMore = visibleCount < filteredFeeds.length;
 
-  // ✅ ESLint(rule: react-hooks/set-state-in-effect) 회피:
-  // filter 변경 시 visibleCount 초기화는 useEffect가 아니라 "이벤트 핸들러"에서 처리
   const applyFilter = (next: FeedFilterKey) => {
     setFilter(next);
     setVisibleCount(PAGE_SIZE);
   };
 
-  // 무한 스크롤 옵저버
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
@@ -164,14 +153,12 @@ export default function Feed() {
         if (!entry?.isIntersecting) return;
         if (!hasMore) return;
 
-        // ✅ effect body가 아니라 "observer callback"에서 setState -> lint 통과
         setVisibleCount((prev) => prev + PAGE_SIZE);
       },
       { root: null, rootMargin: "600px 0px", threshold: 0.01 }
     );
 
     observerRef.current.observe(el);
-
     return () => observerRef.current?.disconnect();
   }, [hasMore]);
 
@@ -200,11 +187,7 @@ export default function Feed() {
                   className="feedNavItem"
                   onClick={() => applyFilter(f.key)}
                   aria-current={active ? "page" : undefined}
-                  style={
-                    active
-                      ? { opacity: 1, fontWeight: 700 }
-                      : { opacity: 0.7, fontWeight: 400 }
-                  }
+                  style={active ? { opacity: 1, fontWeight: 700 } : { opacity: 0.7, fontWeight: 400 }}
                 >
                   {f.label}
                 </button>
@@ -235,9 +218,7 @@ export default function Feed() {
               <div className="feedImgWrap">
                 {/* Badge */}
                 <div
-                  className={`feedBadge ${
-                    item.role === "ARTIST" ? "artist" : "user"
-                  }`}
+                  className={`feedBadge ${item.role === "ARTIST" ? "artist" : "user"}`}
                   aria-label={roleLabel(item.role)}
                   title={roleLabel(item.role)}
                 >
@@ -246,20 +227,13 @@ export default function Feed() {
 
                 {/* Image or Text-only */}
                 {hasImage ? (
-                  <img
-                    className="feedImg"
-                    src={item.imageUrl as string}
-                    alt={item.title}
-                    loading="lazy"
-                  />
+                  <img className="feedImg" src={item.imageUrl as string} alt={item.title} loading="lazy" />
                 ) : (
                   <div className="feedTextOnly">
                     <div className="feedTextOnlyTop" />
                     <div className="feedTextOnlyBody">
                       <div className="feedTextClamp">{item.title}</div>
-                      {item.excerpt ? (
-                        <div className="feedTextClamp">{item.excerpt}</div>
-                      ) : null}
+                      {item.excerpt ? <div className="feedTextClamp">{item.excerpt}</div> : null}
                     </div>
                   </div>
                 )}
@@ -267,16 +241,15 @@ export default function Feed() {
                 {/* Hover Overlay */}
                 <div className="feedOverlay">
                   <div className="feedOverlayText">
-                    <div className="feedOverlayTitle feedTextClamp">
-                      {item.title}
-                    </div>
+                    <div className="feedOverlayTitle feedTextClamp">{item.title}</div>
 
                     <div className="feedOverlayMeta">
                       {item.category ? `${item.category} • ` : ""}
                       {formatDate(item.createdAt)}
+                      {typeof item.views === "number" ? ` • 👁 ${item.views}` : ""}
+                      {typeof item.likes === "number" ? ` • ♥ ${item.likes}` : ""}
                     </div>
 
-                    {/* 작성자 버튼: 카드 클릭(상세)과 분리 */}
                     <button
                       type="button"
                       className="feedAuthor"
@@ -299,10 +272,8 @@ export default function Feed() {
         })}
       </section>
 
-      {/* Sentinel */}
       <div ref={sentinelRef} className="feedSentinel" />
 
-      {/* Loading / End */}
       <div className="feedLoading" aria-live="polite">
         {hasMore ? "LOADING MORE..." : "END"}
       </div>

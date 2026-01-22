@@ -4,9 +4,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiLogin } from "../../api/auth";
 import type { UserRole } from "../../types/auth";
 import { useAuthStore } from "../../stores/authStore";
-import "../../styles/auth.css";
-
-const toStoreRole = (r: UserRole) => (r === "USER" ? "general" : "artist");
+import "./auth.css";
 
 
 export default function Login() {
