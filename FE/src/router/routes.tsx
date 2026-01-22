@@ -96,6 +96,7 @@ export const routes: RouteObject[] = [
 
 
           // Artwork Detail
+          
           { path: "artworks/:id", element: <ArtworkDetail /> },
         ],
       },
