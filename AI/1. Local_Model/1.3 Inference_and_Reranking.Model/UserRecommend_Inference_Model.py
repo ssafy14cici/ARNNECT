@@ -281,18 +281,49 @@ def validate(args, device):
     print(f"✅ Result: Hit@20 = {np.mean(hits):.4f} | NDCG@20 = {np.mean(ndcgs):.4f}")
 
 def recommend(args, device):
+    # 1. 모델 로드
     sas, tt, item_mat, artwork2idx, idx2artwork = load_models(args, device)
     
+    # 2. 로그 파일 로드
     logs = load_logs_auto(args.log_path)
     user_seq = build_user_sequences(logs, artwork2idx)
     
-    target_seq = user_seq.get(args.member_id)
+    # -------------------------------------------------------------
+    # 🔍 [디버깅] 파일에 들어있는 실제 ID 확인하기
+    # -------------------------------------------------------------
+    all_user_ids = list(user_seq.keys())
+    print(f"\n" + "="*60)
+    print(f"📂 로드된 파일: {args.log_path}")
+    print(f"👥 총 유저 수: {len(all_user_ids)}명")
+    print(f"👀 유저 ID 샘플 (앞에서 5개): {all_user_ids[:5]}")
+    print("="*60 + "\n")
+    # -------------------------------------------------------------
+
+    target_id = str(args.member_id).strip()
+    target_seq = user_seq.get(target_id)
+
+    # 기록이 없거나 유저를 못 찾은 경우
     if not target_seq:
-        print(f"❌ User ID '{args.member_id}' logs not found.")
+        print(f"⚠️ 경고: 입력하신 ID '{target_id}'를 찾을 수 없습니다.")
+        print(f"   (위의 '유저 ID 샘플'을 보고 정확한 ID를 다시 입력해주세요.)")
+        
+        # [Cold Start] 인기 추천 로직 실행
+        print(f"\n👉 대신 '{target_id}'님을 위한 인기(Most Popular) 작품을 추천합니다.")
+        
+        all_items = []
+        for seq in user_seq.values():
+            all_items.extend(seq)
+        
+        from collections import Counter
+        popular_items = Counter(all_items).most_common(args.topk)
+        
+        for rank, (idx, count) in enumerate(popular_items, 1):
+            item_name = idx2artwork.get(idx, "Unknown")
+            print(f"{rank}. {item_name} (조회수: {count})")
         return
 
-    print(f">>> Recommending for User: {args.member_id}")
-    print(f"    History Length: {len(target_seq)}")
+    # 정상적인 개인화 추천
+    print(f">>> 🔮 '{target_id}'님을 위한 개인화 추천 진행")
     
     input_pad = right_align(target_seq, MAXLEN)
     input_tensor = torch.tensor([input_pad], device=device)
@@ -304,14 +335,13 @@ def recommend(args, device):
         
         scores = (user_final_emb @ all_items_emb.T).squeeze()
         
-        # 이미 본 작품 필터링 (점수 낮추기)
         if len(target_seq) > 0:
             scores[target_seq] = -9999
         scores[0] = -9999 
 
         vals, indices = torch.topk(scores, k=args.topk)
         
-    print("\n[Top Recommendation]")
+    print("\n🎁 [User Personalized Recommendation]")
     for rank, idx in enumerate(indices.tolist(), 1):
         item_id = idx2artwork.get(idx, "Unknown")
         print(f"{rank}. {item_id} (Score: {vals[rank-1]:.4f})")

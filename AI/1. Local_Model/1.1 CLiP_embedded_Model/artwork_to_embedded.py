@@ -7,19 +7,23 @@ from pathlib import Path
 from tqdm import tqdm
 import numpy as np
 import contextlib
+import sys
 
 # ==========================================
-# 1. 설정 (절대 경로 유지)
+# 1. 설정
 # ==========================================
-# 폴더 경로는 아까 확인된 절대 경로를 그대로 씁니다.
-IMAGE_DIR = Path(r"C:\Users\SSAFY\Desktop\git\S14P11E107\AI\1. Local_Model\1.1 CLiP_embedded_Model\artwork_image")
+
+# [Modified] 절대 경로 대신, 현재 실행 중인 파일(artwork_to_embedded.py)의 위치를 기준으로 경로를 설정합니다.
+# 이렇게 하면 폴더 이름이 조금 바뀌거나 다른 컴퓨터로 옮겨도 에러가 나지 않습니다.
+CURRENT_DIR = Path(__file__).resolve().parent
+IMAGE_DIR = CURRENT_DIR / "artwork_image"
+
+# [Modified] 코드 아래쪽에서 사용되나 선언이 누락되어 있어 추가했습니다.
+# 특정 ID에서 멈추고 싶다면 "test_01000" 처럼 문자열을 넣으세요. (없으면 None)
+STOP_AT_ID = None  
 
 MODEL_NAME = "ViT-B-32"
 PRETRAINED_DATA = "datacomp_xl_s13b_b90k"
-
-# 🛑 [범위 설정] test_01000 번까지 처리
-# (만약 파일이 1000개라면 끝까지 돌아갑니다)
-STOP_AT_ID = "test_01000"
 
 def build_smart_index(directory):
     """
@@ -50,8 +54,15 @@ def main():
     autocast_ctx = torch.cuda.amp.autocast if device == "cuda" else contextlib.nullcontext
 
     # --- [Step 1] 인덱싱 ---
+    # [Modified] 폴더 확인 로직 강화
     if not IMAGE_DIR.exists():
         print(f"❌ [치명적 에러] 폴더가 없습니다: {IMAGE_DIR}")
+        print(f"   (현재 스크립트 위치: {CURRENT_DIR})")
+        
+        # [Modified] 디버깅을 위해 현재 폴더에 무엇이 있는지 출력해줍니다.
+        print("\n👇 현재 폴더에 있는 파일/폴더 목록:")
+        for item in CURRENT_DIR.glob("*"):
+            print(f"   - {item.name}")
         return
 
     # 실제 파일 목록 지도 생성 (예: 'test_image_00001' -> 경로)
@@ -76,7 +87,7 @@ def main():
     # --- [Step 3] JSON 로드 ---
     json_candidates = [
         Path("artwork.json"), 
-        Path(__file__).resolve().parent / "artwork.json",
+        CURRENT_DIR / "artwork.json", # [Modified] 현재 경로 기준 탐색 추가
         Path(__file__).resolve().parent.parent / "artwork.json"
     ]
     
@@ -101,7 +112,9 @@ def main():
     success_count = 0
     missing_count = 0
     
-    print(f"\n[3/4] 임베딩 변환 시작 (목표: {STOP_AT_ID} 까지)...")
+    # [Modified] STOP_AT_ID가 None일 경우를 대비해 출력 메시지 수정
+    stop_msg = STOP_AT_ID if STOP_AT_ID else "끝"
+    print(f"\n[3/4] 임베딩 변환 시작 (목표: {stop_msg} 까지)...")
     
     for item in tqdm(all_items):
         artist_id = item.get("artist_id") or item.get("artist_name")
@@ -168,14 +181,15 @@ def main():
             print(f"Error processing {img_path}: {e}")
             continue
 
-        # 🛑 [종료 조건] test_01000 번이면 멈춤
-        if str(artwork_id) == STOP_AT_ID:
+        # 🛑 [종료 조건] STOP_AT_ID가 설정되어 있고 일치하면 멈춤
+        if STOP_AT_ID and str(artwork_id) == STOP_AT_ID:
             print(f"\n🛑 목표 ID '{STOP_AT_ID}' 도달! 여기서 멈춥니다.")
             break
 
     # --- [Step 5] 저장 ---
-    output_file = Path("artwork_vector.json")
-    print(f"\n[4/4] 저장 중... ({output_file.absolute()})")
+    # [Modified] 저장 위치도 현재 폴더 기준 상대 경로로 명확히 지정
+    output_file = CURRENT_DIR / "artwork_vector.json"
+    print(f"\n[4/4] 저장 중... ({output_file})")
     
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
