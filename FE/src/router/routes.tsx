@@ -73,7 +73,10 @@ export const routes: RouteObject[] = [
           { path: "posts/create", element: <PostCreateRedirect /> },
           { path: "posts/create/artist", element: <PostCreate mode="ARTIST" /> },
           { path: "posts/create/user", element: <PostCreate mode="USER" /> },
+
+          // ✅ 이거 하나만 남기기
           { path: "posts/:id", element: <PostDetail /> },
+
 
           /* ---------- Lounge ---------- */
           {

@@ -1,6 +1,10 @@
+// FE/src/pages/posts/PostCreate.tsx
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./postCreate.css";
+
+import { addPost, fileToDataUrl, type LocalMode } from "../../utils/localPosts";
+import { useAuthStore } from "../../stores/authStore";
 
 type Mode = "ARTIST" | "USER";
 
@@ -11,6 +15,10 @@ type Props = {
 export default function PostCreate({ mode }: Props) {
   const navigate = useNavigate();
   const isArtist = useMemo(() => mode === "ARTIST", [mode]);
+
+  const authUser = useAuthStore((s: any) => s.user);
+  const authorId: string = authUser?.memberUuid ?? "me";
+
 
   // 공통
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -59,34 +67,39 @@ export default function PostCreate({ mode }: Props) {
       return;
     }
 
-    // ✅ 백엔드 붙기 전: formData 구성까지만 해두고 TODO로 남김
-    const fd = new FormData();
-    fd.append("image", imageFile!);
+    // ✅ 핵심: imageFile -> dataUrl 로 변환해서 저장
+    const imageUrl = await fileToDataUrl(imageFile!);
 
-    if (isArtist) {
-      fd.append("title", title.trim());
-      fd.append("description", description.trim());
-      fd.append("field", field.trim());
-      fd.append("genre", genre.trim());
-      parsedTags.forEach((t) => fd.append("tags", t));
-      if (year.trim()) fd.append("year", year.trim());
-      if (size.trim()) fd.append("size", size.trim());
+    addPost({
+      id: `local-${crypto.randomUUID()}`,
+      authorId,
+      mode, // "ARTIST" | "USER"
+      imageUrl,
+      tags: parsedTags,
+      createdAt: new Date().toISOString(),
 
-      console.log("[ARTWORK CREATE] FormData ready", Object.fromEntries(fd.entries()));
-      alert("TODO: 작품 등록 API 연결 (POST /api/v1/artworks)");
-    } else {
-      fd.append("title", reviewTitle.trim());
-      fd.append("text", reviewText.trim());
-      parsedTags.forEach((t) => fd.append("tags", t));
-      if (artworkIdOrUuid.trim()) fd.append("artworkUuid", artworkIdOrUuid.trim());
+      ...(isArtist
+        ? {
+            title: title.trim(),
+            description: description.trim(),
+            field: field.trim(),
+            genre: genre.trim(),
+            year: year.trim() || undefined,
+            size: size.trim() || undefined,
+          }
+        : {
+            reviewTitle: reviewTitle.trim(),
+            reviewText: reviewText.trim(),
+            artworkIdOrUuid: artworkIdOrUuid.trim() || undefined,
+          }),
+    });
 
-      console.log("[REVIEW CREATE] FormData ready", Object.fromEntries(fd.entries()));
-      alert("TODO: 감상평 등록 API 연결 (POST /api/v1/reviews)");
-    }
+    console.log("[POST CREATE] local saved", { authorId, mode });
 
-    // 임시: 성공 가정 후 돌아가기
     navigate(-1);
   };
+
+      
 
   return (
     <div className="postCreate">
@@ -94,9 +107,7 @@ export default function PostCreate({ mode }: Props) {
         <button className="postCreateBack" onClick={() => navigate(-1)}>
           ←
         </button>
-        <div className="postCreateTitle">
-          {isArtist ? "작품 등록" : "감상평 작성"}
-        </div>
+        <div className="postCreateTitle">{isArtist ? "작품 등록" : "감상평 작성"}</div>
         <button className="postCreateSubmit" onClick={onSubmit}>
           등록
         </button>
@@ -149,7 +160,11 @@ export default function PostCreate({ mode }: Props) {
         ) : (
           <>
             <label className="pcLabel">감상평 제목</label>
-            <input className="pcInput" value={reviewTitle} onChange={(e) => setReviewTitle(e.target.value)} />
+            <input
+              className="pcInput"
+              value={reviewTitle}
+              onChange={(e) => setReviewTitle(e.target.value)}
+            />
 
             <label className="pcLabel">감상평 내용</label>
             <textarea
