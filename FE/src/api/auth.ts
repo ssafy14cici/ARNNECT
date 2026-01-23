@@ -43,6 +43,41 @@ function saveUsers(users: StoredUser[]) {
 }
 
 // -----------------------
+// ✅ SEED (기본 계정 자동 주입)
+// - 로컬/도커(origin 달라도) 각각의 localStorage에 자동으로 심김
+// - 이미 있으면 중복으로 안 심음
+// -----------------------
+function seedMockUsers() {
+  const list = loadUsers();
+
+  const hasUser = list.some((u) => normEmail(u.email) === "user@test.com");
+  const hasArtist = list.some((u) => normEmail(u.email) === "artist@test.com");
+
+  const next = [...list];
+
+  if (!hasUser) {
+    next.unshift({
+      email: "user@test.com",
+      password: "123456789",
+      role: "USER",
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  if (!hasArtist) {
+    next.unshift({
+      email: "artist@test.com",
+      password: "123456789",
+      role: "ARTIST",
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  // 바뀐 경우만 저장 (불필요한 write 방지)
+  if (next.length !== list.length) saveUsers(next);
+}
+
+// -----------------------
 // HELPERS (validation)
 // -----------------------
 function isEmailLike(v: string) {
@@ -65,6 +100,7 @@ function assertEmailUnique(email: string) {
 export async function apiCheckEmailDup(
   email: string
 ): Promise<{ available: boolean; reason?: string }> {
+  seedMockUsers(); // ✅ 추가
   await sleep(200);
 
   const e = email.trim();
@@ -82,6 +118,7 @@ export async function apiCheckEmailDup(
 // SIGNUP USER
 // -----------------------
 export async function apiSignupUser(payload: SignupUserRequest): Promise<void> {
+  seedMockUsers(); // ✅ 추가
   await sleep(300);
 
   const email = payload.email.trim();
@@ -112,6 +149,7 @@ export async function apiSignupUser(payload: SignupUserRequest): Promise<void> {
 // SIGNUP ARTIST
 // -----------------------
 export async function apiSignupArtist(payload: SignupArtistRequest): Promise<void> {
+  seedMockUsers(); // ✅ 추가
   await sleep(350);
 
   const email = payload.email.trim();
@@ -129,9 +167,6 @@ export async function apiSignupArtist(payload: SignupArtistRequest): Promise<voi
   if (payload.verified === "YES" && !payload.verifiedFile) {
     throw new Error("예술활동증명 서류를 업로드해주세요.");
   }
-
-  // ✅ intro/profileImage/portfolioFile은 요구사항상 선택
-  // if (!payload.portfolioFile) throw new Error("포트폴리오 파일을 업로드해주세요.");
 
   if (!payload.privacyConsent) throw new Error("개인정보 수집·이용에 동의해주세요.");
 
@@ -152,6 +187,7 @@ export async function apiSignupArtist(payload: SignupArtistRequest): Promise<voi
 // LOGIN
 // -----------------------
 export async function apiLogin(payload: LoginRequest): Promise<LoginResponse> {
+  seedMockUsers(); // ✅ 추가
   await sleep(250);
 
   const email = payload.email.trim();

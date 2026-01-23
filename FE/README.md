@@ -55,6 +55,8 @@ npm run preview
 ```bash
 npm i react-router-dom zustand
 npm i gsap @studio-freight/lenis
+npm i react-qr-code @zxing/browser
+
 
 ```
 
