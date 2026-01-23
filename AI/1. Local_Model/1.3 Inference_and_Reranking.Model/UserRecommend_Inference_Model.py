@@ -105,8 +105,9 @@ class FeatureSASRec(nn.Module):
 class TwoTowerAlign(nn.Module):
     def __init__(self, dim: int = 512, dropout: float = 0.1):
         super().__init__()
-        self.user_proj = nn.Sequential(nn.Linear(dim, dim), nn.LayerNorm(dim), nn.Dropout(dropout))
-        self.item_proj = nn.Sequential(nn.Linear(dim, dim), nn.LayerNorm(dim), nn.Dropout(dropout))
+        # ✅ 학습 코드와 동일하게 LayerNorm 제거
+        self.user_proj = nn.Sequential(nn.Linear(dim, dim), nn.Dropout(dropout))
+        self.item_proj = nn.Sequential(nn.Linear(dim, dim), nn.Dropout(dropout))
 
     def forward(self, user_vec, item_vec):
         zu = self.user_proj(user_vec)
@@ -116,6 +117,7 @@ class TwoTowerAlign(nn.Module):
     @torch.no_grad()
     def predict_user(self, user_vec):
         zu = self.user_proj(user_vec)
+        # 학습 때 F.normalize를 썼으므로 추론 때도 정규화 유지 (기존 코드 유지)
         return zu / (zu.norm(dim=-1, keepdim=True) + 1e-12)
 
     @torch.no_grad()

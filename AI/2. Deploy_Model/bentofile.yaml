@@ -1,7 +1,7 @@
-service: "service:ArtRecommender"  # service.py 파일 안의 ArtRecommender 클래스
+service: "service.py:svc"
 include:
-  - "*.py"
+  - "src/*.py"
+  - "data/*.pth"
   - "data/*.json"
-  - "checkpoints/*.pth"
 python:
   requirements_txt: "./requirements.txt"

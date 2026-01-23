@@ -111,7 +111,7 @@ def load_data():
     item_mat = torch.tensor(np.stack(matrix_list), dtype=torch.float32)
     # 정규화
     item_mat = item_mat / (item_mat.norm(dim=-1, keepdim=True) + 1e-12)
-    
+
     if not os.path.exists(LOG_PATH):
         print(f"❌ 오류: '{LOG_PATH}' 파일이 없습니다.")
         return None, None, None
@@ -121,7 +121,7 @@ def load_data():
 
     user_seq = {}
     for log in logs:
-        uid = log['user_id']
+        uid = log['member_id']
         aid = log['artwork_id']
         if aid in artwork2idx:
             if uid not in user_seq: user_seq[uid] = []
@@ -152,81 +152,91 @@ class SASRecDataset(Dataset):
 def evaluate_valid(sas_model, tt_model, user_seq, all_item_vecs, maxlen=50, device='cuda'):
     """
     Validation: 각 유저의 마지막 아이템(Target)을 맞추는지 테스트 (Leave-One-Out)
+    - 학습과 동일하게 user/item 둘 다 normalize 후 cosine(dot)로 점수 계산
+    - last_emb 미정의(UnboundLocalError) 방지: 빈 시퀀스/이상 케이스는 continue
     """
+    import numpy as np
+    import torch
+    import torch.nn.functional as F
+    from tqdm import tqdm
+
     sas_model.eval()
     tt_model.eval()
-    
+
     HR_10, HR_20 = [], []
     NDCG_10, NDCG_20 = [], []
-    
-    # 전체 아이템 임베딩 미리 계산 (TwoTower Projection)
+
+    # ✅ 전체 아이템 임베딩 미리 계산 + 정규화 (학습과 동일)
     with torch.no_grad():
         all_items_proj = tt_model.item_proj(all_item_vecs.to(device))  # (N_items, H)
-    
-    # 유저별로 평가
-    # (속도를 위해 배치 단위가 아니라 단순 루프로 진행하지만, 데이터가 매우 크면 배치 처리가 필요함)
-    # 여기서는 tqdm으로 진행상황 표시
+        all_items_proj = F.normalize(all_items_proj, p=2, dim=-1)
+
     users = [u for u in user_seq.keys() if len(user_seq[u]) >= 2]
-    
-    # 너무 오래 걸릴 경우를 대비해 최대 1000명만 랜덤 샘플링해서 평가할 수도 있음 (현재는 전체 평가)
-    # users = random.sample(users, min(len(users), 1000))
 
     with torch.no_grad():
-        for uid in users:
+        for uid in tqdm(users, desc="eval", leave=False):
             seq = user_seq[uid]
-            if len(seq) > maxlen + 1: seq = seq[-(maxlen+1):]
-            
-            # 입력: 마지막 하나 뺀 시퀀스
-            # 정답: 마지막 아이템
-            input_seq = seq[:-1] 
-            target_item = seq[-1]
-            
-            pad_len = maxlen - len(input_seq)
-            input_tensor = torch.tensor([0]*pad_len + input_seq, device=device).unsqueeze(0) # (1, maxlen)
-            
-            # 1. User Embedding (SASRec)
-            sas_out = sas_model(input_tensor) # (1, maxlen, H)
-            last_emb = sas_out[:, -1, :]      # (1, H) - 시퀀스의 마지막 시점 임베딩
-            
-            # 2. User Projection (TwoTower)
-            user_vec = tt_model.user_proj(last_emb) # (1, H)
-            
-            # 3. Score Calculation (Dot Product)
-            # (1, H) @ (N, H).T -> (1, N)
-            scores = torch.matmul(user_vec, all_items_proj.T).squeeze()
-            
-            # 4. 이미 본 아이템 마스킹 (선택사항, 여기서는 정답 맞추기므로 생략하거나 정답만 남김)
-            # 여기서는 순수하게 모든 아이템 중 랭킹을 봅니다.
-            scores[0] = -np.inf # 패딩 토큰 제외
+            if len(seq) < 2:
+                continue
 
-            # 5. Ranking
-            # 상위 20개만 뽑음 (속도 최적화)
+            # (hist -> target)
+            input_seq = seq[:-1]
+            target_item = seq[-1]
+
+            # ✅ input_seq가 비면 last_emb 만들 수 없으니 스킵
+            if len(input_seq) == 0:
+                continue
+
+            # 길면 자르고, 오른쪽 정렬(왼쪽 패딩)
+            if len(input_seq) > maxlen:
+                input_seq = input_seq[-maxlen:]
+            pad_len = maxlen - len(input_seq)
+            input_tensor = torch.tensor(([0] * pad_len + input_seq), device=device).unsqueeze(0)  # (1, maxlen)
+
+            # 1) SASRec forward
+            sas_out = sas_model(input_tensor)           # (1, maxlen, H)
+            last_emb = sas_out[:, -1, :]                # (1, H)  ✅ 항상 여기서 정의됨
+
+            # 2) TwoTower user proj + 정규화 (학습과 동일)
+            user_vec = tt_model.user_proj(last_emb)     # (1, H)
+            user_vec = F.normalize(user_vec, p=2, dim=-1)
+
+            # 3) Cosine(dot) score
+            scores = torch.matmul(user_vec, all_items_proj.T).squeeze(0)  # (N_items,)
+
+            # PAD 제외
+            scores[0] = -1e9
+
+            # (선택) 이미 본 아이템 마스킹: leave-one-out에서는 보통 hist는 제외하는 편
+            # 단, target_item은 남겨야 하므로 hist 중 target만 제외하고 마스킹
+            # for seen in set(input_seq):
+            #     if seen != target_item:
+            #         scores[seen] = -1e9
+
+            # topk
             _, top_indices = torch.topk(scores, k=20)
-            top_indices = top_indices.cpu().numpy()
-            
-            # 6. Metric Check
-            # HR (Hit Rate)
+            top_indices = top_indices.detach().cpu().numpy()
+
+            # HR
             hit_10 = 1 if target_item in top_indices[:10] else 0
             hit_20 = 1 if target_item in top_indices[:20] else 0
             HR_10.append(hit_10)
             HR_20.append(hit_20)
-            
+
             # NDCG
-            ndcg_10 = 0
-            ndcg_20 = 0
-            
+            ndcg_10 = 0.0
+            ndcg_20 = 0.0
             if hit_10:
                 rank = np.where(top_indices[:10] == target_item)[0][0]
                 ndcg_10 = 1.0 / np.log2(rank + 2)
-                
             if hit_20:
                 rank = np.where(top_indices[:20] == target_item)[0][0]
                 ndcg_20 = 1.0 / np.log2(rank + 2)
-                
+
             NDCG_10.append(ndcg_10)
             NDCG_20.append(ndcg_20)
-            
-    return np.mean(HR_10), np.mean(HR_20), np.mean(NDCG_10), np.mean(NDCG_20)
+
+    return float(np.mean(HR_10)), float(np.mean(HR_20)), float(np.mean(NDCG_10)), float(np.mean(NDCG_20))
 
 # ==========================================
 # 5. 메인 학습 루프
@@ -284,22 +294,26 @@ def main():
             # (Item - All)
             all_items_vec = sas_model.item_vectors
             item_final = tt_model.item_proj(all_items_vec)
-            item_final = F.normalize(item_final, p=2, dim=-1) # 정규화
-            
+            item_final = F.normalize(item_final, p=2, dim=-1)  # 정규화
+
             # 3. Logit 계산 (Cosine Similarity)
-            # -1 ~ 1 사이의 값이 나옵니다.
-            logits = torch.matmul(user_final, item_final.T) 
-            
-            # 🔥 핵심 변경: Temperature Scaling
-            # 값을 키워줘서 Softmax가 확실하게 동작하게 함
-            logits = logits * logit_scale 
-            
+            logits = torch.matmul(user_final, item_final.T)
+
+            # ✅ (C) PAD(0) 클래스는 절대 정답/추천 후보가 아니므로, 학습에서도 확실히 제외
+            # logits shape: (B*S, num_items+1) 라고 가정 (0번이 PAD)
+            logits[:, 0] = -1e9
+
+            # 🔥 Temperature Scaling
+            logits = logits * logit_scale
+
+            # ✅ (추가 안전장치, 선택) target이 0(PAD)인 위치는 loss에서 무시하도록 세팅 권장
+            # loss_fn = nn.CrossEntropyLoss(ignore_index=0)  # 이미 설정돼 있으면 생략
             loss = loss_fn(logits, target_ids.view(-1))
-            
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            
+
             total_loss += loss.item()
             pbar.set_postfix(loss=loss.item())
 
