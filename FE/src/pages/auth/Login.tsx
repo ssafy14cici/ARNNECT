@@ -24,6 +24,12 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
 
   const ctaText = useMemo(() => (role === "USER" ? "로그인" : "예술인 로그인"), [role]);
+  // ✅ 임시 userId/userName 생성(백엔드/목데이터에 없을 때 fallback)
+  const makeUserId = (email: string) =>
+    `u_${email.trim().toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
+
+  const makeUserName = (email: string) => email.split("@")[0] || "나";
+
 
   useEffect(() => setError(null), [role, email, password]);
 
@@ -38,6 +44,10 @@ export default function Login() {
         token: res.token,
         role: res.role === "USER" ? "general" : "artist",
         remember,
+        user: {
+          memberUuid: (res as any).memberUuid ?? makeUserId(email),
+          name: (res as any).name ?? makeUserName(email),
+        },
       });
 
       if (returnUrl) nav(returnUrl);

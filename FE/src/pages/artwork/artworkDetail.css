@@ -1,0 +1,266 @@
+.artworkDetailPage {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+  font-family: sans-serif;
+}
+
+.artworkDetailCenter {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 100px 24px;
+  font-family: sans-serif;
+  text-align: center;
+}
+
+.loadingText {
+  font-size: 18px;
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #333;
+  border-radius: 50%;
+  margin: 0 auto;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* NotFound */
+.nfImageWrap { margin-bottom: 24px; }
+.nfImage { max-width: 200px; opacity: 0.6; margin: 0 auto; display: block; }
+.nfTitle { font-size: 24px; font-weight: 700; margin-bottom: 16px; }
+.nfDesc { color: #666; margin-bottom: 32px; }
+.nfHint { color: #999; margin-top: 16px; font-size: 14px; }
+
+.primaryBtn {
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  background: #333;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Hero */
+.artworkHero {
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 32px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.artworkHeroImage {
+  width: 100%;
+  display: block;
+}
+
+.artworkHeroPlaceholder {
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.heroFallbackImage { max-width: 120px; opacity: 0.4; }
+.heroFallbackText { color: #999; font-size: 14px; }
+
+/* Header */
+.artworkHeader {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.artworkTitle {
+  font-size: 32px;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+  line-height: 1.3;
+}
+
+.artworkMetaRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.artworkArtist { font-size: 18px; color: #666; }
+
+.followBtn {
+  padding: 8px 20px;
+  background: #d4b87a;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.followBtn.following {
+  background: #f7cc70;
+}
+
+/* Actions */
+.artworkActions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 40px;
+}
+
+.likeBtn, .ghostBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: #fff;
+  color: #333;
+  border: 1px solid #e0e0e0;
+  border-radius: 24px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.likeBtn.liked {
+  background: #ff4d4f;
+  color: #fff;
+  border-color: #ff4d4f;
+}
+
+.likeIcon { display: block; }
+
+/* Desc */
+.descSection { margin-bottom: 48px; }
+.sectionTitle {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  text-align: center;
+}
+.descText {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #555;
+  text-align: center;
+  margin: 0 auto;
+  max-width: 600px;
+}
+
+/* Tags */
+.tagList {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 48px;
+}
+.tagChip {
+  padding: 6px 14px;
+  background: #f5f5f5;
+  border-radius: 20px;
+  font-size: 13px;
+  color: #666;
+}
+
+/* Comments */
+.commentsSection { margin-bottom: 60px; }
+.commentsHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.commentsTitle { font-size: 14px; font-weight: 600; margin: 0; color: #666; }
+.commentsCount { font-size: 14px; color: #999; font-weight: 500; }
+
+/* Grids */
+.gridSection {
+  border-top: 1px solid #eee;
+  padding-top: 40px;
+  margin-bottom: 60px;
+}
+.gridTitle { margin-bottom: 24px; font-size: 20px; font-weight: 700; }
+
+.gridRow {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  justify-content: space-between;
+}
+
+.artworkCard {
+  flex: 1;
+  aspect-ratio: 1/1;
+  position: relative;
+  cursor: pointer;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transition: transform 0.3s ease;
+}
+
+.artworkCard:hover { transform: scale(1.02); }
+
+.artworkCardImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: filter 0.3s ease;
+}
+
+.artworkCard:hover .artworkCardImage { filter: grayscale(0); }
+
+.artworkCardOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #fff;
+  text-align: center;
+  padding: 10px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.artworkCard:hover .artworkCardOverlay { opacity: 1; }
+
+.overlayTitle {
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 4px;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+
+.overlaySub {
+  font-size: 11px;
+  opacity: 0.9;
+  letter-spacing: 0.5px;
+}
