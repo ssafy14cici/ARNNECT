@@ -1,7 +1,6 @@
-// src/scene/enterSequence.ts
 import * as THREE from "three";
-import gsap from "gsap";
 import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import gsap from "gsap";
 
 export function runEnterSequence(args: {
   camera: THREE.PerspectiveCamera;
@@ -10,25 +9,30 @@ export function runEnterSequence(args: {
   scene: THREE.Scene;
   exterior: THREE.Group;
   interior: THREE.Group;
+
   setInteriorCamera: (camera: THREE.PerspectiveCamera, controls: OrbitControls) => void;
-  ui: any;
+  ui: {
+    flash?: (a01: number) => void;
+    setExitVisible?: (v: boolean) => void;
+    setNavVisible?: (v: boolean) => void;
+  };
+
   onDone: () => void;
 }) {
-  const { camera, controls, renderer, scene, exterior, interior, setInteriorCamera, ui, onDone } =
-    args;
+  const { camera, controls, renderer, scene, exterior, interior, setInteriorCamera, ui, onDone } = args;
 
-  const MOVE_T = 1.05;
-  const FADE_IN = 0.25;
-  const FADE_OUT = 0.55;
+  // "swoosh" + white flash + swap to interior
+  const MOVE_T = 1.0;
+  const FLASH_IN = 0.22;
+  const FLASH_OUT = 0.50;
 
-  const forwardPush = 6.5;
-  const targetLift = 1.4;
+  // Conservative forward push (avoid seeing GLB interior)
+  const forwardPush = 3.2;
+  const targetLift = 1.2;
 
   const forward = controls.target.clone().sub(camera.position).normalize();
   const endPos = camera.position.clone().add(forward.multiplyScalar(forwardPush));
-
-  const endTarget = controls.target.clone();
-  endTarget.y += targetLift;
+  const endTarget = controls.target.clone().add(new THREE.Vector3(0, targetLift, 0));
 
   const tl = gsap.timeline({ onComplete: onDone });
 
@@ -58,42 +62,33 @@ export function runEnterSequence(args: {
     0
   );
 
+  // Flash in
   tl.to(
     {},
     {
-      duration: FADE_IN,
+      duration: FLASH_IN,
       onStart: () => ui.flash?.(1),
     },
-    MOVE_T * 0.75
+    MOVE_T * 0.78
   );
 
+  // Swap while flash is ON (no visual glitch)
   tl.add(() => {
-    // ✅ 스왑
     exterior.visible = false;
     interior.visible = true;
 
-    // ✅ 내부 톤
     scene.background = new THREE.Color("#ffffff");
-    scene.fog = null; // 내부에서 fog가 있으면 얇은 벽/디테일이 날아가 보일 수 있음
-    renderer.toneMappingExposure = 1.12;
+    scene.fog = new THREE.Fog("#ffffff", 12, 220);
 
-    // ✅ 내부 카메라 프리셋 "강제 적용"
+    renderer.toneMappingExposure = 1.08;
+
     setInteriorCamera(camera, controls);
-
-    // ✅ 내부 줌/각도 제한 "강제 적용"
-    // - 줌아웃해도 방이 사라지지 않게
-    // - 뒤로 너무 젖혀서 이상한 구도를 못 만들게
-    controls.enablePan = false;
-    controls.enableZoom = true;
-    controls.enableRotate = true;
-
-    controls.minDistance = 1.8;
-    controls.maxDistance = 14.0;
-    controls.minPolarAngle = THREE.MathUtils.degToRad(10);
-    controls.maxPolarAngle = THREE.MathUtils.degToRad(85);
-
     controls.update();
+
+    ui.setExitVisible?.(true);
+    ui.setNavVisible?.(true);
   });
 
-  tl.to({}, { duration: FADE_OUT, onUpdate: () => ui.flash?.(0) }, "+=0.05");
+  // Flash out
+  tl.to({}, { duration: FLASH_OUT, onUpdate: () => ui.flash?.(0) }, "+=0.04");
 }

@@ -1,18 +1,32 @@
-// src/scene/index.ts
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import gsap from "gsap";
-import type { UiApi } from "../ui";
 
+import type { UiApi } from "../ui";
 import type { Mode } from "./state";
-import { buildInterior, applyArtworkTextureToSlot, type ArtSlot, type RoomAnchor } from "./interior";
-import { attachFramesToArtSlots, refitExistingFrameForSlot } from "./frames";
+
 import { loadMuseumExterior } from "./exterior";
+import { buildInterior, type ArtSlot } from "./interior";
+import { attachFramesToArtSlots, refitExistingFrameForSlot } from "./frames";
 import { runEnterSequence } from "./enterSequence";
+import { frameFrontView, projectWorldToScreen } from "./math";
+
+/**
+ * scene/index.ts
+ * ======================================================
+ * Fixes included:
+ * 1) Floor dot pattern: cover plane is placed above the GLB floor TOP surface (not y=0).
+ * 2) Exterior BEFORE enter: free orbit + zoom is allowed; only "punch through inside" is prevented via minDistance clamp.
+ * 3) ENTER: hold 1s UI -> swoosh move + white flash -> swap while flash is ON.
+ * 4) INTERIOR: click artwork/frame -> focus to front; prev/next wraps around (fluid path).
+ * 5) EXIT: swap/restore while flash is ON + restore EXACT starting camera/target + restore exterior zoom clamp.
+ * 6) Input safety: controls.enabled is locked during transitions to prevent user interference.
+ */
 
 export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
-  const UI = ui as any;
-
+  /* ======================================================
+   * Renderer
+   * ====================================================== */
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
@@ -24,6 +38,9 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
 
+  /* ======================================================
+   * Scene / Camera / Controls
+   * ====================================================== */
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#f6f4ef");
   scene.fog = new THREE.Fog("#f6f4ef", 80, 2200);
@@ -32,69 +49,116 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
 
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true;
-  controls.enablePan = false;
-  controls.minDistance = 10.0;
-  controls.maxDistance = 200.0;
 
+  // EXTERIOR: zoom allowed (user requested), but clamp prevents pushing "through" inside
+  controls.enableZoom = true;
+  controls.enablePan = false;
+  controls.enableRotate = true;
+  controls.minPolarAngle = THREE.MathUtils.degToRad(25);
+  controls.maxPolarAngle = THREE.MathUtils.degToRad(80);
+
+  /* ======================================================
+   * Lights (Exterior)
+   * ====================================================== */
   scene.add(new THREE.AmbientLight(0xffffff, 0.9));
   const sun = new THREE.DirectionalLight(0xffffff, 1.0);
   sun.position.set(10, 20, 10);
   scene.add(sun);
 
+  /* ======================================================
+   * Groups
+   * ====================================================== */
   const exterior = new THREE.Group();
   const interior = new THREE.Group();
   interior.visible = false;
   scene.add(exterior, interior);
 
+  /* ======================================================
+   * State
+   * ====================================================== */
   let mode: Mode = "EXTERIOR";
   let isAnimating = false;
   let glbLoaded = false;
-  let museumBounds: THREE.Box3 | null = null;
 
-  const exteriorState = {
+  // Exact exterior restore state
+  const exteriorStart = {
     cam: new THREE.Vector3(),
     target: new THREE.Vector3(),
     exposure: renderer.toneMappingExposure,
+    minDistance: 0,
+    maxDistance: 0,
   };
 
-  // ===== Interior =====
-  const { artworks, artSlots, roomAnchors, setInteriorCamera } = buildInterior(interior);
+  /* ======================================================
+   * Interior build + frames
+   * ====================================================== */
+  const { artworks, artSlots, setInteriorCamera } = buildInterior(interior);
 
+  // Attach frames (async, safe)
   attachFramesToArtSlots({
     glbUrl: `${import.meta.env.BASE_URL}models/frame.glb`,
     artSlots,
-    look: "wood",
-  });
+    materialStyle: "gold",
+  }).catch((e) => console.error("frame.glb load failed:", e));
 
-  // ===== UI loading =====
-  UI.setLoadingVisible?.(true);
-  UI.setLoadingProgress?.(0);
-  UI.setEnterEnabled?.(false, "Loading…");
-  UI.setHeroVisible?.(true);
+  /* ======================================================
+   * UI init
+   * ====================================================== */
+  ui.setHeroVisible(true);
+  ui.setLoadingVisible(true);
+  ui.setLoadingProgress(0);
+  ui.setEnterEnabled(false, "Loading…");
+  ui.setExitVisible(false);
+  ui.setNavVisible(false);
+  ui.flash(0);
 
-  // ===== Exterior load =====
+  /* ======================================================
+   * Load Exterior Museum
+   * ====================================================== */
   loadMuseumExterior({
     parent: exterior,
     url: `${import.meta.env.BASE_URL}models/simu_museum.glb`,
-    floorCover: { enabled: true, color: "#ffffff", size: 900, y: 0.06 },
-    onProgress: (p) => UI.setLoadingProgress?.(p),
-    onLoaded: (museumScene, bounds) => {
-      frameFrontView(camera, controls, museumScene, { fill: 0.86, yawDeg: 90, pitchDeg: 0, lift: 0.1 });
-      museumBounds = bounds;
+    overrideFloorPattern: true, // remove dots/pattern
+    floorColor: "#f6f4ef",
+    addArnnectSign: false,
+    onProgress: (p01) => ui.setLoadingProgress(p01),
+    onLoaded: (museumScene) => {
+      // Exterior "front" framing
+      const FRONT_YAW_DEG = 90; // change only among 0/90/-90/180 if needed
+      frameFrontView(camera, controls, museumScene, {
+        fill: 0.86,
+        yawDeg: FRONT_YAW_DEG,
+        pitchDeg: 0,
+        lift: 0.1,
+      });
+
+      // Exterior zoom clamp: allow zoom, but prevent punching through
+      const startDist = camera.position.distanceTo(controls.target);
+      controls.minDistance = startDist * 0.58;  // tune 0.55~0.70
+      controls.maxDistance = startDist * 2.8;
+
+      // Save for exact Exit restore
+      exteriorStart.cam.copy(camera.position);
+      exteriorStart.target.copy(controls.target);
+      exteriorStart.exposure = renderer.toneMappingExposure;
+      exteriorStart.minDistance = controls.minDistance;
+      exteriorStart.maxDistance = controls.maxDistance;
 
       glbLoaded = true;
-      UI.setLoadingVisible?.(false);
-      UI.setLoadingProgress?.(1);
-      UI.setEnterEnabled?.(true, "Hold ENTER for 1s");
+      ui.setLoadingVisible(false);
+      ui.setLoadingProgress(1);
+      ui.setEnterEnabled(true, "Hold for 1s");
     },
     onError: (err) => {
-      console.error(err);
-      UI.setLoadingVisible?.(false);
-      UI.setEnterEnabled?.(false, "Load failed");
+      console.error("museum glb load failed:", err);
+      ui.setLoadingVisible(false);
+      ui.setEnterEnabled(false, "Load failed");
     },
   });
 
-  // ===== Enter =====
+  /* ======================================================
+   * ENTER (hold 1s) -> Interior
+   * ====================================================== */
   const enterHandler = () => {
     if (!glbLoaded) return;
     if (mode !== "EXTERIOR") return;
@@ -103,12 +167,10 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
     isAnimating = true;
     mode = "TRANSITION";
 
-    UI.setHeroVisible?.(false);
-    UI.setEnterEnabled?.(false, "Entering…");
+    ui.setEnterEnabled(false, "Entering…");
+    ui.setHeroVisible(false);
 
-    exteriorState.cam.copy(camera.position);
-    exteriorState.target.copy(controls.target);
-    exteriorState.exposure = renderer.toneMappingExposure;
+    controls.enabled = false;
 
     runEnterSequence({
       camera,
@@ -118,62 +180,196 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
       exterior,
       interior,
       setInteriorCamera,
-      ui: UI,
+      ui: {
+        flash: ui.flash,
+        setExitVisible: ui.setExitVisible,
+        setNavVisible: ui.setNavVisible,
+      },
       onDone: () => {
         mode = "INTERIOR";
         isAnimating = false;
-        UI.setExitVisible?.(true);
+
+        // Interior: allow zoom + reasonable clamps
+        controls.enableZoom = true;
+        controls.minDistance = 6.5;
+        controls.maxDistance = 20.0;
+
+        // Restrict rotation so user doesn't spin behind walls too much
+        controls.minAzimuthAngle = THREE.MathUtils.degToRad(-70);
+        controls.maxAzimuthAngle = THREE.MathUtils.degToRad(70);
+        controls.minPolarAngle = THREE.MathUtils.degToRad(20);
+        controls.maxPolarAngle = THREE.MathUtils.degToRad(82);
+
+        controls.enabled = true;
+
+        ui.setNavHint("← / → : focus,  UPLOAD : apply to selected");
       },
     });
   };
 
-  UI.onEnterHold?.(enterHandler);
+  ui.onEnterHold(enterHandler);
 
-  // ===== Exit =====
-  UI.onExit?.(() => {
+  /* ======================================================
+   * EXIT (Interior -> Exterior) : swap during flash ON
+   * ====================================================== */
+  ui.onExit(() => {
     if (mode !== "INTERIOR") return;
     if (isAnimating) return;
 
     isAnimating = true;
     mode = "TRANSITION";
 
-    UI.setExitVisible?.(false);
-    UI.closePanel?.();
+    ui.setExitVisible(false);
+    ui.setNavVisible(false);
+    ui.closePanel();
 
-    const tl = gsap.timeline({
+    controls.enabled = false;
+
+    gsap.timeline({
       onComplete: () => {
         mode = "EXTERIOR";
         isAnimating = false;
-        UI.setHeroVisible?.(true);
-        UI.setEnterEnabled?.(true, "Hold ENTER for 1s");
+        controls.enabled = true;
 
-        // 외부 컨트롤 범위 복귀
-        controls.minDistance = 10.0;
-        controls.maxDistance = 200.0;
-        controls.minPolarAngle = 0;
-        controls.maxPolarAngle = Math.PI;
+        ui.setHeroVisible(true);
+        ui.setEnterEnabled(true, "Hold for 1s");
       },
-    });
-
-    tl.to({}, { duration: 0.18, onStart: () => UI.flash?.(1) });
-
-    tl.add(() => {
+    })
+    .to({}, { duration: 0.16, onStart: () => ui.flash(1) })
+    .add(() => {
+      // swap while flash is ON
       interior.visible = false;
       exterior.visible = true;
 
       scene.background = new THREE.Color("#f6f4ef");
       scene.fog = new THREE.Fog("#f6f4ef", 80, 2200);
-      renderer.toneMappingExposure = exteriorState.exposure;
+      renderer.toneMappingExposure = exteriorStart.exposure;
 
-      camera.position.copy(exteriorState.cam);
-      controls.target.copy(exteriorState.target);
+      camera.position.copy(exteriorStart.cam);
+      controls.target.copy(exteriorStart.target);
+
+      // Restore EXTERIOR controls: zoom allowed with clamp (no punch-through)
+      controls.enableZoom = true;
+      controls.minDistance = exteriorStart.minDistance;
+      controls.maxDistance = exteriorStart.maxDistance;
+
+      controls.minAzimuthAngle = -Infinity;
+      controls.maxAzimuthAngle = Infinity;
+      controls.minPolarAngle = THREE.MathUtils.degToRad(25);
+      controls.maxPolarAngle = THREE.MathUtils.degToRad(80);
       controls.update();
-    });
-
-    tl.to({}, { duration: 0.45, onUpdate: () => UI.flash?.(0) }, "+=0.04");
+    })
+    .to({}, { duration: 0.42, onUpdate: () => ui.flash(0) }, "+=0.02");
   });
 
-  // ===== Artwork click =====
+  /* ======================================================
+   * Interior navigation (waypoints + prev/next + upload)
+   * ====================================================== */
+  let selectedSlotId: string = artSlots[0]?.id ?? "";
+
+  function getSlotById(id: string) {
+    return artSlots.find((s) => s.id === id);
+  }
+
+  function getSlotCenterWorld(slot: ArtSlot) {
+    const c = new THREE.Vector3();
+    slot.plane.getWorldPosition(c);
+    return c;
+  }
+
+  function getSlotNormalWorld(slot: ArtSlot) {
+    const q = new THREE.Quaternion();
+    slot.group.getWorldQuaternion(q);
+    return new THREE.Vector3(0, 0, 1).applyQuaternion(q).normalize();
+  }
+
+  function goToSlot(slot: ArtSlot) {
+    if (mode !== "INTERIOR") return;
+    if (isAnimating) return;
+
+    selectedSlotId = slot.id;
+
+    const center = getSlotCenterWorld(slot);
+    const n = getSlotNormalWorld(slot);
+
+    // View from the front
+    const dist = 6.2;
+    const viewPos = center.clone().add(n.multiplyScalar(dist)).add(new THREE.Vector3(0, 0.15, 0));
+    const viewTarget = center.clone().add(new THREE.Vector3(0, 0.08, 0));
+
+    isAnimating = true;
+    gsap.timeline({
+      onComplete: () => {
+        isAnimating = false;
+      },
+    })
+    .to(camera.position, {
+      duration: 0.85,
+      x: viewPos.x,
+      y: viewPos.y,
+      z: viewPos.z,
+      ease: "power2.inOut",
+      onUpdate: () => controls.update(),
+    }, 0)
+    .to(controls.target, {
+      duration: 0.85,
+      x: viewTarget.x,
+      y: viewTarget.y,
+      z: viewTarget.z,
+      ease: "power2.inOut",
+      onUpdate: () => controls.update(),
+    }, 0);
+  }
+
+  // wrap-around prev/next (fluid path)
+  function goPrev() {
+    if (mode !== "INTERIOR") return;
+    const idx = artSlots.findIndex((s) => s.id === selectedSlotId);
+    if (idx < 0 || artSlots.length === 0) return;
+    const next = artSlots[(idx - 1 + artSlots.length) % artSlots.length];
+    goToSlot(next);
+  }
+
+  function goNext() {
+    if (mode !== "INTERIOR") return;
+    const idx = artSlots.findIndex((s) => s.id === selectedSlotId);
+    if (idx < 0 || artSlots.length === 0) return;
+    const next = artSlots[(idx + 1) % artSlots.length];
+    goToSlot(next);
+  }
+
+  ui.onPrev(goPrev);
+  ui.onNext(goNext);
+
+  ui.onWaypointClick((id) => {
+    const s = getSlotById(id);
+    if (s) goToSlot(s);
+  });
+
+  // Keyboard (interior only)
+  window.addEventListener("keydown", (e) => {
+    if (mode !== "INTERIOR") return;
+    if (e.key === "ArrowLeft") goPrev();
+    if (e.key === "ArrowRight") goNext();
+    if (e.key === "Escape") ui.closePanel();
+  });
+
+  // Upload applies to selected slot
+  ui.onUpload(async () => {
+    if (mode !== "INTERIOR") return;
+    const slot = getSlotById(selectedSlotId);
+    if (!slot) return;
+
+    const file = await pickImageFile();
+    if (!file) return;
+
+    const { texture, width, height } = await loadTextureFromFile(file);
+
+    applyArtworkToSlot(slot, texture, width, height);
+    refitExistingFrameForSlot(slot); // auto refit frame
+  });
+
+  // Click artwork OR frame => select + focus
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
 
@@ -188,84 +384,66 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
     const hits = raycaster.intersectObjects(artworks, true);
     if (hits.length === 0) return;
 
-    const meta = hits[0].object.userData?.art as
-      | { id: string; title: string; desc: string }
-      | undefined;
+    // Slot id can be on clicked mesh or any parent (frame meshes)
+    let obj: THREE.Object3D | null = hits[0].object;
+    let slotId: string | undefined;
 
-    if (!meta) return;
-    UI.openPanel?.(meta.title, meta.desc);
-  });
+    while (obj && !slotId) {
+      slotId = (obj as any).userData?.slotId as string | undefined;
+      obj = obj.parent;
+    }
 
-  // ===== Upload hook =====
-  UI.onArtworkUpload?.(async (slotId: string, payload: File | string) => {
-    const slot = findSlot(artSlots, slotId);
+    if (!slotId) return;
+
+    const slot = getSlotById(slotId);
     if (!slot) return;
 
-    try {
-      const tex = await loadTextureFromPayload(payload);
-      applyArtworkTextureToSlot(slot, tex);
-      refitExistingFrameForSlot(slot);
-    } catch (err) {
-      console.error("[upload] failed:", err);
-      UI.toast?.("Image apply failed");
-    }
+    selectedSlotId = slot.id;
+    goToSlot(slot);
+
+    ui.openPanel(slot.label, "Selected. Use UPLOAD to apply an image to this frame.");
   });
 
-  // ===== Room navigation (ArrowLeft / ArrowRight) =====
-  let roomIndex = 0;
-  let navAnimating = false;
-
-  window.addEventListener("keydown", (e) => {
-    if (mode !== "INTERIOR") return;
-    if (navAnimating) return;
-
-    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-      e.preventDefault();
-
-      roomIndex += e.key === "ArrowRight" ? 1 : -1;
-      if (roomIndex < 0) roomIndex = roomAnchors.length - 1;
-      if (roomIndex >= roomAnchors.length) roomIndex = 0;
-
-      const a = roomAnchors[roomIndex];
-      navAnimating = true;
-
-      gsap.to(camera.position, {
-        duration: 0.65,
-        x: a.cam.x,
-        y: a.cam.y,
-        z: a.cam.z,
-        ease: "power2.inOut",
-        onUpdate: () => controls.update(),
-      });
-
-      gsap.to(controls.target, {
-        duration: 0.65,
-        x: a.target.x,
-        y: a.target.y,
-        z: a.target.z,
-        ease: "power2.inOut",
-        onUpdate: () => controls.update(),
-        onComplete: () => {
-          navAnimating = false;
-        },
-      });
+  /* ======================================================
+   * Loop: render + interior waypoints update
+   * ====================================================== */
+  function updateWaypoints() {
+    if (mode !== "INTERIOR") {
+      ui.setWaypoints([]);
+      return;
     }
-  });
 
-  // ===== Loop =====
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    const pts = artSlots.map((s) => {
+      const center = getSlotCenterWorld(s);
+      center.y += 0.15;
+
+      const p = projectWorldToScreen(center, camera, w, h);
+      return {
+        id: s.id,
+        x: p.x,
+        y: p.y,
+        active: s.id === selectedSlotId,
+        hidden: !p.visible,
+      };
+    });
+
+    ui.setWaypoints(pts);
+  }
+
   function tick() {
     controls.update();
-
-    // 외부에서만 줌 침투 방지
-    if (mode === "EXTERIOR" && museumBounds) {
-      preventZoomPenetration(camera, controls, museumBounds);
-    }
-
     renderer.render(scene, camera);
+    updateWaypoints();
     requestAnimationFrame(tick);
   }
   tick();
 
+  /* ======================================================
+   * Resize
+   * ====================================================== */
   window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -273,84 +451,59 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
   });
 }
 
-// ===== Helpers =====
-function frameFrontView(
-  camera: THREE.PerspectiveCamera,
-  controls: OrbitControls,
-  object: THREE.Object3D,
-  opts?: { fill?: number; yawDeg?: number; pitchDeg?: number; lift?: number }
-) {
-  const fill = opts?.fill ?? 0.86;
-  const yaw = THREE.MathUtils.degToRad(opts?.yawDeg ?? 0);
-  const pitch = THREE.MathUtils.degToRad(opts?.pitchDeg ?? 0);
-  const lift = opts?.lift ?? 0.1;
+/* ======================================================
+ * Upload helpers
+ * ====================================================== */
 
-  const box = new THREE.Box3().setFromObject(object);
-  const size = new THREE.Vector3();
-  const center = new THREE.Vector3();
-  box.getSize(size);
-  box.getCenter(center);
-
-  const dir = new THREE.Vector3(0, 0, 1);
-  dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-  dir.applyAxisAngle(new THREE.Vector3(1, 0, 0), pitch);
-  dir.normalize();
-
-  const target = center.clone();
-  target.y = box.min.y + size.y * (0.5 + lift);
-
-  const vFov = THREE.MathUtils.degToRad(camera.fov);
-  const aspect = camera.aspect;
-  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
-
-  const distV = (size.y / (2 * Math.tan(vFov / 2))) / fill;
-  const distH = (Math.max(size.x, size.z) / (2 * Math.tan(hFov / 2))) / fill;
-  const dist = Math.max(distV, distH);
-
-  camera.position.copy(target.clone().add(dir.multiplyScalar(dist)));
-  camera.near = Math.max(0.1, dist / 200);
-  camera.far = Math.max(4000, dist * 20);
-  camera.updateProjectionMatrix();
-
-  controls.target.copy(target);
-  controls.update();
+async function pickImageFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = () => resolve(input.files?.[0] ?? null);
+    input.click();
+  });
 }
 
-function preventZoomPenetration(camera: THREE.PerspectiveCamera, controls: OrbitControls, bounds: THREE.Box3) {
-  if (!bounds.containsPoint(camera.position)) return;
+async function loadTextureFromFile(file: File): Promise<{ texture: THREE.Texture; width: number; height: number }> {
+  const url = URL.createObjectURL(file);
 
-  const dir = camera.position.clone().sub(controls.target);
-  if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1);
-  dir.normalize();
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const im = new Image();
+    im.decoding = "async";
+    im.onload = () => resolve(im);
+    im.onerror = reject;
+    im.src = url;
+  });
 
-  for (let i = 0; i < 120; i++) {
-    if (!bounds.containsPoint(camera.position)) break;
-    camera.position.addScaledVector(dir, 0.12);
-  }
+  const tex = new THREE.Texture(img);
+  tex.needsUpdate = true;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
 
-  if (bounds.containsPoint(camera.position)) {
-    const MIN_DIST = Math.max(controls.minDistance ?? 10, 10);
-    camera.position.copy(controls.target.clone().add(dir.multiplyScalar(MIN_DIST)));
-  }
+  return { texture: tex, width: img.naturalWidth || img.width, height: img.naturalHeight || img.height };
 }
 
-function findSlot(slots: ArtSlot[], id: string) {
-  return slots.find((s) => s.id === id) ?? null;
-}
+/**
+ * Recompute plane size to "contain" the image inside slot.maxW/maxH and apply texture.
+ */
+function applyArtworkToSlot(slot: ArtSlot, texture: THREE.Texture, imgW: number, imgH: number) {
+  const aspect = imgW / Math.max(1, imgH);
 
-async function loadTextureFromPayload(payload: File | string) {
-  const loader = new THREE.TextureLoader();
+  let w = slot.maxW;
+  let h = w / aspect;
 
-  if (typeof payload !== "string") {
-    const url = URL.createObjectURL(payload);
-    try {
-      const tex = await new Promise<THREE.Texture>((res, rej) => loader.load(url, res, undefined, rej));
-      return tex;
-    } finally {
-      URL.revokeObjectURL(url);
-    }
+  if (h > slot.maxH) {
+    h = slot.maxH;
+    w = h * aspect;
   }
 
-  const tex = await new Promise<THREE.Texture>((res, rej) => loader.load(payload, res, undefined, rej));
-  return tex;
+  slot.plane.geometry.dispose();
+  slot.plane.geometry = new THREE.PlaneGeometry(w, h);
+
+  const mat = slot.plane.material as THREE.MeshStandardMaterial;
+  mat.map = texture;
+  mat.roughness = 0.82;
+  mat.metalness = 0.02;
+  mat.needsUpdate = true;
 }
