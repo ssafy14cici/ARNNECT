@@ -5,15 +5,12 @@ export type LoadExteriorArgs = {
   parent: THREE.Group;
   url: string;
 
-  // Remove dotted/patterned floor by overlaying a clean cover plane (no GLB material edits)
+  // 도트/패턴 바닥 제거용: 큰 플레인으로 덮어버림(건물 색/재질 건드리지 않음)
   overrideFloorPattern?: boolean;
   floorColor?: string;
 
-  // Optional: overlay an "ARNNECT" sign without editing GLB
-  addArnnectSign?: boolean;
-
   onProgress?: (p01: number) => void;
-  onLoaded?: (museumScene: THREE.Object3D) => void;
+  onLoaded?: (museumScene: THREE.Object3D, museumBox: THREE.Box3) => void;
   onError?: (err: unknown) => void;
 };
 
@@ -23,7 +20,6 @@ export function loadMuseumExterior(args: LoadExteriorArgs) {
     url,
     overrideFloorPattern = true,
     floorColor = "#f6f4ef",
-    addArnnectSign = false,
     onProgress,
     onLoaded,
     onError,
@@ -38,162 +34,57 @@ export function loadMuseumExterior(args: LoadExteriorArgs) {
     (gltf) => {
       const museum = gltf.scene;
 
-      // 1) Center align (XZ)
-      const box = new THREE.Box3().setFromObject(museum);
+      // 1) 중심 정렬 (x,z 중심 기준)
+      const box0 = new THREE.Box3().setFromObject(museum);
       const center = new THREE.Vector3();
-      box.getCenter(center);
+      box0.getCenter(center);
+      museum.position.sub(center);
 
-      museum.position.x -= center.x;
-      museum.position.z -= center.z;
-
-      // 2) Ground align (minY -> 0)
-      const box2 = new THREE.Box3().setFromObject(museum);
-      museum.position.y -= box2.min.y;
+      // 2) 바닥(minY) -> 0
+      const box1 = new THREE.Box3().setFromObject(museum);
+      museum.position.y -= box1.min.y;
 
       parent.add(museum);
 
-      // 3) Floor cover to hide GLB floor pattern
+      // 3) 외부 도트/패턴 바닥 제거
+      // - GLB 바닥이 반드시 y=0이 아닐 수 있어, "정확한 바닥 상면"을 추정해서 그 위에 덮개를 올립니다.
       if (overrideFloorPattern) {
-        addFloorCover({
-          parent,
-          museum,
-          color: floorColor,
-        });
-      }
+        const museumBox = new THREE.Box3().setFromObject(museum);
+        const floorTopY = museumBox.min.y; // 정렬 이후 minY가 0이 되도록 맞췄으니 보통 0
+        // 다만 모델에 따라 minY가 미세하게 바뀔 수 있어 안정 오프셋을 크게 둠
+        const coverY = floorTopY + 0.06;
 
-      // 4) Optional: overlay sign (no GLB edit)
-      if (addArnnectSign) {
-        const tex = makeTextTexture("ARNNECT");
-        const sign = new THREE.Mesh(
-          new THREE.PlaneGeometry(3.2, 0.8),
-          new THREE.MeshBasicMaterial({ map: tex, transparent: true })
+        const cover = new THREE.Mesh(
+          new THREE.PlaneGeometry(3200, 3200),
+          new THREE.MeshStandardMaterial({
+            color: new THREE.Color(floorColor),
+            roughness: 0.96,
+            metalness: 0.0,
+            depthWrite: true,
+          })
         );
-        // Position is model-dependent; adjust if necessary.
-        sign.position.set(0, 5.6, 2.35);
-        parent.add(sign);
+        cover.name = "FLOOR_COVER";
+        cover.rotation.x = -Math.PI / 2;
+        cover.position.set(0, coverY, 0);
+        cover.receiveShadow = false;
+        cover.renderOrder = 999;
+
+        const m = cover.material as THREE.MeshStandardMaterial;
+        m.polygonOffset = true;
+        m.polygonOffsetFactor = -4;
+        m.polygonOffsetUnits = -16;
+
+        parent.add(cover);
       }
 
-      onLoaded?.(museum);
+      const finalBox = new THREE.Box3().setFromObject(museum);
+      onLoaded?.(museum, finalBox);
     },
     (xhr) => {
       if (xhr.total && xhr.total > 0) onProgress?.(xhr.loaded / xhr.total);
     },
-    (err) => onError?.(err)
-  );
-}
-
-/**
- * Adds a floor cover plane ABOVE the GLB floor top surface.
- * Key fix: do NOT assume y=0 is the floor top (many GLBs have thickness).
- */
-function addFloorCover(args: { parent: THREE.Group; museum: THREE.Object3D; color: string }) {
-  const { parent, museum, color } = args;
-
-  // Compute bounds for size and center.
-  const bounds = new THREE.Box3().setFromObject(museum);
-  const size = new THREE.Vector3();
-  const centerW = new THREE.Vector3();
-  bounds.getSize(size);
-  bounds.getCenter(centerW);
-
-  // Find floor top (world y).
-  const floorTopY_W = findFloorTopYWorld(museum);
-
-  // Convert center and floor top to parent local coordinates (safe even if parent is transformed).
-  const centerL = centerW.clone();
-  parent.worldToLocal(centerL);
-
-  const floorTopPtW = new THREE.Vector3(centerW.x, floorTopY_W, centerW.z);
-  const floorTopPtL = floorTopPtW.clone();
-  parent.worldToLocal(floorTopPtL);
-
-  const EPS = Math.max(0.03, size.y * 0.002); // robust anti z-fighting
-  const coverY = floorTopPtL.y + EPS;
-
-  const coverSize = Math.max(size.x, size.z) * 2.2;
-
-  const mat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(color),
-    roughness: 0.98,
-    metalness: 0.0,
-  });
-
-  // Stronger polygon offset helps at long distances (removes dotted artifacts).
-  mat.polygonOffset = true;
-  mat.polygonOffsetFactor = -4;
-  mat.polygonOffsetUnits = -4;
-
-  const cover = new THREE.Mesh(new THREE.PlaneGeometry(coverSize, coverSize), mat);
-  cover.name = "FLOOR_COVER_WHITE";
-  cover.rotation.x = -Math.PI / 2;
-  cover.position.set(centerL.x, coverY, centerL.z);
-
-  // Ensure it wins in tie cases without disabling depth test.
-  cover.renderOrder = 2;
-  cover.receiveShadow = true;
-
-  parent.add(cover);
-}
-
-/**
- * Heuristic to find the top surface Y of the floor in world coordinates.
- * Looks for large, thin meshes near ground and returns the maximum of their bounding box max.y.
- */
-function findFloorTopYWorld(root: THREE.Object3D) {
-  const tmpBox = new THREE.Box3();
-  const tmpSize = new THREE.Vector3();
-
-  let bestTop = 0;
-  let found = false;
-
-  root.traverse((o) => {
-    const m = o as THREE.Mesh;
-    if (!m || !(m as any).isMesh) return;
-    if (!m.geometry) return;
-
-    tmpBox.setFromObject(m);
-    tmpBox.getSize(tmpSize);
-
-    const bigXZ = tmpSize.x * tmpSize.z;
-    const thinY = tmpSize.y < 0.8;      // allow some thickness/steps
-    const nearGround = tmpBox.min.y < 1.5;
-
-    if (bigXZ > 80 && thinY && nearGround) {
-      found = true;
-      bestTop = Math.max(bestTop, tmpBox.max.y);
+    (err) => {
+      onError?.(err);
     }
-  });
-
-  return found ? bestTop : 0;
-}
-
-function makeTextTexture(text: string) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 128;
-  const ctx = canvas.getContext("2d")!;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  ctx.fillStyle = "rgba(255,255,255,0)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.fillStyle = "rgba(20,20,20,0.85)";
-  ctx.font = "700 72px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
-  // Manual "letter spacing" approximation (no ctx.letterSpacing in Canvas 2D API)
-  const letters = text.split("");
-  const spacing = 14;
-  const totalW = (letters.length - 1) * spacing;
-  let x = canvas.width / 2 - totalW / 2;
-  for (const ch of letters) {
-    ctx.fillText(ch, x, canvas.height / 2);
-    x += spacing;
-  }
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.needsUpdate = true;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  );
 }

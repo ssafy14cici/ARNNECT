@@ -1,1 +1,1 @@
-export type Mode = "EXTERIOR" | "TRANSITION" | "INTERIOR";
+export type Mode = "EXTERIOR" | "TRANSITION" | "EXHIBITION_CSS";

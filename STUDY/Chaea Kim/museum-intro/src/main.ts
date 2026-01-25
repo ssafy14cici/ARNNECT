@@ -1,5 +1,6 @@
 import { createScene } from "./scene";
 import { mountUI } from "./ui";
+import "./exhibition/exhibition.css";
 
 function ensureRoot(): HTMLElement {
   const app = document.querySelector<HTMLElement>("#app");
@@ -8,7 +9,6 @@ function ensureRoot(): HTMLElement {
   const root = document.querySelector<HTMLElement>("#root");
   if (root) return root;
 
-  // 최후 폴백
   const div = document.createElement("div");
   div.id = "app";
   document.body.appendChild(div);
@@ -23,7 +23,6 @@ function ensureCanvas(root: HTMLElement): HTMLCanvasElement {
     root.appendChild(canvas);
   }
 
-  // 전체화면 캔버스
   Object.assign(canvas.style, {
     position: "fixed",
     inset: "0",
@@ -33,7 +32,6 @@ function ensureCanvas(root: HTMLElement): HTMLCanvasElement {
     outline: "none",
   });
 
-  // 페이지 기본 스타일(스크롤/여백 제거)
   document.documentElement.style.height = "100%";
   document.body.style.height = "100%";
   document.body.style.margin = "0";
