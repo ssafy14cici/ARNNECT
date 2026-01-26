@@ -152,4 +152,6 @@ export function runEnterSequence(args: {
     ease: "power2.inOut",
     onUpdate: () => ui?.flash?.(flash.a),
   });
+
+  return tl;
 }

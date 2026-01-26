@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import gsap from "gsap";
 
 import type { UiApi } from "../ui";
 import type { Mode } from "./state";
@@ -57,6 +58,7 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
   let animationMixer: THREE.AnimationMixer | null = null;
   let doorAnimationAction: THREE.AnimationAction | null = null;
   let museumScene: THREE.Object3D | null = null;
+  let enterTimeline: any = null;
 
   const exteriorStart = {
     cam: new THREE.Vector3(),
@@ -93,10 +95,16 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
       restoreExterior();
     },
     onOpenArtwork: ({roomIndex, side, src}) => {
-      console.log("DETAIL: ", {roomIndex, side, src});
-      // 임시 페이지로 이동
+      console.log("=== 작품 클릭 ===");
+      console.log("Room:", roomIndex, "Side:", side);
+      console.log("Src:", src);
+      // SPA 방식으로 페이지 이동 (새로고침 없음)
       const q = new URLSearchParams({room: String(roomIndex), side, src});
-      window.location.href = `/artwork?${q.toString()}`;
+      const url = `/artwork?${q.toString()}`;
+      console.log("이동할 URL:", url);
+      history.pushState(null, "", url);
+      // 커스텀 이벤트 발생시켜 라우터에 알림
+      window.dispatchEvent(new PopStateEvent("popstate"));
     },
     // (payload) => {
     //   const q = new URLSearchParams({
@@ -112,10 +120,35 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
     mode = "TRANSITION";
     isAnimating = true;
 
+    console.log("=== 전시장 복귀 시작 ===");
+    console.log("복귀 전 카메라:", camera.position);
+    console.log("복귀 전 타겟:", controls.target);
+
+    // ✅ GSAP 애니메이션 완전히 중지 (배경색 덮어쓰기 방지)
+    if (enterTimeline) {
+      enterTimeline.kill();
+      enterTimeline = null;
+    }
+    // 모든 scene 관련 GSAP 트윈 제거
+    gsap.killTweensOf(scene);
+    gsap.killTweensOf(scene.background);
+    if (scene.fog) gsap.killTweensOf(scene.fog);
+    gsap.killTweensOf(renderer);
+    gsap.killTweensOf(camera);
+    gsap.killTweensOf(camera.position);
+    gsap.killTweensOf(controls.target);
+
     exhibition.hide();
     canvas.style.display = "block";
     exterior.visible = true;
 
+    // ✅ 문 애니메이션 리셋 (나갈 때 문 닫기)
+    if (doorAnimationAction) {
+      doorAnimationAction.stop();
+      doorAnimationAction.time = 0;
+    }
+
+    // ✅ 배경과 안개를 완전히 새로 생성 (GSAP 참조 제거)
     scene.background = new THREE.Color("#87ceeb");
     scene.fog = new THREE.Fog("#a0d8ef", 200, 3000);
     renderer.toneMappingExposure = exteriorStart.exposure;
@@ -132,16 +165,76 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
     controls.maxPolarAngle = THREE.MathUtils.degToRad(80);
     controls.update();
 
+    console.log("복귀 후 카메라:", camera.position);
+    console.log("복귀 후 타겟:", controls.target);
+    console.log("배경 색상 (바로 후):", scene.background);
+    console.log("안개 색상 (바로 후):", scene.fog ? (scene.fog as THREE.Fog).color : null);
+    console.log("===================");
+
     uiCall("setHeroVisible", true);
     uiCall("setEnterEnabled", true, "Hold for 1s");
 
     uiCall("flash", 1);
     requestAnimationFrame(() => {
       uiCall("flash", 0);
+
+      // ✅ 한 프레임 후 다시 한 번 배경색 강제 설정
+      scene.background = new THREE.Color("#87ceeb");
+      if (scene.fog && (scene.fog as THREE.Fog).isFog) {
+        (scene.fog as THREE.Fog).color.set("#a0d8ef");
+      }
+
+      console.log("배경 색상 (1프레임 후):", scene.background);
+      console.log("안개 색상 (1프레임 후):", scene.fog ? (scene.fog as THREE.Fog).color : null);
+
       mode = "EXTERIOR";
       isAnimating = false;
     });
   }
+
+  // ✅ 전시장 배경 고정 함수 (디테일 페이지에서 복귀 시 사용)
+  function applyExhibitionBackground() {
+    // 전시장에서는 하늘색이 아니라 실내 톤으로 고정
+    scene.background = new THREE.Color("#ffffff");
+    scene.fog = null; // 전시장에서는 안개 불필요
+    renderer.toneMappingExposure = 1.0;
+  }
+
+  // ✅ 디테일 페이지에서 전시장으로 복귀하는 함수
+  function restoreExhibitionFromDetail() {
+    mode = "EXHIBITION_CSS" as Mode;
+    isAnimating = false;
+
+    console.log("=== 디테일 페이지에서 전시장 복귀 ===");
+
+    // GSAP 애니메이션 완전히 중지
+    if (enterTimeline) {
+      enterTimeline.kill();
+      enterTimeline = null;
+    }
+    gsap.killTweensOf(scene);
+    gsap.killTweensOf(scene.background);
+    if (scene.fog) gsap.killTweensOf(scene.fog);
+    gsap.killTweensOf(renderer);
+    gsap.killTweensOf(camera);
+    gsap.killTweensOf(camera.position);
+    gsap.killTweensOf(controls.target);
+
+    // 배경을 전시장 톤으로 설정
+    applyExhibitionBackground();
+
+    // 한 프레임 후 다시 한 번 강제 설정
+    requestAnimationFrame(() => {
+      applyExhibitionBackground();
+      console.log("전시장 배경 복원 완료:", scene.background);
+    });
+  }
+
+  // ✅ 외부에서 호출할 수 있게 노출
+  (window as any).__SCENE_API__ = {
+    restoreExhibitionFromDetail,
+    restoreExterior,
+  };
 
   uiCall("setHeroVisible", true);
   uiCall("setLoadingVisible", true);
@@ -170,13 +263,22 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
         }
       }
 
-      const FRONT_YAW_DEG = 90;
+      // ✅ 정원 방향을 정면으로 설정 (기존 90도에서 270도로 변경 = 180도 회전)
+      const FRONT_YAW_DEG = 270;
       const { dist } = frameFrontView(camera, controls, museumScene, {
-        fill: 0.86,
+        fill: 1.5, // ✅ 값이 클수록 건물이 크게 보임 (카메라가 가까워짐)
         yawDeg: FRONT_YAW_DEG,
         pitchDeg: -15,
         lift: -0.1,
       });
+
+      // 🔍 디버깅: 카메라 위치와 건물 크기 확인
+      console.log("=== 초기 카메라 설정 ===");
+      console.log("Camera position:", camera.position);
+      console.log("Camera target:", controls.target);
+      console.log("Distance:", dist);
+      console.log("Camera FOV:", camera.fov);
+      console.log("Min/Max distance:", controls.minDistance, controls.maxDistance);
 
       controls.enableZoom = true;
       controls.minDistance = Math.max(3, dist * 0.3);
@@ -223,7 +325,7 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
     }
 
     setTimeout(() => {
-      runEnterSequence({
+      enterTimeline = runEnterSequence({
         camera,
         controls,
         renderer,
@@ -241,6 +343,9 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
 
           mode = "EXHIBITION_CSS" as Mode;
           isAnimating = false;
+
+          // ✅ 전시장 진입 완료 후 배경을 전시장 톤으로 설정
+          applyExhibitionBackground();
         },
       });
     }, 500);
