@@ -1,3 +1,7 @@
+// ✅ Vite 번들에 CSS 포함 (public로 옮기기 전까지는 이 방식이 정답)
+import "./css/normalize.css";
+import "./css/demo.css";
+
 export type RoomSet = {
   back: string[];
   left: string[];
@@ -12,9 +16,16 @@ export type RoomSet = {
   location?: string;
 };
 
+export type OpenArtworkPayload = {
+  roomIndex: number;
+  side: "back" | "left" | "right";
+  src: string;
+};
+
 export type ExhibitionOptions = {
   defaultRooms: RoomSet[];
   onExit: () => void;
+  onOpenArtwork?: (payload: OpenArtworkPayload) => void;
 };
 
 export type ExhibitionApi = {
@@ -23,95 +34,98 @@ export type ExhibitionApi = {
   setRooms(rooms: RoomSet[]): void;
 };
 
-const CODROPS_NORMALIZE = "https://tympanus.net/Development/Exhibition/css/normalize.css";
-const CODROPS_DEMO = "https://tympanus.net/Development/Exhibition/css/demo.css";
-const JOSEFIN = "https://fonts.googleapis.com/css?family=Josefin+Sans:400,700";
-
-function ensureLink(href: string) {
-  const id = "exh-link-" + btoa(href).replace(/=+/g, "");
-  if (document.getElementById(id)) return;
-  const link = document.createElement("link");
-  link.id = id;
-  link.rel = "stylesheet";
-  link.href = href;
-  document.head.appendChild(link);
-}
-
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
   return e;
 }
 
+type Side = "back" | "left" | "right";
+type ViewMode = "ROOM" | "FOCUS";
+type CamT = { txPx: number; tyPx: number; tzPx: number; rxDeg: number; ryDeg: number };
+
+// ✅ 여기 값만 바꾸면 “참고사이트 1:1 포커스” 튜닝 가능
+const PRESET: Record<Side, { ryDeg: number; tzPx: number; shift: number }> = {
+  back: { ryDeg: 180, tzPx: 1240, shift: 0.68 },
+  left: { ryDeg: -92, tzPx: 980, shift: 0.60 },
+  right: { ryDeg: 92, tzPx: 980, shift: 0.60 },
+};
+
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
 
 export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): ExhibitionApi {
-  ensureLink(JOSEFIN);
-  ensureLink(CODROPS_NORMALIZE);
-  ensureLink(CODROPS_DEMO);
-
-  // ✅ scoped helpers only (avoid breaking your outside background)
-  const scopedStyleId = "exh-scoped-style";
-  if (!document.getElementById(scopedStyleId)) {
+  const styleId = "exh-override-style";
+  if (!document.getElementById(styleId)) {
     const style = document.createElement("style");
-    style.id = scopedStyleId;
+    style.id = styleId;
     style.textContent = `
-/* ===== Exhibition root visibility (scoped) ===== */
-.exh-root{
-  position: fixed;
-  inset: 0;
-  z-index: 999;
-  display: none;
-}
-.exh-root.is-visible{ display:block; }
+      .exh-root{ position: fixed; inset: 0; z-index: 9999; display: none; }
+      .exh-root.is-visible{ display: block; }
 
-/* We add 2 rigs to avoid overriding Codrops transforms */
-.exh-moveRig, .exh-cameraRig{
-  width: 100%;
-  height: 100%;
-  transform-style: preserve-3d;
-}
-.exh-moveRig{ will-change: transform; }
-.exh-cameraRig{ will-change: transform; }
+      /* Layering */
+      .exh-root .container{ position:absolute; inset:0; z-index:1; pointer-events:auto; }
+      /* ✅ content is full-screen overlay -> must NOT eat clicks */
+      .exh-root .content{ position:absolute; inset:0; z-index:10; pointer-events:none !important; }
 
-/* Lightbox (only on click) */
-.exh-lightbox{
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  display: none;
-  place-items: center;
-  background: rgba(0,0,0,0.62);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-.exh-lightbox.is-open{ display:grid; }
-.exh-lightbox__img{
-  max-width: min(92vw, 1100px);
-  max-height: 88vh;
-  border-radius: 10px;
-  box-shadow: 0 30px 120px rgba(0,0,0,0.45);
-}
-.exh-lightbox__hint{
-  position: fixed;
-  bottom: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans", Arial;
-  font-size: 12px;
-  letter-spacing: .06em;
-  color: rgba(255,255,255,0.82);
-}
-    `.trim();
+      .exh-root .exh-camera{
+        position:absolute; inset:0;
+        transform-style:preserve-3d;
+        will-change:transform;
+        transition:transform 760ms cubic-bezier(.18,.9,.2,1);
+        pointer-events:auto;
+      }
+      .exh-root.is-focus .exh-camera{
+        transition:transform 720ms cubic-bezier(.18,.9,.2,1);
+      }
+
+      /* overlays */
+      .exh-root .overlay{ pointer-events:none !important; }
+      .exh-root .overlay.overlay--open{ pointer-events:auto !important; }
+
+      /* hide big slide texts */
+      .exh-root .slides{ display:none !important; }
+      .exh-root .location{ display:none !important; }
+
+      /* ✅ re-enable only interactive UI */
+      .exh-root .codrops-header,
+      .exh-root .codrops-links,
+      .exh-root .codrops-icon,
+      .exh-root .btn,
+      .exh-root .nav,
+      .exh-root .btn--nav,
+      .exh-root .btn--toggle,
+      .exh-root .overlay.overlay--open,
+      .exh-root .overlay.overlay--open *{
+        pointer-events:auto !important;
+      }
+
+      /* Artworks clickable */
+      .exh-root .scroller,
+      .exh-root .room,
+      .exh-root .room__side,
+      .exh-root .room__img{
+        pointer-events:auto !important;
+      }
+      .exh-root .room__img{ cursor: pointer; }
+
+      /* reduce transform blur a bit */
+      .exh-root .room__img{
+        backface-visibility:hidden;
+        -webkit-backface-visibility:hidden;
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
+        will-change: transform;
+      }
+    `;
     document.head.appendChild(style);
   }
 
   const exh = el("div", "exh-root");
   root.appendChild(exh);
 
-  // SVG symbols (icons)
+  // SVG symbols (원본 유지)
   const svgWrap = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svgWrap.setAttribute("class", "hidden");
   svgWrap.innerHTML = `
@@ -119,7 +133,8 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
       <polygon points="6.3,12.8 20.9,12.8 20.9,11.2 6.3,11.2 10.2,7.2 9,6 3.1,12 9,18 10.2,16.8 "/>
     </symbol>
     <symbol id="icon-drop" viewBox="0 0 24 24">
-      <path d="M12,21c-3.6,0-6.6-3-6.6-6.6C5.4,11,10.8,4,11.4,3.2C11.6,3.1,11.8,3,12,3s0.4,0.1,0.6,0.3c0.6,0.8,6.1,7.8,6.1,11.2C18.6,18.1,15.6,21,12,21zM12,4.8c-1.8,2.4-5.2,7.4-5.2,9.6c0,2.9,2.3,5.2,5.2,5.2s5.2-2.3,5.2-5.2C17.2,12.2,13.8,7.3,12,4.8z"/><path d="M12,18.2c-0.4,0-0.7-0.3-0.7-0.7s0.3-0.7,0.7-0.7c1.3,0,2.4-1.1,2.4-2.4c0-0.4,0.3-0.7,0.7-0.7c0.4,0,0.7,0.3,0.7,0.7C15.8,16.5,14.1,18.2,12,18.2z"/>
+      <path d="M12,21c-3.6,0-6.6-3-6.6-6.6C5.4,11,10.8,4,11.4,3.2C11.6,3.1,11.8,3,12,3s0.4,0.1,0.6,0.3c0.6,0.8,6.1,7.8,6.1,11.2C18.6,18.1,15.6,21,12,21zM12,4.8c-1.8,2.4-5.2,7.4-5.2,9.6c0,2.9,2.3,5.2,5.2,5.2s5.2-2.3,5.2-5.2C17.2,12.2,13.8,7.3,12,4.8z"/>
+      <path d="M12,18.2c-0.4,0-0.7-0.3-0.7-0.7s0.3-0.7,0.7-0.7c1.3,0,2.4-1.1,2.4-2.4c0-0.4,0.3-0.7,0.7-0.7c0.4,0,0.7,0.3,0.7,0.7C15.8,16.5,14.1,18.2,12,18.2z"/>
     </symbol>
     <symbol id="icon-menu" viewBox="0 0 24 24">
       <path d="M24,5.8H0v-2h24V5.8z M19.8,11H4.2v2h15.6V11z M24,18.2H0v2h24V18.2z"/>
@@ -134,48 +149,18 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   `;
   exh.appendChild(svgWrap as any);
 
-  // container / scroller
+  // 3D container/scroller
   const container = el("div", "container");
-
-  // ✅ two rigs so we can add camera/parallax without breaking Codrops transforms
-  const moveRig = el("div", "exh-moveRig");
-  const cameraRig = el("div", "exh-cameraRig");
-
   const scroller = el("div", "scroller");
-  cameraRig.appendChild(scroller);
-  moveRig.appendChild(cameraRig);
-  container.appendChild(moveRig);
+  const cameraWrap = el("div", "exh-camera");
+  cameraWrap.appendChild(scroller);
+  container.appendChild(cameraWrap);
   exh.appendChild(container);
 
-  // content
+  // UI content (overlay)
   const content = el("div", "content");
   exh.appendChild(content);
 
-  // loader overlay (Codrops class)
-  const loaderOverlay = el("div", "overlay overlay--loader overlay--active");
-  loaderOverlay.innerHTML = `<div class="loader"><div></div><div></div><div></div></div>`;
-  exh.appendChild(loaderOverlay);
-
-  // Lightbox for image click zoom
-  const lightbox = el("div", "exh-lightbox");
-  const lightboxImg = el("img", "exh-lightbox__img") as HTMLImageElement;
-  const lightboxHint = el("div", "exh-lightbox__hint");
-  lightboxHint.textContent = "Click anywhere to close · Esc to close";
-  lightbox.appendChild(lightboxImg);
-  lightbox.appendChild(lightboxHint);
-  exh.appendChild(lightbox);
-
-  function openLightbox(src: string) {
-    lightboxImg.src = src;
-    lightbox.classList.add("is-open");
-  }
-  function closeLightbox() {
-    lightbox.classList.remove("is-open");
-    lightboxImg.src = "";
-  }
-  lightbox.addEventListener("click", closeLightbox);
-
-  // Build header+slides+nav
   const header = el("header", "codrops-header");
   header.innerHTML = `
     <div class="codrops-links">
@@ -205,13 +190,12 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
       </ul>
     </div>
     <div class="overlay overlay--info">
-      <p class="info">&ldquo;Life in Pieces&rdquo; is the subject of all exhibitions taking place in the Mirai Art Gallery in 2017. Fragments of lost memories, fleeting moments and the breaking apart of human nature are this year's highlighted topics.</p>
+      <p class="info">&ldquo;Life in Pieces&rdquo; ...</p>
     </div>
   `;
   content.appendChild(header);
 
   const location = el("h4", "location");
-  location.textContent = "Mirai Art Gallery & Exhibition Center, Sapporo, Japan";
   content.appendChild(location);
 
   const slides = el("div", "slides");
@@ -244,20 +228,10 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   const prevBtn = nav.querySelector<HTMLButtonElement>(".btn--nav-left")!;
   const nextBtn = nav.querySelector<HTMLButtonElement>(".btn--nav-right")!;
 
-  backLink.addEventListener("click", (e) => {
-    e.preventDefault();
-    opts.onExit();
-  });
-  exitLink.addEventListener("click", (e) => {
-    e.preventDefault();
-    opts.onExit();
-  });
-
   function toggleOverlay(which: "info" | "menu") {
     if (which === "info") {
       overlayInfo.classList.toggle("overlay--open");
       btnInfo.classList.toggle("btn--active");
-      // close other
       overlayMenu.classList.remove("overlay--open");
       btnMenu.classList.remove("btn--active");
     } else {
@@ -272,195 +246,178 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
 
   let rooms: RoomSet[] = [];
   let index = 0;
-  let locked = false;
-
-  /* ======================================================
-   * Cursor-based camera/parallax (only affects cameraRig)
-   * ====================================================== */
+  let viewMode: ViewMode = "ROOM";
   let pointerX = 0;
   let pointerY = 0;
-  let targetRx = 0;
-  let targetRy = 0;
-  let targetZ = 0;
 
-  let curRx = 0;
-  let curRy = 0;
-  let curZ = 0;
+  let focusedKey: string | null = null;
+  let focusTarget: CamT = { txPx: 0, tyPx: 0, tzPx: 0, rxDeg: 0, ryDeg: 0 };
 
-  // tune (do not affect CSS files)
-  const CAM = {
-    maxRotX: 3.2, // deg
-    maxRotY: 7.0, // deg
-    maxZ: 140, // px
-    lerp: 0.08,
-  };
-
-  function onPointerMove(e: PointerEvent) {
-    if (!exh.classList.contains("is-visible")) return;
-    const w = window.innerWidth || 1;
-    const h = window.innerHeight || 1;
-    // normalized to [-1..1]
-    pointerX = (e.clientX / w) * 2 - 1;
-    pointerY = (e.clientY / h) * 2 - 1;
-
-    targetRy = clamp(pointerX, -1, 1) * CAM.maxRotY;
-    targetRx = clamp(-pointerY, -1, 1) * CAM.maxRotX;
-    // small "lean in" when near center
-    const centerPull = 1 - Math.min(1, Math.sqrt(pointerX * pointerX + pointerY * pointerY));
-    targetZ = centerPull * CAM.maxZ;
+  function applyCam(t: CamT) {
+    cameraWrap.style.transform =
+      `translate3d(${t.txPx}px, ${t.tyPx}px, ${t.tzPx}px) rotateX(${t.rxDeg}deg) rotateY(${t.ryDeg}deg)`;
   }
 
-  function applyCameraRig() {
-    // smooth
-    curRx += (targetRx - curRx) * CAM.lerp;
-    curRy += (targetRy - curRy) * CAM.lerp;
-    curZ += (targetZ - curZ) * CAM.lerp;
+  function scheduleCameraUpdate() {
+    requestAnimationFrame(() => {
+      if (!exh.classList.contains("is-visible")) return;
 
-    cameraRig.style.transform = `translateZ(${curZ.toFixed(1)}px) rotateX(${curRx.toFixed(
-      2
-    )}deg) rotateY(${curRy.toFixed(2)}deg)`;
-  }
+      if (viewMode === "FOCUS") {
+        applyCam(focusTarget);
+        return;
+      }
 
-  window.addEventListener("pointermove", onPointerMove, { passive: true });
-
-  /* ======================================================
-   * Room rendering
-   * ====================================================== */
-  function clearRooms() {
-    scroller.innerHTML = "";
-    slides.innerHTML = "";
-  }
-
-  function renderRooms() {
-    clearRooms();
-
-    rooms.forEach((room, i) => {
-      const roomEl = el("div", "room" + (i === index ? " room--current" : ""));
-      roomEl.innerHTML = `
-        <div class="room__side room__side--back">
-          ${room.back.map((src) => `<img class="room__img" src="${src}" alt="image" />`).join("")}
-        </div>
-        <div class="room__side room__side--left">
-          ${room.left.map((src) => `<img class="room__img" src="${src}" alt="image" />`).join("")}
-        </div>
-        <div class="room__side room__side--right">
-          ${room.right.map((src) => `<img class="room__img" src="${src}" alt="image" />`).join("")}
-        </div>
-        <div class="room__side room__side--bottom"></div>
-      `;
-      scroller.appendChild(roomEl);
-
-      const slide = el("div", "slide");
-      slide.innerHTML = `
-        <h2 class="slide__name">${room.slide.nameLines[0]} <br/>${room.slide.nameLines[1]}</h2>
-        <h3 class="slide__title">
-          <span>&ldquo;${room.slide.title}&rdquo;</span>
-          <div class="slide__number">Room <strong>${room.slide.roomLabel}</strong></div>
-        </h3>
-        <p class="slide__date">${room.slide.date}</p>
-      `;
-      slides.appendChild(slide);
+      const ry = clamp(pointerX * 8, -10, 10);
+      const rx = clamp(-pointerY * 5, -8, 8);
+      applyCam({ txPx: 0, tyPx: 0, tzPx: 0, rxDeg: rx, ryDeg: ry });
     });
-
-    applyRoomState();
   }
 
-  function applyRoomState() {
-    const roomEls = Array.from(scroller.querySelectorAll(".room"));
-    roomEls.forEach((r, i) => r.classList.toggle("room--current", i === index));
+  function computeFocusTarget(side: Side, imgEl: HTMLImageElement): CamT {
+    const preset = PRESET[side];
+    const r = imgEl.getBoundingClientRect();
 
-    const slideEls = Array.from(slides.querySelectorAll(".slide"));
-    slideEls.forEach((s, i) => s.classList.toggle("slide--current", i === index));
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const dx = window.innerWidth / 2 - cx;
+    const dy = window.innerHeight / 2 - cy;
+
+    return {
+      txPx: dx * preset.shift,
+      tyPx: dy * preset.shift,
+      tzPx: preset.tzPx,
+      rxDeg: 0,
+      ryDeg: preset.ryDeg,
+    };
+  }
+
+  function enterFocus(side: Side, src: string, imgEl: HTMLImageElement) {
+    overlayInfo.classList.remove("overlay--open");
+    overlayMenu.classList.remove("overlay--open");
+    btnInfo.classList.remove("btn--active");
+    btnMenu.classList.remove("btn--active");
+
+    viewMode = "FOCUS";
+    exh.classList.add("is-focus");
+
+    focusTarget = computeFocusTarget(side, imgEl);
+    focusedKey = `${side}:${src}`;
+    scheduleCameraUpdate();
+  }
+
+  function exitFocus() {
+    if (viewMode !== "FOCUS") return;
+    viewMode = "ROOM";
+    exh.classList.remove("is-focus");
+    focusedKey = null;
+    focusTarget = { txPx: 0, tyPx: 0, tzPx: 0, rxDeg: 0, ryDeg: 0 };
+    scheduleCameraUpdate();
+  }
+
+  function renderCurrentRoom() {
+    scroller.innerHTML = "";
+    focusedKey = null;
+    viewMode = "ROOM";
+    exh.classList.remove("is-focus");
 
     const room = rooms[index];
-    if (room?.subject) subjectEl.textContent = room.subject;
-    if (room?.location) location.textContent = room.location;
-  }
+    if (!room) return;
 
-  /* ======================================================
-   * Navigation motion (more depth / acceleration)
-   * - animate moveRig only (does not conflict with Codrops transforms)
-   * ====================================================== */
-  function animateGo(direction: -1 | 1) {
-    // direction: -1 = left, 1 = right (meaning index change)
-    // quick, no delays
-    const x = direction === 1 ? -28 : 28;
+    subjectEl.textContent = room.subject ?? "モダンアート";
 
-    // cancel existing by setting style
-    moveRig.getAnimations().forEach((a) => a.cancel());
+    const renderImgs = (side: Side, arr: string[]) =>
+      arr
+        .map((src) => `<img class="room__img" decoding="async" loading="eager" data-side="${side}" data-src="${src}" src="${src}" alt="image" />`)
+        .join("");
 
-    // keyframes (corridor-like push)
-    // keep it short to feel snappy
-    const anim = moveRig.animate(
-      [
-        { transform: "translate3d(0px,0px,0px)", offset: 0 },
-        { transform: `translate3d(${x}px, 0px, 90px)`, offset: 0.35 },
-        { transform: `translate3d(${x * 0.6}px, 0px, 40px)`, offset: 0.65 },
-        { transform: "translate3d(0px,0px,0px)", offset: 1 },
-      ],
-      {
-        duration: 520,
-        easing: "cubic-bezier(.2,.9,.2,1)",
-      }
-    );
+    const roomEl = el("div", "room room--current");
+    roomEl.innerHTML = `
+      <div class="room__side room__side--back">${renderImgs("back", room.back)}</div>
+      <div class="room__side room__side--left">${renderImgs("left", room.left)}</div>
+      <div class="room__side room__side--right">${renderImgs("right", room.right)}</div>
+      <div class="room__side room__side--bottom"></div>
+    `;
+    scroller.appendChild(roomEl);
 
-    return anim;
+    scheduleCameraUpdate();
   }
 
   function go(delta: number) {
     if (!rooms.length) return;
-    if (locked) return;
-    locked = true;
-
-    // close lightbox if open
-    if (lightbox.classList.contains("is-open")) closeLightbox();
-
-    const dir = delta > 0 ? (1 as const) : (-1 as const);
-    animateGo(dir);
-
-    // switch index immediately (no delay)
+    if (viewMode === "FOCUS") return;
     index = (index + delta + rooms.length) % rooms.length;
-    applyRoomState();
-
-    // loader off quickly (no delay)
-    loaderOverlay.classList.remove("overlay--active");
-
-    // unlock quickly after motion peak
-    window.setTimeout(() => {
-      locked = false;
-    }, 220);
+    renderCurrentRoom();
   }
 
   prevBtn.addEventListener("click", () => go(-1));
   nextBtn.addEventListener("click", () => go(1));
 
-  /* ======================================================
-   * Image click -> zoom (event delegation)
-   * ====================================================== */
-  scroller.addEventListener("click", (e) => {
-    if (!exh.classList.contains("is-visible")) return;
-    const t = e.target as HTMLElement | null;
-    if (!t) return;
-    if (t.classList.contains("room__img") && t instanceof HTMLImageElement) {
-      openLightbox(t.currentSrc || t.src);
+  function handleBackOrExit(e?: Event) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
     }
-  });
+    if (viewMode === "FOCUS") {
+      exitFocus();
+      return;
+    }
+    opts.onExit();
+  }
+  backLink.addEventListener("click", handleBackOrExit);
+  exitLink.addEventListener("click", handleBackOrExit);
 
-  /* ======================================================
-   * Keyboard
-   * ====================================================== */
+  function onPointerMove(e: PointerEvent) {
+    if (!exh.classList.contains("is-visible")) return;
+
+    // cursor
+    const elAtPoint = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+    const img = elAtPoint?.closest?.("img.room__img") as HTMLImageElement | null;
+    exh.style.cursor = img ? "pointer" : "";
+
+    if (viewMode !== "ROOM") return;
+    const w = Math.max(1, window.innerWidth);
+    const h = Math.max(1, window.innerHeight);
+    pointerX = (e.clientX / w) * 2 - 1;
+    pointerY = (e.clientY / h) * 2 - 1;
+    scheduleCameraUpdate();
+  }
+  exh.addEventListener("pointermove", onPointerMove, { passive: true });
+
+  function onClickCapture(e: MouseEvent) {
+    if (!exh.classList.contains("is-visible")) return;
+
+    const elAtPoint = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+    const img = elAtPoint?.closest?.("img.room__img") as HTMLImageElement | null;
+    if (!img) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const side = (img.dataset.side as Side) || "back";
+    const src = img.dataset.src || img.getAttribute("src") || "";
+    if (!src) return;
+
+    const key = `${side}:${src}`;
+
+    if (viewMode === "FOCUS" && focusedKey === key) {
+      opts.onOpenArtwork?.({ roomIndex: index, side, src });
+      return;
+    }
+
+    enterFocus(side, src, img);
+  }
+  exh.addEventListener("click", onClickCapture, true);
+
   window.addEventListener("keydown", (e) => {
     if (!exh.classList.contains("is-visible")) return;
 
     if (e.key === "Escape") {
-      if (lightbox.classList.contains("is-open")) {
-        closeLightbox();
-        return;
-      }
-      opts.onExit();
+      if (viewMode === "FOCUS") exitFocus();
+      else opts.onExit();
       return;
     }
 
+    if (viewMode !== "ROOM") return;
     if (e.key === "ArrowLeft") go(-1);
     if (e.key === "ArrowRight") go(1);
   });
@@ -468,44 +425,31 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   function setRooms(nextRooms: RoomSet[]) {
     rooms = nextRooms.slice(0);
     index = 0;
-    renderRooms();
-    loaderOverlay.classList.remove("overlay--active");
+    renderCurrentRoom();
   }
 
-  // init
   setRooms(opts.defaultRooms);
-
-  /* ======================================================
-   * RAF loop for cameraRig only
-   * ====================================================== */
-  let rafId = 0;
-  function raf() {
-    if (exh.classList.contains("is-visible")) {
-      applyCameraRig();
-    }
-    rafId = requestAnimationFrame(raf);
-  }
-  raf();
 
   function show() {
     exh.classList.add("is-visible");
+    exh.style.cursor = "";
+    scheduleCameraUpdate();
   }
 
   function hide() {
     exh.classList.remove("is-visible");
+    exh.classList.remove("is-focus");
+    viewMode = "ROOM";
+    focusedKey = null;
+    exh.style.cursor = "";
 
-    // close overlays
     overlayInfo.classList.remove("overlay--open");
     overlayMenu.classList.remove("overlay--open");
     btnInfo.classList.remove("btn--active");
     btnMenu.classList.remove("btn--active");
 
-    // close lightbox
-    closeLightbox();
+    applyCam({ txPx: 0, tyPx: 0, tzPx: 0, rxDeg: 0, ryDeg: 0 });
   }
-
-  // cleanup note:
-  // (this module likely lives for app lifetime; if you need hard cleanup later, add removeEventListener + cancelAnimationFrame)
 
   return { show, hide, setRooms };
 }

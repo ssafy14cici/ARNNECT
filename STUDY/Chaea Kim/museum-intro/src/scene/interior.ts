@@ -16,7 +16,36 @@ export type ArtSlot = {
   frameRoot?: THREE.Object3D;
 };
 
-export function buildInterior(root: THREE.Group) {
+export type FrameTuning = {
+  scale: number;
+  // frame origin 보정 (프레임 모델 원점이 중앙이 아닐 때)
+  offset: THREE.Vector3;
+  // plane이 프레임 앞/뒤로 파고들면 z-fight 생김 → depth로 미세 조정
+  planeZ: number;
+  // plane 크기 비율(프레임 내부 창 크기에 맞추기)
+  artScale: number;
+};
+
+export type InteriorBuildResult = {
+  artworks: THREE.Object3D[];
+  artSlots: ArtSlot[];
+  setInteriorCamera(camera: THREE.PerspectiveCamera, controls: any): void;
+
+  // ✅ 신규: 외부에서 이미지/프레임을 주입하기 위한 API
+  applyArtworkImage(
+    renderer: THREE.WebGLRenderer,
+    slotId: string,
+    imageUrl: string
+  ): Promise<void>;
+
+  attachFramePrefab(
+    slotId: string,
+    framePrefab: THREE.Object3D,
+    tuning?: Partial<FrameTuning>
+  ): void;
+};
+
+export function buildInterior(root: THREE.Group): InteriorBuildResult {
   const artworks: THREE.Object3D[] = [];
   const artSlots: ArtSlot[] = [];
 
@@ -125,8 +154,7 @@ export function buildInterior(root: THREE.Group) {
   fill.position.set(-8, 6, -10);
   root.add(fill);
 
-  // ---------- Art slots (left/right walls + 3 front panels) ----------
-  // Common art material placeholder
+  // ---------- Art slots ----------
   const artMatBase = new THREE.MeshStandardMaterial({
     color: "#d9d9d9",
     roughness: 0.90,
@@ -148,12 +176,12 @@ export function buildInterior(root: THREE.Group) {
     g.position.set(cfg.x, cfg.y, cfg.z);
     g.rotation.y = cfg.yaw;
 
-    // plane's normal points +Z (viewer direction) in the slot local space
+    // plane local normal +Z
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(cfg.maxW, cfg.maxH), artMatBase.clone());
     plane.position.set(0, 0, 0);
     plane.userData.slotId = cfg.id;
 
-    // lift the plane slightly from the wall (avoid z-fighting)
+    // avoid z-fighting
     plane.position.z = 0.03;
 
     g.add(plane);
@@ -167,13 +195,10 @@ export function buildInterior(root: THREE.Group) {
       maxH: cfg.maxH,
     };
 
-    // For raycaster convenience, also store slotId at group level (clicking frame meshes)
     g.userData.slotId = cfg.id;
 
     root.add(g);
     artSlots.push(slot);
-
-    // Raycaster can intersect plane or frame children; add group so it catches both.
     artworks.push(g);
 
     return slot;
@@ -209,7 +234,7 @@ export function buildInterior(root: THREE.Group) {
     });
   }
 
-  // "Front wall 3 panels" (back wall centered, 3 slots)
+  // Front wall: 3
   const frontZ = -ROOM_L + 10 + 0.9;
   const xs = [-7.5, 0, 7.5];
   for (let i = 0; i < 3; i++) {
@@ -220,20 +245,136 @@ export function buildInterior(root: THREE.Group) {
       x: xs[i],
       y: 5.0,
       z: frontZ,
-      yaw: Math.PI, // facing toward +Z (viewer standing in front)
+      yaw: Math.PI,
       maxW: 3.6,
       maxH: 2.5,
     });
   }
 
-  // ---------- Interior camera preset ----------
   function setInteriorCamera(camera: THREE.PerspectiveCamera, controls: any) {
-    // Entrance-ish position: slightly above floor, looking deep into gallery.
     camera.position.set(0, 2.6, 12.8);
     controls.target.set(0, 5.0, -12.0);
   }
 
-  return { artworks, artSlots, setInteriorCamera };
+  // ============================
+  // ✅ NEW: artwork texture apply
+  // ============================
+  const texLoader = new THREE.TextureLoader();
+
+  function fitContain(slot: ArtSlot, tex: THREE.Texture) {
+    const img = tex.image as { width: number; height: number } | undefined;
+    if (!img?.width || !img?.height) return;
+
+    const iw = img.width;
+    const ih = img.height;
+    const maxW = slot.maxW;
+    const maxH = slot.maxH;
+
+    const s = Math.min(maxW / iw, maxH / ih);
+    const w = iw * s;
+    const h = ih * s;
+
+    // geometry replace (contain)
+    const mesh = slot.plane;
+    mesh.geometry.dispose();
+    mesh.geometry = new THREE.PlaneGeometry(w, h);
+  }
+
+  async function applyArtworkImage(
+    renderer: THREE.WebGLRenderer,
+    slotId: string,
+    imageUrl: string
+  ) {
+    const slot = artSlots.find((s) => s.id === slotId);
+    if (!slot) return;
+
+    const tex = await new Promise<THREE.Texture>((resolve, reject) => {
+      texLoader.load(
+        imageUrl,
+        (t) => resolve(t),
+        undefined,
+        (err) => reject(err)
+      );
+    });
+
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8);
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.generateMipmaps = true;
+    tex.needsUpdate = true;
+
+    fitContain(slot, tex);
+
+    const mat = slot.plane.material as THREE.MeshStandardMaterial;
+    mat.map = tex;
+    mat.color = new THREE.Color("#ffffff"); // map 색 왜곡 방지
+    mat.roughness = 0.85;
+    mat.metalness = 0.0;
+    mat.needsUpdate = true;
+  }
+
+  // ============================
+  // ✅ NEW: attach frame prefab
+  // ============================
+  const DEFAULT_FRAME_TUNING: FrameTuning = {
+    scale: 1.0,
+    offset: new THREE.Vector3(0, 0, 0),
+    planeZ: 0.03,
+    artScale: 1.0,
+  };
+
+  function attachFramePrefab(
+    slotId: string,
+    framePrefab: THREE.Object3D,
+    tuning?: Partial<FrameTuning>
+  ) {
+    const slot = artSlots.find((s) => s.id === slotId);
+    if (!slot) return;
+
+    const t: FrameTuning = {
+      ...DEFAULT_FRAME_TUNING,
+      ...tuning,
+      offset: (tuning?.offset ?? DEFAULT_FRAME_TUNING.offset).clone(),
+    };
+
+    // remove old frame
+    if (slot.frameRoot) {
+      slot.group.remove(slot.frameRoot);
+      // dispose는 prefab 공유일 수 있으니 여기선 하지 않음
+      slot.frameRoot = undefined;
+    }
+
+    const frame = framePrefab.clone(true);
+    frame.position.copy(t.offset);
+    frame.scale.setScalar(t.scale);
+
+    // plane을 프레임 기준으로 재조정
+    slot.plane.position.z = t.planeZ;
+    slot.plane.scale.setScalar(t.artScale);
+
+    // frame이 plane을 가릴 수 있으니 plane이 항상 frame 앞에 오도록 렌더 정렬
+    slot.plane.renderOrder = 2;
+    frame.traverse((o) => {
+      (o as any).renderOrder = 1;
+    });
+
+    // slotId를 frame 자식까지 전파 (raycaster가 frame mesh를 찍어도 slot 매핑 가능)
+    frame.traverse((o) => {
+      o.userData.slotId = slot.id;
+    });
+
+    slot.group.add(frame);
+    slot.frameRoot = frame;
+  }
+
+  return {
+    artworks,
+    artSlots,
+    setInteriorCamera,
+    applyArtworkImage,
+    attachFramePrefab,
+  };
 }
 
 function makeCeilingPatternTexture() {
@@ -243,15 +384,12 @@ function makeCeilingPatternTexture() {
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Background
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Subtle line color
   ctx.strokeStyle = "rgba(0,0,0,0.10)";
   ctx.lineWidth = 2;
 
-  // Generate a "network" pattern by connecting random points to nearest neighbors
   const pts: { x: number; y: number }[] = [];
   const N = 120;
   for (let i = 0; i < N; i++) {
@@ -268,7 +406,6 @@ function makeCeilingPatternTexture() {
   }
 
   for (let i = 0; i < pts.length; i++) {
-    // find 3 nearest neighbors
     const a = pts[i];
     const neighbors = pts
       .map((p, idx) => ({ p, idx, d: dist2(a, p) }))
@@ -284,7 +421,6 @@ function makeCeilingPatternTexture() {
     }
   }
 
-  // Add a few thicker primary lines
   ctx.strokeStyle = "rgba(0,0,0,0.14)";
   ctx.lineWidth = 3;
   for (let i = 0; i < 28; i++) {

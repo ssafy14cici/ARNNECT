@@ -50,18 +50,18 @@ export function mountUI(root: HTMLElement): UiApi {
     ".ui-layer{ position: fixed; inset:0; pointer-events:none; z-index:70; font-family: var(--ui-font); }",
     ".ui-brand{ position: fixed; left: 28px; top: 18px; letter-spacing:0.28em; font-size:14px; color: rgba(20,20,20,0.85); user-select:none; }",
     ".ui-loading{",
-    "  position: fixed; left: 28px; bottom: 22px;",
-    "  padding: 10px 12px;",
+    "  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);",
+    "  padding: 40px 50px;",
     "  border: 1px solid var(--ui-line);",
-    "  background: rgba(255,255,255,0.55);",
-    "  backdrop-filter: blur(8px);",
-    "  border-radius: 12px;",
-    "  box-shadow: var(--ui-shadow);",
-    "  display: none; gap: 10px; align-items: center;",
+    "  background: rgba(255,255,255,0.95);",
+    "  backdrop-filter: blur(20px);",
+    "  border-radius: 20px;",
+    "  box-shadow: 0 8px 32px rgba(0,0,0,0.08);",
+    "  display: none; flex-direction: column; gap: 24px; align-items: center;",
     "}",
-    ".ui-loading__bar{ width: 180px; height: 6px; border-radius: 999px; background: rgba(0,0,0,0.08); overflow: hidden; }",
-    ".ui-loading__bar > i{ display:block; height:100%; width:0%; background: rgba(0,0,0,0.55); }",
-    ".ui-loading__txt{ font-size: 12px; color: rgba(20,20,20,0.55); letter-spacing:0.06em; }",
+    ".ui-loading__bar{ width: 280px; height: 8px; border-radius: 999px; background: rgba(0,0,0,0.08); overflow: hidden; }",
+    ".ui-loading__bar > i{ display:block; height:100%; width:0%; background: linear-gradient(90deg, #5a9a48, #6db84d); transition: width 0.3s ease; }",
+    ".ui-loading__txt{ font-size: 16px; color: rgba(20,20,20,0.7); letter-spacing:0.08em; font-weight: 500; }",
     ".ui-flash{ position: fixed; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:90; transition: opacity 80ms linear; }",
     "",
     ".ui-enterWrap{",
@@ -100,8 +100,8 @@ export function mountUI(root: HTMLElement): UiApi {
   const loading = document.createElement("div");
   loading.className = "ui-loading";
   loading.innerHTML =
-    '<div class="ui-loading__bar"><i></i></div>' +
-    '<div class="ui-loading__txt">Loading…</div>';
+    '<div class="ui-loading__txt">Loading Museum...</div>' +
+    '<div class="ui-loading__bar"><i></i></div>';
   layer.appendChild(loading);
   const loadingBar = loading.querySelector<HTMLDivElement>(".ui-loading__bar > i")!;
 
@@ -197,7 +197,8 @@ export function mountUI(root: HTMLElement): UiApi {
     const p = clamp01(p01);
     loadingBar.style.width = String(Math.round(p * 100)) + "%";
     const txt = loading.querySelector<HTMLDivElement>(".ui-loading__txt")!;
-    txt.textContent = "Loading… " + Math.round(p * 100) + "%";
+    const percent = Math.round(p * 100);
+    txt.textContent = percent < 100 ? `Loading Museum... ${percent}%` : "Ready!";
   }
 
   function setHeroVisible(v: boolean) {
