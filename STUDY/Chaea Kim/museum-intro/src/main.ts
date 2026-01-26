@@ -1,5 +1,6 @@
 import { createScene } from "./scene";
 import { mountUI } from "./ui";
+import { mountArtworkDetail } from "./pages/ArtworkDetail";
 import "./exhibition/exhibition.css";
 
 function ensureRoot(): HTMLElement {
@@ -40,12 +41,82 @@ function ensureCanvas(root: HTMLElement): HTMLCanvasElement {
   return canvas;
 }
 
-function main() {
-  const root = ensureRoot();
-  const canvas = ensureCanvas(root);
+type Route = {
+  path: string;
+  render: (root: HTMLElement) => { unmount?: () => void };
+};
 
-  const ui = mountUI(root);
-  createScene(canvas, ui);
+const routes: Route[] = [
+  {
+    path: "/artwork",
+    render: (root: HTMLElement) => {
+      // 캔버스 숨기기
+      const canvas = document.querySelector<HTMLCanvasElement>("#canvas");
+      if (canvas) canvas.style.display = "none";
+
+      // UI 레이어 숨기기
+      const uiLayer = document.querySelector<HTMLElement>(".ui-layer");
+      if (uiLayer) uiLayer.style.display = "none";
+
+      // 전시장 숨기기
+      const exhRoot = document.querySelector<HTMLElement>(".exh-root");
+      if (exhRoot) exhRoot.classList.remove("is-visible");
+
+      return mountArtworkDetail(root);
+    },
+  },
+];
+
+let currentView: { unmount?: () => void } | null = null;
+let sceneInitialized = false;
+
+function matchRoute(pathname: string): Route | null {
+  return routes.find((r) => pathname.startsWith(r.path)) ?? null;
+}
+
+function navigate() {
+  const pathname = window.location.pathname;
+  const route = matchRoute(pathname);
+
+  // 이전 뷰 정리
+  if (currentView?.unmount) {
+    currentView.unmount();
+    currentView = null;
+  }
+
+  const root = ensureRoot();
+
+  if (route) {
+    // 라우트 매칭 - 해당 뷰 렌더링
+    currentView = route.render(root);
+  } else {
+    // 기본 뷰 - 씬 렌더링
+    const canvas = ensureCanvas(root);
+    canvas.style.display = "block";
+
+    // UI 레이어 다시 표시
+    const uiLayer = document.querySelector<HTMLElement>(".ui-layer");
+    if (uiLayer) uiLayer.style.display = "block";
+
+    // ✅ 전시장은 자동으로 표시하지 않음 (scene에서 제어)
+    // const exhRoot = document.querySelector<HTMLElement>(".exh-root");
+    // if (exhRoot) exhRoot.classList.add("is-visible");
+
+    // 씬은 한 번만 초기화
+    if (!sceneInitialized) {
+      const ui = mountUI(root);
+      createScene(canvas, ui);
+      sceneInitialized = true;
+    }
+  }
+}
+
+function main() {
+  // 초기 라우트 렌더링
+  navigate();
+
+  // 브라우저 뒤로가기/앞으로가기 처리
+  window.addEventListener("popstate", navigate);
 }
 
 main();

@@ -184,6 +184,18 @@ a:focus {
 	top: 100%;
 }
 
+/* ✅ 천장 추가 - Three.js 배경이 비치는 것을 방지 */
+.room__side--top {
+	width: 100vw;
+	height: 4000px;
+	background: #e8e8e8;
+	transform: rotate3d(1, 0, 0, -90deg) translate3d(0, 0, 0);
+	transform-origin: top center;
+	backface-visibility: hidden;
+	position: absolute;
+	top: 0;
+}
+
 /* Inner elements */
 .room__img {
 	flex: none;
