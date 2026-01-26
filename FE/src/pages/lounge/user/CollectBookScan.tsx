@@ -1,11 +1,30 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+// FE/src/pages/lounge/user/CollectBookScan.tsx
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { BrowserMultiFormatReader } from "@zxing/browser";
-import "../lounge.css";
+import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
+import type { Result } from "@zxing/library";
+import { NotFoundException } from "@zxing/library";
 
+import "../lounge.css";
+import { addCollectBookItem } from "../../../utils/collectbookStorage";
 import { getExhibitionByCode, redeemTicket } from "../../../api/tickets";
 
-type Step = "scan" | "preview" | "done";
+type Step = "scan" | "preview";
+type Visibility = "private" | "public";
+
+type Exhibition = {
+  title?: string;
+  place?: string;
+  startDate?: string;
+  endDate?: string;
+  posterUrl?: string;
+};
+
+type FormState = {
+  memo: string;
+  visitedAt: string;
+  visibility: Visibility;
+};
 
 function todayYYYYMMDD() {
   const d = new Date();
@@ -15,87 +34,193 @@ function todayYYYYMMDD() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// ✅ JSON / URL / key 변형까지 대응
 function extractTicketCode(raw: string): string | null {
-  // JSON 형태 지원: {"ticket_code":"..."}
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  // 1) JSON: {"ticket_code": "..."} or {"ticketCode": "..."} or {"code": "..."}
   try {
-    const obj = JSON.parse(raw);
-    if (obj?.ticket_code && typeof obj.ticket_code === "string") return obj.ticket_code;
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (parsed && typeof parsed === "object") {
+      const obj = parsed as Record<string, unknown>;
+      const v =
+        (typeof obj.ticket_code === "string" && obj.ticket_code) ||
+        (typeof obj.ticketCode === "string" && obj.ticketCode) ||
+        (typeof obj.code === "string" && obj.code);
+      if (v) return v.trim();
+    }
   } catch {
     // ignore
   }
-  const trimmed = raw.trim();
-  return trimmed ? trimmed : null;
+
+  // 2) URL: ...?ticket_code=xxx / ticketCode=xxx / code=xxx
+  try {
+    const url = new URL(trimmed);
+    const v =
+      url.searchParams.get("ticket_code") ||
+      url.searchParams.get("ticketCode") ||
+      url.searchParams.get("code");
+    if (v) return v.trim();
+  } catch {
+    // ignore
+  }
+
+  // 3) pattern: ticket_code: xxx / ticketCode=xxx / code=xxx
+  const m =
+    trimmed.match(/ticket[_-]?code\s*[:=]\s*([A-Za-z0-9_-]+)/i) ||
+    trimmed.match(/code\s*[:=]\s*([A-Za-z0-9_-]+)/i);
+  if (m?.[1]) return m[1].trim();
+
+  // 4) fallback: 그냥 문자열
+  return trimmed;
+}
+
+function getErrorMessage(e: unknown, fallback: string) {
+  if (e instanceof Error && e.message) return e.message;
+  if (typeof e === "string" && e) return e;
+  return fallback;
+}
+
+function normalizeExhibition(data: unknown): Exhibition | null {
+  if (!data || typeof data !== "object") return null;
+
+  const obj = data as Record<string, unknown>;
+  const pickStr = (v: unknown) => (typeof v === "string" ? v : undefined);
+
+  return {
+    title: pickStr(obj.title),
+    place: pickStr(obj.place),
+    startDate: pickStr(obj.startDate) ?? pickStr(obj.start_date) ?? pickStr(obj.start),
+    endDate: pickStr(obj.endDate) ?? pickStr(obj.end_date) ?? pickStr(obj.end),
+    posterUrl: pickStr(obj.posterUrl) ?? pickStr(obj.poster_url),
+  };
 }
 
 export default function CollectBookScan() {
   const nav = useNavigate();
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const controlsRef = useRef<IScannerControls | null>(null);
+
+  // ✅ 스캔 중 중복 트리거 방지(같은 화면에서 계속 QR 잡힐 때)
+  const lockedRef = useRef(false);
 
   const [step, setStep] = useState<Step>("scan");
   const [error, setError] = useState("");
 
   const [ticketCode, setTicketCode] = useState("");
-  const [exhibition, setExhibition] = useState<any>(null);
+  const [exhibition, setExhibition] = useState<Exhibition | null>(null);
+  const [scannedAt, setScannedAt] = useState<string>("");
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FormState>({
     memo: "",
     visitedAt: todayYYYYMMDD(),
-    visibility: "private" as "private" | "public",
+    visibility: "private",
   });
 
   const [busy, setBusy] = useState(false);
+  const [scannerReady, setScannerReady] = useState(false);
+  const [loadingExhibition, setLoadingExhibition] = useState(false);
 
-  const canRegister = useMemo(() => !!ticketCode && !!exhibition && !busy, [ticketCode, exhibition, busy]);
+  // ✅ 전시 조회 실패해도 등록은 가능하도록(티켓코드만 있으면 됨)
+  const canRegister = useMemo(() => !!ticketCode && !busy, [ticketCode, busy]);
 
-  // ✅ 스캔은 "읽기"만 하고, 생성은 절대 하지 않음.
   useEffect(() => {
     if (step !== "scan") return;
 
+    let isActive = true;
+    lockedRef.current = false;
+
     const codeReader = new BrowserMultiFormatReader();
-    let locked = false;
+
+    const stopCameraFully = () => {
+      try {
+        controlsRef.current?.stop();
+      } catch {
+        // ignore
+      } finally {
+        controlsRef.current = null;
+      }
+
+      const videoEl = videoRef.current;
+      const stream = videoEl?.srcObject;
+
+      if (stream instanceof MediaStream) {
+        stream.getTracks().forEach((t) => t.stop());
+      }
+      if (videoEl) videoEl.srcObject = null;
+    };
+
+    const onDecode = async (result: Result | undefined, err: unknown, controls: IScannerControls) => {
+      if (!isActive) return;
+
+      // NotFound는 스캔 중 흔한 케이스라 무시
+      if (err && !(err instanceof NotFoundException)) {
+        // console.error(err);
+      }
+
+      if (!result || lockedRef.current) return;
+
+      const raw = result.getText();
+      console.log("[QR raw]", raw);
+
+      const code = extractTicketCode(raw);
+      console.log("[parsed code]", code);
+
+      if (!code) {
+        setError("QR에서 ticket_code를 읽지 못했습니다.");
+        return;
+      }
+
+      // ✅ 여기서 잠그고 스캔 중지
+      lockedRef.current = true;
+      controlsRef.current = controls;
+      controls.stop();
+
+      // ✅ 무조건 다음 화면(프리뷰)로 넘어가게
+      setError("");
+      setTicketCode(code);
+      setScannedAt(new Date().toISOString());
+      setStep("preview");
+
+      // 전시 조회는 프리뷰에서 로딩 표시로 처리(실패해도 멈춤)
+      setLoadingExhibition(true);
+      try {
+        const data = (await getExhibitionByCode(code)) as unknown;
+        const ex = normalizeExhibition(data) ?? (data as Exhibition);
+        if (!isActive) return;
+        setExhibition(ex);
+      } catch (e: unknown) {
+        if (!isActive) return;
+        setExhibition(null);
+        setError(getErrorMessage(e, "전시 정보를 불러오지 못했습니다. (그래도 티켓 등록은 가능합니다)"));
+      } finally {
+        if (isActive) setLoadingExhibition(false);
+      }
+    };
 
     (async () => {
       setError("");
+      setScannerReady(false);
       try {
         const videoEl = videoRef.current;
         if (!videoEl) return;
 
-        await codeReader.decodeFromVideoDevice(undefined, videoEl, async (result) => {
-          if (!result || locked) return;
+        const controls = await codeReader.decodeFromVideoDevice(undefined, videoEl, onDecode);
+        controlsRef.current = controls;
 
-          const raw = result.getText();
-          const code = extractTicketCode(raw);
-          if (!code) {
-            setError("QR에서 ticket_code를 읽지 못했습니다.");
-            return;
-          }
-
-          locked = true;
-          codeReader.reset();
-
-          setTicketCode(code);
-
-          try {
-            setBusy(true);
-            const data = await getExhibitionByCode(code);
-            setExhibition(data);
-            setStep("preview");
-          } catch (e: any) {
-            setError(e?.message ?? "전시 정보를 불러오지 못했습니다.");
-            locked = false;
-            setTicketCode("");
-            setStep("scan");
-          } finally {
-            setBusy(false);
-          }
-        });
-      } catch (e: any) {
-        setError(e?.message ?? "카메라 접근 실패(HTTPS/권한 확인 필요)");
+        console.log("[scanner started]");
+        setScannerReady(true);
+      } catch (e: unknown) {
+        if (!isActive) return;
+        setError(getErrorMessage(e, "카메라 접근 실패(HTTPS/권한 확인 필요)"));
       }
     })();
 
     return () => {
-      codeReader.reset();
+      isActive = false;
+      setScannerReady(false);
+      stopCameraFully();
     };
   }, [step]);
 
@@ -103,7 +228,11 @@ export default function CollectBookScan() {
     setError("");
     setTicketCode("");
     setExhibition(null);
+    setScannedAt("");
     setForm({ memo: "", visitedAt: todayYYYYMMDD(), visibility: "private" });
+    setBusy(false);
+    setLoadingExhibition(false);
+    lockedRef.current = false;
     setStep("scan");
   };
 
@@ -121,10 +250,20 @@ export default function CollectBookScan() {
         visibility: form.visibility,
       });
 
-      setStep("done");
-      setTimeout(() => nav("/lounge/collectbook", { replace: true }), 600);
-    } catch (e: any) {
-      setError(e?.message ?? "등록 실패");
+      // ✅ 로컬 저장(전시 조회 실패해도 저장은 됨)
+      const saved = addCollectBookItem({
+        ticketCode,
+        exhibition: exhibition ?? {},
+        memo: form.memo.trim() || undefined,
+        visitedAt: form.visitedAt,
+        visibility: form.visibility,
+        scannedAt: scannedAt || new Date().toISOString(),
+      });
+
+      // ✅ 디테일로 이동
+      nav(`/lounge/collectbook/${saved.id}`, { replace: true });
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "등록 실패"));
     } finally {
       setBusy(false);
     }
@@ -147,9 +286,17 @@ export default function CollectBookScan() {
               스캔 단계에서는 코드를 생성하지 않고, QR에서 <strong>ticket_code를 읽기만</strong> 합니다.
             </p>
 
+            {scannerReady && (
+              <div className="loungeSubHint" style={{ marginTop: 8 }}>
+                카메라 연결됨 (스캔 중)
+              </div>
+            )}
+
             <div style={{ marginTop: 12 }}>
               <video
                 ref={videoRef}
+                playsInline
+                muted
                 style={{
                   width: "100%",
                   maxWidth: 520,
@@ -168,16 +315,24 @@ export default function CollectBookScan() {
             <h2 className="loungeSubPanelTitle">전시 정보 확인</h2>
 
             <p className="loungeSubHint">
-              <strong>전시</strong>: {exhibition?.title ?? "-"}
-              <br />
-              <strong>장소</strong>: {exhibition?.place ?? "-"}
-              <br />
-              <strong>기간</strong>: {exhibition?.startDate ?? "-"} ~ {exhibition?.endDate ?? "-"}
-              <br />
               <strong>ticket_code</strong>: {ticketCode}
+              <br />
+              {loadingExhibition ? (
+                <>
+                  <strong>전시</strong>: 불러오는 중...
+                </>
+              ) : (
+                <>
+                  <strong>전시</strong>: {exhibition?.title ?? "-"}
+                  <br />
+                  <strong>장소</strong>: {exhibition?.place ?? "-"}
+                  <br />
+                  <strong>기간</strong>: {exhibition?.startDate ?? "-"} ~ {exhibition?.endDate ?? "-"}
+                </>
+              )}
             </p>
 
-            {exhibition?.posterUrl && (
+            {!loadingExhibition && exhibition?.posterUrl && (
               <div style={{ marginTop: 12 }}>
                 <img
                   src={exhibition.posterUrl}
@@ -217,7 +372,10 @@ export default function CollectBookScan() {
                 <div className="loungeSubHint">공개 설정</div>
                 <select
                   value={form.visibility}
-                  onChange={(e) => setForm((p) => ({ ...p, visibility: e.target.value as any }))}
+                  onChange={(e) => {
+                    const v = e.target.value as Visibility;
+                    setForm((p) => ({ ...p, visibility: v }));
+                  }}
                   style={inputStyle}
                 >
                   <option value="private">비공개</option>
@@ -233,16 +391,9 @@ export default function CollectBookScan() {
                 다시 스캔
               </button>
               <button className="loungeSubBtn" type="button" onClick={register} disabled={!canRegister}>
-                {busy ? "등록 중..." : "티켓 등록"}
+                {busy ? "등록 중..." : "티켓 등록 후 디테일로"}
               </button>
             </div>
-          </div>
-        )}
-
-        {step === "done" && (
-          <div className="loungeSubPanel">
-            <h2 className="loungeSubPanelTitle">등록 완료</h2>
-            <p className="loungeSubHint">티켓북에 추가되었습니다.</p>
           </div>
         )}
       </section>
@@ -250,7 +401,7 @@ export default function CollectBookScan() {
   );
 }
 
-const inputStyle: React.CSSProperties = {
+const inputStyle: CSSProperties = {
   width: "100%",
   borderRadius: 12,
   padding: 10,
@@ -259,7 +410,7 @@ const inputStyle: React.CSSProperties = {
   color: "inherit",
 };
 
-const textareaStyle: React.CSSProperties = {
+const textareaStyle: CSSProperties = {
   ...inputStyle,
   resize: "vertical",
 };

@@ -18,6 +18,7 @@ import Feed from "../pages/feed/Feed";
 import Lounge from "../pages/lounge/Lounge";
 import CollectBook from "../pages/lounge/user/CollectBook";
 import CollectBookScan from "../pages/lounge/user/CollectBookScan";
+import CollectBookDetail from "../pages/lounge/user/CollectBookDetail";
 import Taste from "../pages/lounge/user/Taste";
 import Quiz from "../pages/lounge/user/Quiz";
 import TicketQr from "../pages/lounge/artist/TicketQr";
@@ -91,6 +92,7 @@ export const routes: RouteObject[] = [
                 children: [
                   { path: "collectbook", element: <CollectBook /> },
                   { path: "collectbook/scan", element: <CollectBookScan /> }, 
+                  { path: "collectbook/:id", element: <CollectBookDetail /> }, // ✅ 여기만 수정
                   { path: "taste", element: <Taste /> },
                   { path: "quiz", element: <Quiz /> },
                 ],
