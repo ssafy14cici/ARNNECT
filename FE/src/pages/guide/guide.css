@@ -1,0 +1,47 @@
+/* ===== Guide Flow ===== */
+
+.flowRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.flowStep {
+  min-width: 120px;
+  padding: 14px 16px;
+  border: 1px solid #e5e2d9;
+  border-radius: 12px;
+  background: #faf8f3;
+  text-align: center;
+}
+
+.flowTitle {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.flowDesc {
+  font-size: 13px;
+  color: #666;
+}
+
+.flowArrow {
+  font-size: 20px;
+  color: #aaa;
+}
+
+/* ===== Flow Group ===== */
+
+.flowGroup {
+  margin-top: 24px;
+}
+
+.flowRole {
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
