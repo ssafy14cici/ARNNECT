@@ -1,5 +1,4 @@
 // src/exhibition/mount.ts
-// ✅ Vite 번들에 CSS 포함 (public로 옮기기 전까지는 이 방식이 정답)
 import "./css/normalize.css";
 import "./css/demo.css";
 
@@ -45,11 +44,11 @@ type Side = "back" | "left" | "right";
 type ViewMode = "ROOM" | "FOCUS";
 type CamT = { txPx: number; tyPx: number; tzPx: number; rxDeg: number; ryDeg: number };
 
-// ✅ 여기 값만 바꾸면 “참고사이트 1:1 포커스” 튜닝 가능
+// ✅ “훅” 들어가게 하려면 tzPx ↑ (크면 클수록 더 가까이)
 const PRESET: Record<Side, { ryDeg: number; tzPx: number; shift: number }> = {
-  back: { ryDeg: 180, tzPx: 1240, shift: 0.68 },
-  left: { ryDeg: -92, tzPx: 980, shift: 0.60 },
-  right: { ryDeg: 92, tzPx: 980, shift: 0.60 },
+  back: { ryDeg: 180, tzPx: 1500, shift: 0.72 },
+  left: { ryDeg: -92, tzPx: 1150, shift: 0.62 },
+  right: { ryDeg: 92, tzPx: 1150, shift: 0.62 },
 };
 
 function clamp(v: number, min: number, max: number) {
@@ -62,34 +61,37 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
     const style = document.createElement("style");
     style.id = styleId;
     style.textContent = `
-      .exh-root{ position: fixed; inset: 0; z-index: 9999; display: none; }
-      .exh-root.is-visible{ display: block; }
+      .exh-root{ position:fixed; inset:0; z-index:9999; display:none; }
+      .exh-root.is-visible{ display:block; }
 
-      /* Layering */
-      .exh-root .container{ position:absolute; inset:0; z-index:1; pointer-events:auto; }
-      /* ✅ content is full-screen overlay -> must NOT eat clicks */
+      /* ✅ Codrops 3D의 핵심: container perspective */
+      .exh-root .container{
+        position:absolute;
+        inset:0;
+        perspective: 2000px;
+        perspective-origin: 50% 50%;
+        overflow:hidden;
+      }
+
+      /* ✅ 우리가 transform을 직접 먹일 대상: scroller */
+      .exh-root .scroller{
+        position:absolute;
+        inset:0;
+        transform-style:preserve-3d;
+        will-change: transform;
+        transition: transform 720ms cubic-bezier(.18,.9,.2,1);
+      }
+
+      /* content는 전체를 덮어도 클릭 먹지 않게 */
       .exh-root .content{ position:absolute; inset:0; z-index:10; pointer-events:none !important; }
 
-      .exh-root .exh-camera{
-        position:absolute; inset:0;
-        transform-style:preserve-3d;
-        will-change:transform;
-        transition:transform 760ms cubic-bezier(.18,.9,.2,1);
-        pointer-events:auto;
-      }
-      .exh-root.is-focus .exh-camera{
-        transition:transform 720ms cubic-bezier(.18,.9,.2,1);
-      }
-
-      /* overlays */
       .exh-root .overlay{ pointer-events:none !important; }
       .exh-root .overlay.overlay--open{ pointer-events:auto !important; }
 
-      /* hide big slide texts */
       .exh-root .slides{ display:none !important; }
       .exh-root .location{ display:none !important; }
 
-      /* ✅ re-enable only interactive UI */
+      /* UI 클릭 가능한 애들만 */
       .exh-root .codrops-header,
       .exh-root .codrops-links,
       .exh-root .codrops-icon,
@@ -103,21 +105,18 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
       }
 
       /* Artworks clickable */
-      .exh-root .scroller,
       .exh-root .room,
       .exh-root .room__side,
       .exh-root .room__img{
         pointer-events:auto !important;
       }
-      .exh-root .room__img{ cursor: pointer; }
+      .exh-root .room__img{ cursor:pointer; }
 
-      /* reduce transform blur a bit */
       .exh-root .room__img{
         backface-visibility:hidden;
         -webkit-backface-visibility:hidden;
         transform: translateZ(0);
         -webkit-transform: translateZ(0);
-        will-change: transform;
       }
     `;
     document.head.appendChild(style);
@@ -126,7 +125,7 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   const exh = el("div", "exh-root");
   root.appendChild(exh);
 
-  // SVG symbols (원본 유지)
+  // SVG symbols
   const svgWrap = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svgWrap.setAttribute("class", "hidden");
   svgWrap.innerHTML = `
@@ -150,15 +149,13 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   `;
   exh.appendChild(svgWrap as any);
 
-  // 3D container/scroller
+  // ✅ Codrops 원형: container > scroller > room
   const container = el("div", "container");
   const scroller = el("div", "scroller");
-  const cameraWrap = el("div", "exh-camera");
-  cameraWrap.appendChild(scroller);
-  container.appendChild(cameraWrap);
+  container.appendChild(scroller);
   exh.appendChild(container);
 
-  // UI content (overlay)
+  // UI overlay
   const content = el("div", "content");
   exh.appendChild(content);
 
@@ -173,7 +170,7 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
       </a>
     </div>
     <h1 class="codrops-header__title">3D Room Exhibition</h1>
-    <div class="subject">モダンアート</div>
+    <div class="subject">room</div>
     <button class="btn btn--info btn--toggle" type="button">
       <svg class="icon icon--info"><use xlink:href="#icon-info"></use></svg>
       <svg class="icon icon--cross"><use xlink:href="#icon-cross"></use></svg>
@@ -195,12 +192,6 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
     </div>
   `;
   content.appendChild(header);
-
-  const location = el("h4", "location");
-  content.appendChild(location);
-
-  const slides = el("div", "slides");
-  content.appendChild(slides);
 
   const nav = el("nav", "nav");
   nav.innerHTML = `
@@ -245,21 +236,19 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   btnInfo.addEventListener("click", () => toggleOverlay("info"));
   btnMenu.addEventListener("click", () => toggleOverlay("menu"));
 
+  // state
   let rooms: RoomSet[] = [];
   let index = 0;
   let viewMode: ViewMode = "ROOM";
   let pointerX = 0;
   let pointerY = 0;
-
   let focusedKey: string | null = null;
   let focusTarget: CamT = { txPx: 0, tyPx: 0, tzPx: 0, rxDeg: 0, ryDeg: 0 };
 
-  // ✅ FIX: tz sign (Codrops는 "장면을 음수 Z로 밀어야" 줌이 걸림)
   function applyCam(t: CamT) {
-    cameraWrap.style.transform =
-      `translate3d(${t.txPx}px, ${t.tyPx}px, ${-t.tzPx}px) rotateX(${t.rxDeg}deg) rotateY(${t.ryDeg}deg)`;
-    // ❌ scroller에 같은 transform을 주면 codrops transform과 충돌/상쇄될 수 있음
-    // scroller.style.transform = cameraWrap.style.transform;
+    // ✅ transform은 scroller에 직접 적용
+    scroller.style.transform =
+      `translate3d(${t.txPx}px, ${t.tyPx}px, ${t.tzPx}px) rotateX(${t.rxDeg}deg) rotateY(${t.ryDeg}deg)`;
   }
 
   function scheduleCameraUpdate() {
@@ -307,9 +296,6 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
     focusTarget = computeFocusTarget(side, imgEl);
     focusedKey = `${side}:${src}`;
 
-    // ✅ 확인용 로그 (focusTarget이 제대로 계산되는지)
-    console.log("[FOCUS]", side, focusTarget);
-
     scheduleCameraUpdate();
   }
 
@@ -331,8 +317,7 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
     const room = rooms[index];
     if (!room) return;
 
-    subjectEl.textContent = room.subject ?? "モダンアート";
-    location.textContent = room.location ?? "";
+    subjectEl.textContent = room.slide?.roomLabel ?? room.subject ?? "room";
 
     const renderImgs = (side: Side, arr: string[]) =>
       arr
@@ -378,28 +363,30 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   backLink.addEventListener("click", handleBackOrExit);
   exitLink.addEventListener("click", handleBackOrExit);
 
-  function onPointerMove(e: PointerEvent) {
-    if (!exh.classList.contains("is-visible")) return;
+  // pointer parallax
+  exh.addEventListener(
+    "pointermove",
+    (e) => {
+      if (!exh.classList.contains("is-visible")) return;
 
-    // cursor
-    const elAtPoint = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-    const img = elAtPoint?.closest?.("img.room__img") as HTMLImageElement | null;
-    exh.style.cursor = img ? "pointer" : "";
+      const elAtPoint = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+      const img = elAtPoint?.closest?.("img.room__img") as HTMLImageElement | null;
+      exh.style.cursor = img ? "pointer" : "";
 
-    if (viewMode !== "ROOM") return;
-    const w = Math.max(1, window.innerWidth);
-    const h = Math.max(1, window.innerHeight);
-    pointerX = (e.clientX / w) * 2 - 1;
-    pointerY = (e.clientY / h) * 2 - 1;
-    scheduleCameraUpdate();
-  }
-  exh.addEventListener("pointermove", onPointerMove, { passive: true });
+      if (viewMode !== "ROOM") return;
+      const w = Math.max(1, window.innerWidth);
+      const h = Math.max(1, window.innerHeight);
+      pointerX = (e.clientX / w) * 2 - 1;
+      pointerY = (e.clientY / h) * 2 - 1;
 
-  // ✅ click: 1클릭=focus, focus 상태에서 같은 이미지 2클릭=디테일 콜백
+      scheduleCameraUpdate();
+    },
+    { passive: true }
+  );
+
+  // click: 1st = focus, 2nd = detail
   function onClickCapture(e: MouseEvent) {
     if (!exh.classList.contains("is-visible")) return;
-
-    console.log("[exh click]", e.clientX, e.clientY);
 
     const elAtPoint = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
     const img = elAtPoint?.closest?.("img.room__img") as HTMLImageElement | null;
@@ -414,13 +401,11 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
 
     const key = `${side}:${src}`;
 
-    // 2nd click -> detail
     if (viewMode === "FOCUS" && focusedKey === key) {
       opts.onOpenArtwork?.({ roomIndex: index, side, src });
       return;
     }
 
-    // 1st click -> focus
     enterFocus(side, src, img);
   }
   exh.addEventListener("click", onClickCapture, true);

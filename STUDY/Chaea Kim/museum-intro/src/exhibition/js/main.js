@@ -1,3 +1,6 @@
+throw new Error("CODROPS main.js is running (should NOT run)");
+
+
 /**
  * main.js
  * http://www.codrops.com
