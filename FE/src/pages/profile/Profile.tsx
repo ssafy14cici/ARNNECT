@@ -9,6 +9,12 @@ import "./profile.css";
 
 type ProfileModel = ArtistProfile | UserProfile;
 
+// ✅ 하위 탭(Outlet)에서 사용할 컨텍스트 타입
+export type ProfileOutletContext = {
+  profile: ProfileModel;
+  isOwner: boolean;
+};
+
 function toProfileRole(role: "general" | "artist"): ProfileRole {
   return role === "artist" ? "ARTIST" : "USER";
 }
@@ -21,7 +27,7 @@ export default function Profile() {
   const profileId = id ?? "";
 
   const { role: authRole } = useAuthStore();
-  const role = toProfileRole(authRole);
+  const viewerProfileRole = toProfileRole(authRole); // ✅ "내가 누구냐" (me 조회에만 사용)
 
   const isOwner = useMemo(() => profileId === "me", [profileId]);
 
@@ -48,7 +54,7 @@ export default function Profile() {
         // ✅ 내 프로필
         if (profileId === "me") {
           const p =
-            role === "ARTIST"
+            viewerProfileRole === "ARTIST"
               ? await profileApi.getArtistProfile("me")
               : await profileApi.getUserProfile("me");
 
@@ -79,7 +85,7 @@ export default function Profile() {
     return () => {
       cancelled = true;
     };
-  }, [profileId, role]);
+  }, [profileId, viewerProfileRole]);
 
   /** ===============================
    * 액션
@@ -96,6 +102,9 @@ export default function Profile() {
   if (error) return <div style={{ padding: 16 }}>{error}</div>;
   if (!profile) return <div style={{ padding: 16 }}>프로필이 없습니다.</div>;
 
+  // ✅ 탭 노출 기준은 "로그인한 내 역할"이 아니라 "지금 보고 있는 프로필의 역할"
+  const viewedIsArtist = profile.role === "ARTIST";
+
   return (
     <div className="profilePage">
       <ProfileHeader profile={profile} isOwner={isOwner} onProfileUpdated={setProfile} />
@@ -108,7 +117,14 @@ export default function Profile() {
           피드
         </NavLink>
 
-        {role === "USER" && (
+        {viewedIsArtist ? (
+          <NavLink
+            to="portfolio"
+            className={({ isActive }) => (isActive ? "profileTab profileTabActive" : "profileTab")}
+          >
+            포트폴리오
+          </NavLink>
+        ) : (
           <NavLink
             to="collection"
             className={({ isActive }) => (isActive ? "profileTab profileTabActive" : "profileTab")}
@@ -119,7 +135,8 @@ export default function Profile() {
       </div>
 
       <div className="profileTabPanel">
-        <Outlet context={{ role }} />
+        {/* ✅ 하위 탭에서 profile/isOwner를 그대로 쓰게 context 내려주기 */}
+        <Outlet context={{ profile, isOwner } satisfies ProfileOutletContext} />
       </div>
 
       {isOwner && (

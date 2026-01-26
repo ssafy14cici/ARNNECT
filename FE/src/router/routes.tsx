@@ -3,6 +3,7 @@ import type { RouteObject } from "react-router-dom";
 import { Navigate } from "react-router-dom";
 import Guard from "../components/common/Guard";
 import AppLayout from "../layouts/AppLayout";
+import Guide from "../pages/guide/Guide";
 
 
 import Home from "../pages/home/Home";
@@ -32,6 +33,8 @@ import PostCreateRedirect from "../pages/posts/PostCreateRedirect";
 import Profile from "../pages/profile/Profile";
 import FeedTab from "../pages/profile/tabs/FeedTab";
 import CollectionTab from "../pages/profile/tabs/CollectionTab";
+import PortfolioTab from "../pages/profile/tabs/PortfolioTab";
+
 
 import ArtworkDetail from "../pages/artwork/ArtworkDetail";
 import NotFound from "../pages/notfound/NotFound";
@@ -47,6 +50,8 @@ export const routes: RouteObject[] = [
       { path: "home", element: <Home /> },
       { path: "artist-go", element: <ArtistGo /> },
       { path: "search", element: <Search /> },
+      { path: "guide", element: <Guide /> },
+
 
       // 정책: recover를 로그인 상태에도 허용
       { path: "recover", element: <Recover /> },
@@ -137,6 +142,7 @@ export const routes: RouteObject[] = [
               { index: true, element: <Navigate to="feed" relative="path" replace /> },
               { path: "feed", element: <FeedTab /> },
               { path: "collection", element: <CollectionTab /> },
+              { path: "portfolio", element: <PortfolioTab /> },
             ],
           },
 
