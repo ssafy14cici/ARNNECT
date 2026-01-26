@@ -81,6 +81,13 @@ export function loadMuseumExterior(args: LoadExteriorArgs) {
 
           const name = (child.name || "").toLowerCase();
 
+          // 🎯 TEREN_TEREN_0 직접 타겟팅 (도트 바닥)
+          if (child.name === "TEREN_TEREN_0" || name.includes("teren")) {
+            console.log("🗑️ 도트 바닥 제거:", child.name);
+            child.visible = false;
+            return;
+          }
+
           // 계단, 벽 등 건물 구조물은 보존
           const isStairOrStructure =
             name.includes("stair") ||
@@ -97,12 +104,10 @@ export function loadMuseumExterior(args: LoadExteriorArgs) {
             return; // 건물 구조물은 건드리지 않음
           }
 
-          // 바닥으로 의심되는 조건들 (더 공격적으로)
-          const isFlat = size.y < 1.0; // 얇은 메쉬 (0.5 -> 1.0으로 완화)
-          const isAtFloor = Math.abs(bbox.min.y - floorY) < 2; // 바닥 근처 (1 -> 2로 완화)
-
-          // 크기 조건 완화: 작은 바닥 타일도 잡을 수 있도록
-          const isLarge = size.x > 10 || size.z > 10; // 30 -> 10으로 완화
+          // 바닥으로 의심되는 조건들
+          const isFlat = size.y < 1.0;
+          const isAtFloor = Math.abs(bbox.min.y - floorY) < 2;
+          const isLarge = size.x > 10 || size.z > 10;
 
           const looksLikeFloorName =
             name.includes("floor") ||
@@ -115,12 +120,85 @@ export function loadMuseumExterior(args: LoadExteriorArgs) {
             name.includes("dot") ||
             name.includes("pattern");
 
-          // 이름이 바닥처럼 보이거나, (얇고 + 넓고 + 바닥 높이)면 제거
           if (looksLikeFloorName || (isFlat && isLarge && isAtFloor)) {
             console.log("🗑️ 바닥 메쉬 숨김:", child.name, "크기:", size);
             child.visible = false;
           }
         });
+
+        // 🪧 간판 "MUSEUL SIMU" -> "ARNNECT" 교체
+        let signPosition: THREE.Vector3 | null = null;
+        let signRotation: THREE.Euler | null = null;
+        let signScale: THREE.Vector3 | null = null;
+
+        museum.traverse((child: THREE.Object3D) => {
+          const name = (child.name || "").toLowerCase();
+          // 간판으로 추정되는 메쉬 숨기기
+          if (
+            name.includes("museul") ||
+            name.includes("simu") ||
+            name.includes("sign") ||
+            name.includes("board") ||
+            name.includes("text") ||
+            name.includes("label")
+          ) {
+            console.log("🪧 간판 메쉬 발견:", child.name);
+            // 위치 저장
+            const worldPos = new THREE.Vector3();
+            child.getWorldPosition(worldPos);
+            signPosition = worldPos;
+            signRotation = child.rotation.clone();
+            signScale = child.scale.clone();
+            child.visible = false;
+          }
+        });
+
+        // 새 간판 만들기 (Canvas 텍스처)
+        const canvas = document.createElement("canvas");
+        canvas.width = 1024;
+        canvas.height = 256;
+        const ctx = canvas.getContext("2d")!;
+
+        // 배경 (선택사항)
+        ctx.fillStyle = "#2a2a2a";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 텍스트
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 120px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("ARNNECT", canvas.width / 2, canvas.height / 2);
+
+        const signTexture = new THREE.CanvasTexture(canvas);
+        const signMaterial = new THREE.MeshBasicMaterial({
+          map: signTexture,
+          transparent: false,
+          side: THREE.DoubleSide,
+        });
+
+        const signGeometry = new THREE.PlaneGeometry(8, 2); // 크기 조정 가능
+        const newSign = new THREE.Mesh(signGeometry, signMaterial);
+
+        // 위치 설정 (기존 간판 위치 사용, 없으면 기본값)
+        if (signPosition) {
+          newSign.position.copy(signPosition);
+        } else {
+          // 기본 위치: 건물 정면 위쪽
+          newSign.position.set(0, museumBox.max.y * 0.7, museumBox.max.z);
+        }
+
+        if (signRotation) {
+          newSign.rotation.copy(signRotation);
+        }
+
+        if (signScale) {
+          newSign.scale.copy(signScale);
+        }
+
+        newSign.name = "ARNNECT_SIGN";
+        parent.add(newSign);
+        console.log("✅ 새 간판 추가:", newSign.position);
 
         // 잔디 바닥 추가
         const grassFloor = new THREE.Mesh(
@@ -149,7 +227,7 @@ export function loadMuseumExterior(args: LoadExteriorArgs) {
           pathMaterial
         );
         mainPath.rotation.x = -Math.PI / 2;
-        mainPath.position.set(15, floorY + 0.15, 0); // 건물 옆쪽 (x 양수)
+        mainPath.position.set(-15, floorY + 0.15, 0); // 건물 반대편 (x 음수)
         mainPath.receiveShadow = true;
         mainPath.renderOrder = 1;
         parent.add(mainPath);
@@ -203,13 +281,13 @@ export function loadMuseumExterior(args: LoadExteriorArgs) {
           parent.add(leaves3);
         };
 
-        // 나무 배치 (건물 옆쪽, x > 0)
-        addTree(12, 8, 1.3, 0.32);
-        addTree(12, -8, 1.1, 0.28);
-        addTree(16, 10, 1.0, 0.30);
-        addTree(16, -10, 1.2, 0.35);
-        addTree(20, 6, 0.9, 0.29);
-        addTree(20, -6, 1.4, 0.31);
+        // 나무 배치 (건물 반대편, x < 0)
+        addTree(-12, 8, 1.3, 0.32);
+        addTree(-12, -8, 1.1, 0.28);
+        addTree(-16, 10, 1.0, 0.30);
+        addTree(-16, -10, 1.2, 0.35);
+        addTree(-20, 6, 0.9, 0.29);
+        addTree(-20, -6, 1.4, 0.31);
 
         // 🌺 꽃밭
         const addFlowerGarden = (x: number, z: number, color: string, size = 1.8) => {
@@ -249,15 +327,15 @@ export function loadMuseumExterior(args: LoadExteriorArgs) {
           }
         };
 
-        // 꽃밭 배치 (건물 옆쪽, x > 0)
-        addFlowerGarden(9, 7, "#ff69b4", 1.8);
-        addFlowerGarden(9, -7, "#ffa500", 1.6);
-        addFlowerGarden(14, 9, "#da70d6", 1.7);
-        addFlowerGarden(14, -9, "#ff6b9d", 1.9);
-        addFlowerGarden(18, 5, "#ffb6c1", 1.5);
-        addFlowerGarden(18, -5, "#ffd700", 1.5);
+        // 꽃밭 배치 (건물 반대편, x < 0)
+        addFlowerGarden(-9, 7, "#ff69b4", 1.8);
+        addFlowerGarden(-9, -7, "#ffa500", 1.6);
+        addFlowerGarden(-14, 9, "#da70d6", 1.7);
+        addFlowerGarden(-14, -9, "#ff6b9d", 1.9);
+        addFlowerGarden(-18, 5, "#ffb6c1", 1.5);
+        addFlowerGarden(-18, -5, "#ffd700", 1.5);
 
-        // 🌿 덤불 (건물 옆쪽 반원, x > 0)
+        // 🌿 덤불 (건물 반대편 반원, x < 0)
         const bushMat = new THREE.MeshStandardMaterial({
           color: new THREE.Color("#5a8f3a"),
           roughness: 0.9,
@@ -268,11 +346,11 @@ export function loadMuseumExterior(args: LoadExteriorArgs) {
             new THREE.SphereGeometry(0.4, 8, 8),
             bushMat
           );
-          // 0 ~ π 범위 (반원, 옆쪽만)
+          // 0 ~ π 범위 (반원, 반대편만)
           const angle = (i / 12) * Math.PI;
           const radius = 10 + Math.random() * 6; // 건물에서 더 멀리
           bush.position.set(
-            Math.abs(Math.sin(angle) * radius), // x는 항상 양수
+            -Math.abs(Math.sin(angle) * radius), // x는 항상 음수
             floorY + 0.4,
             Math.cos(angle) * radius // z는 -radius ~ +radius
           );

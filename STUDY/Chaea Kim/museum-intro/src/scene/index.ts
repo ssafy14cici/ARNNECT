@@ -1,4 +1,3 @@
-// src/scene/index.ts
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
@@ -9,7 +8,6 @@ import { loadMuseumExterior } from "./exterior";
 import { runEnterSequence } from "./enterSequence";
 import { frameFrontView } from "./math";
 
-// ✅ CSS 전시장
 import { mountExhibition } from "../exhibition/mount";
 
 export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
@@ -19,9 +17,6 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
     if (typeof fn === "function") fn(...args);
   };
 
-  /* ======================================================
-   * Renderer / Scene / Camera
-   * ====================================================== */
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
@@ -55,9 +50,6 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
   const exterior = new THREE.Group();
   scene.add(exterior);
 
-  /* ======================================================
-   * Mode / Flags
-   * ====================================================== */
   let mode: Mode = "EXTERIOR";
   let isAnimating = false;
   let glbLoaded = false;
@@ -74,10 +66,7 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
     maxDistance: 0,
   };
 
-  /* ======================================================
-   * ✅ CSS Exhibition setup
-   * - images: src/exhibition/img/a1..a12.jpg 를 Vite URL로 변환
-   * ====================================================== */
+  // ✅ local images in src/exhibition/img
   const artUrl = (n: number) => new URL(`../exhibition/img/a${n}.jpg`, import.meta.url).toString();
 
   const exhibition = mountExhibition(document.body, {
@@ -100,19 +89,25 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
       },
     ],
     onExit: () => {
-      // ✅ CSS 전시장에서 Exit/Back 누르면 외부로 복귀
       if (mode !== ("EXHIBITION_CSS" as Mode)) return;
       restoreExterior();
     },
-    onOpenArtwork: (payload) => {
-      console.log("🖼️ open artwork:", payload);
-      // TODO: 상세 화면 라우팅 연결 가능
+    onOpenArtwork: ({roomIndex, side, src}) => {
+      console.log("DETAIL: ", {roomIndex, side, src});
+      // 임시 페이지로 이동
+      const q = new URLSearchParams({room: String(roomIndex), side, src});
+      window.location.href = `/artwork?${q.toString()}`;
     },
+    // (payload) => {
+    //   const q = new URLSearchParams({
+    //     room: String(payload.roomIndex),
+    //     side: payload.side,
+    //     src: payload.src,
+    //   });
+    //   window.location.href = `/artwork?${q.toString()}`;
+    // },
   });
 
-  /* ======================================================
-   * Restore exterior
-   * ====================================================== */
   function restoreExterior() {
     mode = "TRANSITION";
     isAnimating = true;
@@ -148,18 +143,12 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
     });
   }
 
-  /* ======================================================
-   * UI init
-   * ====================================================== */
   uiCall("setHeroVisible", true);
   uiCall("setLoadingVisible", true);
   uiCall("setLoadingProgress", 0);
   uiCall("setEnterEnabled", false, "Loading…");
   uiCall("flash", 0);
 
-  /* ======================================================
-   * Load exterior GLB
-   * ====================================================== */
   loadMuseumExterior({
     parent: exterior,
     url: `${import.meta.env.BASE_URL}models/simu_museum.glb`,
@@ -212,9 +201,6 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
     },
   });
 
-  /* ======================================================
-   * Enter handler: EXTERIOR -> enterSequence -> CSS exhibition
-   * ====================================================== */
   const enterHandler = () => {
     if (!glbLoaded) return;
     if (mode !== "EXTERIOR") return;
@@ -244,15 +230,11 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
         scene,
         exterior,
         ui: { flash: (a) => uiCall("flash", a) },
-
-        // ✅ 여기서 CSS로 스왑
         onSwap: async () => {
           canvas.style.display = "none";
           exterior.visible = false;
           exhibition.show();
         },
-
-        // ✅ onDone은 하나만
         onDone: () => {
           controls.enableZoom = prevZoom;
           controls.enableRotate = prevRot;
@@ -266,9 +248,6 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
 
   ui.onEnterHold(enterHandler);
 
-  /* ======================================================
-   * ESC: CSS 전시장일 때 외부 복귀
-   * ====================================================== */
   window.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     if (isAnimating) return;
@@ -276,9 +255,6 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
     restoreExterior();
   });
 
-  /* ======================================================
-   * Render loop
-   * ====================================================== */
   let lastTime = 0;
   function tick() {
     const now = performance.now();
@@ -287,8 +263,6 @@ export function createScene(canvas: HTMLCanvasElement, ui: UiApi) {
 
     if (animationMixer) animationMixer.update(delta);
 
-    // CSS 전시장에서도 Three는 렌더 돌려도 되지만,
-    // canvas가 display:none이면 실제 그려지지 않음.
     controls.update();
     renderer.render(scene, camera);
 

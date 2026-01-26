@@ -1,3 +1,4 @@
+// src/exhibition/mount.ts
 // ✅ Vite 번들에 CSS 포함 (public로 옮기기 전까지는 이 방식이 정답)
 import "./css/normalize.css";
 import "./css/demo.css";
@@ -253,9 +254,12 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   let focusedKey: string | null = null;
   let focusTarget: CamT = { txPx: 0, tyPx: 0, tzPx: 0, rxDeg: 0, ryDeg: 0 };
 
+  // ✅ FIX: tz sign (Codrops는 "장면을 음수 Z로 밀어야" 줌이 걸림)
   function applyCam(t: CamT) {
     cameraWrap.style.transform =
-      `translate3d(${t.txPx}px, ${t.tyPx}px, ${t.tzPx}px) rotateX(${t.rxDeg}deg) rotateY(${t.ryDeg}deg)`;
+      `translate3d(${t.txPx}px, ${t.tyPx}px, ${-t.tzPx}px) rotateX(${t.rxDeg}deg) rotateY(${t.ryDeg}deg)`;
+    // ❌ scroller에 같은 transform을 주면 codrops transform과 충돌/상쇄될 수 있음
+    // scroller.style.transform = cameraWrap.style.transform;
   }
 
   function scheduleCameraUpdate() {
@@ -302,6 +306,10 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
 
     focusTarget = computeFocusTarget(side, imgEl);
     focusedKey = `${side}:${src}`;
+
+    // ✅ 확인용 로그 (focusTarget이 제대로 계산되는지)
+    console.log("[FOCUS]", side, focusTarget);
+
     scheduleCameraUpdate();
   }
 
@@ -324,10 +332,14 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
     if (!room) return;
 
     subjectEl.textContent = room.subject ?? "モダンアート";
+    location.textContent = room.location ?? "";
 
     const renderImgs = (side: Side, arr: string[]) =>
       arr
-        .map((src) => `<img class="room__img" decoding="async" loading="eager" data-side="${side}" data-src="${src}" src="${src}" alt="image" />`)
+        .map(
+          (src) =>
+            `<img class="room__img" decoding="async" loading="eager" data-side="${side}" data-src="${src}" src="${src}" alt="image" />`
+        )
         .join("");
 
     const roomEl = el("div", "room room--current");
@@ -383,8 +395,11 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   }
   exh.addEventListener("pointermove", onPointerMove, { passive: true });
 
+  // ✅ click: 1클릭=focus, focus 상태에서 같은 이미지 2클릭=디테일 콜백
   function onClickCapture(e: MouseEvent) {
     if (!exh.classList.contains("is-visible")) return;
+
+    console.log("[exh click]", e.clientX, e.clientY);
 
     const elAtPoint = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
     const img = elAtPoint?.closest?.("img.room__img") as HTMLImageElement | null;
@@ -399,11 +414,13 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
 
     const key = `${side}:${src}`;
 
+    // 2nd click -> detail
     if (viewMode === "FOCUS" && focusedKey === key) {
       opts.onOpenArtwork?.({ roomIndex: index, side, src });
       return;
     }
 
+    // 1st click -> focus
     enterFocus(side, src, img);
   }
   exh.addEventListener("click", onClickCapture, true);

@@ -49,3 +49,20 @@ function main() {
 }
 
 main();
+// Vite + React Router 기준
+// import React from "react";
+// import ReactDOM from "react-dom/client";
+// import { BrowserRouter, Routes, Route } from "react-router-dom";
+// import App from "./App";
+// import ArtworkDetail from "./pages/ArtworkDetail";
+
+// ReactDOM.createRoot(document.getElementById("app")!).render(
+//   <React.StrictMode>
+//     <BrowserRouter>
+//       <Routes>
+//         <Route path="/*" element={<App />} />
+//         <Route path="/artwork" element={<ArtworkDetail />} />
+//       </Routes>
+//     </BrowserRouter>
+//   </React.StrictMode>
+// );
