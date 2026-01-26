@@ -1,11 +1,55 @@
+// FE/src/pages/lounge/user/CollectBookDetail.tsx
 import { Link, useParams } from "react-router-dom";
 import "../lounge.css";
+import TicketCardModern from "../../../components/lounge/TicketCardModern";
+import "../../../components/lounge/ticketCardModern.css";
 
-import { getCollectBookItem } from "../../../utils/collectbookStorage";
+import { getCollectBookItemById } from "../../../utils/collectbookStorage";
 
 export default function CollectBookDetail() {
   const { id } = useParams<{ id: string }>();
-  const item = id ? getCollectBookItem(id) : null;
+
+  if (!id) {
+    return (
+      <main className="loungePage">
+        <section className="loungeWrap">
+          <div className="loungeSubTop">
+            <h1 className="loungeSubTitle">티켓 상세</h1>
+            <Link className="loungeBackLink" to="/lounge/collectbook">
+              ← 컬렉트북으로
+            </Link>
+          </div>
+
+          <div className="loungeSubPanel">
+            <p className="loungeSubHint">잘못된 접근입니다. (id 없음)</p>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  const item = getCollectBookItemById(id);
+
+  if (!item) {
+    return (
+      <main className="loungePage">
+        <section className="loungeWrap">
+          <div className="loungeSubTop">
+            <h1 className="loungeSubTitle">티켓 상세</h1>
+            <Link className="loungeBackLink" to="/lounge/collectbook">
+              ← 컬렉트북으로
+            </Link>
+          </div>
+
+          <div className="loungeSubPanel">
+            <p className="loungeSubHint">해당 티켓을 찾을 수 없습니다.</p>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  const dateRangeText = `${item.exhibition?.startDate ?? "-"} – ${item.exhibition?.endDate ?? "-"}`;
 
   return (
     <main className="loungePage">
@@ -13,75 +57,31 @@ export default function CollectBookDetail() {
         <div className="loungeSubTop">
           <h1 className="loungeSubTitle">티켓 상세</h1>
           <Link className="loungeBackLink" to="/lounge/collectbook">
-            ← 목록으로
+            ← 컬렉트북으로
           </Link>
         </div>
 
-        <div className="loungeSubPanel">
-          {!item ? (
-            <div className="loungeNotice">
-              티켓을 찾지 못했습니다. 목록으로 돌아가 다시 선택하세요.
-            </div>
-          ) : (
-            <>
-              <div className="loungeSubPanelTitle">{item.exhibition?.title ?? "전시 정보 없음"}</div>
+        <div style={{ display: "grid", gap: 14 }}>
+          <TicketCardModern
+            title={(item.exhibition?.title ?? "EXHIBITION").toUpperCase()}
+            ticketCode={item.ticketCode}
+            dateRangeText={dateRangeText}
+            priceText="TARIF : -"
+            stubColor="#8FB2D9"
+            heroImageUrl={item.exhibition?.posterUrl}
+            metaLeft={item.exhibition?.place ?? "—"}
+            metaRight={item.visibility === "public" ? "PUBLIC" : "PRIVATE"}
+          />
 
-              <p className="loungeSubHint" style={{ marginTop: 10 }}>
-                <strong>장소</strong>: {item.exhibition?.place ?? "-"}
-                <br />
-                <strong>기간</strong>: {item.exhibition?.startDate ?? "-"} ~ {item.exhibition?.endDate ?? "-"}
-                <br />
-                <strong>관람일</strong>: {item.visitedAt}
-                <br />
-                <strong>공개</strong>: {item.visibility === "public" ? "공개" : "비공개"}
-                <br />
-                <strong>스캔</strong>: {new Date(item.scannedAt).toLocaleString()}
-                <br />
-                <strong>ticket_code</strong>: {item.ticketCode}
-              </p>
-
-              {item.exhibition?.posterUrl && (
-                <div style={{ marginTop: 12 }}>
-                  <img
-                    src={item.exhibition.posterUrl}
-                    alt="poster"
-                    style={{
-                      width: "100%",
-                      maxWidth: 520,
-                      borderRadius: 14,
-                      border: "1px solid rgba(255,255,255,0.14)",
-                    }}
-                  />
-                </div>
-              )}
-
-              {item.memo ? (
-                <div style={{ marginTop: 12 }}>
-                  <div className="loungeSubHint">메모</div>
-                  <div
-                    style={{
-                      marginTop: 6,
-                      padding: 12,
-                      borderRadius: 12,
-                      border: "1px solid rgba(255,255,255,0.14)",
-                      background: "rgba(255,255,255,0.04)",
-                    }}
-                  >
-                    {item.memo}
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="loungeSubActions" style={{ marginTop: 14 }}>
-                <Link className="loungeSubBtn" to="/lounge/collectbook">
-                  목록으로
-                </Link>
-                <Link className="loungeSubBtn" to="/lounge/collectbook/scan">
-                  다시 스캔
-                </Link>
-              </div>
-            </>
-          )}
+          <div className="loungeSubPanel">
+            <p className="loungeSubHint">
+              <strong>관람일</strong>: {item.visitedAt}
+              <br />
+              <strong>메모</strong>: {item.memo ?? "-"}
+              <br />
+              <strong>ticket_code</strong>: {item.ticketCode}
+            </p>
+          </div>
         </div>
       </section>
     </main>
