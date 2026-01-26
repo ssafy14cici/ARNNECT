@@ -57,7 +57,8 @@ export default function Navbar() {
       { key: "profile", label: "Profile", path: "/profile/me/feed" },
 
       // ✅ 사용 안 하는 칸은 empty로 두기
-      { key: "guidelines", label: "Guidelines" },
+      { key: "guidelines", label: "Guidelines", path: "/guide" },
+
     ],
     [],
   );

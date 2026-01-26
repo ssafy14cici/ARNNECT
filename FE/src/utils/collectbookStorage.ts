@@ -37,7 +37,7 @@ function uuid() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-function loadAll(): CollectBookItem[] {
+export function loadAll(): CollectBookItem[] {
   return safeParse<CollectBookItem[]>(localStorage.getItem(KEY), []);
 }
 

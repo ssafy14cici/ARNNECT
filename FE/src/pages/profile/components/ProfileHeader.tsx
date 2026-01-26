@@ -1,6 +1,8 @@
+// FE/src/pages/profile/components/ProfileHeader.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../../stores/authStore";
+import basicProfile from "../../../assets/basicprofile.png";
 import { profileApi } from "../api";
 import type { ArtistProfile, UserProfile } from "../types";
 
@@ -52,19 +54,18 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
   // ✅ “일반유저가 질문 남기기” 명세 반영: viewer가 general일 때만 QnA 노출
   const canAskQnA = !isOwner && isArtist && contactEnabled && viewerRole === "general";
 
-  // ✅ img src="" 경고 방지: 빈 문자열이면 placeholder로 대체
+  // ✅ img src="" 경고 방지: 빈 문자열이면 기본 이미지로 대체
   const avatarSrc = useMemo(() => {
     const url = (profile.imageUrl ?? "").trim();
-    return url ? url : "/placeholder.png";
+    if (!url || url === "null" || url === "undefined") return basicProfile;
+    return url;
   }, [profile.imageUrl]);
 
-  // ✅ 관리 메뉴 열림/닫힘 시 포커스 제어 (aria-hidden 경고 예방에 직접적으로 도움)
+  // ✅ 관리 메뉴 열림/닫힘 시 포커스 제어
   useEffect(() => {
     if (manageOpen) {
-      // 메뉴가 열리면 첫 메뉴 아이템으로 포커스 이동
       firstMenuItemRef.current?.focus?.();
     } else {
-      // 메뉴가 닫히면 토글 버튼으로 포커스 복귀
       manageBtnRef.current?.focus?.();
     }
   }, [manageOpen]);
@@ -186,7 +187,16 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
   return (
     <section className="profileHeader">
       <div className="profileHeaderRow">
-        <img className="profileAvatar" src={avatarSrc} alt={`${profile.name} 프로필`} />
+        <img
+          className="profileAvatar"
+          src={avatarSrc}
+          alt={`${profile.name} 프로필`}
+          onError={(e) => {
+            // 깨진 URL이면 기본 이미지로 폴백 (무한 onError 방지)
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = basicProfile;
+          }}
+        />
 
         <div className="profileHeaderMain">
           <div className="profileTitleRow">
@@ -226,7 +236,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
           <div className="profileActionRow">
             {isOwner ? (
               <>
-                <button className="profileBtn" onClick={openEdit}>
+                <button className="profileBtn" onClick={openEdit} type="button">
                   편집
                 </button>
 
@@ -243,12 +253,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
                 </button>
 
                 {manageOpen && (
-                  <div
-                    id="profile-manage-menu"
-                    ref={menuRef}
-                    className="profileMenu"
-                    role="menu"
-                  >
+                  <div id="profile-manage-menu" ref={menuRef} className="profileMenu" role="menu">
                     <button
                       ref={firstMenuItemRef}
                       className="profileMenuItem"
@@ -261,7 +266,12 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
                     <button className="profileMenuItem" onClick={doLogout} role="menuitem" type="button">
                       로그아웃
                     </button>
-                    <button className="profileMenuItem" onClick={() => setManageOpen(false)} role="menuitem" type="button">
+                    <button
+                      className="profileMenuItem"
+                      onClick={() => setManageOpen(false)}
+                      role="menuitem"
+                      type="button"
+                    >
                       닫기
                     </button>
                   </div>
@@ -307,12 +317,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
             <button className="profileBtn" onClick={() => setQnaOpen(false)} type="button">
               취소
             </button>
-            <button
-              className="profileBtn"
-              disabled={busy || !qnaMessage.trim()}
-              onClick={submitQnA}
-              type="button"
-            >
+            <button className="profileBtn" disabled={busy || !qnaMessage.trim()} onClick={submitQnA} type="button">
               보내기
             </button>
           </div>
@@ -333,11 +338,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
             <div className="profileForm">
               <label className="profileLabel">
                 이름(활동명/닉네임)
-                <input
-                  className="profileInput"
-                  value={draftName}
-                  onChange={(e) => setDraftName(e.target.value)}
-                />
+                <input className="profileInput" value={draftName} onChange={(e) => setDraftName(e.target.value)} />
               </label>
 
               <label className="profileLabel">

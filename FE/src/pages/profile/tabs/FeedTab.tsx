@@ -1,7 +1,7 @@
 // FE/src/pages/profile/tabs/FeedTab.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
-import type { FeedItem, ProfileRole } from "../types";
+import type { FeedItem } from "../types";
 
 import {
   listPostsByAuthor,
@@ -9,68 +9,64 @@ import {
   type LocalMode,
 } from "../../../utils/localPosts";
 import { useAuthStore } from "../../../stores/authStore";
+import type { ProfileOutletContext } from "../Profile";
 
-type OutletCtx = { role: ProfileRole | string };
+// ✅ authStore 최소 타입(필요한 것만)
+type AuthUser = { memberUuid?: string | null };
+type AuthState = { user?: AuthUser | null };
 
 export default function FeedTab() {
   const nav = useNavigate();
   const { id } = useParams();
+
+  // ✅ Profile에서 내려주는 context (profile.role 기준으로 모드 결정)
+  const { profile } = useOutletContext<ProfileOutletContext>();
+
   const rawProfileId = id ?? "";
-  const { role } = useOutletContext<OutletCtx>();
 
-  const authUser = useAuthStore((s: any) => s.user);
+  // ❌ any 제거
+  const authUser = useAuthStore((s: AuthState) => s.user);
 
-  // ✅ /profile/me/feed → 실제 내 id로 치환해서 "내가 올린 것만" 보이게
+  // ✅ 외부 저장소 변경을 감지하기 위한 tick (setState는 "구독 콜백"에서만 발생)
+  const [tick, setTick] = useState(0);
+
+  // ✅ /profile/me/feed → 실제 내 id로 치환
   const effectiveProfileId = useMemo(() => {
     if (!rawProfileId) return "";
     if (rawProfileId === "me") return authUser?.memberUuid ?? "me";
     return rawProfileId;
   }, [rawProfileId, authUser?.memberUuid]);
 
-  // ✅ 프로필 역할에 따라 ARTIST면 artworks 성격(작품), USER면 posts 성격(감상평)
+  // ✅ 보고 있는 프로필이 ARTIST냐 USER냐로 모드 결정
   const mode: LocalMode = useMemo(() => {
-    const r = String(role);
-    const isArtistProfile = r === "ARTIST" || r === "artist";
-    return isArtistProfile ? "ARTIST" : "USER";
-  }, [role]);
+    return profile.role === "ARTIST" ? "ARTIST" : "USER";
+  }, [profile.role]);
 
-  const [items, setItems] = useState<FeedItem[]>([]);
+  // ✅ 저장소 업데이트 구독: setState는 콜백에서만 → lint 통과
+  useEffect(() => {
+    const unsub = subscribePostsUpdated(() => setTick((t) => t + 1));
+    return () => unsub();
+  }, []);
 
-  const reload = () => {
-    if (!effectiveProfileId) {
-      setItems([]);
-      return;
-    }
+  // ✅ items는 state로 저장하지 않고 계산(useMemo)으로 만들기
+  const items: FeedItem[] = useMemo(() => {
+    if (!effectiveProfileId) return [];
 
-    // ✅ 로컬 저장소에서 "해당 프로필 + 해당 모드"만 가져오기
     const posts = listPostsByAuthor(effectiveProfileId, mode);
 
-    // 최신순 정렬 + src 빈값 방지
-    posts.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
-
-    setItems(
-      posts
-        .filter((p) => Boolean(p.imageUrl)) // src="" 방지
-        .map((p) => ({ id: p.id, imageUrl: p.imageUrl })) as FeedItem[]
+    // 최신순 정렬
+    const sorted = [...posts].sort((a, b) =>
+      (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
     );
-  };
 
-  useEffect(() => {
-    reload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveProfileId, mode]);
-
-  // ✅ 글 작성 후(로컬 저장 이벤트) 자동 반영
-  useEffect(() => {
-    const unsub = subscribePostsUpdated(() => reload());
-    return () => unsub();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveProfileId, mode]);
+    // src 빈값 방지 + 최소 필드만 매핑
+    return sorted
+      .filter((p) => typeof p.imageUrl === "string" && p.imageUrl.trim().length > 0)
+      .map((p) => ({ id: p.id, imageUrl: p.imageUrl })) as FeedItem[];
+  }, [effectiveProfileId, mode, tick]);
 
   const goDetail = (contentId: string) => {
-    // ARTIST 업로드(작품) → 작품 디테일
     if (mode === "ARTIST") nav(`/artworks/${contentId}`);
-    // USER 업로드(포스트) → 포스트 디테일
     else nav(`/posts/${contentId}`);
   };
 
@@ -80,13 +76,24 @@ export default function FeedTab() {
         {items.map((it) => (
           <button
             key={it.id}
+            type="button"
             style={{ padding: 0, border: "none", background: "transparent" }}
             onClick={() => goDetail(it.id)}
           >
             <img
               src={it.imageUrl}
               alt=""
-              style={{ width: "100%", aspectRatio: "1 / 1", objectFit: "cover", borderRadius: 8 }}
+              style={{
+                width: "100%",
+                aspectRatio: "1 / 1",
+                objectFit: "cover",
+                borderRadius: 8,
+                display: "block",
+              }}
+              onError={(e) => {
+                // 깨진 이미지면 숨김(레이아웃 유지)
+                e.currentTarget.style.visibility = "hidden";
+              }}
             />
           </button>
         ))}
