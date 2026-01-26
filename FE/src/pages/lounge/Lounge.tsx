@@ -24,17 +24,7 @@ export default function Lounge() {
   const rawRole = useAuthStore((s) => s.role);
   const role = normalizeRole(rawRole);
 
-  /** ✅ 1. 컴포넌트 렌더 확인 (렌더될 때마다 찍힘) */
-  console.log("[FE] Lounge render");
-
-  /** ✅ 2. 서버 연동 대상 페이지 진입 로그 */
-  useEffect(() => {
-    console.log("[FE → SERVER] Lounge 페이지 진입 (서버 연동 대상)");
-  }, []);
-
   const tabs = useMemo(() => {
-    console.log("[FE] Lounge tabs 구성, role =", role);
-
     return role === "artist"
       ? ([
           { key: "ticket", title: "QR 티켓", desc: "티켓 발급/스캔" },
@@ -48,30 +38,21 @@ export default function Lounge() {
         ] as const);
   }, [role]);
 
+  // ✅ role 기준 기본 탭 (artist → ticket, general → collectbook)
   const defaultTab: Tab = role === "artist" ? "ticket" : "collectbook";
   const [active, setActive] = useState<Tab>(defaultTab);
 
-  /** ✅ 3. 탭 변경 로그 (무조건 보임) */
-  useEffect(() => {
-    console.log("[FE] Lounge active tab 변경:", active);
-  }, [active]);
-
-  /** ✅ 4. role 변경 감지 */
-  useEffect(() => {
-    console.log("[FE] Lounge role 변경:", role);
-  }, [role]);
-
+  // ✅ "잘못된 탭이면 기본 탭으로 복귀"
+  // - role 변경 등으로 tabs 목록이 바뀌었는데,
+  // - 기존 active가 새 tabs에 없으면 defaultTab으로 되돌림
   useEffect(() => {
     const validKeys = new Set(tabs.map((t) => t.key));
     if (!validKeys.has(active as any)) {
-      console.warn("[FE] 잘못된 탭 → 기본 탭으로 복귀");
       setActive(defaultTab);
     }
-  }, [role, tabs]);
+  }, [active, defaultTab, tabs]);
 
   const Content = useMemo(() => {
-    console.log("[FE] Lounge Content 렌더:", role, active);
-
     if (role === "artist") {
       if (active === "ticket") return <TicketQr />;
       if (active === "portfolio") return <Portfolio />;

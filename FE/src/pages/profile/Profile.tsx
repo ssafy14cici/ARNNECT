@@ -1,5 +1,5 @@
 // FE/src/pages/profile/Profile.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import ProfileHeader from "./components/ProfileHeader";
 import { profileApi } from "./api";
@@ -27,86 +27,57 @@ export default function Profile() {
 
   const [profile, setProfile] = useState<ProfileModel | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // 요청 경합 방지(빠른 라우트 전환/role 변경 시 이전 요청 결과가 덮어쓰지 않게)
+  const reqSeq = useRef(0);
 
   /** ===============================
-   * 🔍 콘솔 로그: 렌더 시점
-   * =============================== */
-  console.log("[FE] Profile render", {
-    profileId,
-    role,
-    isOwner,
-  });
-
-  /** ===============================
-   * 🔌 서버 연동 시도
+   * 서버 연동
    * =============================== */
   useEffect(() => {
-    let mounted = true;
+    let cancelled = false;
+    const mySeq = ++reqSeq.current;
 
-    console.log("[FE → SERVER] Profile 페이지 진입 (서버 연동 대상)", {
-      profileId,
-      role,
-    });
-
-    queueMicrotask(() => {
-      if (!mounted) return;
-      setError(null);
-      setProfile(null);
-    });
+    setLoading(true);
+    setError(null);
+    setProfile(null);
 
     (async () => {
       try {
         // ✅ 내 프로필
         if (profileId === "me") {
-          console.log(
-            "[FE → SERVER] GET /me/profile 요청 송출",
-            role
-          );
-
           const p =
             role === "ARTIST"
               ? await profileApi.getArtistProfile("me")
               : await profileApi.getUserProfile("me");
 
-          if (!mounted) return;
-
-          console.log("[SERVER ✅] /me/profile 응답 수신", p);
+          if (cancelled || reqSeq.current !== mySeq) return;
           setProfile(p);
           return;
         }
 
-        // ✅ 타인 프로필: fallback 전략
-        console.log(
-          "[FE → SERVER] GET /profiles/:id 요청 송출",
-          profileId
-        );
-
+        // ✅ 타인 프로필: fallback 전략 (artist → user)
         try {
           const a = await profileApi.getArtistProfile(profileId);
-          if (!mounted) return;
-
-          console.log("[SERVER ✅] Artist profile 응답 수신", a);
+          if (cancelled || reqSeq.current !== mySeq) return;
           setProfile(a);
         } catch {
           const u = await profileApi.getUserProfile(profileId);
-          if (!mounted) return;
-
-          console.log("[SERVER ✅] User profile 응답 수신", u);
+          if (cancelled || reqSeq.current !== mySeq) return;
           setProfile(u);
         }
       } catch (e) {
-        if (!mounted) return;
-
-        console.warn(
-          "[SERVER ❌] Profile API 연결 실패 (서버 미기동 상태)"
-        );
-
+        if (cancelled || reqSeq.current !== mySeq) return;
         setError(e instanceof Error ? e.message : "프로필 로딩 실패");
+      } finally {
+        if (cancelled || reqSeq.current !== mySeq) return;
+        setLoading(false);
       }
     })();
 
     return () => {
-      mounted = false;
+      cancelled = true;
     };
   }, [profileId, role]);
 
@@ -114,64 +85,45 @@ export default function Profile() {
    * 액션
    * =============================== */
   const navigate = useNavigate();
-
   const goWrite = () => {
-    console.log("[FE] 글쓰기 버튼 클릭");
     navigate("/posts/create");
   };
 
   /** ===============================
    * UI
    * =============================== */
+  if (loading) return <div style={{ padding: 16 }}>로딩중...</div>;
   if (error) return <div style={{ padding: 16 }}>{error}</div>;
-  if (!profile) return <div style={{ padding: 16 }}>로딩중...</div>;
+  if (!profile) return <div style={{ padding: 16 }}>프로필이 없습니다.</div>;
 
   return (
     <div className="profilePage">
-      {/* ✅ 헤더 */}
-      <ProfileHeader
-        profile={profile}
-        isOwner={isOwner}
-        onProfileUpdated={setProfile}
-      />
+      <ProfileHeader profile={profile} isOwner={isOwner} onProfileUpdated={setProfile} />
 
-      {/* ✅ 탭 바 */}
       <div className="profileTabs">
         <NavLink
           to="feed"
-          className={({ isActive }) =>
-            isActive ? "profileTab profileTabActive" : "profileTab"
-          }
+          className={({ isActive }) => (isActive ? "profileTab profileTabActive" : "profileTab")}
         >
           피드
         </NavLink>
 
-        {/* 유저만 콜렉션 노출 */}
         {role === "USER" && (
           <NavLink
             to="collection"
-            className={({ isActive }) =>
-              isActive ? "profileTab profileTabActive" : "profileTab"
-            }
+            className={({ isActive }) => (isActive ? "profileTab profileTabActive" : "profileTab")}
           >
             콜렉션
           </NavLink>
         )}
       </div>
 
-      {/* ✅ 탭 컨텐츠 */}
       <div className="profileTabPanel">
         <Outlet context={{ role }} />
       </div>
 
-      {/* ✅ 글쓰기 버튼 (내 프로필만) */}
       {isOwner && (
-        <button
-          type="button"
-          className="profileFab"
-          aria-label="글쓰기"
-          onClick={goWrite}
-        >
+        <button type="button" className="profileFab" aria-label="글쓰기" onClick={goWrite}>
           +
         </button>
       )}
