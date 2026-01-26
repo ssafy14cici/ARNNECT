@@ -1,6 +1,8 @@
+// FE/src/pages/profile/components/ProfileHeader.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import {  useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../../stores/authStore";
+import basicProfile from "../../../assets/basicprofile.png";
 import { profileApi } from "../api";
 import type { ArtistProfile, UserProfile } from "../types";
 
@@ -18,7 +20,7 @@ function isArtistProfile(p: ProfileModel): p is ArtistProfile {
 
 export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Props) {
   const navigate = useNavigate();
-  const { logout, role: viewerRole } = useAuthStore(); // viewerRole: "general" | "artist"
+  const { logout, role: viewerRole } = useAuthStore(); // "general" | "artist"
 
   const [busy, setBusy] = useState(false);
 
@@ -36,10 +38,12 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
   // ✅ 관리 메뉴
   const [manageOpen, setManageOpen] = useState(false);
   const manageBtnRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const firstMenuItemRef = useRef<HTMLButtonElement | null>(null);
 
   const isArtist = isArtistProfile(profile);
 
-  const badges = useMemo(() => profile.badges ?? [], [profile]);
+  const badges = useMemo(() => profile.badges ?? [], [profile.badges]);
   const genre = useMemo(() => (isArtist ? (profile as ArtistProfile).genre : undefined), [isArtist, profile]);
 
   const contactEnabled = useMemo(() => {
@@ -50,9 +54,47 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
   // ✅ “일반유저가 질문 남기기” 명세 반영: viewer가 general일 때만 QnA 노출
   const canAskQnA = !isOwner && isArtist && contactEnabled && viewerRole === "general";
 
-  // 관리 메뉴 닫힐 때 포커스 복구(접근성 경고 예방)
+  // ✅ img src="" 경고 방지: 빈 문자열이면 기본 이미지로 대체
+  const avatarSrc = useMemo(() => {
+    const url = (profile.imageUrl ?? "").trim();
+    if (!url || url === "null" || url === "undefined") return basicProfile;
+    return url;
+  }, [profile.imageUrl]);
+
+  // ✅ 관리 메뉴 열림/닫힘 시 포커스 제어
   useEffect(() => {
-    if (!manageOpen) manageBtnRef.current?.focus?.();
+    if (manageOpen) {
+      firstMenuItemRef.current?.focus?.();
+    } else {
+      manageBtnRef.current?.focus?.();
+    }
+  }, [manageOpen]);
+
+  // ✅ 클릭 바깥 / ESC로 메뉴 닫기
+  useEffect(() => {
+    if (!manageOpen) return;
+
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      const btn = manageBtnRef.current;
+      const menu = menuRef.current;
+
+      if (menu && menu.contains(target)) return;
+      if (btn && btn.contains(target)) return;
+
+      setManageOpen(false);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setManageOpen(false);
+    };
+
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [manageOpen]);
 
   // -------------------------
@@ -115,19 +157,19 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
   const saveEdit = () => {
     const next: ProfileModel = isArtist
-      ? ({
+      ? (({
           ...(profile as ArtistProfile),
           name: draftName.trim() || profile.name,
           imageUrl: draftImageUrl.trim() || null,
           bio: draftBio,
           genre: draftGenre,
-        } as ArtistProfile)
-      : ({
+        } as ArtistProfile) satisfies ArtistProfile)
+      : (({
           ...(profile as UserProfile),
           name: draftName.trim() || profile.name,
           imageUrl: draftImageUrl.trim() || null,
           bio: draftBio,
-        } as UserProfile);
+        } as UserProfile) satisfies UserProfile);
 
     onProfileUpdated(next);
     setEditOpen(false);
@@ -145,7 +187,16 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
   return (
     <section className="profileHeader">
       <div className="profileHeaderRow">
-        <img className="profileAvatar" src={profile.imageUrl ?? "/placeholder.png"} alt="" />
+        <img
+          className="profileAvatar"
+          src={avatarSrc}
+          alt={`${profile.name} 프로필`}
+          onError={(e) => {
+            // 깨진 URL이면 기본 이미지로 폴백 (무한 onError 방지)
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = basicProfile;
+          }}
+        />
 
         <div className="profileHeaderMain">
           <div className="profileTitleRow">
@@ -185,23 +236,42 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
           <div className="profileActionRow">
             {isOwner ? (
               <>
-                <button className="profileBtn" onClick={openEdit}>
+                <button className="profileBtn" onClick={openEdit} type="button">
                   편집
                 </button>
 
-                <button ref={manageBtnRef} className="profileBtn" onClick={() => setManageOpen((v) => !v)}>
+                <button
+                  ref={manageBtnRef}
+                  className="profileBtn"
+                  onClick={() => setManageOpen((v) => !v)}
+                  aria-haspopup="menu"
+                  aria-expanded={manageOpen}
+                  aria-controls="profile-manage-menu"
+                  type="button"
+                >
                   관리
                 </button>
 
                 {manageOpen && (
-                  <div className="profileMenu" role="menu">
-                    <button className="profileMenuItem" onClick={openEdit} role="menuitem">
+                  <div id="profile-manage-menu" ref={menuRef} className="profileMenu" role="menu">
+                    <button
+                      ref={firstMenuItemRef}
+                      className="profileMenuItem"
+                      onClick={openEdit}
+                      role="menuitem"
+                      type="button"
+                    >
                       프로필 편집
                     </button>
-                    <button className="profileMenuItem" onClick={doLogout} role="menuitem">
+                    <button className="profileMenuItem" onClick={doLogout} role="menuitem" type="button">
                       로그아웃
                     </button>
-                    <button className="profileMenuItem" onClick={() => setManageOpen(false)} role="menuitem">
+                    <button
+                      className="profileMenuItem"
+                      onClick={() => setManageOpen(false)}
+                      role="menuitem"
+                      type="button"
+                    >
                       닫기
                     </button>
                   </div>
@@ -209,13 +279,13 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
               </>
             ) : (
               <>
-                <button className="profileBtn" disabled={busy} onClick={toggleFollow}>
+                <button className="profileBtn" disabled={busy} onClick={toggleFollow} type="button">
                   {profile.isFollowing ? "언팔로우" : "팔로우"}
                 </button>
 
                 {/* ✅ QnA(예술가 + 일반유저만) */}
                 {canAskQnA && (
-                  <button className="profileBtn" onClick={() => setQnaOpen(true)}>
+                  <button className="profileBtn" onClick={() => setQnaOpen(true)} type="button">
                     QnA
                   </button>
                 )}
@@ -224,12 +294,13 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
           </div>
         </div>
       </div>
+
       {/* ✅ QnA 패널 */}
       {qnaOpen && canAskQnA && (
         <div className="profileQnaPanel">
           <div className="profileQnaHeader">
             <strong>QnA 남기기</strong>
-            <button className="profileTextBtn" onClick={() => setQnaOpen(false)}>
+            <button className="profileTextBtn" onClick={() => setQnaOpen(false)} type="button">
               닫기
             </button>
           </div>
@@ -243,10 +314,10 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
           />
 
           <div className="profileQnaActions">
-            <button className="profileBtn" onClick={() => setQnaOpen(false)}>
+            <button className="profileBtn" onClick={() => setQnaOpen(false)} type="button">
               취소
             </button>
-            <button className="profileBtn" disabled={busy || !qnaMessage.trim()} onClick={submitQnA}>
+            <button className="profileBtn" disabled={busy || !qnaMessage.trim()} onClick={submitQnA} type="button">
               보내기
             </button>
           </div>
@@ -259,7 +330,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
           <div className="profileModal">
             <div className="profileModalHeader">
               <strong>프로필 편집</strong>
-              <button className="profileTextBtn" onClick={() => setEditOpen(false)}>
+              <button className="profileTextBtn" onClick={() => setEditOpen(false)} type="button">
                 닫기
               </button>
             </div>
@@ -272,27 +343,40 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
               <label className="profileLabel">
                 프로필 이미지 URL(목업)
-                <input className="profileInput" value={draftImageUrl} onChange={(e) => setDraftImageUrl(e.target.value)} />
+                <input
+                  className="profileInput"
+                  value={draftImageUrl}
+                  onChange={(e) => setDraftImageUrl(e.target.value)}
+                />
               </label>
 
               {isArtist && (
                 <label className="profileLabel">
                   장르
-                  <input className="profileInput" value={draftGenre} onChange={(e) => setDraftGenre(e.target.value)} />
+                  <input
+                    className="profileInput"
+                    value={draftGenre}
+                    onChange={(e) => setDraftGenre(e.target.value)}
+                  />
                 </label>
               )}
 
               <label className="profileLabel">
                 소개글
-                <textarea className="profileTextarea" value={draftBio} onChange={(e) => setDraftBio(e.target.value)} rows={4} />
+                <textarea
+                  className="profileTextarea"
+                  value={draftBio}
+                  onChange={(e) => setDraftBio(e.target.value)}
+                  rows={4}
+                />
               </label>
             </div>
 
             <div className="profileModalActions">
-              <button className="profileBtn" onClick={() => setEditOpen(false)}>
+              <button className="profileBtn" onClick={() => setEditOpen(false)} type="button">
                 취소
               </button>
-              <button className="profileBtn" onClick={saveEdit}>
+              <button className="profileBtn" onClick={saveEdit} type="button">
                 저장
               </button>
             </div>

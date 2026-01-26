@@ -1,0 +1,12 @@
+:root{
+  --exh-z: 80;
+}
+.exh-root{
+  position: fixed;
+  inset: 0;
+  z-index: var(--exh-z);
+  display: none;
+}
+.exh-root.is-visible{
+  display: block;
+}

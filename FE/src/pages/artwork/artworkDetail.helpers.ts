@@ -1,0 +1,91 @@
+export type Comment = {
+  id: string;
+  parentId: string | null;
+  content: string;
+  authorId: string;
+  authorName: string;
+
+  createdAt?: string;
+};
+
+/**
+ * ✅ 핵심: data/artworks 가 보통 `as const`라서 readonly임
+ * 그래서 base 타입도 readonly로 받아야 TS2352가 안 뜸
+ */
+export type ArtworkBase = {
+  readonly id: string;
+  readonly src: string;
+
+  // 더미 데이터에서 자주 쓰는 필드들(선택)
+  readonly title?: string;
+  readonly artist?: string;
+  readonly artistName?: string;
+  readonly description?: string;
+  readonly tags?: readonly string[];
+
+  // 기타 필드들이 있어도 막히지 않도록
+  readonly [key: string]: any;
+};
+
+export type ArtworkDetailData = ArtworkBase & {
+  title: string;
+  artist: string;
+  description: string;
+  tags: string[]; // UI에서 map 돌리기 편하게 최종은 mutable array로 만들어줌
+};
+
+export const getMockArtworkData = (baseArtwork: ArtworkBase): ArtworkDetailData => {
+  const artworkNumber = String(baseArtwork.id).replace("a", "");
+
+  const title = baseArtwork.title || `Garsington Opera Pavilion #${artworkNumber}`;
+  const artist =
+    baseArtwork.artist ||
+    baseArtwork.artistName ||
+    `ARTIST ${artworkNumber}`;
+
+  const description =
+    baseArtwork.description ||
+    `이 작품은 현대 건축과 자연의 조화를 담아낸 독특한 시리즈입니다. 빛과 그림자의 대비, 공간의 흐름을 통해 관람객에게 새로운 시각적 경험을 선사합니다. 작가는 이 작품을 통해 인간과 환경의 관계를 탐구하며, 건축물이 단순한 구조물을 넘어 예술적 표현의 매개체가 될 수 있음을 보여줍니다.`;
+
+  const tags = (baseArtwork.tags ? [...baseArtwork.tags] : ["건축", "현대미술", "공간디자인", "빛과그림자"]);
+
+  return {
+    ...baseArtwork,
+    title,
+    artist,
+    description,
+    tags,
+  };
+};
+
+export const findArtworkById = (list: readonly ArtworkBase[], id?: string) => {
+  if (!id) return null;
+
+  const urlId = String(id);
+
+  return (
+    list.find((item) => {
+      const itemId = String(item.id);
+
+      if (
+        itemId === urlId ||
+        itemId === `a${urlId}` ||
+        itemId.replace("a", "") === urlId.replace("a", "")
+      ) {
+        return true;
+      }
+
+      const numericUrlId = parseInt(urlId.replace("a", ""), 10);
+      const numericItemId = parseInt(itemId.replace("a", ""), 10);
+
+      if (Number.isNaN(numericUrlId) || Number.isNaN(numericItemId)) return false;
+
+      if (numericUrlId >= 1000) {
+        const expectedItemId = numericUrlId - 999;
+        return numericItemId === expectedItemId;
+      }
+
+      return false;
+    }) || null
+  );
+};

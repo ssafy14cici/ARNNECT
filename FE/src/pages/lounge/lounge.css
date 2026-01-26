@@ -168,3 +168,362 @@
   opacity: 0.75;
   font-size: 13px;
 }
+
+/* ===== Radar6 (Taste) ===== */
+.radarSvg {
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.radarGridPolygon {
+  fill: none;
+  stroke: var(--lounge-line, rgba(255, 255, 255, 0.14));
+  stroke-width: 1;
+}
+
+.radarAxisLine {
+  stroke: var(--lounge-line-strong, rgba(255, 255, 255, 0.22));
+  stroke-width: 1;
+}
+
+.radarDataFill {
+  fill: var(--lounge-accent-fill, rgba(120, 180, 255, 0.18));
+  stroke: none;
+}
+
+.radarDataStroke {
+  fill: none;
+  stroke: var(--lounge-accent, rgba(120, 180, 255, 0.85));
+  stroke-width: 2;
+}
+
+.radarLabel {
+  font-size: 12px;
+  fill: var(--lounge-text, rgba(255, 255, 255, 0.9));
+}
+
+/* Taste 레이아웃 보조 */
+.tasteChartRow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 720px) {
+  .tasteChartRow {
+    grid-template-columns: 360px 1fr;
+    align-items: center;
+  }
+}
+
+.tasteTopList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tasteTopList li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--lounge-line, rgba(255, 255, 255, 0.14));
+  border-radius: 10px;
+}
+
+.tasteTopList .label {
+  opacity: 0.95;
+}
+.tasteTopList .value {
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+/* =========================
+   Taste UI (Radar + Details)
+========================= */
+
+.tasteSection {
+  display: grid;
+  gap: 14px;
+}
+
+.tasteCard {
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(6px);
+}
+
+.tasteCardTitle {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.tasteChartGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+@media (min-width: 860px) {
+  .tasteChartGrid {
+    grid-template-columns: 420px 1fr;
+    align-items: center;
+  }
+}
+
+
+/* ===== Radar SVG ===== */
+.radarSvg {
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.radarGridPolygon {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.08);
+  stroke-width: 1;
+}
+
+.radarAxisLine {
+  stroke: rgba(0, 0, 0, 0.10);
+  stroke-width: 1;
+}
+
+.radarDataShadow {
+  fill: rgba(0, 0, 0, 0.10);
+}
+
+.radarDataStroke {
+  fill: none;
+  stroke: rgba(70, 140, 255, 0.90);
+  stroke-width: 2.6;
+}
+
+.radarDot {
+  fill: rgba(255, 255, 255, 0.95);
+  stroke: rgba(70, 140, 255, 0.95);
+  stroke-width: 2;
+}
+
+.radarLabel {
+  font-size: 12px;
+  font-weight: 650;
+  fill: rgba(0, 0, 0, 0.50);
+}
+
+/* ===== Top6 list ===== */
+.tasteTopList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.tasteRow {
+  display: grid;
+  grid-template-columns: 90px 1fr 44px;
+  gap: 10px;
+  align-items: center;
+}
+
+.tasteRowLabel {
+  font-weight: 650;
+  color: rgba(0, 0, 0, 0.66);
+}
+
+.tasteRowValue {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.tasteBarTrack {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.tasteBarFill {
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(70, 140, 255, 0.70);
+}
+
+/* ===== 상세 분석 ===== */
+.tasteDetailGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 860px) {
+  .tasteDetailGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.detailItemList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.detailItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: rgba(255,255,255,0.50);
+}
+
+.detailLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.detailName {
+  font-weight: 650;
+  color: rgba(0,0,0,0.62);
+}
+.detailHint {
+  font-size: 12px;
+  color: rgba(0,0,0,0.40);
+}
+
+.detailScore {
+  font-variant-numeric: tabular-nums;
+  color: rgba(0,0,0,0.44);
+}
+
+.loungeTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.loungeRoleChip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: rgba(255,255,255,0.55);
+  font-size: 12px;
+  color: rgba(0,0,0,0.55);
+}
+
+.loungeTabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.loungeTab {
+  display: block;
+  padding: 14px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: rgba(255,255,255,0.55);
+  text-decoration: none;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.loungeTab:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.06);
+}
+
+.loungeTabTitle {
+  font-weight: 800;
+  color: rgba(0,0,0,0.80);
+}
+
+.loungeTabDesc {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(0,0,0,0.50);
+}
+
+.loungeTab.isActive {
+  border-color: rgba(70, 140, 255, 0.45);
+  background: rgba(70, 140, 255, 0.10);
+  box-shadow: 0 10px 22px rgba(70, 140, 255, 0.12);
+}
+
+.loungeBody {
+  margin-top: 14px;
+}
+.loungeTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.loungeRoleChip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: rgba(255,255,255,0.55);
+  font-size: 12px;
+  color: rgba(0,0,0,0.55);
+}
+
+.loungeTabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.loungeTabBtn {
+  text-align: left;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: rgba(255,255,255,0.55);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.loungeTabBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.06);
+}
+
+.loungeTabBtn.isActive {
+  border-color: rgba(70, 140, 255, 0.45);
+  background: rgba(70, 140, 255, 0.10);
+  box-shadow: 0 10px 22px rgba(70, 140, 255, 0.12);
+}
+
+.loungeTabTitle {
+  font-weight: 800;
+  color: rgba(0,0,0,0.80);
+}
+
+.loungeTabDesc {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(0,0,0,0.50);
+}
+
+.loungeBody {
+  margin-top: 14px;
+}
