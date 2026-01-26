@@ -1,4 +1,25 @@
-import type { CollectBookItem } from "../types/collectbook";
+// FE/src/utils/collectbookStorage.ts
+export type Visibility = "private" | "public";
+
+
+export type ExhibitionLite = {
+  title?: string;
+  place?: string;
+  startDate?: string;
+  endDate?: string;
+  posterUrl?: string;
+  description?: string;
+};
+
+export type CollectBookItem = {
+  id: string;
+  ticketCode: string;
+  exhibition: ExhibitionLite;
+  memo?: string;
+  visitedAt: string; // YYYY-MM-DD
+  visibility: Visibility;
+  scannedAt: string; // ISO
+};
 
 const KEY = "arnnect_collectbook_v1";
 
@@ -11,41 +32,65 @@ function safeParse<T>(raw: string | null, fallback: T): T {
   }
 }
 
-function uid(): string {
-  // modern browsers
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  // fallback
+function uuid() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-export function listCollectBookItems(): CollectBookItem[] {
-  const items = safeParse<CollectBookItem[]>(localStorage.getItem(KEY), []);
-  // 최근 스캔 순
-  return [...items].sort((a, b) => new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime());
+function loadAll(): CollectBookItem[] {
+  return safeParse<CollectBookItem[]>(localStorage.getItem(KEY), []);
 }
 
-export function getCollectBookItem(id: string): CollectBookItem | null {
-  return listCollectBookItems().find((x) => x.id === id) ?? null;
+function saveAll(items: CollectBookItem[]) {
+  localStorage.setItem(KEY, JSON.stringify(items));
 }
 
-export function addCollectBookItem(input: Omit<CollectBookItem, "id"> & { id?: string }): CollectBookItem {
-  const items = safeParse<CollectBookItem[]>(localStorage.getItem(KEY), []);
+// ✅ 최근 스캔 순 목록
+export function getCollectBookItems(): CollectBookItem[] {
+  const items = loadAll();
+  return items.sort((a, b) => (b.scannedAt || "").localeCompare(a.scannedAt || ""));
+}
 
-  const item: CollectBookItem = {
-    ...input,
-    id: input.id ?? uid(),
-  };
 
-  // ticketCode 기준으로 중복 등록 방지(원하면 제거 가능)
-  const filtered = items.filter((x) => x.ticketCode !== item.ticketCode);
+export function removeCollectBookItem(id: string) {
+  const items = loadAll().filter((it) => it.id !== id);
+  saveAll(items);
+}
 
-  const next = [item, ...filtered];
-  localStorage.setItem(KEY, JSON.stringify(next));
+export function addCollectBookItem(input: Omit<CollectBookItem, "id">) {
+  const items = loadAll();
+
+  // ✅ 같은 ticketCode + visitedAt 조합은 1개만
+  const idx = items.findIndex(
+    (it) => it.ticketCode === input.ticketCode && it.visitedAt === input.visitedAt
+  );
+
+  if (idx >= 0) {
+    // 이미 있으면: 기존 항목 갱신(중복 방지)
+    const updated: CollectBookItem = {
+      ...items[idx],
+      ...input,
+      id: items[idx].id, // id 유지
+      // scannedAt은 "최신 스캔 시간으로 갱신"하고 싶으면 아래처럼
+      scannedAt: input.scannedAt || items[idx].scannedAt,
+    };
+    items[idx] = updated;
+    saveAll(items);
+    return updated;
+  }
+
+  // 없으면 새로 추가
+  const item: CollectBookItem = { id: uuid(), ...input };
+  items.push(item);
+  saveAll(items);
   return item;
 }
 
-export function clearCollectBookAll() {
-  localStorage.removeItem(KEY);
+// ✅ 상세 1건 조회
+export function getCollectBookItemById(id: string) {
+  const items = getCollectBookItems();
+  return items.find((it) => it.id === id) ?? null;
 }
+
+// ✅ (옵션) 예전 이름을 쓰고 있었다면 alias로도 제공
+export const getCollectBookItem = getCollectBookItemById;

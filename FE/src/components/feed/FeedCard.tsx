@@ -1,41 +1,30 @@
-// src/components/FeedCard.tsx
-
+// src/components/feed/FeedCard.tsx
 import React from 'react';
-import { Feed } from '../../data/mockFeeds';
-import './FeedCard.css';  // ← 이 줄 추가
+import { Feed } from '@/types/feed';
+import './FeedCard.css';
 
-// ... 나머지 코드 동일
 interface FeedCardProps {
   feed: Feed;
 }
 
 export const FeedCard: React.FC<FeedCardProps> = ({ feed }) => {
+  console.log('[FE] FeedCard render:', feed.id);
+
   return (
     <div className="feed-card">
-      {/* 썸네일 영역 */}
+      {/* 썸네일 */}
       <div className="feed-card__thumbnail">
-        <img src={feed.thumbnail} alt={feed.title} />
+        <img src={feed.imageUrl} alt={feed.title} />
       </div>
 
-      {/* 정보 영역 */}
-      <div className="feed-card__info">
-        {/* 제목 */}
+      {/* 정보 */}
+      <div className="feed-card__content">
         <h3 className="feed-card__title">{feed.title}</h3>
+        <p className="feed-card__author">{feed.authorName}</p>
 
-        {/* 작가 정보 */}
-        <div className="feed-card__artist">
-          <img 
-            src={feed.artistProfile} 
-            alt={feed.artist}
-            className="feed-card__artist-profile"
-          />
-          <span className="feed-card__artist-name">{feed.artist}</span>
-        </div>
-
-        {/* 통계 정보 */}
-        <div className="feed-card__stats">
-          <span className="feed-card__likes">❤️ {feed.likes}</span>
-          <span className="feed-card__views">👁️ {feed.views}</span>
+        <div className="feed-card__meta">
+          <span>❤️ {feed.likes}</span>
+          <span>👁 {feed.views}</span>
         </div>
       </div>
     </div>

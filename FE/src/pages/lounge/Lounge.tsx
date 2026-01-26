@@ -1,156 +1,114 @@
-// FE/src/pages/lounge/Lounge.tsx
-import { useMemo } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import "./lounge.css";
-
 import { useAuthStore } from "../../stores/authStore";
-import type { Role } from "../../router/guards";
 
-type LoungeAction = {
-  key: string;
-  title: string;
-  desc: string;
-  to: string; // 추후 서브 라우트 연결용
-  disabled?: boolean;
-};
+import CollectBook from "./user/CollectBook";
+import Taste from "./user/Taste";
+import Quiz from "./user/Quiz";
 
-function getRoleLabel(role?: Role) {
-  if (!role) return "UNKNOWN";
-  return role === "artist" ? "ARTIST" : "general";
-}
+import TicketQr from "./artist/TicketQr";
+import Portfolio from "./artist/Portfolio";
+import FanLetter from "./artist/FanLetter";
 
-function isArtist(role?: Role) {
-  return role === "artist";
+type Role = "general" | "artist";
+type UserTab = "collectbook" | "taste" | "quiz";
+type ArtistTab = "ticket" | "portfolio" | "fan-letter";
+type Tab = UserTab | ArtistTab;
+
+function normalizeRole(role: any): Role {
+  if (role === "artist" || role === "ARTIST") return "artist";
+  return "general";
 }
 
 export default function Lounge() {
-  const { isLoggedIn, role } = useAuthStore();
+  const rawRole = useAuthStore((s) => s.role);
+  const role = normalizeRole(rawRole);
 
-  const roleLabel = useMemo(() => getRoleLabel(role), [role]);
+  /** ✅ 1. 컴포넌트 렌더 확인 (렌더될 때마다 찍힘) */
+  console.log("[FE] Lounge render");
 
-  const actions: LoungeAction[] = useMemo(() => {
-    // 로그인/역할이 확정되지 않은 경우에도 UI는 뜨되, 액션은 잠시 비활성 처리
-    const baseDisabled = !isLoggedIn || !role;
+  /** ✅ 2. 서버 연동 대상 페이지 진입 로그 */
+  useEffect(() => {
+    console.log("[FE → SERVER] Lounge 페이지 진입 (서버 연동 대상)");
+  }, []);
 
-    if (isArtist(role)) {
-      return [
-        {
-          key: "qr",
-          title: "QR 티켓 발급",
-          desc: "관람객 스캔용 티켓 코드/QR 생성",
-          to: "/lounge/qr",
-          disabled: baseDisabled,
-        },
-        {
-          key: "portfolio",
-          title: "포트폴리오",
-          desc: "내 작품/작업물 관리",
-          to: "/lounge/portfolio",
-          disabled: baseDisabled,
-        },
-        {
-          key: "fanletter",
-          title: "팬레터 · QnA",
-          desc: "질문/답변 및 소통 관리",
-          to: "/lounge/fanletter",
-          disabled: baseDisabled,
-        },
-      ];
+  const tabs = useMemo(() => {
+    console.log("[FE] Lounge tabs 구성, role =", role);
+
+    return role === "artist"
+      ? ([
+          { key: "ticket", title: "QR 티켓", desc: "티켓 발급/스캔" },
+          { key: "portfolio", title: "포트폴리오", desc: "작가 정보/작품" },
+          { key: "fan-letter", title: "팬레터", desc: "질문/답변" },
+        ] as const)
+      : ([
+          { key: "collectbook", title: "컬렉트북", desc: "스캔한 티켓/작품 기록" },
+          { key: "taste", title: "취향분석", desc: "선호/활동 기반 요약" },
+          { key: "quiz", title: "퀴즈", desc: "작품/작가 기반 퀴즈" },
+        ] as const);
+  }, [role]);
+
+  const defaultTab: Tab = role === "artist" ? "ticket" : "collectbook";
+  const [active, setActive] = useState<Tab>(defaultTab);
+
+  /** ✅ 3. 탭 변경 로그 (무조건 보임) */
+  useEffect(() => {
+    console.log("[FE] Lounge active tab 변경:", active);
+  }, [active]);
+
+  /** ✅ 4. role 변경 감지 */
+  useEffect(() => {
+    console.log("[FE] Lounge role 변경:", role);
+  }, [role]);
+
+  useEffect(() => {
+    const validKeys = new Set(tabs.map((t) => t.key));
+    if (!validKeys.has(active as any)) {
+      console.warn("[FE] 잘못된 탭 → 기본 탭으로 복귀");
+      setActive(defaultTab);
     }
+  }, [role, tabs]);
 
-    // USER (일반유저)
-    return [
-      {
-        key: "collectbook",
-        title: "컬렉트북",
-        desc: "스캔한 티켓/작품 기록",
-        to: "/lounge/collectbook",
-        disabled: baseDisabled,
-      },
-      {
-        key: "taste",
-        title: "취향분석",
-        desc: "나의 선호/활동 기반 요약",
-        to: "/lounge/taste",
-        disabled: baseDisabled,
-      },
-      {
-        key: "quiz",
-        title: "퀴즈",
-        desc: "작품/작가 기반 퀴즈",
-        to: "/lounge/quiz",
-        disabled: baseDisabled,
-      },
-    ];
-  }, [isLoggedIn, role]);
+  const Content = useMemo(() => {
+    console.log("[FE] Lounge Content 렌더:", role, active);
+
+    if (role === "artist") {
+      if (active === "ticket") return <TicketQr />;
+      if (active === "portfolio") return <Portfolio />;
+      return <FanLetter />;
+    } else {
+      if (active === "collectbook") return <CollectBook />;
+      if (active === "taste") return <Taste />;
+      return <Quiz />;
+    }
+  }, [active, role]);
 
   return (
     <main className="loungePage">
       <section className="loungeWrap">
-        <header className="loungeHeader">
-          <div className="loungeHeaderTop">
+        <div className="loungeTop">
+          <div>
             <h1 className="loungeTitle">Lounge</h1>
-            <span className={`loungeRoleBadge ${roleLabel.toLowerCase()}`}>
-              {roleLabel}
-            </span>
+            <p className="loungeDesc">내 활동/내 기능 허브 (Role Split)</p>
           </div>
+          <div className="loungeRoleChip">{role}</div>
+        </div>
 
-          <p className="loungeSubtitle">
-            내 활동/내 기능 허브 (Role Split)
-          </p>
+        <div className="loungeTabs">
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              className={`loungeTabBtn ${active === t.key ? "isActive" : ""}`}
+              onClick={() => setActive(t.key as Tab)}
+            >
+              <div className="loungeTabTitle">{t.title}</div>
+              <div className="loungeTabDesc">{t.desc}</div>
+            </button>
+          ))}
+        </div>
 
-          {!isLoggedIn && (
-            <div className="loungeNotice">
-              로그인이 필요합니다. (현재는 UI만 노출)
-            </div>
-          )}
-
-          {isLoggedIn && !role && (
-            <div className="loungeNotice">
-              역할(Role)이 아직 확정되지 않았습니다. 스토어/Mock 데이터 확인 필요
-            </div>
-          )}
-        </header>
-
-        <section className="loungeSection">
-          <h2 className="loungeSectionTitle">Quick Actions</h2>
-
-          <div className="loungeGrid">
-            {actions.map((a) => (
-              <Link
-                key={a.key}
-                to={a.to}
-                className={`loungeCard ${a.disabled ? "disabled" : ""}`}
-                onClick={(e) => {
-                  if (a.disabled) e.preventDefault();
-                }}
-                aria-disabled={a.disabled || undefined}
-              >
-                <div className="loungeCardBody">
-                  <div className="loungeCardTitleRow">
-                    <h3 className="loungeCardTitle">{a.title}</h3>
-                    <span className="loungeChevron" aria-hidden="true">
-                      →
-                    </span>
-                  </div>
-                  <p className="loungeCardDesc">{a.desc}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <section className="loungeSection">
-          <h2 className="loungeSectionTitle">My Activity</h2>
-          <div className="loungePanel">
-            <p className="loungePanelText">
-              최근 활동(업로드/댓글/좋아요/스캔/답변 등) 영역 — 추후 API 연동 시 타임라인으로 확장
-            </p>
-            <div className="loungeEmpty">
-              아직 표시할 데이터가 없습니다.
-            </div>
-          </div>
-        </section>
+        <section className="loungeBody">{Content}</section>
       </section>
     </main>
   );
