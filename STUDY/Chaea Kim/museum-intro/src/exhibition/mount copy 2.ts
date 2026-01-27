@@ -3,9 +3,6 @@ import "./css/normalize.css";
 import "./css/demo.css";
 
 import receptionDeskPng from "./img/desk_cat.png"; // ✅ desk_cat.png (1280x728)
-import frontalWallPng from "./img/frontal.png"; // ✅ 리셉션 정면 벽
-import leftWallPng from "./img/left_side.png"; // ✅ 리셉션 좌측 벽
-import rightWallPng from "./img/right_side.png"; // ✅ 리셉션 우측 벽
 
 export type RoomSet = {
   back: string[];
@@ -60,12 +57,6 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   if (!document.getElementById(styleId)) {
     const style = document.createElement("style");
     style.id = styleId;
-
-    // ✅ 프레임 두께 - 얇게 조정
-    // - front(액자면) padding = thickness
-    // - side 두께는 padding과 동일하게 맞춰야 정합됨
-    const FRAME_THICK = 16; // ✅ 프레임을 얇게 (26 → 16)
-
     style.textContent = `
       .exh-root{
         position: fixed; inset: 0;
@@ -117,122 +108,86 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
       }
 
       /* =====================================================
-       * ✅ 리셉션 룸 벽면 PNG 이미지
-       * ===================================================== */
-      .exh-root .room--reception .room__side--back,
-      .exh-root .room--room0 .room__side--back{
-        background-image: url(${frontalWallPng});
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-      }
-
-      .exh-root .room--reception .room__side--left,
-      .exh-root .room--room0 .room__side--left{
-        background-image: url(${leftWallPng});
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-      }
-
-      .exh-root .room--reception .room__side--right,
-      .exh-root .room--room0 .room__side--right{
-        background-image: url(${rightWallPng});
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-      }
-
-      /* =====================================================
-       * ✅ 액자 Wrapper - 얇은 상자 형식 (벽에 붙은 얇은 캔버스)
+       * ✅ 액자 Wrapper - 3D 프레임 두께감 시스템
        * ===================================================== */
       .exh-root .room__frame{
         flex: none;
-        max-width: 28%; /* ✅ 작품 크기 축소 (공간감 개선) */
-        max-height: 45%; /* ✅ 작품 크기 축소 */
-        margin: 0 6%; /* ✅ 작품 간격 */
-        transform: translate3d(0,0,25px); /* ✅ 얇게 튀어나옴 */
+        max-width: 50%;
+        max-height: 70%;
+        margin: 0 5%;
+        transform: translate3d(0,0,100px);
         backface-visibility: hidden;
         position: relative;
         transform-style: preserve-3d;
         pointer-events: auto;
-
-        /* ✅ 매우 얇은 프레임 */
-        padding: ${FRAME_THICK}px;
-        border-radius: 4px;
-
-        /* ✅ 얇은 상자 스타일 */
-        background: rgba(250, 245, 240, 0.98);
-        box-shadow:
-          0 8px 16px rgba(0,0,0,0.15),
-          0 2px 6px rgba(0,0,0,0.08);
       }
 
-      /* ✅ 이미지 자체는 프레임 안으로 */
-      .exh-root img.room__img{
-        display:block;
-        width: 100%;
-        height: auto;
-        border-radius: 8px;
-        box-shadow: 0 10px 18px rgba(0,0,0,0.18);
-        transform: translateZ(1px); /* z-fighting 방지 */
-
-        /* ✅ 중요: demo.css의 과한 padding 제거 */
-        padding: 0 !important;
-        margin: 0 !important;
-        background: none !important;
-        border: none !important;
-      }
-
-      /* ✅ side 4개 - 매우 얇은 상자 측면 (두께감 최소화) */
       .exh-root .room__frame-side{
         position: absolute;
         backface-visibility: hidden;
-        pointer-events:none;
       }
 
+      /* ✅ 위쪽 측면 - 밝은 면 */
       .exh-root .room__frame-side--top{
         top: 0;
         left: 0;
         width: 100%;
-        height: ${FRAME_THICK}px;
+        height: 19px; /* ✅ 38px → 19px (절반) */
         transform-origin: top center;
         transform: rotateX(90deg);
-        background: rgba(220, 215, 210, 0.9);
+        background: linear-gradient(to bottom,
+          #d4c4a8 0%,
+          #c0ad88 40%,
+          #b39d70 100%
+        );
       }
-
+      /* ✅ 오른쪽 측면 - 어두운 면 */
       .exh-root .room__frame-side--right{
         top: 0;
         right: 0;
-        width: ${FRAME_THICK}px;
+        width: 19px; /* ✅ 38px → 19px (절반) */
         height: 100%;
         transform-origin: right center;
         transform: rotateY(90deg);
-        background: rgba(200, 195, 190, 0.9);
+        background: linear-gradient(to right,
+          #8b7544 0%,
+          #7a6438 50%,
+          #6d5a35 100%
+        );
       }
-
+      /* ✅ 아래쪽 측면 - 가장 어두운 면 */
       .exh-root .room__frame-side--bottom{
         bottom: 0;
         left: 0;
         width: 100%;
-        height: ${FRAME_THICK}px;
+        height: 19px; /* ✅ 38px → 19px (절반) */
         transform-origin: bottom center;
         transform: rotateX(-90deg);
-        background: rgba(200, 195, 190, 0.9);
+        background: linear-gradient(to top,
+          #6d5a35 0%,
+          #7a6438 40%,
+          #8b7544 100%
+        );
       }
-
+      /* ✅ 왼쪽 측면 - 중간 밝기 */
       .exh-root .room__frame-side--left{
         top: 0;
         left: 0;
-        width: ${FRAME_THICK}px;
+        width: 19px; /* ✅ 38px → 19px (절반) */
         height: 100%;
         transform-origin: left center;
         transform: rotateY(-90deg);
-        background: rgba(210, 205, 200, 0.9);
+        background: linear-gradient(to left,
+          #9e8655 0%,
+          #8b7544 50%,
+          #7a6438 100%
+        );
       }
 
       /* =====================================================
        * ✅ Reception Desk Cat (1280x728)
+       * - 바닥에 "붙어있는" 느낌: top 위치 + shadow + 약한 원근
+       * - 과한 회전 제거(합성 티 줄임)
        * ===================================================== */
       .exh-root .reception-desk{
         position:absolute;
@@ -241,7 +196,7 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
         width: 780px;
         max-width: 78vw;
 
-        aspect-ratio: 1280 / 728;
+        aspect-ratio: 1280 / 728; /* ✅ desk_cat.png 비율 고정 */
         height: auto;
 
         pointer-events:auto;
@@ -250,6 +205,8 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
         background: transparent;
         cursor: pointer;
 
+        /* ✅ '바닥 접지'를 살리기 위해: translateY를 거의 안 쓰고,
+           rotateX를 아주 약하게(바닥면과 평행한 느낌) */
         transform-origin: 50% 92%;
         transform:
           translate(-50%, -100%)
@@ -261,6 +218,7 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
         filter: none;
       }
 
+      /* ✅ 접지 그림자(바닥에 붙어 보이게) */
       .exh-root .reception-desk::after{
         content:"";
         position:absolute;
@@ -284,30 +242,14 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
         display:block;
         user-select:none;
         -webkit-user-drag:none;
+
+        /* ✅ 살짝만 공간 톤에 맞춤(과하면 인위적이니까 최소) */
         filter: saturate(0.98) brightness(1.01);
       }
 
       /* =====================================================
        * ✅ Cat wave (hover / first-enter)
-       * - 리셉션에서는 "아예" 안 움직이게 해야 하니,
-       *   wave 클래스 붙어도 애니메이션 무효화.
        * ===================================================== */
-      .exh-root .room--reception .reception-desk,
-      .exh-root .room--room0 .reception-desk{
-        animation: none !important;
-      }
-      .exh-root .room--reception .reception-desk.wave,
-      .exh-root .room--room0 .reception-desk.wave{
-        animation: none !important;
-      }
-
-      /* 혹시 room subject가 다를 수 있으니, JS에서 data-reception도 같이 씀 */
-      .exh-root .reception-desk[data-no-motion="1"],
-      .exh-root .reception-desk[data-no-motion="1"].wave{
-        animation: none !important;
-      }
-
-      /* 기존 keyframes는 남겨두되(다른 룸에서 쓸 수도 있으니), 리셉션에서는 차단 */
       @keyframes catWave {
         0%   { transform: translate(-50%, -100%) perspective(1600px) rotateX(1.2deg) rotateY(-2.2deg) translateZ(10px) rotate(0deg); }
         20%  { transform: translate(-50%, -100%) perspective(1600px) rotateX(1.2deg) rotateY(-2.2deg) translateZ(10px) rotate(-1.6deg); }
@@ -584,20 +526,30 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
       <div class="room__side room__side--top"></div>
     `;
 
-    // ✅ reception: overlay로 데스크(고양이) 추가 (리셉션에서는 절대 움직임 X)
+    // ✅ reception: overlay로 데스크(고양이) 추가
     if (isReceptionRoom(room, index)) {
       const layer = el("div", "reception-prop-layer");
       layer.innerHTML = `
-        <button class="reception-desk" data-no-motion="1" type="button" aria-label="Reception desk">
+        <button class="reception-desk" type="button" aria-label="Reception desk">
           <img src="${receptionDeskPng}" alt="Reception desk cat" draggable="false" />
         </button>
       `;
       roomEl.appendChild(layer);
 
-      // ✅ 기존에 wave 넣던 로직 제거 (리셉션은 정지)
+      // ✅ 첫 진입 1회 웨이브 + hover 웨이브
       const deskBtn = layer.querySelector<HTMLButtonElement>(".reception-desk")!;
-      deskBtn.classList.remove("wave");
-      deskBtn.onmouseenter = null;
+      // first wave
+      requestAnimationFrame(() => {
+        deskBtn.classList.remove("wave");
+        void deskBtn.offsetWidth;
+        deskBtn.classList.add("wave");
+      });
+      // hover wave
+      deskBtn.addEventListener("mouseenter", () => {
+        deskBtn.classList.remove("wave");
+        void deskBtn.offsetWidth;
+        deskBtn.classList.add("wave");
+      });
     }
 
     scroller.appendChild(roomEl);
@@ -799,7 +751,7 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
 
   // =========================================================
   // 5.5) ✅ 커서 따라 룸 흔들리는 모션 (parallax wobble)
-  // ✅ 리셉션 룸은 제외
+  // ✅ 리셉션 룸은 제외, 다른 전시장만 적용
   // =========================================================
   function onMouseMoveWobble(e: MouseEvent) {
     if (!exh.classList.contains("is-visible")) return;
@@ -807,11 +759,10 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
     const roomEl = scroller.querySelector<HTMLElement>(".room--current");
     if (!roomEl) return;
 
+    // ✅ 리셉션 룸은 모션 제외
     const currentRoom = rooms[index];
     if (isReceptionRoom(currentRoom, index)) {
-      // ✅ 리셉션은 흔들림 완전 제거(transition도 제거해서 잔상 방지)
-      roomEl.style.transition = "";
-      roomEl.style.transform = "";
+      roomEl.style.transform = ""; // 리셉션은 transform 제거
       return;
     }
 
@@ -820,9 +771,8 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
     const offsetX = (e.clientX - centerX) / centerX;
     const offsetY = (e.clientY - centerY) / centerY;
 
-    // ✅ 각도 제한 (외부가 보이지 않도록 최소화)
-    const maxRotateY = 1.2; // ✅ 3 → 1.2: 좌우 흔들림 최소화
-    const maxRotateX = 0.8; // ✅ 2.5 → 0.8: 상하 흔들림 최소화
+    const maxRotateY = 3;
+    const maxRotateX = 2.5;
 
     const rotateY = offsetX * maxRotateY;
     const rotateX = -offsetY * maxRotateX;
