@@ -1,0 +1,54 @@
+/* src/styles/footer.css */
+.footer {
+  /* 이미지 톤에 맞춘 따뜻한 라이트 그레이 배경 */
+  background-color: #f6f5f2; 
+  border-top: 1px solid #edece8;
+  padding: 60px 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 작대기 대신 여백으로 구분 */
+  gap: 40px; 
+}
+
+.footer-link {
+  font-size: 14px;
+  /* 배경과 어울리는 웜 그레이 컬러 */
+  color: #8a8883; 
+  text-decoration: none;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  transition: color 0.2s ease;
+}
+
+.footer-link:hover {
+  /* 호버 시에는 조금 더 진하게 */
+  color: #4a4945; 
+}
+
+.footer-link.policy {
+  /* 개인정보 처리방침은 조금 더 명확한 톤으로 */
+  color: #63615e;
+  font-weight: 700;
+}
+
+.footer-copyright {
+  font-size: 13px;
+  /* 저작권 문구는 아주 연하게 처리 */
+  color: #b0aeaa;
+  margin: 0;
+}
