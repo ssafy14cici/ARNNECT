@@ -11,6 +11,7 @@ public enum ErrorCode {
     // AUTH
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "AUTH_001", "인증에 실패했습니다."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "AUTH_002", "접근 권한이 없습니다."),
+    USER_NOT_FOUND(HttpStatus.UNAUTHORIZED, "AUTH_003", "잘못된 이메일 또는 비밀번호 입니다."),
 
     // VALIDATION
     INVALID_PARAMETER(HttpStatus.BAD_REQUEST, "VALID_001", "요청 값이 올바르지 않습니다.");
