@@ -51,7 +51,7 @@ const routes: Route[] = [
     path: "/artwork",
     render: (root: HTMLElement) => {
       // 캔버스 숨기기
-      const canvas = document.querySelector<HTMLCanvasElement>("#canvas");
+      const canvas = document.querySelector<HTMLCanvasElement>("#canvas")!;
       if (canvas) canvas.style.display = "none";
 
       // UI 레이어 숨기기

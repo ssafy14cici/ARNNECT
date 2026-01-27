@@ -37,14 +37,14 @@ export function runEnterSequence(args: {
   const dist0 = startPos.distanceTo(startTarget);
   const dirFromTarget = startPos.clone().sub(startTarget).normalize(); // points from target -> camera
 
-  // Bring camera closer to target but keep a minimum distance so it doesn’t clip.
-  const dist1 = Math.max(3.0, dist0 * 0.52);
+  // ✅ 문 쪽으로 더 가까이 줌인 (0.52 -> 0.35)
+  const dist1 = Math.max(3.0, dist0 * 0.35);
   const endPos = startTarget
     .clone()
     .add(dirFromTarget.multiplyScalar(dist1))
-    .add(new THREE.Vector3(0, 1.0, 0)); // slight lift
+    .add(new THREE.Vector3(0, 1.2, 0)); // slight lift (1.0 -> 1.2)
 
-  const endTarget = startTarget.clone().add(new THREE.Vector3(0, 1.15, 0));
+  const endTarget = startTarget.clone().add(new THREE.Vector3(0, 1.35, 0)); // 1.15 -> 1.35
 
   // Optional “pull-in” perspective: narrow FOV a little
   const fov0 = camera.fov;

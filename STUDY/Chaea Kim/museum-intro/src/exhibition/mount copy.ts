@@ -2,8 +2,6 @@
 import "./css/normalize.css";
 import "./css/demo.css";
 
-import receptionDeskPng from "./img/desk_cat.png"; // ✅ desk_cat.png (1280x728)
-
 export type RoomSet = {
   back: string[];
   left: string[];
@@ -44,25 +42,14 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string) {
 
 type Side = "back" | "left" | "right";
 
-function isReceptionRoom(room: RoomSet | undefined, idx: number) {
-  if (!room) return false;
-  return idx === 0 || room.subject === "reception" || room.subject === "room0";
-}
-
 export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): ExhibitionApi {
   // =========================================================
-  // 0) CSS override
+  // 0) CSS override: 전시장 레이어가 클릭을 확실히 "먹게" 만들기
   // =========================================================
   const styleId = "exh-override-style";
   if (!document.getElementById(styleId)) {
     const style = document.createElement("style");
     style.id = styleId;
-
-    // ✅ 프레임 두께 "자연스럽게" (과하게 키우면 망가짐)
-    // - front(액자면) padding = thickness
-    // - side 두께는 padding과 동일하게 맞춰야 정합됨
-    const FRAME_THICK = 26; // ✅ 19는 너무 얇고, 38은 과함. 26이 가장 덜 티 남.
-
     style.textContent = `
       .exh-root{
         position: fixed; inset: 0;
@@ -72,7 +59,7 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
       }
       .exh-root.is-visible{ display:block; }
 
-      /* content overlay가 클릭 먹지 않게 */
+      /* content overlay가 클릭을 먹지 않게 */
       .exh-root .content{ pointer-events:none !important; }
 
       /* overlay는 열렸을 때만 클릭 */
@@ -92,223 +79,15 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
         pointer-events:auto !important;
       }
 
-      /* ✅ room / side / frame / img는 클릭 가능 */
+      /* ✅ 핵심: room / side / img는 무조건 클릭 가능 */
       .exh-root .room,
       .exh-root .room__side,
-      .exh-root .room__frame,
       .exh-root img.room__img{
         pointer-events:auto !important;
       }
-      .exh-root .room__frame{ cursor:pointer; }
       .exh-root img.room__img{ cursor:pointer; }
 
-      /* =====================================================
-       * ✅ Reception prop layer
-       * ===================================================== */
-      .exh-root .room{ position: relative; }
-      .exh-root .reception-prop-layer{
-        position:absolute;
-        inset:0;
-        pointer-events:none;
-        z-index: 6;
-      }
-
-      /* =====================================================
-       * ✅ 액자 Wrapper - 3D 프레임 두께감(정합 버전)
-       * - 망가지는 이유: front padding과 side 두께가 불일치 + Z가 과함
-       * - 해결: padding = side thickness = ${FRAME_THICK}px, Z는 적당히
-       * ===================================================== */
-      .exh-root .room__frame{
-        flex: none;
-        max-width: 50%;
-        max-height: 70%;
-        margin: 0 5%;
-        transform: translate3d(0,0,90px); /* ✅ 100 -> 90: 과도한 튀어나옴 방지 */
-        backface-visibility: hidden;
-        position: relative;
-        transform-style: preserve-3d;
-        pointer-events: auto;
-
-        /* ✅ 핵심: front 두께(패딩) */
-        padding: ${FRAME_THICK}px;
-        border-radius: 10px;
-
-        /* ✅ 프레임 톤(은은하게) */
-        background: linear-gradient(135deg,
-          rgba(203,185,150,0.95) 0%,
-          rgba(178,156,112,0.95) 55%,
-          rgba(140,116,70,0.95) 100%
-        );
-        box-shadow:
-          0 18px 26px rgba(0,0,0,0.22),
-          inset 0 1px 0 rgba(255,255,255,0.22);
-      }
-
-      /* ✅ 이미지 자체는 프레임 안으로 */
-      .exh-root img.room__img{
-        display:block;
-        width: 100%;
-        height: auto;
-        border-radius: 8px;
-        box-shadow: 0 10px 18px rgba(0,0,0,0.18);
-        transform: translateZ(1px); /* z-fighting 방지 */
-      }
-
-      /* ✅ side 4개 - 두께는 padding과 "동일" */
-      .exh-root .room__frame-side{
-        position: absolute;
-        backface-visibility: hidden;
-        pointer-events:none;
-      }
-
-      .exh-root .room__frame-side--top{
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: ${FRAME_THICK}px;
-        transform-origin: top center;
-        transform: rotateX(90deg);
-        background: linear-gradient(to bottom,
-          rgba(230,220,200,0.95) 0%,
-          rgba(196,178,140,0.95) 55%,
-          rgba(178,156,112,0.95) 100%
-        );
-      }
-
-      .exh-root .room__frame-side--right{
-        top: 0;
-        right: 0;
-        width: ${FRAME_THICK}px;
-        height: 100%;
-        transform-origin: right center;
-        transform: rotateY(90deg);
-        background: linear-gradient(to right,
-          rgba(140,116,70,0.95) 0%,
-          rgba(120,96,56,0.95) 55%,
-          rgba(100,80,48,0.95) 100%
-        );
-      }
-
-      .exh-root .room__frame-side--bottom{
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: ${FRAME_THICK}px;
-        transform-origin: bottom center;
-        transform: rotateX(-90deg);
-        background: linear-gradient(to top,
-          rgba(100,80,48,0.95) 0%,
-          rgba(120,96,56,0.95) 55%,
-          rgba(140,116,70,0.95) 100%
-        );
-      }
-
-      .exh-root .room__frame-side--left{
-        top: 0;
-        left: 0;
-        width: ${FRAME_THICK}px;
-        height: 100%;
-        transform-origin: left center;
-        transform: rotateY(-90deg);
-        background: linear-gradient(to left,
-          rgba(178,156,112,0.95) 0%,
-          rgba(140,116,70,0.95) 55%,
-          rgba(120,96,56,0.95) 100%
-        );
-      }
-
-      /* =====================================================
-       * ✅ Reception Desk Cat (1280x728)
-       * ===================================================== */
-      .exh-root .reception-desk{
-        position:absolute;
-        left: 50%;
-        top: 84%;
-        width: 780px;
-        max-width: 78vw;
-
-        aspect-ratio: 1280 / 728;
-        height: auto;
-
-        pointer-events:auto;
-        border: 0;
-        padding: 0;
-        background: transparent;
-        cursor: pointer;
-
-        transform-origin: 50% 92%;
-        transform:
-          translate(-50%, -100%)
-          perspective(1600px)
-          rotateX(1.2deg)
-          rotateY(-2.2deg)
-          translateZ(10px);
-
-        filter: none;
-      }
-
-      .exh-root .reception-desk::after{
-        content:"";
-        position:absolute;
-        left: 50%;
-        bottom: 6px;
-
-        width: 72%;
-        height: 18px;
-
-        transform: translateX(-50%);
-        background: rgba(0,0,0,0.20);
-        filter: blur(12px);
-        border-radius: 999px;
-
-        pointer-events:none;
-      }
-
-      .exh-root .reception-desk img{
-        width:100%;
-        height:auto;
-        display:block;
-        user-select:none;
-        -webkit-user-drag:none;
-        filter: saturate(0.98) brightness(1.01);
-      }
-
-      /* =====================================================
-       * ✅ Cat wave (hover / first-enter)
-       * - 리셉션에서는 "아예" 안 움직이게 해야 하니,
-       *   wave 클래스 붙어도 애니메이션 무효화.
-       * ===================================================== */
-      .exh-root .room--reception .reception-desk,
-      .exh-root .room--room0 .reception-desk{
-        animation: none !important;
-      }
-      .exh-root .room--reception .reception-desk.wave,
-      .exh-root .room--room0 .reception-desk.wave{
-        animation: none !important;
-      }
-
-      /* 혹시 room subject가 다를 수 있으니, JS에서 data-reception도 같이 씀 */
-      .exh-root .reception-desk[data-no-motion="1"],
-      .exh-root .reception-desk[data-no-motion="1"].wave{
-        animation: none !important;
-      }
-
-      /* 기존 keyframes는 남겨두되(다른 룸에서 쓸 수도 있으니), 리셉션에서는 차단 */
-      @keyframes catWave {
-        0%   { transform: translate(-50%, -100%) perspective(1600px) rotateX(1.2deg) rotateY(-2.2deg) translateZ(10px) rotate(0deg); }
-        20%  { transform: translate(-50%, -100%) perspective(1600px) rotateX(1.2deg) rotateY(-2.2deg) translateZ(10px) rotate(-1.6deg); }
-        40%  { transform: translate(-50%, -100%) perspective(1600px) rotateX(1.2deg) rotateY(-2.2deg) translateZ(10px) rotate(1.6deg); }
-        60%  { transform: translate(-50%, -100%) perspective(1600px) rotateX(1.2deg) rotateY(-2.2deg) translateZ(10px) rotate(-1.2deg); }
-        80%  { transform: translate(-50%, -100%) perspective(1600px) rotateX(1.2deg) rotateY(-2.2deg) translateZ(10px) rotate(0.8deg); }
-        100% { transform: translate(-50%, -100%) perspective(1600px) rotateX(1.2deg) rotateY(-2.2deg) translateZ(10px) rotate(0deg); }
-      }
-      .exh-root .reception-desk.wave{
-        animation: catWave 1.2s ease-in-out;
-      }
-
-      /* =====================================================
-       * ✅ Artwork Detail modal
-       * ===================================================== */
+      /* ✅ 임시 디테일 모달 */
       .exh-detailBackdrop{
         position: fixed; inset:0;
         display:none;
@@ -337,7 +116,11 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
         font-size: 14px;
         border-bottom: 1px solid rgba(255,255,255,0.12);
       }
-      .exh-detailActions{ display:flex; gap: 8px; align-items:center; }
+      .exh-detailActions{
+        display:flex;
+        gap: 8px;
+        align-items:center;
+      }
       .exh-detailBody{
         flex:1;
         display:flex;
@@ -376,43 +159,6 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
       .exh-detailGoPage:hover{
         background: linear-gradient(135deg, #6db84d, #5a9a48);
         box-shadow: 0 6px 16px rgba(90, 154, 72, 0.4);
-      }
-
-      /* =====================================================
-       * ✅ Reception welcome modal
-       * ===================================================== */
-      .exh-receptionBackdrop{
-        position: fixed; inset:0;
-        display:none;
-        align-items:center; justify-content:center;
-        background: rgba(0,0,0,0.28);
-        z-index: 2147483647;
-        pointer-events:auto;
-      }
-      .exh-receptionBackdrop.is-open{ display:flex; }
-      .exh-receptionCard{
-        width: min(560px, 92vw);
-        background:#1b1b1b;
-        border: 1px solid rgba(255,255,255,0.15);
-        border-radius: 14px;
-        overflow:hidden;
-      }
-      .exh-receptionTop{
-        padding: 14px 16px;
-        color:#fff;
-        font-size: 15px;
-        font-weight: 700;
-        border-bottom: 1px solid rgba(255,255,255,0.12);
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap: 12px;
-      }
-      .exh-receptionBody{
-        padding: 16px;
-        color: rgba(255,255,255,0.88);
-        font-size: 14px;
-        line-height: 1.5;
       }
     `;
     document.head.appendChild(style);
@@ -549,19 +295,13 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
       arr
         .map(
           (src) =>
-            `<div class="room__frame">
-              <img class="room__img" decoding="async" loading="eager" data-side="${side}" data-src="${src}" src="${src}" alt="image" draggable="false" />
-              <div class="room__frame-side room__frame-side--top"></div>
-              <div class="room__frame-side room__frame-side--right"></div>
-              <div class="room__frame-side room__frame-side--bottom"></div>
-              <div class="room__frame-side room__frame-side--left"></div>
-            </div>`
+            `<img class="room__img" decoding="async" loading="eager" data-side="${side}" data-src="${src}" src="${src}" alt="image" draggable="false" />`
         )
         .join("");
 
+    // ✅ 룸별 클래스 추가 (room--room1, room--room2)
     const roomClass = `room room--current room--${room.subject || `room${index + 1}`}`;
     const roomEl = el("div", roomClass);
-
     roomEl.innerHTML = `
       <div class="room__side room__side--back">${renderImgs("back", room.back)}</div>
       <div class="room__side room__side--left">${renderImgs("left", room.left)}</div>
@@ -569,23 +309,6 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
       <div class="room__side room__side--bottom"></div>
       <div class="room__side room__side--top"></div>
     `;
-
-    // ✅ reception: overlay로 데스크(고양이) 추가 (리셉션에서는 절대 움직임 X)
-    if (isReceptionRoom(room, index)) {
-      const layer = el("div", "reception-prop-layer");
-      layer.innerHTML = `
-        <button class="reception-desk" data-no-motion="1" type="button" aria-label="Reception desk">
-          <img src="${receptionDeskPng}" alt="Reception desk cat" draggable="false" />
-        </button>
-      `;
-      roomEl.appendChild(layer);
-
-      // ✅ 기존에 wave 넣던 로직 제거 (리셉션은 정지)
-      const deskBtn = layer.querySelector<HTMLButtonElement>(".reception-desk")!;
-      deskBtn.classList.remove("wave");
-      deskBtn.onmouseenter = null;
-    }
-
     scroller.appendChild(roomEl);
   }
 
@@ -598,7 +321,7 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   nextBtn.addEventListener("click", () => go(1));
 
   // =========================================================
-  // 3) Exit
+  // 3) Exit (ONLY buttons)
   // =========================================================
   function handleBackOrExit(e: Event) {
     e.preventDefault();
@@ -609,8 +332,14 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   exitLink.addEventListener("click", handleBackOrExit);
 
   // =========================================================
-  // 4) Detail modal
+  // 4) Detail modal (라우팅 대신 내부 모달)
   // =========================================================
+  // ✅ 라우터 연결 가이드:
+  //    - onOpenArtwork 콜백이 제공되면 내부 모달 대신 외부 라우팅 사용
+  //    - scene/index.ts에서 onOpenArtwork 콜백으로 history.pushState 호출
+  //    - main.ts의 라우터가 /artwork 경로를 감지하여 ArtworkDetail 페이지 렌더링
+  //    - 콜백이 없으면 아래 내부 모달 사용 (fallback)
+
   const detailBackdrop = el("div", "exh-detailBackdrop");
   detailBackdrop.innerHTML = `
     <div class="exh-detailCard" role="dialog" aria-modal="true">
@@ -640,51 +369,30 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   }
   function closeDetail() {
     detailBackdrop.classList.remove("is-open");
+    // src 비우기(메모리/플리커 방지)
     detailImg.src = "";
   }
 
   detailBackdrop.addEventListener("pointerdown", (e) => {
+    // 바깥 클릭 시 닫기
     if (e.target === detailBackdrop) closeDetail();
   });
   detailClose.addEventListener("click", closeDetail);
+
+  // ✅ 작품 상세 페이지로 가기 버튼 (나중에 라우팅 연결)
   detailGoPage.addEventListener("click", () => {
-    console.log("📄 작품 상세 페이지로 이동:", { src: detailImg.src, meta: detailMeta.textContent || "" });
+    const src = detailImg.src;
+    const meta = detailMeta.textContent || "";
+    console.log("📄 작품 상세 페이지로 이동:", { src, meta });
+    // TODO: 실제 라우팅 로직 연결 (예: history.pushState + popstate 이벤트)
+    // 예시: window.location.href = `/artwork-detail?src=${encodeURIComponent(src)}`;
   });
-
-  // =========================================================
-  // 4.5) Reception welcome modal
-  // =========================================================
-  const receptionBackdrop = el("div", "exh-receptionBackdrop");
-  receptionBackdrop.innerHTML = `
-    <div class="exh-receptionCard" role="dialog" aria-modal="true">
-      <div class="exh-receptionTop">
-        <div>Welcome</div>
-        <button class="exh-miniBtn exh-receptionClose" type="button">Close</button>
-      </div>
-      <div class="exh-receptionBody">
-        리셉션입니다.<br/>
-        벽의 작품 이미지를 클릭하면 작품을 크게 볼 수 있어요.
-      </div>
-    </div>
-  `;
-  exh.appendChild(receptionBackdrop);
-
-  const receptionClose = receptionBackdrop.querySelector<HTMLButtonElement>(".exh-receptionClose")!;
-  function openReception() {
-    receptionBackdrop.classList.add("is-open");
-  }
-  function closeReception() {
-    receptionBackdrop.classList.remove("is-open");
-  }
-  receptionBackdrop.addEventListener("pointerdown", (e) => {
-    if (e.target === receptionBackdrop) closeReception();
-  });
-  receptionClose.addEventListener("click", closeReception);
 
   function isAllowedUiTarget(t: EventTarget | null): boolean {
     const el = t as HTMLElement | null;
     if (!el) return false;
 
+    // 전시장 UI 버튼/링크는 동작해야 함
     return !!el.closest?.(
       [
         ".codrops-icon--drop",
@@ -695,12 +403,6 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
         ".btn--menu",
         ".overlay.overlay--open",
         ".overlay.overlay--open *",
-
-        // ✅ 모달은 실드 통과
-        ".exh-detailBackdrop",
-        ".exh-detailBackdrop *",
-        ".exh-receptionBackdrop",
-        ".exh-receptionBackdrop *",
       ].join(",")
     );
   }
@@ -708,22 +410,20 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   function killEvent(e: Event) {
     e.preventDefault();
     e.stopPropagation();
+    // ✅ 다른 캡처 리스너까지 차단
+    // (TS에서 Event에 없을 수 있으니 any로)
     (e as any).stopImmediatePropagation?.();
   }
 
   // =========================================================
-  // 5) 클릭/포인터 처리
+  // 5) 클릭/포인터 처리 (전파 차단 + img 탐색)
   // =========================================================
   function getImgFromPoint(x: number, y: number): HTMLImageElement | null {
     const stack = document.elementsFromPoint(x, y) as HTMLElement[];
     for (const n of stack) {
-      const frame = n?.closest?.(".room__frame") as HTMLElement | null;
-      if (frame) {
-        const img = frame.querySelector("img.room__img") as HTMLImageElement | null;
-        if (img) return img;
-      }
       const img = n?.closest?.("img.room__img") as HTMLImageElement | null;
       if (img) return img;
+      // 버튼/헤더 위면 즉시 중단(이미지 클릭이 아님)
       if (n.closest?.(".codrops-header") || n.closest?.(".nav") || n.closest?.(".overlay.overlay--open")) return null;
     }
     return null;
@@ -731,44 +431,31 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
 
   function onPointerMove(e: PointerEvent) {
     if (!exh.classList.contains("is-visible")) return;
-
-    const target = e.target as HTMLElement | null;
-    if (target?.closest?.(".reception-desk")) {
-      exh.style.cursor = "pointer";
-      return;
-    }
-
     const img = getImgFromPoint(e.clientX, e.clientY);
     exh.style.cursor = img ? "pointer" : "";
   }
 
-  function shield(e: Event) {
+  // ✅ 가장 중요: 전시장 열렸을 때, 전시장 내부 클릭은 무조건 "먹어서" 외부로 전파 안 되게
+  function onWindowPointerDownCapture(e: PointerEvent) {
     if (!exh.classList.contains("is-visible")) return;
 
-    const target = e.target as HTMLElement | null;
-    const insideExh = !!target?.closest?.(".exh-root");
-    if (!insideExh) return;
-
-    if (isAllowedUiTarget(target)) return;
-    killEvent(e);
-  }
-
-  function onPointerDownCapture(e: PointerEvent) {
-    shield(e);
-
-    if (!exh.classList.contains("is-visible")) return;
-    const target = e.target as HTMLElement | null;
-    const insideExh = !!target?.closest?.(".exh-root");
-    if (!insideExh) return;
-    if (isAllowedUiTarget(target)) return;
-
-    // ✅ 데스크 클릭
-    if (target?.closest?.(".reception-desk")) {
-      openReception();
+    // detail 모달 열린 상태면 모달 처리만
+    if (detailBackdrop.classList.contains("is-open")) {
+      // 모달 자체가 처리하므로 여기서는 전파만 차단
+      e.preventDefault();
+      e.stopPropagation();
       return;
     }
 
-    // ✅ 작품 클릭
+    const target = e.target as HTMLElement | null;
+    const insideExh = !!target?.closest?.(".exh-root");
+    if (!insideExh) return;
+
+    // 전시장 내부면 일단 전파 차단(Three/UI로 안 내려가게)
+    e.preventDefault();
+    e.stopPropagation();
+
+    // 이미지면 디테일 오픈
     const img = getImgFromPoint(e.clientX, e.clientY);
     if (!img) return;
 
@@ -777,55 +464,68 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
     if (!src) return;
 
     const payload: OpenArtworkPayload = { roomIndex: index, side, src };
-    if (opts.onOpenArtwork) opts.onOpenArtwork(payload);
-    else openDetail(payload);
+
+    // 콜백도 살려둠(원하면 외부에서 연결)
+    opts.onOpenArtwork?.(payload);
+
+    // 지금은 무조건 내부 임시 디테일 모달
+    openDetail(payload);
   }
 
   exh.addEventListener("pointermove", onPointerMove, { passive: true });
+  function shield(e: Event) {
+  if (!exh.classList.contains("is-visible")) return;
 
-  // =========================================================
-  // 5.5) ✅ 커서 따라 룸 흔들리는 모션 (parallax wobble)
-  // ✅ 리셉션 룸은 제외
-  // =========================================================
-  function onMouseMoveWobble(e: MouseEvent) {
-    if (!exh.classList.contains("is-visible")) return;
+  const target = e.target as HTMLElement | null;
+  const insideExh = !!target?.closest?.(".exh-root");
+  if (!insideExh) return;
 
-    const roomEl = scroller.querySelector<HTMLElement>(".room--current");
-    if (!roomEl) return;
+  // 전시장 UI 버튼은 통과
+  if (isAllowedUiTarget(target)) return;
 
-    const currentRoom = rooms[index];
-    if (isReceptionRoom(currentRoom, index)) {
-      // ✅ 리셉션은 흔들림 완전 제거(transition도 제거해서 잔상 방지)
-      roomEl.style.transition = "";
-      roomEl.style.transform = "";
-      return;
-    }
+  // ✅ 전시장 내부 클릭/터치는 전부 먹어서 바깥(Three/기존 UI)로 절대 안 내려가게
+  killEvent(e);
+}
 
-    const centerX = window.innerWidth / 2;
-    const centerY = window.innerHeight / 2;
-    const offsetX = (e.clientX - centerX) / centerX;
-    const offsetY = (e.clientY - centerY) / centerY;
+function onPointerDownCapture(e: PointerEvent) {
+  shield(e);
 
-    const maxRotateY = 3;
-    const maxRotateX = 2.5;
+  // shield가 먹었는데도, 이미지면 디테일 열기 또는 삭제
+  if (!exh.classList.contains("is-visible")) return;
 
-    const rotateY = offsetX * maxRotateY;
-    const rotateX = -offsetY * maxRotateX;
+  const target = e.target as HTMLElement | null;
+  const insideExh = !!target?.closest?.(".exh-root");
+  if (!insideExh) return;
+  if (isAllowedUiTarget(target)) return;
 
-    roomEl.style.transition = "transform 0.3s ease-out";
-    roomEl.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+  const img = getImgFromPoint(e.clientX, e.clientY);
+  if (!img) return;
+
+  const side = (img.dataset.side as Side) || "back";
+  const src = img.dataset.src || img.getAttribute("src") || "";
+  if (!src) return;
+
+  const payload: OpenArtworkPayload = { roomIndex: index, side, src };
+
+  // ✅ onOpenArtwork 콜백이 있으면 외부 라우팅 사용 (내부 모달 열지 않음)
+  if (opts.onOpenArtwork) {
+    opts.onOpenArtwork(payload);
+  } else {
+    // 콜백이 없으면 내부 모달 사용 (fallback)
+    openDetail(payload);
   }
-  exh.addEventListener("mousemove", onMouseMoveWobble, { passive: true });
+}
 
-  // ✅ 전역 캡처 실드
-  window.addEventListener("pointerdown", onPointerDownCapture, true);
-  window.addEventListener("pointerup", shield, true);
-  window.addEventListener("click", shield, true);
-  window.addEventListener("mousedown", shield, true);
-  window.addEventListener("mouseup", shield, true);
-  window.addEventListener("touchstart", shield, { capture: true, passive: false } as any);
-  window.addEventListener("touchend", shield, { capture: true, passive: false } as any);
-  window.addEventListener("contextmenu", shield, true);
+// ✅ 전역 캡처 실드: pointer/mouse/touch/click 전부
+window.addEventListener("pointerdown", onPointerDownCapture, true);
+window.addEventListener("pointerup", shield, true);
+window.addEventListener("click", shield, true);
+window.addEventListener("mousedown", shield, true);
+window.addEventListener("mouseup", shield, true);
+window.addEventListener("touchstart", shield, { capture: true, passive: false } as any);
+window.addEventListener("touchend", shield, { capture: true, passive: false } as any);
+window.addEventListener("contextmenu", shield, true);
+
 
   // =========================================================
   // 6) Rooms API
@@ -837,7 +537,7 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   }
   setRooms(opts.defaultRooms);
 
-  // ✅ #ui 레이어 pointer-events off
+  // ✅ #ui 레이어가 덮는 경우가 있어 전시장 show 때 pointer-events off
   const uiLayer = document.getElementById("ui") as HTMLElement | null;
   const uiPrev = { pointerEvents: "" };
 
@@ -865,8 +565,11 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
     btnInfo.classList.remove("btn--active");
     btnMenu.classList.remove("btn--active");
     closeDetail();
-    closeReception();
     restoreUiLayer();
+
+    // ✅ 이벤트 리스너를 제거하지 않음
+    // shield와 onPointerDownCapture에서 is-visible 체크로 이미 필터링됨
+    // 이벤트 리스너를 제거하면 재진입 시 클릭이 안 먹힘
   }
 
   return { show, hide, setRooms };

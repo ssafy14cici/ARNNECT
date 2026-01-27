@@ -1,12 +1,46 @@
-:root{
-  --exh-z: 80;
+/* 스테이지: 이 박스가 캔버스 크기/위치 전담 */
+.landing__stage{
+  position: absolute;
+  left: 50%;
+  bottom: 58px;
+  transform: translateX(-50%);
+  width: min(900px, 78vw);
+  height: 270px;
+  overflow: hidden;
+  z-index: 10;
 }
-.exh-root{
-  position: fixed;
+
+/* 캔버스: 스테이지 안을 꽉 채움 */
+#canvas{
+  position: absolute;
   inset: 0;
-  z-index: var(--exh-z);
-  display: none;
-}
-.exh-root.is-visible{
+  width: 100%;
+  height: 100%;
   display: block;
+}
+
+/* 네 “파란 사각형(물/원경)”은 별도 레이어로 유지 */
+.landing__horizon{
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 420px; /* 원하는 값 */
+  z-index: 4;
+  /* background는 네가 이미 쓰는대로 */
+}
+
+/* 반사 레이어도 스테이지에 붙이는 게 안전함 */
+.landing__reflection{
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: min(900px, 78vw);
+  height: 140px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.13), rgba(0,0,0,0));
+  opacity: 0.20;
+  filter: blur(7px);
+  z-index: 9;
+  pointer-events: none;
 }
