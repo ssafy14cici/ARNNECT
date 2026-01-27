@@ -1,10 +1,8 @@
-// src/router/routes.tsx
 import type { RouteObject } from "react-router-dom";
 import { Navigate } from "react-router-dom";
 import Guard from "../components/common/Guard";
 import AppLayout from "../layouts/AppLayout";
 import Guide from "../pages/guide/Guide";
-
 
 import Home from "../pages/home/Home";
 import ArtistGo from "../pages/asc/ASC";
@@ -35,9 +33,14 @@ import FeedTab from "../pages/profile/tabs/FeedTab";
 import CollectionTab from "../pages/profile/tabs/CollectionTab";
 import PortfolioTab from "../pages/profile/tabs/PortfolioTab";
 
-
 import ArtworkDetail from "../pages/artwork/ArtworkDetail";
 import NotFound from "../pages/notfound/NotFound";
+
+/**
+ * ✅ 수정된 임포트 경로: legal 폴더가 components 바로 아래에 있음
+ */
+import PrivacyPolicyContent from "../components/legal/PrivacyPolicyContent";
+import TermsOfServiceContent from "../components/legal/TermsOfServiceContent";
 
 export const routes: RouteObject[] = [
   {
@@ -52,8 +55,10 @@ export const routes: RouteObject[] = [
       { path: "search", element: <Search /> },
       { path: "guide", element: <Guide /> },
 
+      // ✅ ARNNECT 정책 페이지 경로 추가
+      { path: "privacy", element: <PrivacyPolicyContent /> },
+      { path: "terms", element: <TermsOfServiceContent /> },
 
-      // 정책: recover를 로그인 상태에도 허용
       { path: "recover", element: <Recover /> },
 
       /* =========================
@@ -79,22 +84,17 @@ export const routes: RouteObject[] = [
           { path: "posts/create", element: <PostCreateRedirect /> },
           { path: "posts/create/artist", element: <PostCreate mode="ARTIST" /> },
           { path: "posts/create/user", element: <PostCreate mode="USER" /> },
-
-          // ✅ 이거 하나만 남기기
           { path: "posts/:id", element: <PostDetail /> },
-
 
           /* ---------- Lounge ---------- */
           {
             path: "/lounge",
-            element: <Guard requireAuth />, // ✅ 여기서는 children 금지. Guard가 Outlet을 렌더해야 함.
+            element: <Guard requireAuth />,
             children: [
               {
-                element: <Lounge />, // ✅ 라운지 레이아웃(탭/상단) + Outlet 자리
+                element: <Lounge />,
                 children: [
-                  { index: true, element: <LoungeIndex /> }, // 역할에 따라 기본 탭
-
-                  // USER(=general)
+                  { index: true, element: <LoungeIndex /> },
                   {
                     path: "collectbook",
                     element: <Guard requireRole="general" />,
@@ -110,8 +110,6 @@ export const routes: RouteObject[] = [
                     element: <Guard requireRole="general" />,
                     children: [{ index: true, element: <Quiz /> }],
                   },
-
-                  // ARTIST
                   {
                     path: "ticket",
                     element: <Guard requireRole="artist" />,
@@ -132,8 +130,6 @@ export const routes: RouteObject[] = [
             ],
           },
 
-
-
           /* ---------- Profile ---------- */
           {
             path: "profile/:id",
@@ -150,10 +146,6 @@ export const routes: RouteObject[] = [
           { path: "artworks/:id", element: <ArtworkDetail /> },
         ],
       },
-
-      /* =========================
-       * 404
-       * ========================= */
       { path: "*", element: <NotFound /> },
     ],
   },

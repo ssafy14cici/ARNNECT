@@ -1,0 +1,31 @@
+/* src/styles/legal.css */
+.legal-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 100px 24px;
+  /* 눈이 편안한 웜 다크 그레이 */
+  color: #55534f;
+  line-height: 1.9;
+}
+
+.legal-container h1 {
+  font-size: 30px;
+  color: #2b2a28;
+  margin-bottom: 64px;
+  text-align: center;
+  font-weight: 800;
+}
+
+.legal-container h3 {
+  font-size: 19px;
+  color: #3d3b38;
+  margin-top: 56px;
+  margin-bottom: 20px;
+  font-weight: 700;
+}
+
+.legal-container p, .legal-container li {
+  font-size: 15.5px;
+  /* 본문 텍스트 색상 최적화 */
+  color: #63615e; 
+}
