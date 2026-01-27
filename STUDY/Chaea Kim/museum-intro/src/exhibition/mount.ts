@@ -2,443 +2,37 @@
 import "./css/normalize.css";
 import "./css/demo.css";
 
-import receptionDeskPng from "./img/desk_cat.png"; // ✅ desk_cat.png (1280x728)
-import frontalWallPng from "./img/frontal.png"; // ✅ 리셉션 정면 벽
-import leftWallPng from "./img/left_side.png"; // ✅ 리셉션 좌측 벽
-import rightWallPng from "./img/right_side.png"; // ✅ 리셉션 우측 벽
+import type { ExhibitionOptions, ExhibitionApi } from "./types";
+import { createExhibitionStyles } from "./styles";
+import { el } from "./utils";
+import { createRoomRenderer } from "./room-renderer";
+import { createDetailModal, createReceptionModal } from "./modals";
+import { createEventHandlers } from "./event-handlers";
 
-export type RoomSet = {
-  back: string[];
-  left: string[];
-  right: string[];
-  slide: {
-    nameLines: [string, string];
-    title: string;
-    roomLabel: string;
-    date: string;
-  };
-  subject?: string;
-  location?: string;
-};
+export * from "./types";
 
-export type OpenArtworkPayload = {
-  roomIndex: number;
-  side: "back" | "left" | "right";
-  src: string;
-};
-
-export type ExhibitionOptions = {
-  defaultRooms: RoomSet[];
-  onExit: () => void;
-  onOpenArtwork?: (payload: OpenArtworkPayload) => void;
-};
-
-export type ExhibitionApi = {
-  show(): void;
-  hide(): void;
-  setRooms(rooms: RoomSet[]): void;
-};
-
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  return e;
-}
-
-type Side = "back" | "left" | "right";
-
-function isReceptionRoom(room: RoomSet | undefined, idx: number) {
-  if (!room) return false;
-  return idx === 0 || room.subject === "reception" || room.subject === "room0";
-}
-
+/**
+ * 전시관 UI를 마운트합니다.
+ */
 export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): ExhibitionApi {
   // =========================================================
-  // 0) CSS override
+  // 1) CSS 스타일 주입
   // =========================================================
   const styleId = "exh-override-style";
   if (!document.getElementById(styleId)) {
     const style = document.createElement("style");
     style.id = styleId;
-
-    // ✅ 프레임 두께 - 얇게 조정
-    // - front(액자면) padding = thickness
-    // - side 두께는 padding과 동일하게 맞춰야 정합됨
-    const FRAME_THICK = 16; // ✅ 프레임을 얇게 (26 → 16)
-
-    style.textContent = `
-      .exh-root{
-        position: fixed; inset: 0;
-        z-index: 2147483647;
-        display:none;
-        pointer-events:auto;
-      }
-      .exh-root.is-visible{ display:block; }
-
-      /* content overlay가 클릭 먹지 않게 */
-      .exh-root .content{ pointer-events:none !important; }
-
-      /* overlay는 열렸을 때만 클릭 */
-      .exh-root .overlay{ pointer-events:none !important; }
-      .exh-root .overlay.overlay--open{ pointer-events:auto !important; }
-
-      /* 버튼류만 클릭 */
-      .exh-root .codrops-header,
-      .exh-root .codrops-links,
-      .exh-root .codrops-icon,
-      .exh-root .btn,
-      .exh-root .nav,
-      .exh-root .btn--nav,
-      .exh-root .btn--toggle,
-      .exh-root .overlay.overlay--open,
-      .exh-root .overlay.overlay--open *{
-        pointer-events:auto !important;
-      }
-
-      /* ✅ room / side / frame / img는 클릭 가능 */
-      .exh-root .room,
-      .exh-root .room__side,
-      .exh-root .room__frame,
-      .exh-root img.room__img{
-        pointer-events:auto !important;
-      }
-      .exh-root .room__frame{ cursor:pointer; }
-      .exh-root img.room__img{ cursor:pointer; }
-
-      /* =====================================================
-       * ✅ Reception prop layer
-       * ===================================================== */
-      .exh-root .room{ position: relative; }
-      .exh-root .reception-prop-layer{
-        position:absolute;
-        inset:0;
-        pointer-events:none;
-        z-index: 6;
-      }
-
-      /* =====================================================
-       * ✅ 리셉션 룸 벽면 PNG 이미지
-       * ===================================================== */
-      .exh-root .room--reception .room__side--back,
-      .exh-root .room--room0 .room__side--back{
-        background-image: url(${frontalWallPng});
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-      }
-
-      .exh-root .room--reception .room__side--left,
-      .exh-root .room--room0 .room__side--left{
-        background-image: url(${leftWallPng});
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-      }
-
-      .exh-root .room--reception .room__side--right,
-      .exh-root .room--room0 .room__side--right{
-        background-image: url(${rightWallPng});
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-      }
-
-      /* =====================================================
-       * ✅ 액자 Wrapper - 얇은 상자 형식 (벽에 붙은 얇은 캔버스)
-       * ===================================================== */
-      .exh-root .room__frame{
-        flex: none;
-        max-width: 28%; /* ✅ 작품 크기 축소 (공간감 개선) */
-        max-height: 45%; /* ✅ 작품 크기 축소 */
-        margin: 0 6%; /* ✅ 작품 간격 */
-        transform: translate3d(0,0,25px); /* ✅ 얇게 튀어나옴 */
-        backface-visibility: hidden;
-        position: relative;
-        transform-style: preserve-3d;
-        pointer-events: auto;
-
-        /* ✅ 매우 얇은 프레임 */
-        padding: ${FRAME_THICK}px;
-        border-radius: 4px;
-
-        /* ✅ 얇은 상자 스타일 */
-        background: rgba(250, 245, 240, 0.98);
-        box-shadow:
-          0 8px 16px rgba(0,0,0,0.15),
-          0 2px 6px rgba(0,0,0,0.08);
-      }
-
-      /* ✅ 이미지 자체는 프레임 안으로 */
-      .exh-root img.room__img{
-        display:block;
-        width: 100%;
-        height: auto;
-        border-radius: 8px;
-        box-shadow: 0 10px 18px rgba(0,0,0,0.18);
-        transform: translateZ(1px); /* z-fighting 방지 */
-
-        /* ✅ 중요: demo.css의 과한 padding 제거 */
-        padding: 0 !important;
-        margin: 0 !important;
-        background: none !important;
-        border: none !important;
-      }
-
-      /* ✅ side 4개 - 매우 얇은 상자 측면 (두께감 최소화) */
-      .exh-root .room__frame-side{
-        position: absolute;
-        backface-visibility: hidden;
-        pointer-events:none;
-      }
-
-      .exh-root .room__frame-side--top{
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: ${FRAME_THICK}px;
-        transform-origin: top center;
-        transform: rotateX(90deg);
-        background: rgba(220, 215, 210, 0.9);
-      }
-
-      .exh-root .room__frame-side--right{
-        top: 0;
-        right: 0;
-        width: ${FRAME_THICK}px;
-        height: 100%;
-        transform-origin: right center;
-        transform: rotateY(90deg);
-        background: rgba(200, 195, 190, 0.9);
-      }
-
-      .exh-root .room__frame-side--bottom{
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: ${FRAME_THICK}px;
-        transform-origin: bottom center;
-        transform: rotateX(-90deg);
-        background: rgba(200, 195, 190, 0.9);
-      }
-
-      .exh-root .room__frame-side--left{
-        top: 0;
-        left: 0;
-        width: ${FRAME_THICK}px;
-        height: 100%;
-        transform-origin: left center;
-        transform: rotateY(-90deg);
-        background: rgba(210, 205, 200, 0.9);
-      }
-
-      /* =====================================================
-       * ✅ Reception Desk Cat (1280x728)
-       * ===================================================== */
-      .exh-root .reception-desk{
-        position:absolute;
-        left: 50%;
-        top: 84%;
-        width: 780px;
-        max-width: 78vw;
-
-        aspect-ratio: 1280 / 728;
-        height: auto;
-
-        pointer-events:auto;
-        border: 0;
-        padding: 0;
-        background: transparent;
-        cursor: pointer;
-
-        transform-origin: 50% 92%;
-        transform:
-          translate(-50%, -100%)
-          perspective(1600px)
-          rotateX(1.2deg)
-          rotateY(-2.2deg)
-          translateZ(10px);
-
-        filter: none;
-      }
-
-      .exh-root .reception-desk::after{
-        content:"";
-        position:absolute;
-        left: 50%;
-        bottom: 6px;
-
-        width: 72%;
-        height: 18px;
-
-        transform: translateX(-50%);
-        background: rgba(0,0,0,0.20);
-        filter: blur(12px);
-        border-radius: 999px;
-
-        pointer-events:none;
-      }
-
-      .exh-root .reception-desk img{
-        width:100%;
-        height:auto;
-        display:block;
-        user-select:none;
-        -webkit-user-drag:none;
-        filter: saturate(0.98) brightness(1.01);
-      }
-
-      /* =====================================================
-       * ✅ Cat wave (hover / first-enter)
-       * - 리셉션에서는 "아예" 안 움직이게 해야 하니,
-       *   wave 클래스 붙어도 애니메이션 무효화.
-       * ===================================================== */
-      .exh-root .room--reception .reception-desk,
-      .exh-root .room--room0 .reception-desk{
-        animation: none !important;
-      }
-      .exh-root .room--reception .reception-desk.wave,
-      .exh-root .room--room0 .reception-desk.wave{
-        animation: none !important;
-      }
-
-      /* 혹시 room subject가 다를 수 있으니, JS에서 data-reception도 같이 씀 */
-      .exh-root .reception-desk[data-no-motion="1"],
-      .exh-root .reception-desk[data-no-motion="1"].wave{
-        animation: none !important;
-      }
-
-      /* 기존 keyframes는 남겨두되(다른 룸에서 쓸 수도 있으니), 리셉션에서는 차단 */
-      @keyframes catWave {
-        0%   { transform: translate(-50%, -100%) perspective(1600px) rotateX(1.2deg) rotateY(-2.2deg) translateZ(10px) rotate(0deg); }
-        20%  { transform: translate(-50%, -100%) perspective(1600px) rotateX(1.2deg) rotateY(-2.2deg) translateZ(10px) rotate(-1.6deg); }
-        40%  { transform: translate(-50%, -100%) perspective(1600px) rotateX(1.2deg) rotateY(-2.2deg) translateZ(10px) rotate(1.6deg); }
-        60%  { transform: translate(-50%, -100%) perspective(1600px) rotateX(1.2deg) rotateY(-2.2deg) translateZ(10px) rotate(-1.2deg); }
-        80%  { transform: translate(-50%, -100%) perspective(1600px) rotateX(1.2deg) rotateY(-2.2deg) translateZ(10px) rotate(0.8deg); }
-        100% { transform: translate(-50%, -100%) perspective(1600px) rotateX(1.2deg) rotateY(-2.2deg) translateZ(10px) rotate(0deg); }
-      }
-      .exh-root .reception-desk.wave{
-        animation: catWave 1.2s ease-in-out;
-      }
-
-      /* =====================================================
-       * ✅ Artwork Detail modal
-       * ===================================================== */
-      .exh-detailBackdrop{
-        position: fixed; inset:0;
-        display:none;
-        align-items:center; justify-content:center;
-        background: rgba(0,0,0,0.55);
-        z-index: 2147483647;
-        pointer-events:auto;
-      }
-      .exh-detailBackdrop.is-open{ display:flex; }
-      .exh-detailCard{
-        width: min(920px, 92vw);
-        height: min(680px, 86vh);
-        background: #111;
-        border: 1px solid rgba(255,255,255,0.15);
-        border-radius: 14px;
-        overflow:hidden;
-        display:flex;
-        flex-direction:column;
-      }
-      .exh-detailTop{
-        padding: 12px 14px;
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        color:#fff;
-        font-size: 14px;
-        border-bottom: 1px solid rgba(255,255,255,0.12);
-      }
-      .exh-detailActions{ display:flex; gap: 8px; align-items:center; }
-      .exh-detailBody{
-        flex:1;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        padding: 14px;
-      }
-      .exh-detailImg{
-        max-width: 100%;
-        max-height: 100%;
-        object-fit: contain;
-        border-radius: 10px;
-      }
-      .exh-miniBtn{
-        background: rgba(255,255,255,0.10);
-        color:#fff;
-        border: 1px solid rgba(255,255,255,0.16);
-        border-radius: 10px;
-        padding: 8px 12px;
-        cursor:pointer;
-        font-size: 13px;
-        font-weight: 500;
-        transition: all 0.2s ease;
-        white-space: nowrap;
-      }
-      .exh-miniBtn:hover{
-        background: rgba(255,255,255,0.16);
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-      }
-      .exh-detailGoPage{
-        background: linear-gradient(135deg, #5a9a48, #4a8a38);
-        border: 1px solid rgba(255,255,255,0.25);
-        font-weight: 600;
-      }
-      .exh-detailGoPage:hover{
-        background: linear-gradient(135deg, #6db84d, #5a9a48);
-        box-shadow: 0 6px 16px rgba(90, 154, 72, 0.4);
-      }
-
-      /* =====================================================
-       * ✅ Reception welcome modal
-       * ===================================================== */
-      .exh-receptionBackdrop{
-        position: fixed; inset:0;
-        display:none;
-        align-items:center; justify-content:center;
-        background: rgba(0,0,0,0.28);
-        z-index: 2147483647;
-        pointer-events:auto;
-      }
-      .exh-receptionBackdrop.is-open{ display:flex; }
-      .exh-receptionCard{
-        width: min(560px, 92vw);
-        background:#1b1b1b;
-        border: 1px solid rgba(255,255,255,0.15);
-        border-radius: 14px;
-        overflow:hidden;
-      }
-      .exh-receptionTop{
-        padding: 14px 16px;
-        color:#fff;
-        font-size: 15px;
-        font-weight: 700;
-        border-bottom: 1px solid rgba(255,255,255,0.12);
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap: 12px;
-      }
-      .exh-receptionBody{
-        padding: 16px;
-        color: rgba(255,255,255,0.88);
-        font-size: 14px;
-        line-height: 1.5;
-      }
-    `;
+    style.textContent = createExhibitionStyles();
     document.head.appendChild(style);
   }
 
   // =========================================================
-  // 1) Root
+  // 2) Root 엘리먼트 생성
   // =========================================================
   const exh = el("div", "exh-root");
   root.appendChild(exh);
 
-  // SVG symbols
+  // SVG 아이콘
   const svgWrap = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svgWrap.setAttribute("class", "hidden");
   svgWrap.innerHTML = `
@@ -472,6 +66,7 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   const content = el("div", "content");
   exh.appendChild(content);
 
+  // Header
   const header = el("header", "codrops-header");
   header.innerHTML = `
     <div class="codrops-links">
@@ -503,6 +98,7 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   `;
   content.appendChild(header);
 
+  // Navigation
   const nav = el("nav", "nav");
   nav.innerHTML = `
     <button class="btn btn--nav btn--nav-left" type="button" aria-label="Prev room">
@@ -520,6 +116,7 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   `;
   content.appendChild(nav);
 
+  // UI 요소들
   const btnInfo = header.querySelector<HTMLButtonElement>(".btn--info")!;
   const btnMenu = header.querySelector<HTMLButtonElement>(".btn--menu")!;
   const overlayInfo = header.querySelector<HTMLDivElement>(".overlay--info")!;
@@ -530,7 +127,40 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   const prevBtn = nav.querySelector<HTMLButtonElement>(".btn--nav-left")!;
   const nextBtn = nav.querySelector<HTMLButtonElement>(".btn--nav-right")!;
 
-  function toggleOverlay(which: "info" | "menu") {
+  // =========================================================
+  // 3) 룸 렌더러 생성
+  // =========================================================
+  const roomRenderer = createRoomRenderer(scroller, subjectEl);
+  roomRenderer.setRooms(opts.defaultRooms);
+
+  // =========================================================
+  // 4) 모달 생성
+  // =========================================================
+  const { openDetail, closeDetail } = createDetailModal(exh);
+  const { openReception, closeReception } = createReceptionModal(exh);
+
+  // =========================================================
+  // 5) 이벤트 핸들러 생성
+  // =========================================================
+  const eventHandlers = createEventHandlers({
+    exh,
+    scroller,
+    getCurrentRoom: roomRenderer.getCurrentRoom,
+    getCurrentIndex: roomRenderer.getCurrentIndex,
+    openDetail,
+    openReception,
+    onOpenArtwork: opts.onOpenArtwork,
+  });
+
+  // 이벤트 등록
+  exh.addEventListener("pointermove", eventHandlers.onPointerMove, { passive: true });
+  exh.addEventListener("mousemove", eventHandlers.onMouseMoveWobble, { passive: true });
+  eventHandlers.registerGlobalListeners();
+
+  // =========================================================
+  // 6) UI 버튼 이벤트
+  // =========================================================
+  function toggleOverlay(which: "info" | "menu"): void {
     if (which === "info") {
       overlayInfo.classList.toggle("overlay--open");
       btnInfo.classList.toggle("btn--active");
@@ -543,78 +173,15 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
       btnInfo.classList.remove("btn--active");
     }
   }
+
   btnInfo.addEventListener("click", () => toggleOverlay("info"));
   btnMenu.addEventListener("click", () => toggleOverlay("menu"));
 
-  // =========================================================
-  // 2) Rooms render
-  // =========================================================
-  let rooms: RoomSet[] = [];
-  let index = 0;
+  prevBtn.addEventListener("click", () => roomRenderer.go(-1));
+  nextBtn.addEventListener("click", () => roomRenderer.go(1));
 
-  function renderCurrentRoom() {
-    scroller.innerHTML = "";
-    const room = rooms[index];
-    if (!room) return;
-
-    subjectEl.textContent = room.subject ?? `room${index + 1}`;
-
-    const renderImgs = (side: Side, arr: string[]) =>
-      arr
-        .map(
-          (src) =>
-            `<div class="room__frame">
-              <img class="room__img" decoding="async" loading="eager" data-side="${side}" data-src="${src}" src="${src}" alt="image" draggable="false" />
-              <div class="room__frame-side room__frame-side--top"></div>
-              <div class="room__frame-side room__frame-side--right"></div>
-              <div class="room__frame-side room__frame-side--bottom"></div>
-              <div class="room__frame-side room__frame-side--left"></div>
-            </div>`
-        )
-        .join("");
-
-    const roomClass = `room room--current room--${room.subject || `room${index + 1}`}`;
-    const roomEl = el("div", roomClass);
-
-    roomEl.innerHTML = `
-      <div class="room__side room__side--back">${renderImgs("back", room.back)}</div>
-      <div class="room__side room__side--left">${renderImgs("left", room.left)}</div>
-      <div class="room__side room__side--right">${renderImgs("right", room.right)}</div>
-      <div class="room__side room__side--bottom"></div>
-      <div class="room__side room__side--top"></div>
-    `;
-
-    // ✅ reception: overlay로 데스크(고양이) 추가 (리셉션에서는 절대 움직임 X)
-    if (isReceptionRoom(room, index)) {
-      const layer = el("div", "reception-prop-layer");
-      layer.innerHTML = `
-        <button class="reception-desk" data-no-motion="1" type="button" aria-label="Reception desk">
-          <img src="${receptionDeskPng}" alt="Reception desk cat" draggable="false" />
-        </button>
-      `;
-      roomEl.appendChild(layer);
-
-      // ✅ 기존에 wave 넣던 로직 제거 (리셉션은 정지)
-      const deskBtn = layer.querySelector<HTMLButtonElement>(".reception-desk")!;
-      deskBtn.classList.remove("wave");
-      deskBtn.onmouseenter = null;
-    }
-
-    scroller.appendChild(roomEl);
-  }
-
-  function go(delta: number) {
-    if (!rooms.length) return;
-    index = (index + delta + rooms.length) % rooms.length;
-    renderCurrentRoom();
-  }
-  prevBtn.addEventListener("click", () => go(-1));
-  nextBtn.addEventListener("click", () => go(1));
-
-  // =========================================================
-  // 3) Exit
-  // =========================================================
-  function handleBackOrExit(e: Event) {
+  // Exit
+  function handleBackOrExit(e: Event): void {
     e.preventDefault();
     e.stopPropagation();
     opts.onExit();
@@ -623,256 +190,32 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   exitLink.addEventListener("click", handleBackOrExit);
 
   // =========================================================
-  // 4) Detail modal
+  // 7) UI 레이어 제어
   // =========================================================
-  const detailBackdrop = el("div", "exh-detailBackdrop");
-  detailBackdrop.innerHTML = `
-    <div class="exh-detailCard" role="dialog" aria-modal="true">
-      <div class="exh-detailTop">
-        <div class="exh-detailMeta"></div>
-        <div class="exh-detailActions">
-          <button class="exh-miniBtn exh-detailGoPage" type="button">작품 상세 페이지로 가기</button>
-          <button class="exh-miniBtn exh-detailClose" type="button">Close</button>
-        </div>
-      </div>
-      <div class="exh-detailBody">
-        <img class="exh-detailImg" alt="artwork" />
-      </div>
-    </div>
-  `;
-  exh.appendChild(detailBackdrop);
-
-  const detailMeta = detailBackdrop.querySelector<HTMLDivElement>(".exh-detailMeta")!;
-  const detailImg = detailBackdrop.querySelector<HTMLImageElement>(".exh-detailImg")!;
-  const detailClose = detailBackdrop.querySelector<HTMLButtonElement>(".exh-detailClose")!;
-  const detailGoPage = detailBackdrop.querySelector<HTMLButtonElement>(".exh-detailGoPage")!;
-
-  function openDetail(payload: OpenArtworkPayload) {
-    detailMeta.textContent = `room: ${payload.roomIndex + 1} / side: ${payload.side}`;
-    detailImg.src = payload.src;
-    detailBackdrop.classList.add("is-open");
-  }
-  function closeDetail() {
-    detailBackdrop.classList.remove("is-open");
-    detailImg.src = "";
-  }
-
-  detailBackdrop.addEventListener("pointerdown", (e) => {
-    if (e.target === detailBackdrop) closeDetail();
-  });
-  detailClose.addEventListener("click", closeDetail);
-  detailGoPage.addEventListener("click", () => {
-    console.log("📄 작품 상세 페이지로 이동:", { src: detailImg.src, meta: detailMeta.textContent || "" });
-  });
-
-  // =========================================================
-  // 4.5) Reception welcome modal
-  // =========================================================
-  const receptionBackdrop = el("div", "exh-receptionBackdrop");
-  receptionBackdrop.innerHTML = `
-    <div class="exh-receptionCard" role="dialog" aria-modal="true">
-      <div class="exh-receptionTop">
-        <div>Welcome</div>
-        <button class="exh-miniBtn exh-receptionClose" type="button">Close</button>
-      </div>
-      <div class="exh-receptionBody">
-        리셉션입니다.<br/>
-        벽의 작품 이미지를 클릭하면 작품을 크게 볼 수 있어요.
-      </div>
-    </div>
-  `;
-  exh.appendChild(receptionBackdrop);
-
-  const receptionClose = receptionBackdrop.querySelector<HTMLButtonElement>(".exh-receptionClose")!;
-  function openReception() {
-    receptionBackdrop.classList.add("is-open");
-  }
-  function closeReception() {
-    receptionBackdrop.classList.remove("is-open");
-  }
-  receptionBackdrop.addEventListener("pointerdown", (e) => {
-    if (e.target === receptionBackdrop) closeReception();
-  });
-  receptionClose.addEventListener("click", closeReception);
-
-  function isAllowedUiTarget(t: EventTarget | null): boolean {
-    const el = t as HTMLElement | null;
-    if (!el) return false;
-
-    return !!el.closest?.(
-      [
-        ".codrops-icon--drop",
-        ".codrops-icon--prev",
-        ".btn--nav-left",
-        ".btn--nav-right",
-        ".btn--info",
-        ".btn--menu",
-        ".overlay.overlay--open",
-        ".overlay.overlay--open *",
-
-        // ✅ 모달은 실드 통과
-        ".exh-detailBackdrop",
-        ".exh-detailBackdrop *",
-        ".exh-receptionBackdrop",
-        ".exh-receptionBackdrop *",
-      ].join(",")
-    );
-  }
-
-  function killEvent(e: Event) {
-    e.preventDefault();
-    e.stopPropagation();
-    (e as any).stopImmediatePropagation?.();
-  }
-
-  // =========================================================
-  // 5) 클릭/포인터 처리
-  // =========================================================
-  function getImgFromPoint(x: number, y: number): HTMLImageElement | null {
-    const stack = document.elementsFromPoint(x, y) as HTMLElement[];
-    for (const n of stack) {
-      const frame = n?.closest?.(".room__frame") as HTMLElement | null;
-      if (frame) {
-        const img = frame.querySelector("img.room__img") as HTMLImageElement | null;
-        if (img) return img;
-      }
-      const img = n?.closest?.("img.room__img") as HTMLImageElement | null;
-      if (img) return img;
-      if (n.closest?.(".codrops-header") || n.closest?.(".nav") || n.closest?.(".overlay.overlay--open")) return null;
-    }
-    return null;
-  }
-
-  function onPointerMove(e: PointerEvent) {
-    if (!exh.classList.contains("is-visible")) return;
-
-    const target = e.target as HTMLElement | null;
-    if (target?.closest?.(".reception-desk")) {
-      exh.style.cursor = "pointer";
-      return;
-    }
-
-    const img = getImgFromPoint(e.clientX, e.clientY);
-    exh.style.cursor = img ? "pointer" : "";
-  }
-
-  function shield(e: Event) {
-    if (!exh.classList.contains("is-visible")) return;
-
-    const target = e.target as HTMLElement | null;
-    const insideExh = !!target?.closest?.(".exh-root");
-    if (!insideExh) return;
-
-    if (isAllowedUiTarget(target)) return;
-    killEvent(e);
-  }
-
-  function onPointerDownCapture(e: PointerEvent) {
-    shield(e);
-
-    if (!exh.classList.contains("is-visible")) return;
-    const target = e.target as HTMLElement | null;
-    const insideExh = !!target?.closest?.(".exh-root");
-    if (!insideExh) return;
-    if (isAllowedUiTarget(target)) return;
-
-    // ✅ 데스크 클릭
-    if (target?.closest?.(".reception-desk")) {
-      openReception();
-      return;
-    }
-
-    // ✅ 작품 클릭
-    const img = getImgFromPoint(e.clientX, e.clientY);
-    if (!img) return;
-
-    const side = (img.dataset.side as Side) || "back";
-    const src = img.dataset.src || img.getAttribute("src") || "";
-    if (!src) return;
-
-    const payload: OpenArtworkPayload = { roomIndex: index, side, src };
-    if (opts.onOpenArtwork) opts.onOpenArtwork(payload);
-    else openDetail(payload);
-  }
-
-  exh.addEventListener("pointermove", onPointerMove, { passive: true });
-
-  // =========================================================
-  // 5.5) ✅ 커서 따라 룸 흔들리는 모션 (parallax wobble)
-  // ✅ 리셉션 룸은 제외
-  // =========================================================
-  function onMouseMoveWobble(e: MouseEvent) {
-    if (!exh.classList.contains("is-visible")) return;
-
-    const roomEl = scroller.querySelector<HTMLElement>(".room--current");
-    if (!roomEl) return;
-
-    const currentRoom = rooms[index];
-    if (isReceptionRoom(currentRoom, index)) {
-      // ✅ 리셉션은 흔들림 완전 제거(transition도 제거해서 잔상 방지)
-      roomEl.style.transition = "";
-      roomEl.style.transform = "";
-      return;
-    }
-
-    const centerX = window.innerWidth / 2;
-    const centerY = window.innerHeight / 2;
-    const offsetX = (e.clientX - centerX) / centerX;
-    const offsetY = (e.clientY - centerY) / centerY;
-
-    // ✅ 각도 제한 (외부가 보이지 않도록 최소화)
-    const maxRotateY = 1.2; // ✅ 3 → 1.2: 좌우 흔들림 최소화
-    const maxRotateX = 0.8; // ✅ 2.5 → 0.8: 상하 흔들림 최소화
-
-    const rotateY = offsetX * maxRotateY;
-    const rotateX = -offsetY * maxRotateX;
-
-    roomEl.style.transition = "transform 0.3s ease-out";
-    roomEl.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
-  }
-  exh.addEventListener("mousemove", onMouseMoveWobble, { passive: true });
-
-  // ✅ 전역 캡처 실드
-  window.addEventListener("pointerdown", onPointerDownCapture, true);
-  window.addEventListener("pointerup", shield, true);
-  window.addEventListener("click", shield, true);
-  window.addEventListener("mousedown", shield, true);
-  window.addEventListener("mouseup", shield, true);
-  window.addEventListener("touchstart", shield, { capture: true, passive: false } as any);
-  window.addEventListener("touchend", shield, { capture: true, passive: false } as any);
-  window.addEventListener("contextmenu", shield, true);
-
-  // =========================================================
-  // 6) Rooms API
-  // =========================================================
-  function setRooms(nextRooms: RoomSet[]) {
-    rooms = nextRooms.slice(0);
-    index = 0;
-    renderCurrentRoom();
-  }
-  setRooms(opts.defaultRooms);
-
-  // ✅ #ui 레이어 pointer-events off
   const uiLayer = document.getElementById("ui") as HTMLElement | null;
   const uiPrev = { pointerEvents: "" };
 
-  function disableUiLayer() {
+  function disableUiLayer(): void {
     if (!uiLayer) return;
     uiPrev.pointerEvents = uiLayer.style.pointerEvents;
     uiLayer.style.pointerEvents = "none";
   }
-  function restoreUiLayer() {
+
+  function restoreUiLayer(): void {
     if (!uiLayer) return;
     uiLayer.style.pointerEvents = uiPrev.pointerEvents;
   }
 
-  function show() {
+  // =========================================================
+  // 8) Public API
+  // =========================================================
+  function show(): void {
     disableUiLayer();
     exh.classList.add("is-visible");
     exh.style.cursor = "";
   }
 
-  function hide() {
+  function hide(): void {
     exh.classList.remove("is-visible");
     exh.style.cursor = "";
     overlayInfo.classList.remove("overlay--open");
@@ -884,5 +227,9 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
     restoreUiLayer();
   }
 
-  return { show, hide, setRooms };
+  return {
+    show,
+    hide,
+    setRooms: roomRenderer.setRooms,
+  };
 }
