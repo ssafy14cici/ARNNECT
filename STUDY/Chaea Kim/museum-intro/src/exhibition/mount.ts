@@ -136,8 +136,8 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   // =========================================================
   // 4) 모달 생성
   // =========================================================
-  const { openDetail, closeDetail } = createDetailModal(exh);
-  const { openReception, closeReception } = createReceptionModal(exh);
+  const { openDetail, closeDetail, isOpen: isDetailOpen } = createDetailModal(exh) as any;
+  const { openReception, closeReception, isOpen: isReceptionOpen } = createReceptionModal(exh) as any;
 
   // =========================================================
   // 5) 이벤트 핸들러 생성
@@ -152,10 +152,65 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
     onOpenArtwork: opts.onOpenArtwork,
   });
 
-  // 이벤트 등록
+  // ✅ pointermove만 유지
   exh.addEventListener("pointermove", eventHandlers.onPointerMove, { passive: true });
-  exh.addEventListener("mousemove", eventHandlers.onMouseMoveWobble, { passive: true });
+
+  // ✅ wobble 제거: 아래 한 줄 삭제/미등록
+  // exh.addEventListener("mousemove", eventHandlers.onMouseMoveWobble, { passive: true });
+
+  // 전역 캡처 실드/클릭 처리
   eventHandlers.registerGlobalListeners();
+
+  // =========================================================
+  // ✅ Wheel Walk (CSS 룸에서 스크롤로 Z 이동)
+  // - Room CSS에: .room--current { transform: translateZ(var(--walkZ, 0px)); } 필요
+  // =========================================================
+  let walkZ = 0;
+
+  // 감도/범위 (여기만 조절)
+  const WALK_SPEED = 0.35;
+  const WALK_MIN_Z = -420;
+  const WALK_MAX_Z = 140;
+
+  function anyModalOpen(): boolean {
+    // modals.ts가 isOpen 제공하면 그걸 우선 사용
+    const byFn =
+      (typeof isDetailOpen === "function" && isDetailOpen()) ||
+      (typeof isReceptionOpen === "function" && isReceptionOpen());
+    if (byFn) return true;
+
+    // fallback: 클래스 기반
+    return (
+      !!exh.querySelector(".exh-detailBackdrop.is-open") ||
+      !!exh.querySelector(".exh-receptionBackdrop.is-open")
+    );
+  }
+
+  function applyWalkZ() {
+    const roomEl = scroller.querySelector<HTMLElement>(".room--current");
+    if (!roomEl) return;
+    roomEl.style.setProperty("--walkZ", `${walkZ}px`);
+  }
+
+  function resetWalkZ() {
+    walkZ = 0;
+    applyWalkZ();
+  }
+
+  function onWheelWalk(e: WheelEvent) {
+    if (!exh.classList.contains("is-visible")) return;
+    if (anyModalOpen()) return;
+
+    // 스크롤이 페이지 자체를 움직이지 않게
+    e.preventDefault();
+
+    walkZ += -e.deltaY * WALK_SPEED;
+    walkZ = Math.max(WALK_MIN_Z, Math.min(WALK_MAX_Z, walkZ));
+    applyWalkZ();
+  }
+
+  // wheel은 passive:false 필수
+  exh.addEventListener("wheel", onWheelWalk, { passive: false });
 
   // =========================================================
   // 6) UI 버튼 이벤트
@@ -177,8 +232,15 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
   btnInfo.addEventListener("click", () => toggleOverlay("info"));
   btnMenu.addEventListener("click", () => toggleOverlay("menu"));
 
-  prevBtn.addEventListener("click", () => roomRenderer.go(-1));
-  nextBtn.addEventListener("click", () => roomRenderer.go(1));
+  prevBtn.addEventListener("click", () => {
+    roomRenderer.go(-1);
+    resetWalkZ(); // ✅ 방 바뀌면 시점 원복(원치 않으면 제거)
+  });
+
+  nextBtn.addEventListener("click", () => {
+    roomRenderer.go(1);
+    resetWalkZ(); // ✅ 방 바뀌면 시점 원복
+  });
 
   // Exit
   function handleBackOrExit(e: Event): void {
@@ -213,6 +275,7 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
     disableUiLayer();
     exh.classList.add("is-visible");
     exh.style.cursor = "";
+    resetWalkZ(); // ✅ 진입 시 초기화
   }
 
   function hide(): void {
@@ -225,11 +288,17 @@ export function mountExhibition(root: HTMLElement, opts: ExhibitionOptions): Exh
     closeDetail();
     closeReception();
     restoreUiLayer();
+
+    // ✅ wheel 시점 잔상 방지
+    resetWalkZ();
   }
 
   return {
     show,
     hide,
-    setRooms: roomRenderer.setRooms,
+    setRooms: (rooms) => {
+      roomRenderer.setRooms(rooms);
+      resetWalkZ(); // ✅ 룸 세트 바뀌면 초기화
+    },
   };
 }

@@ -1,71 +1,97 @@
 // src/exhibition/event-handlers.ts
+import type { OpenArtworkPayload } from "./types";
 
-import type { Side, OpenArtworkPayload, RoomSet } from "./types";
-import { isReceptionRoom, killEvent } from "./utils";
+type Side = "back" | "left" | "right";
 
-export interface EventHandlerDeps {
+type CreateEventHandlersArgs = {
   exh: HTMLElement;
   scroller: HTMLElement;
-  getCurrentRoom: () => RoomSet | undefined;
+
+  getCurrentRoom: () => any; // RoomSet 타입을 여기서 강제하지 않음(순환/경로 꼬임 방지)
   getCurrentIndex: () => number;
+
   openDetail: (payload: OpenArtworkPayload) => void;
   openReception: () => void;
+
   onOpenArtwork?: (payload: OpenArtworkPayload) => void;
+};
+
+export type ExhibitionEventHandlers = {
+  onPointerMove: (e: PointerEvent) => void;
+
+  // (wobble은 mount.ts에서 등록 안 하니까 굳이 안 만들어도 되지만,
+  // 기존 코드가 호출할 수도 있어서 빈 함수로 제공)
+  onMouseMoveWobble: (e: MouseEvent) => void;
+
+  registerGlobalListeners: () => void;
+  unregisterGlobalListeners: () => void;
+};
+
+function isAllowedUiTarget(t: EventTarget | null): boolean {
+  const el = t as HTMLElement | null;
+  if (!el) return false;
+
+  return !!el.closest?.(
+    [
+      ".codrops-icon--drop",
+      ".codrops-icon--prev",
+      ".btn--nav-left",
+      ".btn--nav-right",
+      ".btn--info",
+      ".btn--menu",
+      ".overlay.overlay--open",
+      ".overlay.overlay--open *",
+
+      // ✅ 모달은 실드 통과
+      ".exh-detailBackdrop",
+      ".exh-detailBackdrop *",
+      ".exh-receptionBackdrop",
+      ".exh-receptionBackdrop *",
+    ].join(",")
+  );
+}
+
+function killEvent(e: Event) {
+  e.preventDefault();
+  e.stopPropagation();
+  (e as any).stopImmediatePropagation?.();
 }
 
 /**
- * 이벤트 핸들러 생성
+ * 마우스 위치에서 작품 이미지 찾기
  */
-export function createEventHandlers(deps: EventHandlerDeps) {
-  const { exh, scroller, getCurrentRoom, getCurrentIndex, openDetail, openReception, onOpenArtwork } = deps;
+function getImgFromPoint(x: number, y: number): HTMLImageElement | null {
+  const stack = document.elementsFromPoint(x, y) as HTMLElement[];
 
-  /**
-   * 포인트에서 이미지 엘리먼트 찾기
-   */
-  function getImgFromPoint(x: number, y: number): HTMLImageElement | null {
-    const stack = document.elementsFromPoint(x, y) as HTMLElement[];
-    for (const n of stack) {
-      const frame = n?.closest?.(".room__frame") as HTMLElement | null;
-      if (frame) {
-        const img = frame.querySelector("img.room__img") as HTMLImageElement | null;
-        if (img) return img;
-      }
-      const img = n?.closest?.("img.room__img") as HTMLImageElement | null;
+  for (const n of stack) {
+    // frame 안쪽을 먼저 우선
+    const frame = n?.closest?.(".room__frame") as HTMLElement | null;
+    if (frame) {
+      const img = frame.querySelector("img.room__img") as HTMLImageElement | null;
       if (img) return img;
-      if (n.closest?.(".codrops-header") || n.closest?.(".nav") || n.closest?.(".overlay.overlay--open")) return null;
     }
-    return null;
+
+    const img = n?.closest?.("img.room__img") as HTMLImageElement | null;
+    if (img) return img;
+
+    // UI 위에선 작품 판정 중단
+    if (
+      n.closest?.(".codrops-header") ||
+      n.closest?.(".nav") ||
+      n.closest?.(".overlay.overlay--open")
+    ) {
+      return null;
+    }
   }
 
-  /**
-   * 허용된 UI 타겟인지 확인
-   */
-  function isAllowedUiTarget(t: EventTarget | null): boolean {
-    const el = t as HTMLElement | null;
-    if (!el) return false;
+  return null;
+}
 
-    return !!el.closest?.(
-      [
-        ".codrops-icon--drop",
-        ".codrops-icon--prev",
-        ".btn--nav-left",
-        ".btn--nav-right",
-        ".btn--info",
-        ".btn--menu",
-        ".overlay.overlay--open",
-        ".overlay.overlay--open *",
-        ".exh-detailBackdrop",
-        ".exh-detailBackdrop *",
-        ".exh-receptionBackdrop",
-        ".exh-receptionBackdrop *",
-      ].join(",")
-    );
-  }
-
-  /**
-   * 이벤트 차단
-   */
-  function shield(e: Event): void {
+/**
+ * 전역 캡처 실드(바깥으로 이벤트 새는 것 방지)
+ */
+function shieldFactory(exh: HTMLElement) {
+  return function shield(e: Event) {
     if (!exh.classList.contains("is-visible")) return;
 
     const target = e.target as HTMLElement | null;
@@ -74,15 +100,23 @@ export function createEventHandlers(deps: EventHandlerDeps) {
 
     if (isAllowedUiTarget(target)) return;
     killEvent(e);
-  }
+  };
+}
 
-  /**
-   * 포인터 이동 핸들러
-   */
-  function onPointerMove(e: PointerEvent): void {
+/**
+ * ✅ named export로 반드시 제공
+ */
+export function createEventHandlers(args: CreateEventHandlersArgs): ExhibitionEventHandlers {
+  const { exh, scroller, getCurrentIndex, openDetail, openReception, onOpenArtwork } = args;
+
+  const shield = shieldFactory(exh);
+
+  function onPointerMove(e: PointerEvent) {
     if (!exh.classList.contains("is-visible")) return;
 
     const target = e.target as HTMLElement | null;
+
+    // ✅ 리셉션 데스크 커서
     if (target?.closest?.(".reception-desk")) {
       exh.style.cursor = "pointer";
       return;
@@ -92,19 +126,22 @@ export function createEventHandlers(deps: EventHandlerDeps) {
     exh.style.cursor = img ? "pointer" : "";
   }
 
-  /**
-   * 포인터 다운 캡처 핸들러
-   */
-  function onPointerDownCapture(e: PointerEvent): void {
+  // wobble 미사용: 안전하게 빈 함수 제공
+  function onMouseMoveWobble(_: MouseEvent) {
+    // intentionally empty
+  }
+
+  function onPointerDownCapture(e: PointerEvent) {
     shield(e);
 
     if (!exh.classList.contains("is-visible")) return;
+
     const target = e.target as HTMLElement | null;
     const insideExh = !!target?.closest?.(".exh-root");
     if (!insideExh) return;
     if (isAllowedUiTarget(target)) return;
 
-    // ✅ 데스크 클릭
+    // ✅ 데스크 클릭 → 리셉션 모달
     if (target?.closest?.(".reception-desk")) {
       openReception();
       return;
@@ -118,64 +155,53 @@ export function createEventHandlers(deps: EventHandlerDeps) {
     const src = img.dataset.src || img.getAttribute("src") || "";
     if (!src) return;
 
-    const payload: OpenArtworkPayload = { roomIndex: getCurrentIndex(), side, src };
+    const payload: OpenArtworkPayload = {
+      roomIndex: getCurrentIndex(),
+      side,
+      src,
+    };
+
     if (onOpenArtwork) onOpenArtwork(payload);
     else openDetail(payload);
   }
 
-  /**
-   * 마우스 움직임에 따른 룸 흔들림 효과 (parallax wobble)
-   * 리셉션 룸은 제외
-   */
-  function onMouseMoveWobble(e: MouseEvent): void {
-    if (!exh.classList.contains("is-visible")) return;
+  // 전역 리스너 핸들 보관(해제 가능하게)
+  const globalListeners: Array<() => void> = [];
 
-    const roomEl = scroller.querySelector<HTMLElement>(".room--current");
-    if (!roomEl) return;
-
-    const currentRoom = getCurrentRoom();
-    const currentIndex = getCurrentIndex();
-
-    if (isReceptionRoom(currentRoom, currentIndex)) {
-      // ✅ 리셉션은 흔들림 완전 제거(transition도 제거해서 잔상 방지)
-      roomEl.style.transition = "";
-      roomEl.style.transform = "";
-      return;
-    }
-
-    const centerX = window.innerWidth / 2;
-    const centerY = window.innerHeight / 2;
-    const offsetX = (e.clientX - centerX) / centerX;
-    const offsetY = (e.clientY - centerY) / centerY;
-
-    // ✅ 각도 제한 (외부가 보이지 않도록 최소화)
-    const maxRotateY = 1.2; // 좌우 흔들림 최소화
-    const maxRotateX = 0.8; // 상하 흔들림 최소화
-
-    const rotateY = offsetX * maxRotateY;
-    const rotateX = -offsetY * maxRotateX;
-
-    roomEl.style.transition = "transform 0.3s ease-out";
-    roomEl.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+  function addGlobal<K extends keyof WindowEventMap>(
+    type: K,
+    handler: (ev: WindowEventMap[K]) => any,
+    options?: boolean | AddEventListenerOptions
+  ) {
+    window.addEventListener(type, handler as any, options as any);
+    globalListeners.push(() => window.removeEventListener(type, handler as any, options as any));
   }
 
-  /**
-   * 전역 이벤트 리스너 등록
-   */
-  function registerGlobalListeners(): void {
-    window.addEventListener("pointerdown", onPointerDownCapture, true);
-    window.addEventListener("pointerup", shield, true);
-    window.addEventListener("click", shield, true);
-    window.addEventListener("mousedown", shield, true);
-    window.addEventListener("mouseup", shield, true);
-    window.addEventListener("touchstart", shield, { capture: true, passive: false } as any);
-    window.addEventListener("touchend", shield, { capture: true, passive: false } as any);
-    window.addEventListener("contextmenu", shield, true);
+  function registerGlobalListeners() {
+    // ✅ 캡처 실드
+    addGlobal("pointerdown", onPointerDownCapture as any, true);
+    addGlobal("pointerup", shield as any, true);
+    addGlobal("click", shield as any, true);
+    addGlobal("mousedown", shield as any, true);
+    addGlobal("mouseup", shield as any, true);
+    addGlobal("contextmenu", shield as any, true);
+
+    // 터치에서 preventDefault 필요할 수 있어 passive:false
+    addGlobal("touchstart", shield as any, { capture: true, passive: false } as any);
+    addGlobal("touchend", shield as any, { capture: true, passive: false } as any);
+  }
+
+  function unregisterGlobalListeners() {
+    while (globalListeners.length) {
+      const off = globalListeners.pop();
+      off?.();
+    }
   }
 
   return {
     onPointerMove,
     onMouseMoveWobble,
     registerGlobalListeners,
+    unregisterGlobalListeners,
   };
 }

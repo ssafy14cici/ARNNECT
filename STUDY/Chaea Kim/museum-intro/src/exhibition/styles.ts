@@ -153,6 +153,16 @@ export function createExhibitionStyles(): string {
     .exh-root .room__frame-side{
       display:none !important;
     }
+    
+    // ✅ 전시회 "걷기" (wheel 이동)용: room transform은 CSS 변수로만 제어
+    /* =====================================================
+    * ✅ Wheel Walk (CSS room camera move)
+    * ===================================================== */
+    .exh-root .room--current{
+      transform: translateZ(var(--walkZ, 0px));
+      will-change: transform;
+    }
+
 
     /* 이미지가 박스(프레임)를 키우는 기준이 되도록 */
     .exh-root img.room__img{
