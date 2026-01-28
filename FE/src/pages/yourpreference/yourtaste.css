@@ -1,0 +1,165 @@
+/* FE/src/pages/yourpreference/yourtaste.css */
+
+/* 공용 버튼 */
+.ytBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.18);
+  background: #fff;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+}
+.ytBtnPrimary {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.ytRow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+.ytFullBleed { width: 100%; }
+
+/* =========================
+   Battle
+========================= */
+.ytBattlePage {
+  padding: 18px 16px 24px;
+}
+
+/* 가운데 고정 + 좌우 치우침 방지 */
+.ytBattleShell {
+  width: min(1280px, 100%);
+  margin: 0 auto;
+}
+
+.ytEmptyState {
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(0,0,0,0.10);
+  background: rgba(255,255,255,0.7);
+}
+
+.ytBattleTop {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.ytBattleHead { min-width: 0; }
+
+.ytBattleTitle {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.ytBattleSub {
+  margin-top: 6px;
+  font-size: 14px;
+  opacity: 0.75;
+  line-height: 1.45;
+}
+
+.ytBattleMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.ytMetaText {
+  font-size: 13px;
+  opacity: 0.75;
+  font-weight: 800;
+}
+
+.ytProgressTrack {
+  width: 220px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+.ytProgressFill {
+  height: 100%;
+  background: rgba(0,0,0,0.30);
+  border-radius: 999px;
+}
+
+/* ✅ “화면 꽉 차게” 느낌: 두 카드가 가능한 크게 */
+.ytBattleGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+
+  /* 상단 nav/타이틀 영역 제외하고 카드가 세로로 크게 */
+  min-height: calc(100svh - 190px);
+}
+
+.ytChoiceBtn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  height: 100%;
+}
+
+.ytChoiceCard {
+  position: relative;
+  height: 100%;
+  border-radius: 22px;
+  overflow: hidden;
+  background: rgba(0,0,0,0.06);
+  box-shadow: 0 14px 30px rgba(0,0,0,0.10);
+}
+
+.ytChoiceImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ytChoiceOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  opacity: 0;
+  background: rgba(0,0,0,0.25);
+  color: #fff;
+  font-weight: 900;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  transition: opacity 0.14s ease;
+}
+
+.ytChoiceBtn:hover .ytChoiceOverlay { opacity: 1; }
+.ytChoiceBtn:active .ytChoiceCard { transform: translateY(1px); }
+
+/* 모바일에서는 세로 스택 */
+@media (max-width: 860px) {
+  .ytBattleTop { align-items: flex-start; }
+  .ytBattleMeta { align-items: flex-start; min-width: 0; width: 100%; }
+  .ytProgressTrack { width: 100%; }
+
+  .ytBattleGrid {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+  .ytChoiceCard {
+    height: min(62svh, 620px);
+  }
+}

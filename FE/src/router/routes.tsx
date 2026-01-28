@@ -5,7 +5,6 @@ import AppLayout from "../layouts/AppLayout";
 import Guide from "../pages/guide/Guide";
 
 import Home from "../pages/home/Home";
-import ArtistGo from "../pages/asc/ASC";
 import Search from "../pages/search/Search";
 import Recover from "../pages/auth/Recover";
 
@@ -36,11 +35,12 @@ import PortfolioTab from "../pages/profile/tabs/PortfolioTab";
 import ArtworkDetail from "../pages/artwork/ArtworkDetail";
 import NotFound from "../pages/notfound/NotFound";
 
-/**
- * ✅ 수정된 임포트 경로: legal 폴더가 components 바로 아래에 있음
- */
 import PrivacyPolicyContent from "../components/legal/PrivacyPolicyContent";
 import TermsOfServiceContent from "../components/legal/TermsOfServiceContent";
+
+import { yourTasteRoutes } from "../pages/yourpreference";
+
+
 
 export const routes: RouteObject[] = [
   {
@@ -51,7 +51,7 @@ export const routes: RouteObject[] = [
        * ========================= */
       { path: "/", element: <Home /> },
       { path: "home", element: <Home /> },
-      { path: "artist-go", element: <ArtistGo /> },
+      yourTasteRoutes,
       { path: "search", element: <Search /> },
       { path: "guide", element: <Guide /> },
 
