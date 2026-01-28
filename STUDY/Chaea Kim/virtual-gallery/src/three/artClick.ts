@@ -4,33 +4,32 @@ export function installArtClick(params: {
   canvas: HTMLCanvasElement;
   camera: THREE.Camera;
   scene: THREE.Scene;
-  openModal: (src: string) => void;
+  onClickArt: (payload: { id: string; index: number; src: string }) => void;
 }) {
-  const { canvas, camera, scene, openModal } = params;
+  const { canvas, camera, scene, onClickArt } = params;
+
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
 
-  const onClick = (e: MouseEvent) => {
+  const pick = (e: MouseEvent | PointerEvent) => {
     const rect = canvas.getBoundingClientRect();
     ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     ndc.y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
 
     raycaster.setFromCamera(ndc, camera);
 
-    // TEMP_FRAMES 안의 ART_*만 찾는 게 베스트지만,
-    // 간단히 name prefix로 필터
     const hits = raycaster.intersectObjects(scene.children, true);
     const hit = hits.find((h) => h.object?.name?.startsWith("ART_"));
     if (!hit) return;
 
-    // ART_3 => /art/a3.jpg
-    const name = hit.object.name; // ART_#
-    const n = Number(name.split("_")[1]);
-    if (!Number.isFinite(n) || n <= 0) return;
+    const id = hit.object.name; // "ART_3"
+    const num = Number(id.split("_")[1]);
+    if (!Number.isFinite(num) || num <= 0) return;
 
-    openModal(`/art/a${n}.jpg`);
+    onClickArt({ id, index: num, src: `/art/a${num}.jpg` });
   };
 
-  canvas.addEventListener("click", onClick);
-  return () => canvas.removeEventListener("click", onClick);
+  // pointerdown이 click보다 반응이 일정함
+  canvas.addEventListener("pointerdown", pick);
+  return () => canvas.removeEventListener("pointerdown", pick);
 }

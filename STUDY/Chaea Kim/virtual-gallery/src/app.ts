@@ -9,6 +9,7 @@ import { createTransitionController } from "./three/transition";
 import { createTempFramesRaycasted } from "./three/tempFrames";
 import { createArtModal } from "./three/artModal";
 import { installArtClick } from "./three/artClick";
+import { createClickModal } from "./three/clickModal";
 
 type Pose = { pos: THREE.Vector3; target: THREE.Vector3 };
 
@@ -88,6 +89,30 @@ export async function startApp() {
     fixedYMode: "center",
   });
   viewer.scene.add(frames);
+
+  const clickModal = createClickModal();
+
+  installArtClick({
+    canvas,
+    camera: viewer.camera,
+    scene: viewer.scene,
+    onClickArt: (p) => {
+      console.log("[ART CLICK]", p);
+      clickModal.open({ id: p.id, index: p.index, src: p.src });
+    },
+  });
+
+  // 나중에 “디테일 페이지 이동”으로 바꿀 때
+
+  // 위 코드에서 이 한 줄만 교체하면 끝:
+
+  // clickModal.open(...)
+
+
+  // → 예를 들면
+
+  // navigate(`/art/${p.index}`)
+
 
   // ✅ UI (시점 번호)
   const label = createViewIndexLabel();
