@@ -2,12 +2,13 @@ package com.ssafy.arnnect.member.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ManyToAny;
 
 import java.time.Year;
 
 @Entity
 @Table(name = "artist")
-@Data
+@Getter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -17,9 +18,6 @@ public class Artist {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "artist_id")
     private Long artistId;
-
-    @Column(name = "member_id", insertable = false, updatable = false)
-    private Long memberId;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id")
@@ -41,8 +39,8 @@ public class Artist {
     @Column(name = "document", length = 255)
     private String document;
 
-    @Column(name = "affilation", length = 50)
-    private String affilation;
+    @Column(name = "affiliation", length = 50)
+    private String affiliation;
 
     @Column(name = "is_verified")
     private Boolean isVerified;
@@ -52,5 +50,6 @@ public class Artist {
 
     @Column(name = "is_new")
     private Boolean isNew;
+
 }
 

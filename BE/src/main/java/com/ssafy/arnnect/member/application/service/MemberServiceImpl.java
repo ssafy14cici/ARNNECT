@@ -1,10 +1,16 @@
 package com.ssafy.arnnect.member.application.service;
 
+import com.ssafy.arnnect.common.exception.BusinessException;
+import com.ssafy.arnnect.common.exception.ErrorCode;
 import com.ssafy.arnnect.member.application.dto.request.CreateArtistRequest;
 import com.ssafy.arnnect.member.application.dto.request.CreateMemberRequest;
+import com.ssafy.arnnect.member.application.dto.response.MyInfoResponse;
 import com.ssafy.arnnect.member.domain.entity.Artist;
 import com.ssafy.arnnect.member.domain.entity.Member;
+import com.ssafy.arnnect.member.domain.entity.UserRole;
+import com.ssafy.arnnect.member.repository.ArtistRepository;
 import com.ssafy.arnnect.member.repository.MemberRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -15,37 +21,57 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class MemberServiceImpl implements MemberService{
 
-    private final MemberRepository repository;
+    private final MemberRepository memberRepo;
+    private final ArtistRepository artistRepo;
     private final PasswordEncoder passwordEncoder;
 
     @Override
+    @Transactional
     public void createMember(CreateMemberRequest request) {
         Member member = request.toMemberEntity();
         member.encodePassword(passwordEncoder.encode(member.getPassword()));
         log.info("사용자 회원가입 : member => {}",member.toString());
-        repository.save(member);
+        memberRepo.save(member);
     }
 
     @Override
+    @Transactional
     public void createArtist(CreateArtistRequest request) {
         Member member = request.toMemberEntity();
-        Artist artist = request.toArtistEntity();
+        member.encodePassword(passwordEncoder.encode(member.getPassword()));
+
+
         log.info("예술가 회원가입 : member => {}",member.toString());
-        //두개 저장
+
+        Artist artist = request.toArtistEntity(memberRepo.save(member));
+        artistRepo.save(artist);
     }
 
     @Override
-    public int updateMember() {
-        return 0;
+    public void updateMember() {
+
     }
 
     @Override
-    public int updateArtist() {
-        return 0;
+    public void updateArtist() {
+
     }
 
     @Override
-    public int deleteMember(String memberUuid) {
-        return 0;
+    public void deleteMember(String memberUuid) {
+
+    }
+
+    @Override
+    public MyInfoResponse getMyInfo(String memberUuid, UserRole role) {
+        if(UserRole.GENERAL.equals(role)){
+            return MyInfoResponse.fromMember(memberRepo.findByMemberUuid(memberUuid).orElseThrow(
+                    ()-> new BusinessException(ErrorCode.USER_NOT_FOUND)
+            ));
+        }else{
+            return MyInfoResponse.fromArtist(artistRepo.findByMember_MemberUuid(memberUuid).orElseThrow(
+                    ()->new BusinessException(ErrorCode.USER_NOT_FOUND)
+            ));
+        }
     }
 }

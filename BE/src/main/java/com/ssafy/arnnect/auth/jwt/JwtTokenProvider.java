@@ -1,10 +1,9 @@
 package com.ssafy.arnnect.auth.jwt;
 
 import com.ssafy.arnnect.member.domain.entity.UserRole;
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -28,6 +27,7 @@ public class JwtTokenProvider {
         return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
 
+    // Access Token 생성
     public String createAccessToken(String memberUuid, UserRole role) {
         return Jwts.builder()
                 .setSubject(memberUuid)
@@ -38,6 +38,7 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    // Refresh Token 생성
     public String createRefreshToken(String memberUuid) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + refreshTokenExpireTime);
@@ -50,6 +51,7 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    // 토큰 검증
     public boolean validateToken(String token) {
         try {
             Jwts.parserBuilder()
@@ -62,14 +64,32 @@ public class JwtTokenProvider {
         }
     }
 
-    public Long getUserId(String token) {
-        return Long.valueOf(
-                Jwts.parserBuilder()
-                        .setSigningKey(getKey())
-                        .build()
-                        .parseClaimsJws(token)
-                        .getBody()
-                        .getSubject()
-        );
+    // memberUuid 꺼내기
+    public String getMemberUuid(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(getKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getSubject();
+    }
+
+    // role 꺼내기
+    public String getRole(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(getKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .get("role", String.class);
+    }
+
+    // Request에서 토큰 가져오기 (예: Authorization: Bearer <token>)
+    public String resolveToken(HttpServletRequest request) {
+        String bearer = request.getHeader("Authorization");
+        if (bearer != null && bearer.startsWith("Bearer ")) {
+            return bearer.substring(7);
+        }
+        return null;
     }
 }

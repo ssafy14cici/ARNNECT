@@ -8,6 +8,7 @@ import lombok.*;
 
 import java.time.LocalDate;
 import java.time.Year;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -75,6 +76,8 @@ public class CreateArtistRequest {
 
     public Member toMemberEntity(){
         return Member.builder()
+                .memberUuid(String.valueOf(UUID.randomUUID()))
+                .role(UserRole.ARTIST)
                 .name(this.name)
                 .email(this.email)
                 .password(this.password)
@@ -82,18 +85,17 @@ public class CreateArtistRequest {
                 .birth(this.birth)
                 .nickname(this.nickname)
                 .isAgree(this.isAgree)
-                .role(UserRole.ARTIST)
                 .build();
     }
-
-    public Artist toArtistEntity(){
+    public Artist toArtistEntity(Member member){
         return Artist.builder()
+                .member(member)
                 .fieldId(this.fieldId)
                 .genreId(this.genreId)
                 .debutYear(this.debutYear)
                 .snsPage(this.snsPage)
                 .document(this.document)
-                .affilation(this.affiliation)
+                .affiliation(this.affiliation)
                 .isNew(this.isNew)
                 .introduction(this.introduction)
                 .build();
