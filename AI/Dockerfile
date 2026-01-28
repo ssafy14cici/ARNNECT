@@ -10,7 +10,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 소스코드 복사
-COPY ../../ssafy/공통/Dockerfile들 .
+COPY . .
 
 # 실행 (Port 3000)
 CMD ["bentoml", "serve", "service:svc", "--production", "--host", "0.0.0.0", "--port", "3000"]
