@@ -1,0 +1,14 @@
+service: "service:RecommenderService"
+labels:
+  owner: "user"
+  project: "art_recommender"
+include:
+  - "service.py"
+  - "model_defs.py"
+  - "data/*.json"
+  - "checkpoints/*.pth"
+python:
+  packages:
+    - torch>=2.0.0
+    - numpy
+    - bentoml>=1.0.0
