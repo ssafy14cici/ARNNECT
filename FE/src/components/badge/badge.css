@@ -1,0 +1,168 @@
+.badgeSection {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+}
+
+.badgeSectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.badgeSectionTitle {
+  margin: 0;
+  font-size: 14px;
+}
+
+.badgeEdit {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.badgeSubTitle {
+  margin-top: 10px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.badgeEmpty {
+  margin-top: 8px;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.badgeRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.badgeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.badgeChip {
+  text-align: left;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+}
+
+.badgeChip:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.badgeChip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.badgeChip.isSelected {
+  outline: 2px solid rgba(255, 255, 255, 0.28);
+}
+
+.badgeName {
+  display: block;
+  font-weight: 700;
+}
+
+.badgeDesc {
+  display: block;
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+/* modal */
+.badgeModalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 999;
+}
+
+.badgeModal {
+  width: min(860px, 100%);
+  background: #111;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.badgeModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.badgeTitle {
+  margin: 0;
+  font-size: 15px;
+}
+
+.badgeClose {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.badgeHint {
+  font-size: 13px;
+  opacity: 0.8;
+  margin: 8px 0 12px;
+}
+
+.badgeFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.badgeSelectedCount {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.badgeFooterBtns {
+  display: flex;
+  gap: 8px;
+}
+
+.badgeGhost {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.badgeOk {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  cursor: pointer;
+}
