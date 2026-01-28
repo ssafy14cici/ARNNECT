@@ -21,6 +21,9 @@ public class JwtTokenProvider {
     @Value("${jwt.access-token-expiration}")
     private long expirationMillis;
 
+    @Value("${jwt.refresh-token-expire-time}")
+    private long refreshTokenExpireTime;
+
     private Key getKey() {
         return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
@@ -32,6 +35,18 @@ public class JwtTokenProvider {
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expirationMillis))
                 .signWith(getKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String createRefreshToken(String memberUuid) {
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + refreshTokenExpireTime);
+
+        return Jwts.builder()
+                .setSubject(memberUuid)
+                .setIssuedAt(now)
+                .setExpiration(expiry)
+                .signWith(getKey(), SignatureAlgorithm.HS512)
                 .compact();
     }
 

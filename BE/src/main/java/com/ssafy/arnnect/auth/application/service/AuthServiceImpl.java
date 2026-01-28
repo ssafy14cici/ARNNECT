@@ -1,6 +1,7 @@
 package com.ssafy.arnnect.auth.application.service;
 
 import com.ssafy.arnnect.auth.application.dto.request.LoginRequest;
+import com.ssafy.arnnect.auth.application.dto.response.TokenPair;
 import com.ssafy.arnnect.auth.jwt.JwtTokenProvider;
 import com.ssafy.arnnect.common.exception.BusinessException;
 import com.ssafy.arnnect.common.exception.ErrorCode;
@@ -19,7 +20,7 @@ public class AuthServiceImpl implements AuthService{
     private final JwtTokenProvider jwtTokenProvider;
 
     @Override
-    public String login(LoginRequest request) {
+    public TokenPair login(LoginRequest request) {
         Member member = repository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
@@ -27,6 +28,18 @@ public class AuthServiceImpl implements AuthService{
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
 
-        return jwtTokenProvider.createAccessToken(member.getMemberUuid(), member.getRole());
+        String accessToken = jwtTokenProvider.createAccessToken(member.getMemberUuid(), member.getRole());
+        String refreshToken = jwtTokenProvider.createRefreshToken(member.getMemberUuid());
+
+//        redis.save(memberUuid, refreshToken);
+
+        return new TokenPair(accessToken, refreshToken);
+
+    }
+
+
+    @Override
+    public boolean emailVerify(String email) {
+        return !repository.existsByEmail(email);
     }
 }
