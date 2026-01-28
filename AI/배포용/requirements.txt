@@ -1,5 +1,0 @@
-bentoml
-torch
-numpy
-open_clip_torch
-pillow
