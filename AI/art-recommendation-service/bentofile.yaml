@@ -1,7 +1,0 @@
-service: "service.py:ArtService"
-include:
-  - "src/*.py"
-  - "data/*.pth"
-  - "data/*.json"
-python:
-  requirements_txt: "./requirements.txt"
