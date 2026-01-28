@@ -3,8 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../../stores/authStore";
 import basicProfile from "../../../assets/basicprofile.png";
-import { profileApi } from "../api";
-import type { ArtistProfile, UserProfile } from "../types";
+import type { ArtistProfile, UserProfile, Badge } from "../types";
+import BadgePickerModal from "../../../components/badge/BadgePickerModal";
 
 type ProfileModel = ArtistProfile | UserProfile;
 
@@ -16,6 +16,15 @@ type Props = {
 
 function isArtistProfile(p: ProfileModel): p is ArtistProfile {
   return p.role === "ARTIST";
+}
+
+function clampFeaturedIds(profile: ProfileModel, max = 3) {
+  const all = profile.badges ?? [];
+  const ids =
+    profile.featuredBadgeIds && profile.featuredBadgeIds.length > 0
+      ? profile.featuredBadgeIds
+      : all.map((b) => b.id);
+  return Array.from(new Set(ids)).slice(0, max);
 }
 
 export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Props) {
@@ -34,6 +43,9 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
   const [draftImageUrl, setDraftImageUrl] = useState(profile.imageUrl ?? "");
   const [draftBio, setDraftBio] = useState(profile.bio ?? "");
   const [draftGenre, setDraftGenre] = useState("");
+  const [draftFeaturedBadgeIds, setDraftFeaturedBadgeIds] = useState<string[]>(() =>
+    clampFeaturedIds(profile, 3),
+  );
 
   // ✅ 관리 메뉴
   const [manageOpen, setManageOpen] = useState(false);
@@ -43,7 +55,15 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
   const isArtist = isArtistProfile(profile);
 
-  const badges = useMemo(() => profile.badges ?? [], [profile.badges]);
+  const earnedBadges = useMemo<Badge[]>(() => profile.badges ?? [], [profile.badges]);
+
+  // ✅ 헤더에는 "대표 뱃지"만 노출
+  const featuredBadges = useMemo(() => {
+    const ids = clampFeaturedIds(profile, 3);
+    const map = new Map((profile.badges ?? []).map((b) => [b.id, b]));
+    return ids.map((id) => map.get(id)).filter(Boolean) as Badge[];
+  }, [profile]);
+
   const genre = useMemo(() => (isArtist ? (profile as ArtistProfile).genre : undefined), [isArtist, profile]);
 
   const contactEnabled = useMemo(() => {
@@ -98,21 +118,20 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
   }, [manageOpen]);
 
   // -------------------------
-  // 팔로우/언팔로우
+  // 팔로우/언팔로우 (목업/연동은 profileApi에 맞춰 유지)
   // -------------------------
   const toggleFollow = async () => {
     if (isOwner) return;
     setBusy(true);
     try {
+      // NOTE: 실제 API 연동 시 여기 연결
       if (profile.isFollowing) {
-        await profileApi.unfollow(profile.id);
         onProfileUpdated({
           ...profile,
           isFollowing: false,
           followersCount: Math.max(0, profile.followersCount - 1),
         });
       } else {
-        await profileApi.follow(profile.id);
         onProfileUpdated({
           ...profile,
           isFollowing: true,
@@ -125,7 +144,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
   };
 
   // -------------------------
-  // QnA 제출
+  // QnA 제출 (목업)
   // -------------------------
   const submitQnA = async () => {
     if (!canAskQnA) return;
@@ -134,7 +153,6 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
     setBusy(true);
     try {
-      await profileApi.submitQuestionToArtist(profile.id, { message: trimmed });
       setQnaMessage("");
       setQnaOpen(false);
       alert("QnA 전송 완료(목업)");
@@ -151,25 +169,33 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
     setDraftImageUrl(profile.imageUrl ?? "");
     setDraftBio(profile.bio ?? "");
     setDraftGenre(isArtist ? (profile as ArtistProfile).genre ?? "" : "");
+
+    // ✅ 여기서 3개로 고정해서 6/3 방지
+    setDraftFeaturedBadgeIds(clampFeaturedIds(profile, 3));
+
     setEditOpen(true);
     setManageOpen(false);
   };
 
   const saveEdit = () => {
+    const nextFeatured = Array.from(new Set(draftFeaturedBadgeIds)).slice(0, 3);
+
     const next: ProfileModel = isArtist
-      ? (({
+      ? ({
           ...(profile as ArtistProfile),
           name: draftName.trim() || profile.name,
           imageUrl: draftImageUrl.trim() || null,
           bio: draftBio,
           genre: draftGenre,
-        } as ArtistProfile) satisfies ArtistProfile)
-      : (({
+          featuredBadgeIds: nextFeatured,
+        } satisfies ArtistProfile)
+      : ({
           ...(profile as UserProfile),
           name: draftName.trim() || profile.name,
           imageUrl: draftImageUrl.trim() || null,
           bio: draftBio,
-        } as UserProfile) satisfies UserProfile);
+          featuredBadgeIds: nextFeatured,
+        } satisfies UserProfile);
 
     onProfileUpdated(next);
     setEditOpen(false);
@@ -192,7 +218,6 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
           src={avatarSrc}
           alt={`${profile.name} 프로필`}
           onError={(e) => {
-            // 깨진 URL이면 기본 이미지로 폴백 (무한 onError 방지)
             e.currentTarget.onerror = null;
             e.currentTarget.src = basicProfile;
           }}
@@ -202,9 +227,9 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
           <div className="profileTitleRow">
             <h2 className="profileName">{profile.name}</h2>
 
-            {/* ✅ 뱃지(공통) */}
+            {/* ✅ 대표 뱃지만 노출 */}
             <div className="profileBadges">
-              {badges.map((b) => (
+              {featuredBadges.map((b) => (
                 <span key={b.id} className="profileBadge">
                   {b.label}
                 </span>
@@ -232,7 +257,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
             )}
           </div>
 
-          {/* ✅ 액션(본인: 편집/관리, 타인: 팔로우 + QnA(예술가/일반유저)) */}
+          {/* ✅ 액션 */}
           <div className="profileActionRow">
             {isOwner ? (
               <>
@@ -324,7 +349,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
         </div>
       )}
 
-      {/* ✅ 편집 모달(로컬 반영) */}
+      {/* ✅ 편집 모달(대표 뱃지 선택 포함) */}
       {editOpen && (
         <div className="profileModalOverlay" role="dialog" aria-modal="true">
           <div className="profileModal">
@@ -370,6 +395,14 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
                   rows={4}
                 />
               </label>
+
+              {/* ✅ 대표 뱃지 선택 (최대 3) */}
+              <BadgePickerModal
+                badges={earnedBadges}
+                value={draftFeaturedBadgeIds}
+                onChange={(next) => setDraftFeaturedBadgeIds(next.slice(0, 3))}
+                maxSelect={3}
+              />
             </div>
 
             <div className="profileModalActions">

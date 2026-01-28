@@ -1,4 +1,9 @@
-/* FE/src/styles/profile.css */
+/* FE/src/styles/profile.css
+   ✅ 정리 원칙
+   - 중복 정의 제거 (동일 클래스 1회만)
+   - "사용 중인 구조(ProfileHeader.tsx + Profile.tsx + BadgePickerModal.tsx)" 기준만 남김
+   - 옛 배지 모달(.badgeModal*, .profileBadgeSection*, .profileBadgeEditor*) 제거
+*/
 
 /* ===== Page Layout ===== */
 .profilePage {
@@ -9,10 +14,14 @@
 
 /* ===== Header ===== */
 .profileHeader {
+  padding: 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.profileHeaderRow {
   display: flex;
-  gap: 16px;
-  align-items: center;
-  margin-bottom: 18px;
+  gap: 14px;
+  align-items: flex-start;
 }
 
 .profileAvatar {
@@ -29,7 +38,7 @@
   min-width: 0;
 }
 
-.profileNameRow {
+.profileTitleRow {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -38,33 +47,67 @@
 
 .profileName {
   margin: 0;
-  font-size: 32px;
+  font-size: 20px;
+  line-height: 1.2;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
 
+.profileBadges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .profileBadge {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.profileBadgeEmpty {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.55);
+  padding: 4px 8px;
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+  border-radius: 999px;
+}
+
+.profileGenre {
+  margin-top: 6px;
   font-size: 13px;
   font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(6px);
+  opacity: 0.8;
 }
 
-.profileStats {
+.profileFollowRow {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   margin-top: 8px;
-  font-size: 15px;
-  color: rgba(0, 0, 0, 0.65);
+  font-size: 14px;
+  opacity: 0.8;
 }
 
-.profileActions {
+.profileBio {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  opacity: 0.85;
+}
+
+.profileBioPlaceholder {
+  opacity: 0.5;
+}
+
+.profileActionRow {
   display: flex;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 10px;
+  position: relative;
 }
 
 .profileBtn {
@@ -79,10 +122,51 @@
 
 .profileBtn:disabled {
   opacity: 0.55;
-  cursor: default;
+  cursor: not-allowed;
 }
 
-/* ===== Tabs (optional) ===== */
+/* manage dropdown */
+.profileMenu {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+  min-width: 160px;
+  z-index: 20;
+}
+
+.profileMenuItem {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.profileMenuItem:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.profileTextBtn,
+.profileTextLink {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.75;
+  text-decoration: none;
+  color: inherit;
+}
+
+.profileTextBtn:hover,
+.profileTextLink:hover {
+  opacity: 1;
+}
+
+/* ===== Tabs ===== */
 .profileTabs {
   display: flex;
   gap: 8px;
@@ -105,7 +189,12 @@
   border-color: #111;
 }
 
-/* ===== Feed Grid ===== */
+/* 탭 아래 컨텐츠 영역 여백 */
+.profileTabPanel {
+  margin-top: 12px;
+}
+
+/* ===== Feed Grid (tab 내부에서 사용 시) ===== */
 .profileGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -142,34 +231,189 @@
   display: block;
 }
 
-/* ===== Responsive ===== */
-@media (max-width: 720px) {
-  .profilePage {
-    padding: 18px 12px;
-  }
-  .profileName {
-    font-size: 26px;
-  }
-  .profileGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-  .profileCard {
-    border-radius: 16px;
-  }
+/* ===== QnA panel ===== */
+.profileQnaPanel {
+  margin-top: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 14px;
+  padding: 12px;
 }
 
-@media (max-width: 420px) {
-  .profileGrid {
-    grid-template-columns: 1fr;
-  }
+.profileQnaHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
 }
-/* 탭 아래 컨텐츠 영역 여백 */
-.profileTabPanel {
+
+.profileTextarea {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  padding: 10px;
+  resize: vertical;
+}
+
+.profileQnaActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* ===== Profile Edit Modal ===== */
+.profileModalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 16px;
+}
+
+.profileModal {
+  width: min(520px, 100%);
+  background: #fff;
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.profileModalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.profileForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profileLabel {
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profileInput {
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  padding: 10px;
+}
+
+.profileModalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
   margin-top: 12px;
 }
 
-/* 우하단 동그란 글쓰기 버튼 */
+/* ===== Badge picker (inside profile edit modal) ===== */
+.badgePicker {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.badgePickerTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.badgePickerTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.badgePickerHint {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.badgePickerCount {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.badgeChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.badgeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  background: rgba(0, 0, 0, 0.03);
+  cursor: pointer;
+}
+
+.badgeChipX {
+  opacity: 0.7;
+}
+
+.badgeEmpty {
+  font-size: 12px;
+  opacity: 0.7;
+  padding: 8px 0;
+}
+
+.badgeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.badgeCard {
+  text-align: left;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  background: rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+}
+
+.badgeCardSelected {
+  border-color: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.badgeCardDisabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.badgeCardTitle {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.badgeCardDesc {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-bottom: 8px;
+}
+
+.badgeCardMeta {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* ===== Floating Action Button ===== */
 .profileFab {
   position: fixed;
   right: 18px;
@@ -177,19 +421,15 @@
   width: 56px;
   height: 56px;
   border-radius: 999px;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
   border: 1px solid rgba(0, 0, 0, 0.12);
   background: #111;
   color: #fff;
-
   font-size: 30px;
   line-height: 1;
   font-weight: 700;
-
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
   cursor: pointer;
   z-index: 50;
@@ -202,48 +442,33 @@
 .profileFab:active {
   transform: translateY(0);
 }
-.profileHeader { padding: 16px; border-bottom: 1px solid rgba(0,0,0,0.06); }
-.profileHeaderRow { display: flex; gap: 14px; align-items: flex-start; }
-.profileAvatar { width: 84px; height: 84px; border-radius: 999px; object-fit: cover; background: #eee; }
 
-.profileHeaderMain { flex: 1; min-width: 0; }
-.profileTitleRow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.profileName { margin: 0; font-size: 20px; line-height: 1.2; }
+/* ===== Responsive ===== */
+@media (max-width: 720px) {
+  .profilePage {
+    padding: 18px 12px;
+  }
 
-.profileBadges { display: flex; gap: 6px; flex-wrap: wrap; }
-.profileBadge { font-size: 12px; padding: 3px 8px; border: 1px solid rgba(0,0,0,0.12); border-radius: 999px; }
+  .profileName {
+    font-size: 18px;
+  }
 
-.profileGenre { margin-top: 6px; font-size: 13px; font-weight: 700; opacity: 0.8; }
+  .profileGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
 
-.profileFollowRow { display: flex; gap: 12px; margin-top: 8px; font-size: 14px; opacity: 0.8; }
+  .profileCard {
+    border-radius: 16px;
+  }
 
-.profileBio { margin-top: 8px; font-size: 14px; line-height: 1.45; opacity: 0.85; }
-.profileBioPlaceholder { opacity: 0.5; }
+  .badgeGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 
-.profileActionRow { display: flex; gap: 8px; margin-top: 10px; position: relative; }
-.profileBtn { padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.14); background: #fff; cursor: pointer; }
-.profileBtn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-.profileMenu { position: absolute; top: 44px; right: 0; border: 1px solid rgba(0,0,0,0.14); border-radius: 12px; background: #fff; overflow: hidden; min-width: 160px; z-index: 20; }
-.profileMenuItem { width: 100%; text-align: left; padding: 10px 12px; background: transparent; border: 0; cursor: pointer; }
-.profileMenuItem:hover { background: rgba(0,0,0,0.04); }
-
-.profileCollectBook { margin-top: 12px; padding: 12px; border: 1px solid rgba(0,0,0,0.10); border-radius: 14px; background: rgba(0,0,0,0.02); }
-.profileCollectBookTop { display: flex; align-items: center; justify-content: space-between; }
-.profileCollectBookDesc { margin-top: 6px; font-size: 13px; opacity: 0.75; }
-
-.profileTextBtn, .profileTextLink { border: 0; background: transparent; cursor: pointer; opacity: 0.75; text-decoration: none; color: inherit; }
-.profileTextBtn:hover, .profileTextLink:hover { opacity: 1; }
-
-.profileQnaPanel { margin-top: 12px; border: 1px solid rgba(0,0,0,0.12); border-radius: 14px; padding: 12px; }
-.profileQnaHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.profileTextarea { width: 100%; border-radius: 12px; border: 1px solid rgba(0,0,0,0.12); padding: 10px; resize: vertical; }
-.profileQnaActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
-
-.profileModalOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
-.profileModal { width: min(520px, 100%); background: #fff; border-radius: 16px; padding: 14px; }
-.profileModalHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.profileForm { display: flex; flex-direction: column; gap: 10px; }
-.profileLabel { font-size: 13px; display: flex; flex-direction: column; gap: 6px; }
-.profileInput { border-radius: 12px; border: 1px solid rgba(0,0,0,0.12); padding: 10px; }
-.profileModalActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+@media (max-width: 420px) {
+  .profileGrid {
+    grid-template-columns: 1fr;
+  }
+}

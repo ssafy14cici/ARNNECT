@@ -64,65 +64,403 @@ npm i react-qr-code @zxing/browser
 
 ## 5) 프로젝트 구조(뼈대) / 더 추가 예정
 
-```txt
-FE/
-  public/
-  src/
-    app/
-      providers.tsx
-    router/
-      index.tsx
-      routes.tsx
-      guards.ts
-    layouts/
-      RootLayout.tsx
-      AuthLayout.tsx
-    pages/
-      home/Home.tsx
-      artistGo/ArtistGo.tsx
-      search/Search.tsx
-      feed/Feed.tsx
-      lounge/Lounge.tsx
-      profile/Profile.tsx
-      artwork/ArtworkDetail.tsx
-      auth/Login.tsx
-      auth/Signup.tsx
-      menu/Menu.tsx
-      notfound/NotFound.tsx
-    components/
-      menu/
-        FullScreenMenu.tsx
-        MenuButton.tsx
-      common/
-        Guard.tsx
-        Loading.tsx
-        Empty.tsx
-      feed/
-        FeedList.tsx
-        FeedCard.tsx
-        RecommendCard.tsx
-      search/
-        SearchTabs.tsx
-        SearchSort.tsx
-        SearchResultList.tsx
-      artwork/
-        CommentThread.tsx
-        SimilarSection.tsx
-    stores/
-      authStore.ts
-      uiStore.ts
-    api/
-      client.ts
-      endpoints.ts
-    types/
-      models.ts
-      auth.ts
-      api.ts
-    styles/
-      global.css
-      tokens.css
-      layout.css
+
+### Root
+
 ```
+FE/
+ ├─ public/
+ ├─ src/
+ ├─ index.html
+ ├─ vite.config.ts
+ ├─ tsconfig*.json
+ ├─ eslint.config.js
+ └─ Dockerfile
+```
+
+* `public/` : 빌드 시 정적 자원 (favicon, 이미지 등)
+
+  * `public/art/` : 전시/작품 관련 정적 리소스
+  * `arnnect_logo_ver1.png`, `NotFound.png`, `vite.svg`
+
+---
+
+### `src/` Overview
+
+```
+src/
+ ├─ api/
+ ├─ app/
+ ├─ assets/
+ ├─ components/
+ ├─ data/
+ ├─ hooks/
+ ├─ layouts/
+ ├─ mocks/
+ ├─ pages/
+ ├─ router/
+ ├─ stores/
+ ├─ styles/
+ ├─ types/
+ ├─ utils/
+ ├─ App.tsx
+ └─ main.tsx
+```
+
+---
+
+### `src/api/` — API layer (HTTP 요청 모듈)
+
+```
+src/api/
+ ├─ http.ts
+ ├─ auth.ts
+ ├─ feed.ts
+ ├─ lounge.ts
+ ├─ fanLetter.ts
+ └─ tickets.ts
+```
+
+* `http.ts` : axios 인스턴스/인터셉터/공통 에러 처리의 엔트리 포인트(권장)
+* 각 도메인별 API 파일:
+
+  * `auth.ts` : 로그인/회원가입/토큰 관련
+  * `feed.ts` : 메인/피드
+  * `lounge.ts` : 라운지(마이페이지 성격 기능)
+  * `fanLetter.ts` : 팬레터
+  * `tickets.ts` : 티켓/QR
+
+**규칙**
+
+* API 함수는 “UI 로직” 없이 **순수 요청/응답 변환만** 담당
+* 요청/응답 타입은 `src/types/`에서 import
+
+---
+
+### `src/app/` — App-level providers
+
+```
+src/app/
+ └─ {providers.tsx}
+```
+
+* 전역 Provider(예: Router/QueryClient/Theme 등)를 한 곳에서 관리
+
+---
+
+### `src/assets/` — Bundled assets
+
+```
+src/assets/
+ ├─ basicprofile.png
+ └─ react.svg
+```
+
+* 번들에 포함되는 이미지/아이콘 보관 (`import ... from` 형태로 사용)
+
+---
+
+### `src/components/` — Reusable UI components
+
+도메인/기능별로 재사용 가능한 컴포넌트를 모아둔다.
+
+#### `components/artwork/` (댓글 UI)
+
+```
+components/artwork/
+ ├─ CommentForm.tsx
+ ├─ CommentItem.tsx
+ ├─ CommentList.tsx
+ └─ ReplyList.tsx
+```
+
+#### `components/feed/` (피드 카드)
+
+```
+components/feed/
+ ├─ FeedCard.tsx
+ └─ FeedCard.css
+```
+
+#### `components/common/` (공통)
+
+```
+components/common/
+ └─ Guard.tsx
+```
+
+* `Guard.tsx` : 인증/권한 라우팅 가드
+
+#### `components/charts/` (차트)
+
+```
+components/charts/
+ └─ Radar6.tsx
+```
+
+#### `components/legal/` (약관/정책)
+
+```
+components/legal/
+ ├─ PrivacyPolicyContent.tsx
+ └─ TermsOfServiceContent.tsx
+```
+
+#### `components/lounge/` (라운지 재사용 컴포넌트)
+
+```
+components/lounge/
+ ├─ TicketCardModern.tsx
+ └─ ticketCardModern.css
+```
+
+#### `components/main/` (홈 섹션 구성요소)
+
+```
+components/main/
+ ├─ Hero.tsx
+ ├─ AboutSection.tsx
+ ├─ ShowcaseStage.tsx
+ ├─ ScrollIndicator.tsx
+ └─ HerRingLoader.tsx
+```
+
+**규칙**
+
+* 페이지에 종속되지 않는 UI는 무조건 `components/`로 올린다.
+* CSS는 해당 컴포넌트 옆에 붙이거나(`*.css`), 전역 스타일은 `styles/`로.
+
+---
+
+### `src/data/` — Local dummy/mock data
+
+```
+src/data/
+ ├─ artworks.ts
+ ├─ users.ts
+ ├─ mockFeeds.ts
+ └─ mockPosts.ts
+```
+
+* 백엔드 미연동/개발 테스트용 데이터
+
+---
+
+### `src/hooks/` — Custom hooks
+
+```
+src/hooks/
+ └─ useReveal.js
+```
+
+---
+
+### `src/layouts/` — Layout components
+
+```
+src/layouts/
+ ├─ AppLayout.tsx
+ ├─ Navbar.tsx
+ ├─ Footer.tsx
+ └─ ...
+```
+
+* 페이지 골격(네비/푸터/공통 프레임)을 담당
+
+---
+
+### `src/mocks/` — Mock auth & utilities
+
+```
+src/mocks/
+ └─ authMock.ts
+```
+
+---
+
+### `src/pages/` — Route-level pages (화면 단위)
+
+라우트와 1:1로 매핑되는 “페이지” 컴포넌트들.
+
+#### `pages/auth/`
+
+```
+pages/auth/
+ ├─ Login.tsx
+ ├─ Signup.tsx
+ ├─ UserSignup.tsx
+ ├─ ArtistSignup.tsx
+ ├─ Recover.tsx
+ ├─ auth.css
+ ├─ components/
+ └─ utils/
+     ├─ validation.ts
+     └─ emailDupCheck.ts
+```
+
+#### `pages/feed/`
+
+```
+pages/feed/
+ ├─ Feed.tsx
+ └─ feed.css
+```
+
+#### `pages/lounge/` (라운지/마이페이지 성격)
+
+```
+pages/lounge/
+ ├─ Lounge.tsx
+ ├─ LoungeIndex.tsx
+ ├─ LoungeLayout.tsx
+ ├─ lounge.css
+ ├─ artist/
+ │   ├─ Portfolio.tsx
+ │   ├─ FanLetter.tsx
+ │   ├─ TicketQr.tsx
+ │   └─ qr/
+ │       └─ QrEntry.tsx
+ └─ user/
+     ├─ CollectBook.tsx
+     ├─ CollectBookDetail.tsx
+     ├─ CollectBookScan.tsx
+     ├─ Quiz.tsx
+     └─ Taste.tsx
+```
+
+#### `pages/artwork/`
+
+```
+pages/artwork/
+ ├─ ArtworkDetail.tsx
+ ├─ ArtworkDetailView.tsx
+ ├─ artworkDetail.helpers.ts
+ └─ artworkDetail.css
+```
+
+#### `pages/profile/`
+
+```
+pages/profile/
+ ├─ Profile.tsx
+ ├─ profile.css
+ ├─ types.ts
+ ├─ api.ts
+ ├─ components/
+ │   ├─ ProfileHeader.tsx
+ │   ├─ ArtistInfo.tsx
+ │   └─ UserInfo.tsx
+ └─ tabs/
+     ├─ FeedTab.tsx
+     ├─ CollectionTab.tsx
+     ├─ PortfolioTab.tsx
+     └─ (PortfolioTab 2.tsx)   // 중복 파일 정리 필요
+```
+
+#### `pages/search/`
+
+```
+pages/search/
+ ├─ Search.tsx
+ └─ search.css
+```
+
+#### `pages/posts/`
+
+```
+pages/posts/
+ ├─ PostCreate.tsx
+ ├─ PostCreateRedirect.tsx
+ ├─ PostDetail.tsx
+ └─ postCreate.css
+```
+
+#### `pages/notfound/`
+
+```
+pages/notfound/
+ └─ NotFound.tsx
+```
+
+**규칙**
+
+* “라우트 단위 화면”은 `pages/`에만 둔다.
+* 페이지에서만 쓰이는 조각 UI는 `pages/**/components`에 둔다.
+* 페이지 로직/뷰 분리는 이미 `ArtworkDetail.tsx + ArtworkDetailView.tsx` 패턴으로 적용됨.
+
+---
+
+### `src/router/` — Routing
+
+```
+src/router/
+ ├─ index.tsx
+ ├─ routes.tsx
+ └─ guards.ts
+```
+
+* `routes.tsx`: RouteObject 구성
+* `guards.ts`: Role 타입 및 가드 정책(현재 Role: `"general" | "artist"`)
+
+---
+
+### `src/stores/` — State management
+
+```
+src/stores/
+ ├─ authStore.ts
+ └─ uiStore.ts
+```
+
+---
+
+### `src/styles/` — Global styles
+
+```
+src/styles/
+ ├─ global.css
+ ├─ theme.css
+ ├─ navbar.css
+ ├─ footer.css
+ ├─ home.css
+ ├─ hero.css
+ ├─ legal.css
+ └─ notfound.css
+```
+
+* 레이아웃/공통 UI/테마 관련 전역 스타일
+
+---
+
+### `src/types/` — Type definitions
+
+```
+src/types/
+ ├─ auth.ts
+ ├─ collectbook.ts
+ ├─ fanLetter.ts
+ ├─ models.ts
+ └─ vendor.d.ts
+```
+
+* API request/response + 도메인 모델 타입 정의
+
+---
+
+### `src/utils/` — Utilities
+
+```
+src/utils/
+ ├─ collectbookStorage.ts
+ ├─ issuedTicketsStorage.ts
+ ├─ ticketMockStorage.ts
+ ├─ localPosts.ts
+ ├─ qrDownload.ts
+ └─ networkProgress.ts
+```
+
+* localStorage 기반 임시 저장/목업 로직이 여기로 모여 있음
+
 
 ---
 

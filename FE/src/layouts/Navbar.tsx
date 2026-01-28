@@ -46,7 +46,7 @@ export default function Navbar() {
         image: "/arnnect_logo_ver1.png",
         path: "/",
       },
-      { key: "artist", label: "예술인\nGo", path: "/artist-go" },
+      { key: "artist", label: "예술인\nGo", path: "/yourtaste" },
       { key: "search", label: "Search", path: "/search" },
 
       // ✅ 그리드 2x4 맞추려면 빈칸 1개 정도는 필요할 수 있음
