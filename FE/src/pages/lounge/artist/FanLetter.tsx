@@ -1,19 +1,31 @@
-import { useEffect, useMemo, useState } from "react";
+// FE/src/pages/lounge/artist/FanLetter.tsx
+
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import "../lounge.css";
 
-import type { FanLetter, FanLetterFilter, FanLetterViewMode } from "../../../types/fanLetter";
+import type {
+  FanLetter,
+  FanLetterFilter,
+  FanLetterViewMode,
+} from "../../../features/fanLetter/types";
 import {
   createFanLetterAnswer,
   deleteFanLetterAnswer,
   fetchArtistFanLetters,
   updateFanLetterAnswer,
-} from "../../../api/fanLetter";
+} from "../../../features/fanLetter/api";
+import { useAuthStore } from "../../../features/auth/store";
 
-import { useAuthStore } from "../../../stores/authStore";
+// AuthStore 타입 정의 (any 제거용)
+interface AuthState {
+  memberUuid?: string;
+  me?: { memberUuid: string };
+  user?: { memberUuid: string };
+  profile?: { memberUuid: string };
+}
 
 function toMillis(dateStr: string): number {
-  // API: "yyyy-MM-dd" 형태가 기본. ISO도 들어올 수 있으니 둘 다 방어.
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     const [y, m, d] = dateStr.split("-").map((v) => Number(v));
     return new Date(y, m - 1, d).getTime();
@@ -22,8 +34,8 @@ function toMillis(dateStr: string): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
+// fmt 함수 사용 (날짜 표시용)
 function fmt(dateStr: string): string {
-  // yyyy-MM-dd는 그대로 노출, ISO면 간단 표시
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr.replaceAll("-", ".");
   const t = Date.parse(dateStr);
   if (Number.isNaN(t)) return dateStr;
@@ -37,18 +49,20 @@ function fmt(dateStr: string): string {
 export default function FanLetter() {
   const [searchParams] = useSearchParams();
 
-  // authStore 구조가 프로젝트마다 달라서 최대한 안전하게 꺼냄
-  const auth = useAuthStore((s: any) => s);
+  const auth = useAuthStore((s) => s) as AuthState;
   const artistUuidFromStore =
-    auth?.memberUuid ?? auth?.me?.memberUuid ?? auth?.user?.memberUuid ?? auth?.profile?.memberUuid ?? null;
+    auth?.memberUuid ??
+    auth?.me?.memberUuid ??
+    auth?.user?.memberUuid ??
+    auth?.profile?.memberUuid ??
+    null;
 
-  // 디버깅/개발 중엔 ?artist=UUID 로도 주입 가능하게 (store 없을 때 대비)
   const artistUuid = (searchParams.get("artist") || artistUuidFromStore) as string | null;
 
   const [items, setItems] = useState<FanLetter[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const [viewMode, setViewMode] = useState<FanLetterViewMode>("postit"); // default: 포스트잇
+  const [viewMode, setViewMode] = useState<FanLetterViewMode>("postit");
   const [filter, setFilter] = useState<FanLetterFilter>("all");
   const [query, setQuery] = useState("");
 
@@ -69,7 +83,7 @@ export default function FanLetter() {
       return;
     }
     setDraftAnswer(selected.answer ?? "");
-  }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selected?.id]);
 
   const filteredSorted = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -83,16 +97,15 @@ export default function FanLetter() {
       return hay.includes(q);
     });
 
-    // 미답변 우선 + 최신순
     return filtered.sort((a, b) => {
       if (a.isAnswered !== b.isAnswered) return a.isAnswered ? 1 : -1;
       return toMillis(b.createdAt) - toMillis(a.createdAt);
     });
   }, [items, filter, query]);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (!artistUuid) {
-      setError("artist UUID를 찾지 못했습니다. (authStore 또는 ?artist=UUID 확인)");
+      setError("artist UUID를 찾지 못했습니다.");
       return;
     }
 
@@ -101,25 +114,27 @@ export default function FanLetter() {
     try {
       const list = await fetchArtistFanLetters(artistUuid);
       setItems(list);
-      setSelectedId((prev) => prev ?? (list[0]?.id ?? null));
-    } catch (e: any) {
-      setError(String(e?.message ?? e));
+      if (list.length > 0 && !selectedId) {
+        setSelectedId(list[0].id);
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "데이터를 불러오지 못했습니다.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
-  }
+  }, [artistUuid, selectedId]);
 
   useEffect(() => {
     void refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [artistUuid]);
+  }, [refresh]);
 
   async function onSaveAnswer() {
     if (!selected) return;
 
     const trimmed = draftAnswer.trim();
     if (!trimmed) {
-      setError("답변 내용을 입력해 주세요.");
+      alert("답변 내용을 입력해 주세요.");
       return;
     }
 
@@ -133,37 +148,39 @@ export default function FanLetter() {
         await createFanLetterAnswer(selected.id, trimmed);
       }
 
-      // 명세상 답장 API 응답에 data가 없으므로, 로컬 업데이트 후 필요 시 재조회
       setItems((prev) =>
         prev.map((it) =>
-          it.id === selected.id ? { ...it, isAnswered: true, answer: trimmed } : it,
-        ),
+          it.id === selected.id ? { ...it, isAnswered: true, answer: trimmed } : it
+        )
       );
-    } catch (e: any) {
-      setError(String(e?.message ?? e));
+      alert("답변이 저장되었습니다.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "저장에 실패했습니다.";
+      setError(msg);
     } finally {
       setSaving(false);
     }
   }
 
   async function onDeleteAnswer() {
-    if (!selected) return;
-    if (!selected.isAnswered) return;
+    if (!selected || !selected.isAnswered) return;
+    if (!window.confirm("답변을 삭제하시겠습니까?")) return;
 
     setSaving(true);
     setError(null);
 
     try {
       await deleteFanLetterAnswer(selected.id);
-
       setItems((prev) =>
         prev.map((it) =>
-          it.id === selected.id ? { ...it, isAnswered: false, answer: undefined } : it,
-        ),
+          it.id === selected.id ? { ...it, isAnswered: false, answer: undefined } : it
+        )
       );
       setDraftAnswer("");
-    } catch (e: any) {
-      setError(String(e?.message ?? e));
+      alert("답변이 삭제되었습니다.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "삭제에 실패했습니다.";
+      setError(msg);
     } finally {
       setSaving(false);
     }
@@ -171,30 +188,19 @@ export default function FanLetter() {
 
   const empty = filteredSorted.length === 0 && !loading;
 
-  // 간단 post-it 스타일(별도 css 파일 없이 최소)
-  const postitGridStyle: React.CSSProperties = {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-    gap: 12,
-  };
-
-  // lounge.css에 .postitCard 클래스 추가하는 것이 좋으나, 여기선 인라인으로 유지하되 스타일 개선
   const postitCardStyle = (active: boolean): React.CSSProperties => ({
-    borderRadius: 2, /* 덜 둥글게 */
+    borderRadius: 2,
     padding: "20px",
     cursor: "pointer",
-    background: active ? "#fff" : "rgba(255,255,255,0.9)", /* 너무 노란색 대신 흰색 계열 */
+    background: active ? "#fff" : "rgba(255,255,255,0.9)",
     color: "#000",
-    boxShadow: active 
-      ? "0 20px 40px rgba(0,0,0,0.5)" 
-      : "0 5px 15px rgba(0,0,0,0.3)",
-    transform: active ? "scale(1.02) rotate(-1deg)" : "rotate(0deg)", /* 활성 시 살짝 기울기 */
+    boxShadow: active ? "0 20px 40px rgba(0,0,0,0.5)" : "0 5px 15px rgba(0,0,0,0.3)",
+    transform: active ? "scale(1.02) rotate(-1deg)" : "rotate(0deg)",
     transition: "all 0.3s ease",
-    fontFamily: "'Nanum Pen Script', cursive", /* 손글씨 폰트 있으면 적용 */
     minHeight: 200,
     display: "flex",
     flexDirection: "column",
-    justifyContent: "space-between"
+    justifyContent: "space-between",
   });
 
   return (
@@ -202,7 +208,9 @@ export default function FanLetter() {
       <section className="loungeWrap">
         <div className="loungeSubTop">
           <h1 className="loungeSubTitle">팬레터 · QnA</h1>
-          <Link className="loungeBackLink" to="/lounge">← 라운지로</Link>
+          <Link className="loungeBackLink" to="/lounge">
+            ← 라운지로
+          </Link>
         </div>
 
         <p className="loungeSubDesc">관객들의 소중한 메시지와 질문을 확인하세요.</p>
@@ -211,60 +219,70 @@ export default function FanLetter() {
         <div className="loungeSubPanel" style={{ padding: 20, marginBottom: 30 }}>
           <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
             <div style={{ display: "flex", gap: 8 }}>
-              {/* Filter Buttons */}
-              <button 
-                className={`loungeSubBtn ${filter === 'all' ? 'active' : ''}`} 
-                onClick={() => setFilter("all")}
-              >
-                전체
-              </button>
-              <button 
-                className={`loungeSubBtn ${filter === 'unanswered' ? 'active' : ''}`} 
-                onClick={() => setFilter("unanswered")}
-              >
-                미답변
-              </button>
+              <button className={`loungeSubBtn ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>전체</button>
+              <button className={`loungeSubBtn ${filter === "unanswered" ? "active" : ""}`} onClick={() => setFilter("unanswered")}>미답변</button>
+              {/* 검색어 입력창 추가 (setQuery 사용) */}
+              <input 
+                type="text" 
+                placeholder="검색..." 
+                className="loungeInput" 
+                style={{ width: 150, padding: "4px 12px" }}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
             </div>
-            
+
             <div style={{ display: "flex", gap: 8 }}>
-              <button className="loungeSubBtn" onClick={() => setViewMode("postit")}>포스트잇</button>
-              <button className="loungeSubBtn" onClick={() => setViewMode("list")}>리스트</button>
+              <button className={`loungeSubBtn ${viewMode === "postit" ? "active" : ""}`} onClick={() => setViewMode("postit")}>포스트잇</button>
+              <button className={`loungeSubBtn ${viewMode === "list" ? "active" : ""}`} onClick={() => setViewMode("list")}>리스트</button>
             </div>
           </div>
+          {error && <p style={{ color: "#ff6b6b", marginTop: 10, fontSize: "0.85rem" }}>{error}</p>}
         </div>
 
-        {/* Content Layout */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40 }}>
-          
           {/* Left: Message List */}
           <div>
-            <h2 className="loungeSubPanelTitle">Messages</h2>
+            <h2 className="loungeSubPanelTitle">Messages ({filteredSorted.length})</h2>
+            {loading && <div className="loungeEmpty">불러오는 중...</div>}
             {empty && <div className="loungeEmpty">도착한 메시지가 없습니다.</div>}
-            
+
             {!empty && viewMode === "postit" && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16 }}>
                 {filteredSorted.map((it) => (
                   <div key={it.id} style={postitCardStyle(it.id === selectedId)} onClick={() => setSelectedId(it.id)}>
-                    <div style={{ fontSize: '0.9rem', marginBottom: 10 }}>{it.question}</div>
-                    <div style={{ fontSize: '0.8rem', color: '#666', textAlign: 'right' }}>
-                      - {it.fromNickname ?? "익명"}
+                    <div style={{ fontSize: "0.9rem", marginBottom: 10, wordBreak: "break-all" }}>{it.question}</div>
+                    <div>
+                      <div style={{ fontSize: "0.75rem", color: "#888" }}>{fmt(it.createdAt)}</div>
+                      <div style={{ fontSize: "0.8rem", color: "#666", textAlign: "right" }}>- {it.fromNickname ?? "익명"}</div>
                     </div>
                   </div>
                 ))}
               </div>
             )}
-            {/* List View 구현 생략 (기존 유지) */}
+            
+            {!empty && viewMode === "list" && (
+              <div className="loungeList">
+                {filteredSorted.map((it) => (
+                  <div key={it.id} className={`loungeListItem ${it.id === selectedId ? "active" : ""}`} onClick={() => setSelectedId(it.id)}>
+                    <span className="q-text">{it.question}</span>
+                    <span className="q-date">{fmt(it.createdAt)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Right: Detail & Answer (Sticky) */}
-          <div style={{ position: 'sticky', top: 120, height: 'fit-content' }}>
-            <div className="loungeSubPanel" style={{ textAlign: 'left' }}>
+          {/* Right: Detail & Answer */}
+          <div style={{ position: "sticky", top: 120, height: "fit-content" }}>
+            <div className="loungeSubPanel" style={{ textAlign: "left" }}>
               <h2 className="loungeSubPanelTitle">Reply</h2>
               {selected ? (
                 <>
-                  <div style={{ marginBottom: 20, padding: 16, background: 'rgba(255,255,255,0.05)', borderRadius: 8 }}>
-                    <div style={{ color: '#C8A97E', fontSize: '0.9rem', marginBottom: 8 }}>FROM: {selected.fromNickname}</div>
-                    <div style={{ fontSize: '1.1rem', lineHeight: 1.5 }}>{selected.question}</div>
+                  <div style={{ marginBottom: 20, padding: 16, background: "rgba(255,255,255,0.05)", borderRadius: 8 }}>
+                    <div style={{ color: "#C8A97E", fontSize: "0.8rem", marginBottom: 4 }}>DATE: {fmt(selected.createdAt)}</div>
+                    <div style={{ color: "#C8A97E", fontSize: "0.9rem", marginBottom: 8 }}>FROM: {selected.fromNickname}</div>
+                    <div style={{ fontSize: "1.1rem", lineHeight: 1.5 }}>{selected.question}</div>
                   </div>
 
                   <textarea
@@ -273,21 +291,25 @@ export default function FanLetter() {
                     onChange={(e) => setDraftAnswer(e.target.value)}
                     rows={6}
                     placeholder="답장을 작성해주세요..."
-                    style={{ background: 'transparent', width: '100%', resize: 'none', border: '1px solid rgba(255,255,255,0.2)' }}
+                    style={{ background: "transparent", width: "100%", resize: "none", border: "1px solid rgba(255,255,255,0.2)", padding: 12 }}
                   />
 
-                  <div className="loungeSubActions">
-                    <button className="loungeSubBtn" onClick={onSaveAnswer} disabled={saving}>
-                      {selected.isAnswered ? "수정하기" : "보내기"}
+                  <div className="loungeSubActions" style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                    <button className="loungeSubBtn active" onClick={onSaveAnswer} disabled={saving}>
+                      {saving ? "처리 중..." : selected.isAnswered ? "수정하기" : "보내기"}
                     </button>
+                    {selected.isAnswered && (
+                      <button className="loungeSubBtn" onClick={onDeleteAnswer} disabled={saving} style={{ color: "#ff6b6b" }}>
+                        삭제
+                      </button>
+                    )}
                   </div>
                 </>
               ) : (
-                <div className="loungeEmpty" style={{ padding: '40px 0' }}>메시지를 선택해주세요.</div>
+                <div className="loungeEmpty" style={{ padding: "40px 0" }}>메시지를 선택해주세요.</div>
               )}
             </div>
           </div>
-
         </div>
       </section>
     </main>

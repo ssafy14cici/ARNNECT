@@ -1,50 +1,62 @@
+// FE/src/pages/profile/tabs/FeedTab.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
-import type { FeedItem } from "../types";
+import type { FeedItem } from "../../../features/profile/types";
 import {
   listPostsByAuthor,
   subscribePostsUpdated,
+  ensureSeedForAuthor,
   type LocalMode,
-} from "../../../utils/localPosts";
-import { useAuthStore } from "../../../stores/authStore";
+} from "../../../features/posts/local";
+import { useAuthStore } from "../../../features/auth/store";
 import type { ProfileOutletContext } from "../Profile";
-import "./profileTabs.css"; // ✅ CSS Import
-
-type AuthUser = { memberUuid?: string | null };
-type AuthState = { user?: AuthUser | null };
+import "./profileTabs.css";
 
 export default function FeedTab() {
   const nav = useNavigate();
   const { id } = useParams();
   const { profile } = useOutletContext<ProfileOutletContext>();
+
+  const authUser = useAuthStore((s) => s.user); // { memberUuid, name } | null
   const rawProfileId = id ?? "";
-  const authUser = useAuthStore((s: AuthState) => s.user);
   const [tick, setTick] = useState(0);
 
   const effectiveProfileId = useMemo(() => {
     if (!rawProfileId) return "";
-    if (rawProfileId === "me") return authUser?.memberUuid ?? "me";
+    if (rawProfileId === "me") return authUser?.memberUuid ?? "";
     return rawProfileId;
   }, [rawProfileId, authUser?.memberUuid]);
 
-  const mode: LocalMode = useMemo(() => {
-    return profile.role === "ARTIST" ? "ARTIST" : "USER";
-  }, [profile.role]);
+  const mode: LocalMode = useMemo(
+    () => (profile.role === "ARTIST" ? "ARTIST" : "USER"),
+    [profile.role],
+  );
 
   useEffect(() => {
     const unsub = subscribePostsUpdated(() => setTick((t) => t + 1));
     return () => unsub();
   }, []);
 
+  // ✅ "me"인데 내 글이 아예 없으면 목업 생성(원치 않으면 이 effect 삭제)
+  useEffect(() => {
+    if (rawProfileId !== "me") return;
+    if (!authUser?.memberUuid || !authUser?.name) return;
+
+    ensureSeedForAuthor({
+      authorId: authUser.memberUuid,
+      authorName: authUser.name,
+      mode,
+      count: 6,
+    });
+  }, [rawProfileId, authUser?.memberUuid, authUser?.name, mode]);
+
   const items: FeedItem[] = useMemo(() => {
     if (!effectiveProfileId) return [];
+
     const posts = listPostsByAuthor(effectiveProfileId, mode);
-    const sorted = [...posts].sort((a, b) =>
-      (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
-    );
-    return sorted
+    return posts
       .filter((p) => typeof p.imageUrl === "string" && p.imageUrl.trim().length > 0)
-      .map((p) => ({ id: p.id, imageUrl: p.imageUrl })) as FeedItem[];
+      .map((p) => ({ id: p.id, imageUrl: p.imageUrl! }));
   }, [effectiveProfileId, mode, tick]);
 
   const goDetail = (contentId: string) => {

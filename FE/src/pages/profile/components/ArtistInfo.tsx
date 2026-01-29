@@ -1,9 +1,16 @@
 // FE/src/pages/profile/components/ArtistInfo.tsx
-import type { ArtistProfile } from "../types";
+import type { ArtistProfile } from "../../../features/profile/types";
 
 export default function ArtistInfo({ profile }: { profile: ArtistProfile }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 16,
+      }}
+    >
       {profile.genre && (
         <span
           style={{

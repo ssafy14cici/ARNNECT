@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { loadAll } from "../../../utils/collectbookStorage";
-import type { CollectBookItem } from "../../../utils/collectbookStorage";
+import { loadAll } from "../../../features/collectbook/storage";
+import type { CollectBookItem } from "../../../features/collectbook/types";
 import "./profileTabs.css"; // ✅ CSS Import
 
 export default function CollectionTab() {

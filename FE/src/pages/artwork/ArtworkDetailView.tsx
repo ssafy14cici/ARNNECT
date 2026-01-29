@@ -1,7 +1,12 @@
-import { useEffect, useRef } from "react";
+// FE/src/pages/artwork/ArtworkDetailView.tsx
+
 import { CommentForm } from "../../components/artwork/CommentForm";
 import { CommentList } from "../../components/artwork/CommentList";
-import type { Comment, ArtworkBase, ArtworkDetailData } from "./artworkDetail.helpers";
+import type {
+  Comment,
+  ArtworkBase,
+  ArtworkDetailData,
+} from "../../features/artwork/helpers";
 import "./artworkDetail.css"; // CSS 파일 import (아래에서 작성)
 
 type Props = {
@@ -49,7 +54,6 @@ export function ArtworkDetailView({
   onNavigateArtwork,
   profilePath,
 }: Props) {
-  
   // 로딩 상태
   if (isLoading) {
     return (
@@ -65,14 +69,15 @@ export function ArtworkDetailView({
     return (
       <div className="artwork-error">
         <h2 className="error-title">Artwork Not Found</h2>
-        <button className="back-btn" onClick={onGoHome}>Back to Home</button>
+        <button className="back-btn" onClick={onGoHome}>
+          Back to Home
+        </button>
       </div>
     );
   }
 
   return (
     <div className="artwork-detail-page">
-      
       {/* 1. Hero Section: 작품 감상 영역 (100vh) */}
       <section className="artwork-hero">
         <div className="hero-content">
@@ -109,24 +114,32 @@ export function ArtworkDetailView({
         </div>
       </section>
 
-
       {/* 2. Content Section: 정보 및 소통 (스크롤 내리면 보임) */}
       <div className="artwork-body">
-        
         {/* Actions Row */}
         <div className="action-bar">
           <div className="action-left">
-            <button 
-              className={`follow-btn ${isFollowing ? 'active' : ''}`} 
+            <button
+              className={`follow-btn ${isFollowing ? "active" : ""}`}
               onClick={onToggleFollow}
             >
               {isFollowing ? "Following" : "+ Follow Artist"}
             </button>
           </div>
-          
+
           <div className="action-right">
-            <button className={`like-btn ${isLiked ? 'active' : ''}`} onClick={onLike}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5">
+            <button
+              className={`like-btn ${isLiked ? "active" : ""}`}
+              onClick={onLike}
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill={isLiked ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
               </svg>
               <span>{likeCount}</span>
@@ -139,18 +152,25 @@ export function ArtworkDetailView({
         <div className="info-section">
           <h3 className="section-label">Description</h3>
           <p className="desc-text">{artwork.description}</p>
-          
+
           <div className="tags-row">
             {artwork.tags.map((tag, i) => (
-              <span key={i} className="tag-pill">#{tag}</span>
+              <span key={i} className="tag-pill">
+                #{tag}
+              </span>
             ))}
           </div>
         </div>
 
         {/* Comments */}
         <div className="comments-section">
-          <h3 className="section-label">Comments <span className="count">({comments.length})</span></h3>
-          <CommentForm placeholder="Leave a thought on this piece..." onAdd={onAddComment} />
+          <h3 className="section-label">
+            Comments <span className="count">({comments.length})</span>
+          </h3>
+          <CommentForm
+            placeholder="Leave a thought on this piece..."
+            onAdd={onAddComment}
+          />
           <CommentList
             comments={comments}
             onDelete={onDeleteComment}
@@ -163,13 +183,17 @@ export function ArtworkDetailView({
         {/* Discovery (Similar & Recommend) */}
         <div className="discovery-section">
           <h3 className="section-heading">More to Explore</h3>
-          
+
           {/* Similar */}
           <div className="grid-group">
             <div className="grid-label">Similar Style</div>
             <div className="artwork-grid">
               {similarArtworks.map((item) => (
-                <div key={item.id} className="grid-card" onClick={() => onNavigateArtwork(String(item.id))}>
+                <div
+                  key={item.id}
+                  className="grid-card"
+                  onClick={() => onNavigateArtwork(String(item.id))}
+                >
                   <img src={item.src} alt="artwork" loading="lazy" />
                   <div className="card-overlay">
                     <span>View Artwork</span>
@@ -184,7 +208,11 @@ export function ArtworkDetailView({
             <div className="grid-label">Curated for You</div>
             <div className="artwork-grid">
               {recommendArtworks.map((item) => (
-                <div key={item.id} className="grid-card" onClick={() => onNavigateArtwork(String(item.id))}>
+                <div
+                  key={item.id}
+                  className="grid-card"
+                  onClick={() => onNavigateArtwork(String(item.id))}
+                >
                   <img src={item.src} alt="artwork" loading="lazy" />
                   <div className="card-overlay">
                     <span>View Artwork</span>
@@ -194,7 +222,6 @@ export function ArtworkDetailView({
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

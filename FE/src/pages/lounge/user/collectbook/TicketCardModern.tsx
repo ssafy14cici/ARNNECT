@@ -2,13 +2,6 @@
 import type { CSSProperties } from "react";
 import "./ticketCardModern.css";
 
-type ExhibitionLite = {
-  title?: string;
-  place?: string;
-  startDate?: string;
-  endDate?: string;
-  posterUrl?: string;
-};
 
 type Props = {
   title: string;

@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { BADGES } from "../../data/badges";
-import { useBadgeStore } from "../../stores/badgeStore";
-import type { BadgeStats } from "../../types/badge";
-import { computeEarnedBadgeIds } from "../../utils/badgeRules";
+import { BADGES } from "../../features/badge/data";
+import { useBadgeStore } from "../../features/badge/store";
+import type { BadgeStats } from "../../features/badge/types";
+import { computeEarnedBadgeIds } from "../../features/badge/rules";
 import BadgeChip from "./BadgeChip";
 import BadgePicker from "./BadgePicker";
 import "./badge.css";
@@ -12,41 +12,72 @@ export default function BadgeSection({ stats }: { stats: BadgeStats }) {
   const { featured } = useBadgeStore();
 
   const earnedIds = useMemo(() => computeEarnedBadgeIds(stats), [stats]);
-  const featuredBadges = useMemo(() => BADGES.filter((b) => featured.includes(b.id)), [featured]);
-  const earnedBadges = useMemo(() => BADGES.filter((b) => earnedIds.includes(b.id)), [earnedIds]);
+  const featuredBadges = useMemo(
+    () => BADGES.filter((b) => featured.includes(b.id)),
+    [featured],
+  );
+  const earnedBadges = useMemo(
+    () => BADGES.filter((b) => earnedIds.includes(b.id)),
+    [earnedIds],
+  );
 
   return (
-    <section className="badgeSection">
-      <div className="badgeSectionHeader">
-        <h2 className="badgeSectionTitle">뱃지</h2>
-        <button type="button" className="badgeEdit" onClick={() => setOpen(true)}>
-          대표 뱃지 선택
+    <section className="badge-container">
+      {/* Header */}
+      <div className="badge-header">
+        <div>
+          <h2 className="badge-title">Collection</h2>
+          <p className="badge-desc">당신의 활동이 증명된 훈장들입니다.</p>
+        </div>
+        <button
+          type="button"
+          className="badge-edit-btn"
+          onClick={() => setOpen(true)}
+        >
+          편집하기
         </button>
       </div>
 
-      <div className="badgeSubTitle">대표 뱃지</div>
-      {featuredBadges.length === 0 ? (
-        <div className="badgeEmpty">대표 뱃지를 선택해보세요 (최대 3개)</div>
-      ) : (
-        <div className="badgeRow">
-          {featuredBadges.map((b) => (
-            <BadgeChip key={b.id} badge={b} selected />
-          ))}
-        </div>
-      )}
+      {/* 1. Featured Badges (Showcase) */}
+      <div className="badge-showcase">
+        <div className="badge-label">REPRESENTATIVE</div>
 
-      <div className="badgeSubTitle">획득한 뱃지</div>
-      {earnedBadges.length === 0 ? (
-        <div className="badgeEmpty">아직 획득한 뱃지가 없어요.</div>
-      ) : (
-        <div className="badgeGrid">
-          {earnedBadges.map((b) => (
-            <BadgeChip key={b.id} badge={b} />
-          ))}
-        </div>
-      )}
+        {featuredBadges.length === 0 ? (
+          <div className="badge-empty-box">
+            <span>대표 뱃지를 선택하여 프로필을 꾸며보세요.</span>
+          </div>
+        ) : (
+          <div className="badge-featured-row">
+            {featuredBadges.map((b) => (
+              // BadgeChip에 size props 등을 추가해서 크게 보여줄 수도 있음
+              <div key={b.id} className="badge-wrapper featured">
+                <BadgeChip badge={b} selected />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-      <BadgePicker open={open} onClose={() => setOpen(false)} earnedIds={earnedIds} />
+      {/* 2. All Earned Badges (Grid) */}
+      <div className="badge-list-section">
+        <div className="badge-label">ARCHIVE ({earnedBadges.length})</div>
+
+        {earnedBadges.length === 0 ? (
+          <div className="badge-empty-text">아직 획득한 뱃지가 없습니다.</div>
+        ) : (
+          <div className="badge-grid">
+            {earnedBadges.map((b) => (
+              <BadgeChip key={b.id} badge={b} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <BadgePicker
+        open={open}
+        onClose={() => setOpen(false)}
+        earnedIds={earnedIds}
+      />
     </section>
   );
 }

@@ -1,6 +1,6 @@
 // FE\src\pages\auth\artist\ArtistStep2Profile.tsx
 import type React from "react";
-import type { ArtistStep2 } from "../../../types/auth";
+import type { ArtistStep2 } from "../../../features/auth/types";
 
 type Props = {
   value: ArtistStep2;
@@ -55,7 +55,9 @@ export default function ArtistStep2Profile({
         <select
           className="auth-dark-input"
           value={value.artMain}
-          onChange={(e) => onChange({ ...value, artMain: e.target.value, artSub: "" })}
+          onChange={(e) =>
+            onChange({ ...value, artMain: e.target.value, artSub: "" })
+          }
           required
         >
           <option value="">대분류 선택</option>
@@ -103,7 +105,9 @@ export default function ArtistStep2Profile({
             type="radio"
             name="verified"
             checked={value.verified === "NO"}
-            onChange={() => onChange({ ...value, verified: "NO", verifiedFile: null })}
+            onChange={() =>
+              onChange({ ...value, verified: "NO", verifiedFile: null })
+            }
           />
           해당없음
         </label>
@@ -120,14 +124,21 @@ export default function ArtistStep2Profile({
                 accept=".pdf,image/*"
                 hidden
                 onChange={(e) =>
-                  onChange({ ...value, verifiedFile: e.target.files?.[0] ?? null })
+                  onChange({
+                    ...value,
+                    verifiedFile: e.target.files?.[0] ?? null,
+                  })
                 }
               />
               <div>클릭하여 파일 선택</div>
-              {value.verifiedFile ? <div className="auth-file">{value.verifiedFile.name}</div> : null}
+              {value.verifiedFile ? (
+                <div className="auth-file">{value.verifiedFile.name}</div>
+              ) : null}
             </label>
 
-            <div className="auth-help">PDF 또는 이미지 파일을 첨부해주세요.</div>
+            <div className="auth-help">
+              PDF 또는 이미지 파일을 첨부해주세요.
+            </div>
           </div>
         ) : null}
       </div>
@@ -182,7 +193,9 @@ export default function ArtistStep2Profile({
           <input
             type="checkbox"
             checked={value.birthYearPublic}
-            onChange={(e) => onChange({ ...value, birthYearPublic: e.target.checked })}
+            onChange={(e) =>
+              onChange({ ...value, birthYearPublic: e.target.checked })
+            }
           />
           {value.birthYearPublic ? "공개" : "비공개"}
         </label>

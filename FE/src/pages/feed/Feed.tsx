@@ -1,16 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-
-import { FeedCard, ViewMode } from "../../components/feed/FeedCard"; 
+// FE/src/pages/feed/Feed.tsx
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { FeedCard, type ViewMode } from "../../components/feed/FeedCard";
+import { useAuthStore } from "../../features/auth/store";
+import {
+  createPost,
+  listPosts,
+  seedMyPosts,
+  setMe,
+  type PostRole,
+} from "../../features/feed/mockData";
 import "./feed.css";
 
-// --- Types & Constants ---
 const DETAIL_PATH = (id: string) => `/artworks/${id}`;
 const PROFILE_PATH = (authorId: string) => `/profile/${authorId}`;
 
 export type FeedRole = "ARTIST" | "USER";
 
-interface FeedItem {
+type FeedItem = {
   id: string;
   role: FeedRole;
   title: string;
@@ -19,10 +26,9 @@ interface FeedItem {
   authorId: string;
   createdAt: string;
   imageUrl?: string;
-  category?: string;
   likes?: number;
   views?: number;
-}
+};
 
 type FeedFilterKey = "ALL" | "ARTIST" | "USER";
 
@@ -34,69 +40,134 @@ const FILTERS: Array<{ key: FeedFilterKey; label: string }> = [
 
 const PAGE_SIZE = 12;
 
-// ✅ Public 폴더에 있는 이미지 경로 (없으면 엑박 뜨니 확인 필요)
+// ✅ FE/public/art/a1.jpg ... a12.jpg
 const ART_IMAGES = Array.from({ length: 12 }).map((_, i) => `/art/a${i + 1}.jpg`);
 
-// --- Mock Data Generator (더미 데이터 생성) ---
-function buildMockFeeds(total = 48): FeedItem[] {
+function pickExcerpt(content?: string, max = 120) {
+  if (!content) return undefined;
+  const s = content.replace(/\s+/g, " ").trim();
+  if (!s) return undefined;
+  return s.length > max ? `${s.slice(0, max)}…` : s;
+}
+
+// ✅ 최초 1회: 기본 더미(공용) 생성
+const BASE_SEED_KEY = "comet_mock_posts_seeded_v1";
+function ensureBaseSeedOnce() {
+  if (localStorage.getItem(BASE_SEED_KEY) === "1") return;
+
+  const existing = listPosts();
+  if (existing.length > 0) {
+    localStorage.setItem(BASE_SEED_KEY, "1");
+    return;
+  }
+
   const artistNames = ["A. KIM", "S. LEE", "J. PARK", "H. CHOI"];
   const userNames = ["U. PARK", "U. CHOI", "U. KANG", "U. HAN"];
-  const cats = ["Lacquer", "Oil Paint", "Sculpture", "Media Art", "Sketch"];
 
-  return Array.from({ length: total }).map((_, idx) => {
-    const role: FeedRole = idx % 2 === 0 ? "ARTIST" : "USER";
-    const isTextOnly = idx % 8 === 0; // 8개 중 1개는 이미지 없음
-    const authorName = role === "ARTIST" ? artistNames[idx % artistNames.length] : userNames[idx % userNames.length];
-    const imageUrl = isTextOnly ? undefined : ART_IMAGES[idx % ART_IMAGES.length];
+  for (let i = 0; i < 24; i++) {
+    const role: PostRole = i % 2 === 0 ? "ARTIST" : "USER";
+    const authorName =
+      role === "ARTIST"
+        ? artistNames[i % artistNames.length]
+        : userNames[i % userNames.length];
+    const authorId =
+      role === "ARTIST" ? `artist-${(i % 6) + 1}` : `user-${(i % 10) + 1}`;
 
-    return {
-      id: String(idx + 1),
-      role,
-      title: role === "ARTIST" ? `Untitled No.${idx + 1}` : `Exhibition Review #${idx + 1}`,
-      excerpt: "Through artistic expression, master artisans bring to life stories of resilience and beauty. This piece explores the depth of...",
+    createPost({
+      authorId,
       authorName,
-      authorId: role === "ARTIST" ? `artist-${(idx % 6) + 1}` : `user-${(idx % 10) + 1}`,
-      createdAt: new Date().toISOString(),
-      imageUrl,
-      category: cats[idx % cats.length],
-      likes: Math.floor(Math.random() * 500),
-      views: Math.floor(Math.random() * 2000),
-    };
-  });
+      role,
+      title: role === "ARTIST" ? `Untitled No.${i + 1}` : `Exhibition Review #${i + 1}`,
+      content: role === "ARTIST" ? "작품 업로드 목업 포스트입니다." : "감상평 목업 포스트입니다.",
+      imageUrls: [ART_IMAGES[i % ART_IMAGES.length]],
+      tags: ["mock"],
+      meta: { seeded: true },
+    });
+  }
+
+  localStorage.setItem(BASE_SEED_KEY, "1");
+}
+
+// ✅ 로그인 유저별 1회: 내 글 더미 생성
+const MY_SEED_PREFIX = "comet_mock_my_posts_seeded_v1";
+function ensureMySeedOnce(me: { id: string; name: string; role: PostRole }, count = 6) {
+  const key = `${MY_SEED_PREFIX}.${me.id}`;
+  if (localStorage.getItem(key) === "1") return;
+
+  setMe(me);
+  seedMyPosts(count);
+
+  localStorage.setItem(key, "1");
+}
+
+function mapPostsToFeeds(): FeedItem[] {
+  return listPosts()
+    .map((p): FeedItem => ({
+      id: p.id,
+      role: p.role, // "ARTIST" | "USER"
+      title: p.title,
+      excerpt: pickExcerpt(p.content),
+      authorName: p.authorName,
+      authorId: p.authorId,
+      createdAt: p.createdAt,
+      imageUrl: p.imageUrls?.[0],
+      likes: p.likes,
+      views: p.views,
+    }))
+    .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
 }
 
 export default function Feed() {
   const navigate = useNavigate();
-  
-  // 1. 데이터 상태
-  const [feeds] = useState<FeedItem[]>(() => buildMockFeeds(60));
-  
-  // 2. UI 상태 (필터, 뷰 모드, 페이지네이션)
+  const location = useLocation();
+
+  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+  const appRole = useAuthStore((s) => s.role); // "general" | "artist" | null
+  const user = useAuthStore((s) => s.user); // { memberUuid, name } | null
+
   const [filter, setFilter] = useState<FeedFilterKey>("ALL");
   const [viewMode, setViewMode] = useState<ViewMode>("GRID");
   const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
 
-  // 3. 무한 스크롤 Refs
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
-  // --- Filtering Logic ---
-  const filteredFeeds = useMemo(() => {
-    if (filter === "ALL") return feeds;
-    if (filter === "ARTIST") return feeds.filter((f) => f.role === "ARTIST");
-    return feeds.filter((f) => f.role === "USER");
-  }, [feeds, filter]);
+  // ✅ seed는 멱등(키로 1회만)이라 렌더 중 호출해도 중복 생성 안 됨
+  ensureBaseSeedOnce();
 
-  const visibleFeeds = useMemo(() => filteredFeeds.slice(0, visibleCount), [filteredFeeds, visibleCount]);
+  const me =
+    isLoggedIn && user
+      ? ({
+          id: user.memberUuid,
+          name: user.name,
+          role: appRole === "artist" ? "ARTIST" : "USER",
+        } as const)
+      : null;
+
+  if (me) ensureMySeedOnce(me, 6);
+
+  // ✅ PostCreate 갔다가 돌아오면 보통 Feed가 리마운트/리렌더 됨.
+  //    혹시 같은 화면 유지되는 케이스 대비로 location.key를 참조해서 리스트 다시 읽음.
+  //    (useMemo 없이 그냥 계산)
+  void location.key;
+  const feeds = mapPostsToFeeds();
+
+  const filteredFeeds =
+    filter === "ALL"
+      ? feeds
+      : filter === "ARTIST"
+        ? feeds.filter((f) => f.role === "ARTIST")
+        : feeds.filter((f) => f.role === "USER");
+
+  const visibleFeeds = filteredFeeds.slice(0, visibleCount);
   const hasMore = visibleCount < filteredFeeds.length;
 
   const applyFilter = (next: FeedFilterKey) => {
     setFilter(next);
     setVisibleCount(PAGE_SIZE);
-    window.scrollTo({ top: 0, behavior: 'smooth' }); // 필터 변경 시 맨 위로
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // --- Infinite Scroll Logic ---
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
@@ -104,46 +175,43 @@ export default function Feed() {
     observerRef.current?.disconnect();
     observerRef.current = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore) {
+        if (entries[0]?.isIntersecting && hasMore) {
           setVisibleCount((prev) => prev + PAGE_SIZE);
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     observerRef.current.observe(el);
     return () => observerRef.current?.disconnect();
   }, [hasMore]);
 
-  // --- Handlers ---
   const goDetail = (id: string) => navigate(DETAIL_PATH(id));
   const goProfile = (authorId: string) => navigate(PROFILE_PATH(authorId));
 
   return (
     <div className="feedPage">
-      {/* --- Header (Lumen Style Typography) --- */}
       <header className="feedHeader">
         <h1 className="feedMainTitle">
           <span className="italic-serif">(Art)</span> Gallery
         </h1>
-        
+
         <p className="feedDesc">
-          We invite you to immerse yourself in the essence of culture.<br/>
+          We invite you to immerse yourself in the essence of culture.
+          <br />
           Through artistic expression, master artisans bring to life stories of resilience and beauty.
         </p>
 
-        {/* Controls: View Toggle & Filter */}
         <div className="feedControls">
-          {/* 1. View Mode Toggle (Pill Shape) */}
           <div className="togglePill">
-            <button 
+            <button
               type="button"
               className={`pillBtn ${viewMode === "LIST" ? "active" : ""}`}
               onClick={() => setViewMode("LIST")}
             >
               List
             </button>
-            <button 
+            <button
               type="button"
               className={`pillBtn ${viewMode === "GRID" ? "active" : ""}`}
               onClick={() => setViewMode("GRID")}
@@ -152,7 +220,6 @@ export default function Feed() {
             </button>
           </div>
 
-          {/* 2. Filter Buttons */}
           <nav className="filterNav">
             {FILTERS.map((f) => (
               <button
@@ -168,27 +235,27 @@ export default function Feed() {
         </div>
       </header>
 
-      {/* --- Feed Container (Spotlight Effect Wrapper) --- */}
-      {/* viewMode에 따라 CSS 클래스 변경 (mode-list / mode-grid) */}
       <section className={`feedContainer ${viewMode === "LIST" ? "mode-list" : "mode-grid"}`}>
         {visibleFeeds.map((item) => (
           <FeedCard
             key={item.id}
-            feed={item}          
-            viewMode={viewMode}  // 리스트/그리드 모드 전달
+            feed={item}
+            viewMode={viewMode}
             onClick={() => goDetail(item.id)}
             onAuthorClick={(e) => {
-              // FeedCard 내부 버튼 클릭 이벤트 처리
+              e?.stopPropagation?.();
               goProfile(item.authorId);
             }}
           />
         ))}
+
+        {visibleFeeds.length === 0 && (
+          <div style={{ padding: 24, opacity: 0.8 }}>아직 표시할 피드가 없습니다.</div>
+        )}
       </section>
 
-      {/* --- Infinite Scroll Sentinel --- */}
       <div ref={sentinelRef} className="loadingTrigger" />
-      
-      {/* Loading Indicator */}
+
       {hasMore && (
         <div className="loadingText">
           <span>LOADING MORE</span>

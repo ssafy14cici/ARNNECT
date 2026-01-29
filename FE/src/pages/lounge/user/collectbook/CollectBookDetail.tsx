@@ -4,7 +4,7 @@ import "../../lounge.css";
 import TicketCardModern from "./TicketCardModern";
 import "./ticketCardModern.css";
 
-import { getCollectBookItemById } from "../../../../utils/collectbookStorage";
+import { getCollectBookItemById } from "../../../../features/collectbook/storage";
 
 export default function CollectBookDetail() {
   const { id } = useParams<{ id: string }>();

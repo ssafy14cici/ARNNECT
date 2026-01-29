@@ -1,6 +1,9 @@
 import { useMemo } from "react";
 import { Link, useOutletContext } from "react-router-dom";
-import type { ArtistProfile, UserProfile } from "../types";
+import type {
+  ArtistProfile,
+  UserProfile,
+} from "../../../features/profile/types";
 import "./profileTabs.css"; // ✅ CSS Import
 
 type ProfileModel = ArtistProfile | UserProfile;
@@ -19,7 +22,7 @@ type PortfolioItem = {
   title: string;
   imageUrl?: string | null;
   description?: string | null;
-  createdAt?: string; 
+  createdAt?: string;
 };
 
 export default function PortfolioTab() {
@@ -28,16 +31,17 @@ export default function PortfolioTab() {
 
   const items: PortfolioItem[] = useMemo(() => {
     if (!isArtist) return [];
-    const anyProfile = profile as unknown as { portfolioItems?: PortfolioItem[]; portfolio?: PortfolioItem[] };
+    const anyProfile = profile as unknown as {
+      portfolioItems?: PortfolioItem[];
+      portfolio?: PortfolioItem[];
+    };
     return anyProfile.portfolioItems ?? anyProfile.portfolio ?? [];
   }, [isArtist, profile]);
 
   if (!isArtist) {
     return (
       <div className="tab-container">
-        <div className="tab-empty">
-          Available for Artist Profiles only.
-        </div>
+        <div className="tab-empty">Available for Artist Profiles only.</div>
       </div>
     );
   }
@@ -71,18 +75,34 @@ export default function PortfolioTab() {
             <article key={it.id} className="tab-card">
               {/* 이미지 영역 */}
               {it.imageUrl && (
-                <div style={{ width: '100%', aspectRatio: '4/3', overflow: 'hidden', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                <div
+                  style={{
+                    width: "100%",
+                    aspectRatio: "4/3",
+                    overflow: "hidden",
+                    borderBottom: "1px solid rgba(255,255,255,0.1)",
+                  }}
+                >
                   <img
                     src={it.imageUrl}
                     alt={it.title}
-                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      display: "block",
+                    }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
                   />
                 </div>
               )}
 
               <div className="tab-card-body">
-                <div className="tab-card-title" style={{ marginBottom: '8px' }}>{it.title}</div>
+                <div className="tab-card-title" style={{ marginBottom: "8px" }}>
+                  {it.title}
+                </div>
                 <div className="tab-card-info">
                   {it.description ? it.description : "No description"}
                 </div>

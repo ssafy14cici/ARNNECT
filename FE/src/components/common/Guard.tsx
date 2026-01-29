@@ -1,15 +1,15 @@
 // src/components/common/Guard.tsx
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import type { Role } from "../../router/guards";
-import { useAuthStore } from "../../stores/authStore";
+import type { Role } from "../../app/router/guards";
+import { useAuthStore } from "../../features/auth/store";
 
 type GuardProps = {
   requireAuth?: boolean;
   requireRole?: Role;
 
   // ✅ 추가
-  guestOnly?: boolean;      // 비로그인만 접근 가능(로그인/회원가입)
-  redirectTo?: string;      // 로그인 상태일 때 보내줄 곳
+  guestOnly?: boolean; // 비로그인만 접근 가능(로그인/회원가입)
+  redirectTo?: string; // 로그인 상태일 때 보내줄 곳
 };
 
 export default function Guard({
