@@ -1,361 +1,246 @@
+/* ==========================================================================
+   TICKET CARD MODERN (Premium Black & Gold Theme)
+========================================================================== */
+
+/* 1. Card Container (Levitation Effect) */
 .tcm {
-  display: grid;
-  grid-template-columns: 120px 18px 1fr 84px;
-  align-items: stretch;
-  border-radius: 18px;
+  display: flex;
+  width: 100%;
+  height: 200px;
+  background: #111; /* Matte Black */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px; /* 날렵한 모서리 */
   overflow: hidden;
-  background: #0f1012;
-  box-shadow: 0 18px 42px rgba(0,0,0,0.34);
-  cursor: pointer;
-  user-select: none;
-}
-
-.tcm:focus {
-  outline: 2px solid rgba(255,255,255,0.35);
-  outline-offset: 2px;
-}
-
-/* LEFT STUB */
-.tcmStub {
-  color: #fff;
   position: relative;
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.6);
+  transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s ease, border-color 0.4s;
+  
+  font-family: 'Pretendard', sans-serif;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.tcm:hover {
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: 0 20px 40px rgba(200, 169, 126, 0.15); /* Gold Shadow */
+  border-color: rgba(200, 169, 126, 0.5); /* Gold Border */
+}
+
+/* 2. Left Stub (Force Black Theme) */
+.tcmStub {
+  width: 50px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  
+  /* ⚠️ TSX inline-style override */
+  background: #080808 !important; 
+  border-right: 1px dashed rgba(255, 255, 255, 0.15);
 }
 
 .tcmStubInner {
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
   height: 100%;
-  padding: 12px 10px;
-  display: grid;
-  grid-template-rows: 1fr auto;
-  gap: 10px;
+  padding: 12px 0;
 }
 
 .tcmStubBarcode {
-  height: 52px;
-  border-radius: 10px;
-  background-image: repeating-linear-gradient(
-    90deg,
-    rgba(255,255,255,0.9) 0px,
-    rgba(255,255,255,0.9) 2px,
-    rgba(255,255,255,0) 2px,
-    rgba(255,255,255,0) 4px
+  width: 3px;
+  height: 60%;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 2px,
+    rgba(255,255,255,0.2) 2px,
+    rgba(255,255,255,0.2) 4px
   );
-  opacity: 0.8;
 }
 
 .tcmStubText {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  font-weight: 900;
-  letter-spacing: 0.14em;
-  font-size: 12px;
-  opacity: 0.95;
-}
-
-.tcmStubTop + .tcmStubTop {
-  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  color: #C8A97E; /* Gold Text */
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .tcmStubBottom {
-  display: grid;
-  gap: 6px;
-  font-size: 11px;
-  opacity: 0.95;
+  margin-top: auto;
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.3);
+  font-family: monospace;
 }
 
-.tcmStubCode {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-weight: 800;
-}
+/* Perforation (숨김 - Border Dashed로 대체) */
+.tcmPerf { display: none; }
 
-.tcmStubDate {
-  opacity: 0.9;
-}
 
-/* PERFORATION */
-.tcmPerf {
-  background: #0f1012;
-  position: relative;
-}
-
-.tcmPerf::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 10px;
-  bottom: 10px;
-  width: 10px;
-  transform: translateX(-50%);
-  background:
-    radial-gradient(circle, rgba(255,255,255,0.20) 0 3px, transparent 3.5px) 50% 0/10px 16px repeat-y;
-  opacity: 0.9;
-}
-
-.tcmPerf::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 10px;
-  bottom: 10px;
-  width: 1px;
-  transform: translateX(-50%);
-  background: rgba(255,255,255,0.14);
-}
-
-/* MAIN */
+/* 3. Main Content */
 .tcmMain {
-  background: #fff;
-  padding: 16px 18px;
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  gap: 10px;
+  flex: 1;
+  padding: 24px 30px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  /* 은은한 배경 그라데이션 */
+  background: radial-gradient(circle at top right, rgba(255,255,255,0.03), transparent 60%);
 }
 
+/* Header */
 .tcmHeader {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 12px;
 }
 
 .tcmTitle {
-  font-size: 28px;
-  font-weight: 900;
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem;
+  font-weight: 500;
+  color: #fff;
   letter-spacing: -0.02em;
-  line-height: 1;
-  text-transform: uppercase;
-  color: #0f1012;
-}
-
-.tcmPrice {
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: rgba(15,16,18,0.7);
-  white-space: nowrap;
-}
-
-.tcmMetaRow {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.tcmMeta {
-  font-size: 11px;
-  color: rgba(15,16,18,0.62);
-  max-width: 48%;
-}
-
-.tcmBottomRow {
-  display: grid;
-  grid-template-columns: 1fr 220px;
-  align-items: end;
-  gap: 14px;
-}
-
-.tcmDates {
-  font-size: 14px;
-  font-weight: 900;
-  color: rgba(15,16,18,0.85);
-  letter-spacing: 0.02em;
-}
-
-/* HERO (이미지 + 버블) */
-.tcmHero {
-  position: relative;
-  height: 110px;
-  border-radius: 16px;
+  
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.tcmBubble {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(0.2px);
-  opacity: 0.78;
+.tcmPrice {
+  font-size: 0.9rem;
+  color: #C8A97E; /* Price Gold */
+  font-weight: 600;
+  white-space: nowrap;
+  margin-left: 16px;
 }
 
-.tcmBubbleA {
-  width: 90px;
-  height: 90px;
-  right: 22px;
-  top: -18px;
-  background: rgba(80, 140, 255, 0.35);
+/* Meta Info */
+.tcmMetaRow {
+  display: flex;
+  gap: 20px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.tcmBubbleB {
+/* Bottom Area */
+.tcmBottomRow {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.tcmDates {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.2rem;
+  color: #fff;
+  font-style: italic;
+}
+
+/* Hero Image (Ticket Stamp) */
+.tcmHero {
   width: 120px;
-  height: 120px;
-  right: 64px;
-  bottom: -40px;
-  background: rgba(240, 140, 80, 0.28);
+  height: 70px;
+  position: relative;
 }
 
 .tcmHeroMedia {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #000;
 }
 
 .tcmHeroImg {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
+  filter: grayscale(100%); /* 흑백 처리 */
+  transition: filter 0.3s;
+}
+.tcm:hover .tcmHeroImg {
+  filter: grayscale(0%); /* 호버 시 컬러 */
 }
 
-.tcmHeroPh {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-  font-weight: 900;
-  letter-spacing: 0.14em;
-  color: rgba(15,16,18,0.45);
-  background: rgba(15,16,18,0.04);
-}
+/* Hide Bubbles */
+.tcmBubble { display: none; }
 
-/* RIGHT BARCODE */
+
+/* 4. Right Barcode */
 .tcmRight {
-  background: #fff;
-  padding: 12px 10px;
-  display: grid;
-  gap: 10px;
-  align-content: center;
-  justify-items: center;
+  width: 60px;
+  flex-shrink: 0;
+  background: #fff; /* White Barcode Area */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  position: relative;
+}
+
+/* Serrated Edge Effect (톱니) */
+.tcmRight::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: 4px;
+  background: radial-gradient(circle, #111 2px, transparent 2.5px);
+  background-size: 4px 8px;
+  background-position: -2px 0;
 }
 
 .tcmRightBarcode {
-  width: 42px;
-  height: 110px;
-  border-radius: 10px;
-  background-color: rgba(0,0,0,0.04);
-  background-size: auto 100%;
-  background-position: center;
-  border: 1px solid rgba(15,16,18,0.10);
+  flex: 1;
+  width: 100%;
+  opacity: 0.85;
 }
 
 .tcmRightCode {
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  color: rgba(15,16,18,0.65);
-  text-align: center;
-  word-break: break-all;
+  writing-mode: vertical-rl;
+  font-family: monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  color: #000;
+  margin-top: 10px;
+  font-weight: 600;
 }
 
-/* === Mobile: stack vertical (최종) === */
-@media (max-width: 560px) {
+/* --- Mobile Responsive --- */
+@media (max-width: 600px) {
   .tcm {
-    display: grid;
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto auto; /* stub / perf / main / right */
-    border-radius: 18px;
+    height: auto;
+    flex-direction: column;
   }
-
-  /* grid 위치를 명시해서 절대 흔들리지 않게 */
-  .tcmStub { grid-row: 1; }
-  .tcmPerf { grid-row: 2; }
-  .tcmMain { grid-row: 3; }
-  .tcmRight { grid-row: 4; }
-
-  /* LEFT STUB -> 상단 가로 배너 */
+  .tcmStub {
+    width: 100%;
+    height: 40px;
+    flex-direction: row;
+    border-right: none;
+    border-bottom: 1px dashed rgba(255,255,255,0.2);
+  }
   .tcmStubInner {
-    padding: 12px 12px;
-    display: grid;
-    grid-template-columns: 1fr auto; /* text / barcode */
-    grid-template-rows: auto auto;   /* top + bottom */
-    align-items: center;
-    gap: 10px;
-  }
-
-  .tcmStubBarcode {
-    grid-column: 2;
-    grid-row: 1;
-    width: 64px;
-    height: 38px;
-    border-radius: 10px;
-  }
-
-  .tcmStubText {
-    grid-column: 1;
-    grid-row: 1;
     writing-mode: horizontal-tb;
     transform: none;
-    font-size: 12px;
-    letter-spacing: 0.12em;
+    padding: 0 16px;
   }
-
-  .tcmStubBottom {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    display: grid;
-    gap: 6px;
-    font-size: 11px;
-  }
-
-  /* perforation -> 가로 점선 */
-  .tcmPerf {
-    height: 18px;
-  }
-  .tcmPerf::before {
-    left: 12px;
-    right: 12px;
-    top: 50%;
-    bottom: auto;
-    width: auto;
-    height: 10px;
-    transform: translateY(-50%);
-    background:
-      radial-gradient(circle, rgba(255,255,255,0.20) 0 3px, transparent 3.5px)
-      0 50%/16px 10px repeat-x;
-  }
-  .tcmPerf::after {
-    left: 12px;
-    right: 12px;
-    top: 50%;
-    bottom: auto;
-    width: auto;
-    height: 1px;
-    transform: translateY(-50%);
-  }
-
-  /* MAIN */
-  .tcmMain {
-    padding: 14px 14px;
-    gap: 10px;
-  }
-
-  .tcmTitle {
-    font-size: 20px;
-  }
-
-  /* 날짜/이미지 세로로 */
-  .tcmBottomRow {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
-  .tcmHero {
-    height: 140px;
-  }
-
-  /* RIGHT BARCODE -> 하단 가로 바코드 */
-  .tcmRight {
-    padding: 12px 14px;
-    display: grid;
-    justify-items: stretch;
-    gap: 8px;
-  }
-
-  .tcmRightBarcode {
-    width: 100%;
-    height: 46px;
-    border-radius: 12px;
-  }
-
-  .tcmRightCode {
-    text-align: left;
-  }
+  .tcmRight { display: none; }
 }

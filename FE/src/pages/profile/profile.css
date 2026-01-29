@@ -1,474 +1,474 @@
-/* FE/src/styles/profile.css
-   ✅ 정리 원칙
-   - 중복 정의 제거 (동일 클래스 1회만)
-   - "사용 중인 구조(ProfileHeader.tsx + Profile.tsx + BadgePickerModal.tsx)" 기준만 남김
-   - 옛 배지 모달(.badgeModal*, .profileBadgeSection*, .profileBadgeEditor*) 제거
-*/
+/* ==========================================================================
+   PROFILE PAGE (Dual Theme System)
+========================================================================== */
 
-/* ===== Page Layout ===== */
-.profilePage {
-  padding: 24px 16px;
-  max-width: 980px;
-  margin: 0 auto;
+/* 1. 기본 다크 모드 설정 */
+.profile-page {
+  min-height: 100vh;
+  background-color: #050505;
+  color: #fff;
+  font-family: 'Pretendard', sans-serif;
+  position: relative;
+  /* Navbar 높이만큼 패딩 (필요시 조정) */
+  padding-top: 80px; 
 }
 
-/* ===== Header ===== */
+/* 2. 테마 변수 정의 (핵심) */
+.profile-page.theme-artist {
+  --accent: #C8A97E; /* Artist Gold */
+  --accent-dim: rgba(200, 169, 126, 0.1);
+  --bg-glow: radial-gradient(circle at 50% 20%, rgba(200, 169, 126, 0.08), transparent 50%);
+}
+
+.profile-page.theme-user {
+  --accent: #ffffff; /* User White/Silver */
+  --accent-dim: rgba(255, 255, 255, 0.1);
+  --bg-glow: radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.05), transparent 50%);
+}
+
+/* 배경 은은한 빛 효과 */
+.profile-bg-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 600px;
+  background: var(--bg-glow);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.profile-container {
+  position: relative;
+  z-index: 1;
+  max-width: 1000px;
+  margin: 0 auto;
+  /* 양옆 패딩은 유지하되, 하단 패딩은 제거 (버튼 공간 확보는 내부에서) */
+  padding: 0 20px; 
+  
+  /* ✅ [핵심 1] Flex Column 설정: 컨텐츠가 적어도 높이를 채우도록 함 */
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 80px); /* Navbar 높이 뺀 만큼 확보 */
+}
+
+.profile-content {
+  /* ✅ [핵심 2] 남은 공간을 모두 차지하여 FAB를 바닥으로 밀어냄 */
+  flex: 1;
+  padding-bottom: 60px; /* 버튼이 컨텐츠 가리지 않게 여백 */
+}
+
+/* --- Tabs (Minimalist Underline) --- */
+.profile-tabs-wrapper {
+  margin-top: 40px;
+  margin-bottom: 40px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: center; /* 중앙 정렬 */
+}
+
+.profile-tabs {
+  display: flex;
+  gap: 40px;
+}
+
+.profile-tab {
+  padding: 16px 4px;
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid transparent;
+  transition: all 0.3s ease;
+  position: relative;
+  top: 1px; /* border 겹치게 */
+}
+
+.profile-tab:hover {
+  color: #fff;
+}
+
+/* 활성화된 탭은 테마 색상을 따라감 */
+.profile-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+
+/* --- FAB (Floating Action Button) --- */
+.profile-fab {
+  /* ✅ [핵심 3] Sticky 포지셔닝 */
+  position: -webkit-sticky;
+  position: sticky;
+  bottom: 40px; /* 화면 바닥에서 40px 위에 고정 */
+  
+  /* ✅ Flex Container 안에서 우측 정렬 */
+  align-self: flex-end; 
+  margin-right: 10px; /* 우측 살짝 여백 */
+  margin-bottom: 40px; /* 푸터와 닿기 전 여백 */
+  
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 1px solid var(--accent); /* 테마색 테두리 */
+  
+  /* 배경: 반투명 블랙 (뒤에 컨텐츠 비침 방지) */
+  background: #000; 
+  color: var(--accent);
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  z-index: 90; 
+}
+
+.profile-fab:hover {
+  background: var(--accent);
+  color: #000;
+  transform: scale(1.1) rotate(90deg);
+  box-shadow: 0 0 20px var(--accent-dim);
+}
+
+
+/* --- Utils --- */
+.profile-loading, .profile-error {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #050505;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.spinner {
+  width: 30px; height: 30px;
+  border: 2px solid rgba(255,255,255,0.1);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+/* ... (이전의 profile-page, theme 설정 코드는 유지) ... */
+
+/* ==========================================================================
+   PROFILE HEADER (Premium Look)
+========================================================================== */
 .profileHeader {
-  padding: 16px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  margin-bottom: 60px;
+  animation: fadeUp 0.8s ease;
 }
 
 .profileHeaderRow {
   display: flex;
-  gap: 14px;
+  gap: 40px;
   align-items: flex-start;
 }
 
+/* 1. Avatar */
 .profileAvatar {
-  width: 84px;
-  height: 84px;
-  border-radius: 999px;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%; /* 원형 */
   object-fit: cover;
-  background: #eee;
-  flex: 0 0 auto;
+  border: 2px solid var(--accent-dim); /* 테마색 테두리 */
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  flex-shrink: 0;
+  background-color: #111;
 }
 
+/* 2. Main Info Area */
 .profileHeaderMain {
   flex: 1;
-  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 10px;
 }
 
+/* Title & Badge Row */
 .profileTitleRow {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
 .profileName {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.5rem;
+  font-weight: 400;
   margin: 0;
-  font-size: 20px;
-  line-height: 1.2;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  color: #fff;
+  line-height: 1;
 }
 
 .profileBadges {
   display: flex;
-  align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
 .profileBadge {
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  background: rgba(0, 0, 0, 0.02);
-}
-
-.profileBadgeEmpty {
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.55);
+  font-size: 0.7rem;
   padding: 4px 8px;
-  border: 1px dashed rgba(0, 0, 0, 0.15);
-  border-radius: 999px;
+  border: 1px solid var(--accent); /* 테마색 라인 */
+  color: var(--accent);
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(0,0,0,0.3);
 }
 
+/* Genre (Artist Only) */
 .profileGenre {
-  margin-top: 6px;
-  font-size: 13px;
-  font-weight: 700;
-  opacity: 0.8;
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 
+/* Stats (Followers) */
 .profileFollowRow {
   display: flex;
-  gap: 12px;
-  margin-top: 8px;
-  font-size: 14px;
-  opacity: 0.8;
+  gap: 24px;
+  font-size: 0.95rem;
+  color: rgba(255,255,255,0.8);
+}
+.profileFollowRow span {
+  font-variant-numeric: tabular-nums;
 }
 
+/* Bio */
 .profileBio {
-  margin-top: 8px;
-  font-size: 14px;
-  line-height: 1.45;
-  opacity: 0.85;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: rgba(255,255,255,0.6);
+  max-width: 600px;
+  margin-top: 4px;
+  white-space: pre-wrap;
 }
-
 .profileBioPlaceholder {
-  opacity: 0.5;
+  color: rgba(255,255,255,0.3);
+  font-style: italic;
 }
 
+/* Actions (Buttons) */
 .profileActionRow {
   display: flex;
-  gap: 8px;
-  margin-top: 10px;
-  position: relative;
+  gap: 12px;
+  margin-top: 12px;
+  position: relative; /* 메뉴 팝업 기준점 */
 }
 
 .profileBtn {
-  height: 36px;
-  padding: 0 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(0, 0, 0, 0.16);
-  background: #fff;
-  font-weight: 800;
+  padding: 8px 20px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: transparent;
+  color: #fff;
+  border-radius: 50px; /* 둥근 버튼 */
+  font-size: 0.85rem;
   cursor: pointer;
+  transition: all 0.3s;
+}
+.profileBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
 }
 
-.profileBtn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
 
-/* manage dropdown */
+/* ==========================================================================
+   MANAGE MENU (Dropdown)
+========================================================================== */
 .profileMenu {
   position: absolute;
-  top: 44px;
-  right: 0;
-  border: 1px solid rgba(0, 0, 0, 0.14);
-  border-radius: 12px;
-  background: #fff;
-  overflow: hidden;
-  min-width: 160px;
-  z-index: 20;
+  top: 100%;
+  left: 0;
+  margin-top: 8px;
+  background: #1a1a1a;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+  z-index: 50;
 }
 
 .profileMenuItem {
-  width: 100%;
   text-align: left;
-  padding: 10px 12px;
   background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.profileMenuItem:hover {
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.profileTextBtn,
-.profileTextLink {
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  opacity: 0.75;
-  text-decoration: none;
-  color: inherit;
-}
-
-.profileTextBtn:hover,
-.profileTextLink:hover {
-  opacity: 1;
-}
-
-/* ===== Tabs ===== */
-.profileTabs {
-  display: flex;
-  gap: 8px;
-  margin: 14px 0 10px;
-}
-
-.profileTab {
-  height: 34px;
-  padding: 0 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  background: rgba(255, 255, 255, 0.6);
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.profileTabActive {
-  background: #111;
-  color: #fff;
-  border-color: #111;
-}
-
-/* 탭 아래 컨텐츠 영역 여백 */
-.profileTabPanel {
-  margin-top: 12px;
-}
-
-/* ===== Feed Grid (tab 내부에서 사용 시) ===== */
-.profileGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 10px;
-}
-
-.profileCardBtn {
-  padding: 0;
   border: none;
-  background: transparent;
+  color: rgba(255,255,255,0.7);
+  padding: 10px 12px;
+  font-size: 0.9rem;
   cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+.profileMenuItem:hover {
+  background: rgba(255,255,255,0.05);
+  color: #fff;
 }
 
-.profileCard {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  border-radius: 18px;
-  overflow: hidden;
-  background: #f2f2f2;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
-}
 
-.profileCardBtn:hover .profileCard {
-  transform: translateY(-3px);
-  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.10);
-}
-
-.profileThumb {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-/* ===== QnA panel ===== */
-.profileQnaPanel {
-  margin-top: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 14px;
-  padding: 12px;
-}
-
-.profileQnaHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.profileTextarea {
-  width: 100%;
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  padding: 10px;
-  resize: vertical;
-}
-
-.profileQnaActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-/* ===== Profile Edit Modal ===== */
+/* ==========================================================================
+   MODAL (QnA / Edit)
+========================================================================== */
 .profileModalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 50;
-  padding: 16px;
+  z-index: 100;
 }
 
-.profileModal {
-  width: min(520px, 100%);
-  background: #fff;
-  border-radius: 16px;
-  padding: 14px;
+.profileModal, .profileQnaPanel {
+  background: #111;
+  border: 1px solid var(--accent); /* 테마색 테두리 */
+  padding: 30px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.9);
 }
 
-.profileModalHeader {
+/* QnA Panel Specifics (Center Floating) */
+.profileQnaPanel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+}
+
+.profileModalHeader, .profileQnaHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 24px;
+  color: var(--accent);
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
 }
 
+.profileTextBtn {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.profileTextBtn:hover { color: #fff; }
+
+/* Form Elements inside Modal */
 .profileForm {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 20px;
 }
 
 .profileLabel {
-  font-size: 13px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  color: rgba(255,255,255,0.5);
+  font-size: 0.85rem;
 }
 
-.profileInput {
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  padding: 10px;
+.profileInput, .profileTextarea {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+  padding: 10px 0;
+  color: #fff;
+  font-family: 'Pretendard', sans-serif;
+  font-size: 1rem;
+}
+.profileInput:focus, .profileTextarea:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
 }
 
-.profileModalActions {
+.profileModalActions, .profileQnaActions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-/* ===== Badge picker (inside profile edit modal) ===== */
-.badgePicker {
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
-}
-
-.badgePickerTop {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
+  margin-top: 30px;
 }
 
-.badgePickerTitle {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
 
-.badgePickerHint {
-  font-size: 12px;
-  opacity: 0.7;
-}
-
-.badgePickerCount {
-  font-size: 12px;
-  opacity: 0.7;
-}
-
-.badgeChips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.badgeChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.18);
-  background: rgba(0, 0, 0, 0.03);
-  cursor: pointer;
-}
-
-.badgeChipX {
-  opacity: 0.7;
-}
-
-.badgeEmpty {
-  font-size: 12px;
-  opacity: 0.7;
-  padding: 8px 0;
-}
-
-.badgeGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.badgeCard {
-  text-align: left;
-  padding: 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(0, 0, 0, 0.18);
-  background: rgba(0, 0, 0, 0.02);
-  cursor: pointer;
-}
-
-.badgeCardSelected {
-  border-color: rgba(0, 0, 0, 0.45);
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.badgeCardDisabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.badgeCardTitle {
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-
-.badgeCardDesc {
-  font-size: 12px;
-  opacity: 0.75;
-  margin-bottom: 8px;
-}
-
-.badgeCardMeta {
-  font-size: 12px;
-  opacity: 0.7;
-}
-
-/* ===== Floating Action Button ===== */
+/* ==========================================================================
+   FAB (Floating Action Button) - Sticky Fix
+   푸터를 가리지 않도록 위치 전략 변경
+========================================================================== */
 .profileFab {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
-  width: 56px;
-  height: 56px;
-  border-radius: 999px;
+  /* fixed 대신 sticky를 사용하여 부모 컨테이너(Profile Page) 안에서만 따라다니게 함.
+     하지만 sticky는 '스크롤 영역' 내부에서 동작하므로, 
+     가장 확실한 방법은 fixed를 유지하되 z-index를 조절하거나 위치를 타협하는 것입니다.
+     
+     여기서는 '우측 하단에 고정되되, 부모 영역 끝에 다다르면 멈추는' sticky 방식을 적용합니다.
+  */
+  position: sticky; 
+  float: right; /* sticky와 함께 사용하여 우측 정렬 */
+  bottom: 40px; /* 화면 하단에서의 거리 */
+  margin-right: 0; /* 우측 여백 */
+  margin-top: -60px; /* 본문과 겹치지 않게 살짝 위로 */
+  
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  background: #000; /* 완전 불투명 블랙 */
+  color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  background: #111;
-  color: #fff;
-  font-size: 30px;
-  line-height: 1;
-  font-weight: 700;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
   cursor: pointer;
-  z-index: 50;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  z-index: 90; /* Footer(z-index:10)보다 높고 Modal(100)보다 낮게 */
 }
 
 .profileFab:hover {
-  transform: translateY(-2px);
+  background: var(--accent);
+  color: #000;
+  transform: scale(1.1) rotate(90deg);
 }
 
-.profileFab:active {
-  transform: translateY(0);
-}
 
-/* ===== Responsive ===== */
-@media (max-width: 720px) {
-  .profilePage {
-    padding: 18px 12px;
+/* Responsive */
+@media (max-width: 768px) {
+  .profileHeaderRow {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
   }
-
-  .profileName {
-    font-size: 18px;
+  .profileAvatar {
+    width: 120px;
+    height: 120px;
   }
-
-  .profileGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+  .profileTitleRow {
+    flex-direction: column;
+    gap: 8px;
   }
-
-  .profileCard {
-    border-radius: 16px;
+  .profileBio {
+    margin: 0 auto;
   }
-
-  .badgeGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .profileActionRow {
+    justify-content: center;
   }
-}
-
-@media (max-width: 420px) {
-  .profileGrid {
-    grid-template-columns: 1fr;
+  .profileMenu {
+    left: 50%;
+    transform: translateX(-50%);
   }
 }

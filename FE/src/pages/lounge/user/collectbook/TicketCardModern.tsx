@@ -1,3 +1,4 @@
+//FE\src\pages\lounge\user\collectbook\TicketCardModern.tsx
 import type { CSSProperties } from "react";
 import "./ticketCardModern.css";
 

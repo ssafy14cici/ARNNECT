@@ -1,3 +1,4 @@
+//FE\src\pages\lounge\LoungeIndex.tsx
 import { Navigate } from "react-router-dom";
 import { useAuthStore } from "../../stores/authStore";
 

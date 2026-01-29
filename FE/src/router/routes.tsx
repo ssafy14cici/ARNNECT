@@ -42,7 +42,7 @@ import NotFound from "../pages/notfound/NotFound";
 import PrivacyPolicyContent from "../components/legal/PrivacyPolicyContent";
 import TermsOfServiceContent from "../components/legal/TermsOfServiceContent";
 
-
+import YourPreference from "../pages/yourpreference/YourPreference";
 
 
 export const routes: RouteObject[] = [
@@ -56,6 +56,7 @@ export const routes: RouteObject[] = [
       { path: "home", element: <Home /> },
       { path: "search", element: <Search /> },
       { path: "guide", element: <Guide /> },
+      { path: "preference", element: <YourPreference /> },
 
       // ✅ ARNNECT 정책 페이지 경로 추가
       { path: "privacy", element: <PrivacyPolicyContent /> },

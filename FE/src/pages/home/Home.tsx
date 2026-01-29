@@ -1,45 +1,53 @@
+// FE/src/pages/home/Home.tsx
 import { Suspense, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
-import HoverModel from "../../components/HoverModel"; // Navbar에서 쓰던 그 컴포넌트
+import HoverModel from "../../components/HoverModel"; 
 import "../../styles/home.css";
+
+// Shape 타입 임포트 혹은 재정의 (Navbar와 동일하게 맞춤)
+type ShapeType = "knot" | "sphere" | "box" | "octahedron" | "torus";
 
 export default function Home() {
   const navigate = useNavigate();
 
-  // ✅ 우리 Navbar 데이터와 일치시킨 섹션 정보
-  // (Close와 Logout은 제외하고 실제 이동 가능한 6개 페이지만 구성)
+  // ✅ 섹션 정보 (Navbar와 일관성 유지 + Shape 추가)
   const sections = useMemo(
     () => [
       { 
-        key: "yourtaste", 
+        key: "preference", 
         label: "너의 취향은", 
-        path: "/yourtaste", 
-        desc: "Discover Your Taste" 
+        path: "/preference", 
+        desc: "Discover Your Preference",
+        shape: "octahedron" as ShapeType
       },
       { 
         key: "search", 
         label: "Search", 
         path: "/search", 
-        desc: "Find Inspiration" 
+        desc: "Find Inspiration",
+        shape: "sphere" as ShapeType
       },
       { 
         key: "feed", 
         label: "Feed", 
         path: "/feed", 
-        desc: "Share Your World" 
+        desc: "Share Your World",
+        shape: "box" as ShapeType
       },
       { 
         key: "lounge", 
         label: "Lounge", 
         path: "/lounge", 
-        desc: "Connect with Artists" 
+        desc: "Connect with Artists",
+        shape: "torus" as ShapeType
       },
       { 
         key: "profile", 
         label: "Profile", 
         path: "/profile/me/feed", 
-        desc: "Your Archive" 
+        desc: "Your Archive",
+        shape: "sphere" as ShapeType // Profile은 sphere 재사용
       },
     ],
     []
@@ -51,11 +59,10 @@ export default function Home() {
         <section 
           key={item.key} 
           className="snap-section"
-          onClick={() => navigate(item.path)} // ✅ 클릭 시 해당 페이지로 이동
+          onClick={() => navigate(item.path)}
         >
-          {/* 1. 텍스트 정보 (The-Artery 스타일) */}
+          {/* 1. 텍스트 정보 */}
           <div className="content-overlay">
-            {/* 인덱스 번호 (01, 02 ...) */}
             <div className="index-number">
               {(index + 1).toString().padStart(2, "0")}
             </div>
@@ -70,7 +77,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 2. 3D 모델 배경 (HoverModel 재사용) */}
+          {/* 2. 3D 모델 배경 */}
           <div className="canvas-wrapper">
             <Canvas camera={{ position: [0, 0, 6], fov: 45 }}>
               <ambientLight intensity={0.5} />
@@ -78,23 +85,24 @@ export default function Home() {
               <pointLight position={[-10, -10, -5]} color="blue" intensity={1} />
               
               <Suspense fallback={null}>
-                {/* scale={2.2}: 화면에 꽉 차게 키움
-                  rotation: 섹션마다 조금씩 다르게 돌려놓음 (심심하지 않게)
+                {/* scale: 화면 꽉 차게 
+                  rotation: 섹션마다 조금씩 다르게 회전
                 */}
                 <group 
                   scale={2.2} 
                   rotation={[index * 0.5, index * 0.3, 0]}
                 >
-                   {/* Navbar에서 쓰던 HoverModel 그대로 사용.
-                      필요하다면 color prop을 넘겨서 색상을 바꿀 수도 있음.
-                   */}
-                   <HoverModel color={index % 2 === 0 ? "#ffffff" : "#cccccc"} />
+                   {/* ✅ 여기서도 shape 전달해서 섹션마다 다른 모양 보여주기 */}
+                   <HoverModel 
+                     color={index % 2 === 0 ? "#ffffff" : "#e0e0e0"} 
+                     shape={item.shape}
+                   />
                 </group>
               </Suspense>
             </Canvas>
           </div>
           
-          {/* 첫 번째 섹션에만 스크롤 유도 표시 */}
+          {/* 첫 번째 섹션 스크롤 유도 */}
           {index === 0 && <div className="scroll-indicator">SCROLL</div>}
         </section>
       ))}

@@ -1,0 +1,184 @@
+/* ==========================================================================
+   ERROR PAGE (Artistic Glitch Theme)
+========================================================================== */
+
+.error-page {
+  position: fixed;
+  inset: 0;
+  background-color: #050505;
+  color: #fff;
+  font-family: 'Pretendard', sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  z-index: 9999; /* 최상단 */
+}
+
+/* --- 1. Noise Texture (필름 그레인 효과) --- */
+.noise-overlay {
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  animation: noiseMove 0.5s infinite linear;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+}
+
+@keyframes noiseMove {
+  0% { transform: translate(0, 0); }
+  10% { transform: translate(-5%, -5%); }
+  20% { transform: translate(-10%, 5%); }
+  30% { transform: translate(5%, -10%); }
+  40% { transform: translate(-5%, 15%); }
+  50% { transform: translate(-10%, 5%); }
+  60% { transform: translate(15%, 0); }
+  70% { transform: translate(0, 10%); }
+  80% { transform: translate(-15%, 0); }
+  90% { transform: translate(10%, 5%); }
+  100% { transform: translate(5%, 0); }
+}
+
+/* --- 2. Content Layout --- */
+.error-content {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* --- 3. Glitch Typography (핵심) --- */
+.error-code-wrapper {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.error-code {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(8rem, 25vw, 18rem); /* 화면 크기에 따라 거대하게 */
+  font-weight: 700;
+  line-height: 0.8;
+  margin: 0;
+  color: transparent;
+  /* 글자 테두리만 보이게 (Hollow Text) */
+  -webkit-text-stroke: 2px rgba(255, 255, 255, 0.2); 
+  position: relative;
+  letter-spacing: -0.05em;
+}
+
+/* 글리치 효과 (겹쳐진 레이어) */
+.error-code::before,
+.error-code::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.8;
+}
+
+.error-code::before {
+  color: #C8A97E; /* Gold Glitch */
+  z-index: -1;
+  transform: translate(-2px, -2px);
+  clip-path: polygon(0 0, 100% 0, 100% 40%, 0 40%);
+  animation: glitch-anim-1 3s infinite linear alternate-reverse;
+  -webkit-text-stroke: 0; /* 색상 채움 */
+}
+
+.error-code::after {
+  color: #fff; /* White Glitch */
+  z-index: -2;
+  transform: translate(2px, 2px);
+  clip-path: polygon(0 60%, 100% 60%, 100% 100%, 0 100%);
+  animation: glitch-anim-2 2.5s infinite linear alternate-reverse;
+  -webkit-text-stroke: 0;
+}
+
+/* --- 4. Text & Button --- */
+.error-text-box {
+  margin-top: 20px;
+  animation: fadeUp 1s ease 0.5s backwards;
+}
+
+.error-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.5rem;
+  font-weight: 400;
+  margin: 0 0 16px;
+  color: #fff;
+  letter-spacing: 0.05em;
+  font-style: italic;
+}
+
+.error-desc {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 50px;
+  white-space: pre-wrap; /* 줄바꿈 허용 */
+}
+
+/* Styled Link Button */
+.error-home-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  group: hover;
+}
+
+.btn-text {
+  font-size: 0.85rem;
+  letter-spacing: 0.2em;
+  color: #C8A97E;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  transition: color 0.3s;
+}
+
+.btn-line {
+  width: 40px;
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.3);
+  transition: width 0.3s, background-color 0.3s;
+}
+
+.error-home-btn:hover .btn-text {
+  color: #fff;
+}
+
+.error-home-btn:hover .btn-line {
+  width: 100%;
+  background-color: #C8A97E;
+}
+
+/* --- Keyframes --- */
+@keyframes glitch-anim-1 {
+  0% { clip-path: polygon(0 0, 100% 0, 100% 10%, 0 10%); transform: translate(2px, 0); }
+  20% { clip-path: polygon(0 80%, 100% 80%, 100% 100%, 0 100%); transform: translate(-2px, 0); }
+  40% { clip-path: polygon(0 40%, 100% 40%, 100% 60%, 0 60%); transform: translate(2px, 0); }
+  60% { clip-path: polygon(0 20%, 100% 20%, 100% 30%, 0 30%); transform: translate(-2px, 0); }
+  80% { clip-path: polygon(0 50%, 100% 50%, 100% 70%, 0 70%); transform: translate(2px, 0); }
+  100% { clip-path: polygon(0 10%, 100% 10%, 100% 40%, 0 40%); transform: translate(-2px, 0); }
+}
+
+@keyframes glitch-anim-2 {
+  0% { clip-path: polygon(0 20%, 100% 20%, 100% 30%, 0 30%); transform: translate(-2px, 0); }
+  20% { clip-path: polygon(0 60%, 100% 60%, 100% 70%, 0 70%); transform: translate(2px, 0); }
+  40% { clip-path: polygon(0 0, 100% 0, 100% 10%, 0 10%); transform: translate(-2px, 0); }
+  60% { clip-path: polygon(0 80%, 100% 80%, 100% 90%, 0 90%); transform: translate(2px, 0); }
+  80% { clip-path: polygon(0 40%, 100% 40%, 100% 50%, 0 50%); transform: translate(-2px, 0); }
+  100% { clip-path: polygon(0 10%, 100% 10%, 100% 20%, 0 20%); transform: translate(2px, 0); }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}

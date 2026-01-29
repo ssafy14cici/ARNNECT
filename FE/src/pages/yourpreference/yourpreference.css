@@ -1,0 +1,385 @@
+/* ==========================================================================
+   BLIND PREFERENCE ANALYSIS PAGE
+========================================================================== */
+
+.pref-page {
+  min-height: 100vh;
+  background-color: #050505;
+  color: #fff;
+  font-family: 'Pretendard', sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 80px 20px; /* 헤더 공간 */
+}
+
+.pref-container {
+  width: 100%;
+  max-width: 1000px;
+  text-align: center;
+  position: relative;
+}
+
+.gold-text {
+  color: #C8A97E;
+}
+
+.fade-in {
+  animation: fadeIn 0.8s ease forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- 1. Intro View --- */
+.pref-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.pref-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 4rem;
+  line-height: 1.1;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.pref-desc {
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.6;
+  max-width: 600px;
+}
+
+.pref-badges {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.pref-badges span {
+  padding: 6px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50px;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.pref-btn-start {
+  background: #C8A97E;
+  color: #000;
+  border: none;
+  padding: 16px 48px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.pref-btn-start:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 30px rgba(200, 169, 126, 0.4);
+}
+
+.pref-limit-notice {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 10px;
+}
+
+/* --- 2. Battle View (Split Screen) --- */
+.pref-battle {
+  width: 100%;
+  height: 100%;
+}
+
+.battle-header {
+  margin-bottom: 40px;
+}
+
+.battle-round {
+  font-family: 'Playfair Display', serif;
+  color: #C8A97E;
+  font-size: 1.2rem;
+  letter-spacing: 0.1em;
+}
+
+.battle-title {
+  font-size: 2rem;
+  margin: 10px 0 0;
+}
+
+.battle-arena {
+  display: flex;
+  gap: 20px;
+  height: 60vh; /* 화면 꽉 채우기 */
+  position: relative;
+  align-items: center;
+}
+
+.battle-card {
+  flex: 1;
+  height: 100%;
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.4s ease, filter 0.4s ease;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.battle-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s ease;
+}
+
+/* Hover Effects */
+.battle-card:hover {
+  transform: scale(1.02);
+  border-color: #C8A97E;
+  z-index: 2;
+}
+
+.battle-card:hover img {
+  transform: scale(1.1);
+}
+
+/* Non-hovered card dims out */
+.battle-arena:hover .battle-card:not(:hover) {
+  filter: grayscale(80%) brightness(0.5);
+}
+
+.battle-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  backdrop-filter: blur(4px);
+}
+
+.battle-card:hover .battle-overlay {
+  opacity: 1;
+}
+
+.battle-vs {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 60px;
+  background: #000;
+  border: 1px solid #C8A97E;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-style: italic;
+  color: #C8A97E;
+  z-index: 10;
+  box-shadow: 0 0 20px rgba(0,0,0,0.8);
+}
+
+/* --- 3. Analyzing View --- */
+.pref-analyzing {
+  padding: 100px 0;
+}
+
+.analyzing-loader {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 40px;
+}
+
+.orb {
+  width: 20px;
+  height: 20px;
+  background: #C8A97E;
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.orb:nth-child(1) { animation-delay: -0.32s; }
+.orb:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
+
+.analyzing-text {
+  font-size: 2rem;
+  font-weight: 300;
+  margin-bottom: 16px;
+}
+
+.analyzing-sub {
+  color: rgba(255,255,255,0.5);
+  font-size: 1rem;
+}
+
+/* --- 4. Result View --- */
+.pref-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+}
+
+.result-card {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 60px 40px;
+  border-radius: 20px;
+  max-width: 600px;
+  width: 100%;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Card Decorative Glow */
+.result-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(200, 169, 126, 0.1) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.result-header {
+  font-size: 0.9rem;
+  letter-spacing: 0.2em;
+  color: rgba(255,255,255,0.5);
+  margin-bottom: 20px;
+}
+
+.result-type {
+  font-family: 'Playfair Display', serif;
+  font-size: 4rem;
+  margin: 0;
+  line-height: 1;
+  margin-bottom: 10px;
+}
+
+.result-title {
+  font-size: 1.5rem;
+  font-weight: 400;
+  margin-bottom: 30px;
+}
+
+.result-desc {
+  line-height: 1.7;
+  color: rgba(255,255,255,0.8);
+  margin-bottom: 40px;
+  font-size: 1.05rem;
+}
+
+.result-keywords {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 40px;
+}
+
+.result-keywords span {
+  background: rgba(200, 169, 126, 0.1);
+  color: #C8A97E;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.result-recommend {
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 20px;
+}
+
+.result-recommend p {
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.5);
+  margin-bottom: 8px;
+}
+
+.result-recommend strong {
+  font-size: 1.2rem;
+  color: #fff;
+}
+
+.result-actions {
+  display: flex;
+  gap: 16px;
+}
+
+.pref-btn-primary {
+  background: #fff;
+  color: #000;
+  padding: 14px 32px;
+  border-radius: 50px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.pref-btn-primary:hover {
+  background: #C8A97E;
+  transform: translateY(-2px);
+}
+
+.pref-btn-secondary {
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+  border: 1px solid rgba(255,255,255,0.3);
+  padding: 14px 32px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.3s;
+}
+.pref-btn-secondary:hover {
+  border-color: #fff;
+  color: #fff;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .battle-arena {
+    flex-direction: column;
+    height: auto;
+    gap: 10px;
+  }
+  .battle-card {
+    width: 100%;
+    height: 300px; /* 모바일에서 적당한 높이 */
+  }
+  .battle-vs {
+    position: relative;
+    transform: none;
+    left: auto;
+    top: auto;
+    margin: -30px 0; /* 겹치게 */
+  }
+  .pref-title { font-size: 3rem; }
+}

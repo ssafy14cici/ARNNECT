@@ -11,27 +11,7 @@ import {
   updateExhibitionByCode,
 } from "../../../api/tickets";
 
-/**
- * 스키마(조회 Response) 기준:
- * - memberUuid: string
- * - address: string
- * - addressDetail: string
- * - title: string
- * - startDate: string(date)
- * - endDate: string(date)
- * - startTime: string ("HH:mm")
- * - endTime: string ("HH:mm")
- * - ticketCode: string
- * - image: string (url or base64)  // 조회용
- *
- * ✅ 유저 요구사항:
- * - image는 URL이 아니라 base64로 백엔드로 바로 보냄(= 업로드)
- *   → 발급 후 ticketCode를 받은 뒤, FE에서 QR SVG를 base64로 만들어 update로 업로드(옵션)
- */
-
-// -----------------------
-// helpers
-// -----------------------
+// --- Helpers ---
 function todayYYYYMMDD() {
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -41,11 +21,9 @@ function todayYYYYMMDD() {
 }
 
 function isHHmm(v: string) {
-  // 00:00 ~ 23:59
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(v);
 }
 
-// 유니코드 안전 base64
 function base64EncodeUnicode(str: string) {
   return btoa(
     encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) =>
@@ -54,29 +32,24 @@ function base64EncodeUnicode(str: string) {
   );
 }
 
-// react-qr-code가 렌더한 SVG를 data url로 변환
 function svgToDataUrl(svgEl: SVGElement) {
   const xml = new XMLSerializer().serializeToString(svgEl);
   const svg64 = base64EncodeUnicode(xml);
   return `data:image/svg+xml;base64,${svg64}`;
 }
 
-// 백엔드가 base64만 주거나(data prefix 없음) data url / url을 줄 수도 있어서 normalize
 function normalizeImageToSrc(image?: string | null) {
   if (!image) return "";
-  // 이미 data url이면 그대로
   if (image.startsWith("data:image/")) return image;
-  // url이면 그대로
   if (image.startsWith("http://") || image.startsWith("https://")) return image;
-  // base64만 온 경우(보통 png로 가정). 백엔드가 svg base64를 주면 여기 mime만 바꾸면 됨.
   return `data:image/png;base64,${image}`;
 }
 
-// API 응답에서 ticketCode 키가 ticket_code / ticketCode 혼재할 수 있으니 흡수
 function pickTicketCode(obj: any): string {
   return obj?.ticketCode ?? obj?.ticket_code ?? obj?.ticketCode?.toString?.() ?? "";
 }
 
+// --- Types ---
 type TicketItem = {
   memberUuid?: string;
   address: string;
@@ -87,7 +60,7 @@ type TicketItem = {
   startTime: string;
   endTime: string;
   ticketCode: string;
-  image?: string; // base64 or url or data url
+  image?: string;
 };
 
 type FormState = {
@@ -112,29 +85,28 @@ function toForm(t?: Partial<TicketItem> | null): FormState {
   };
 }
 
+// ✅ 화면 모드 정의
+type TabMode = "ISSUE" | "LIST";
+
 export default function TicketQr() {
+  // --- Global State ---
+  const [activeTab, setActiveTab] = useState<TabMode>("ISSUE"); // 'ISSUE' or 'LIST'
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  // 현재 선택된 티켓 코드 & 이미지(조회용)
+  // --- Issue (Form) State ---
   const [ticketCode, setTicketCode] = useState<string>("");
   const [qrImageSrc, setQrImageSrc] = useState<string>("");
-
-  // ✅ 수정 모드: 기존 ticketCode 유지하고 내용만 수정
   const [editingCode, setEditingCode] = useState<string | null>(null);
-
   const [form, setForm] = useState<FormState>(() => toForm(null));
-
-  // 발급 목록
-  const [issued, setIssued] = useState<TicketItem[]>([]);
-  const [showIssued, setShowIssued] = useState(false);
-
-  // QR 렌더 DOM 접근(= SVG를 base64로 만들어 백엔드에 보낼 때 사용)
+  
   const qrWrapRef = useRef<HTMLDivElement | null>(null);
-
-  // ---- 설정: “발급 후 QR 이미지를 base64로 백엔드에 업로드”를 자동으로 할지
   const AUTO_UPLOAD_QR_IMAGE = true;
 
+  // --- List State ---
+  const [issued, setIssued] = useState<TicketItem[]>([]);
+
+  // --- Derived ---
   const canSubmit = useMemo(() => {
     if (busy) return false;
     if (!form.title.trim()) return false;
@@ -144,19 +116,18 @@ export default function TicketQr() {
     return true;
   }, [form, busy]);
 
-  // 스캔 payload(기존 로직 유지)
   const qrValue = useMemo(() => {
     if (!ticketCode) return "";
     return JSON.stringify({ v: 1, ticket_code: ticketCode });
   }, [ticketCode]);
 
+  // --- API Methods ---
   const normalizeList = (raw: unknown): TicketItem[] => {
     const arr = Array.isArray(raw) ? raw : [];
     return arr
       .map((x: any) => {
         const code = pickTicketCode(x);
         if (!code) return null;
-
         return {
           memberUuid: x?.memberUuid ?? x?.member_uuid,
           address: x?.address ?? "",
@@ -177,24 +148,18 @@ export default function TicketQr() {
     try {
       const list = await listIssuedExhibitions();
       setIssued(normalizeList(list as unknown));
-    } catch {
-      // 목록 실패는 치명적이지 않아서 조용히
-    }
+    } catch { /* quiet */ }
   };
 
-  useEffect(() => {
-    reloadIssued();
-  }, []);
+  useEffect(() => { reloadIssued(); }, []);
+
+  // --- Actions ---
 
   const submit = async () => {
     if (!canSubmit) return;
-
-    setBusy(true);
-    setError("");
-
+    setBusy(true); setError("");
     try {
       const payload = {
-        // ✅ Request에는 image 넣지 않음(조회용 필드)
         title: form.title.trim(),
         address: form.address.trim(),
         addressDetail: form.addressDetail.trim() || undefined,
@@ -205,22 +170,18 @@ export default function TicketQr() {
       };
 
       if (editingCode) {
-        // ✅ ticketCode 고정, 내용만 수정
         await updateExhibitionByCode(editingCode, payload);
         setTicketCode(editingCode);
+        alert("수정되었습니다.");
       } else {
-        // ✅ 신규 발급
         const res: any = await createExhibitionTicket(payload);
         const code = pickTicketCode(res);
         setTicketCode(code);
-
-        // ✅ 백엔드가 image를 같이 내려주면 그대로 사용(권장 A)
         const img = res?.image ? normalizeImageToSrc(res.image) : "";
         setQrImageSrc(img);
+        alert("QR이 발급되었습니다.");
       }
-
       await reloadIssued();
-      setShowIssued(true);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "처리 실패");
     } finally {
@@ -229,46 +190,29 @@ export default function TicketQr() {
   };
 
   const resetForm = () => {
-    setError("");
-    setBusy(false);
-    setEditingCode(null);
-    setTicketCode("");
-    setQrImageSrc("");
-    setForm(toForm(null));
+    setError(""); setBusy(false); setEditingCode(null);
+    setTicketCode(""); setQrImageSrc(""); setForm(toForm(null));
   };
 
-  const copy = async () => {
-    if (!ticketCode) return;
-    try {
-      await navigator.clipboard.writeText(ticketCode);
-    } catch {
-      // ignore
-    }
-  };
-
+  // ✅ 목록에서 '수정' 누르면 -> 발급 탭으로 이동해서 데이터 채움
   const startEdit = (t: TicketItem) => {
     setError("");
     setEditingCode(t.ticketCode);
     setTicketCode(t.ticketCode);
     setQrImageSrc(normalizeImageToSrc(t.image));
     setForm(toForm(t));
-    setShowIssued(true);
+    
+    // 탭 이동
+    setActiveTab("ISSUE");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const remove = async (code: string) => {
-    const ok = confirm("이 발급 기록을 삭제할까요?");
-    if (!ok) return;
-
-    setBusy(true);
-    setError("");
+    if (!confirm("이 발급 기록을 삭제할까요?")) return;
+    setBusy(true); setError("");
     try {
       await deleteExhibitionByCode(code);
-      if (ticketCode === code) {
-        setTicketCode("");
-        setQrImageSrc("");
-      }
-      if (editingCode === code) setEditingCode(null);
+      if (ticketCode === code) resetForm();
       await reloadIssued();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "삭제 실패");
@@ -277,286 +221,309 @@ export default function TicketQr() {
     }
   };
 
-  /**
-   * ✅ 대안 B: “URL이 아니라 백엔드로 바로” (base64 업로드)
-   * - ticketCode가 생긴 뒤 QR SVG를 base64(data url)로 만들고
-   * - 백엔드에 저장(업데이트)한다.
-   *
-   * ⚠️ 전제: updateExhibitionByCode가 `image` 필드를 받을 수 있어야 함
-   *    (아니면 /tickets/{code}/image 같은 전용 업로드 API를 따로 만들고 여기서 호출)
-   */
+  // ✅ QR 이미지 다운로드 함수 (Canvas 사용)
+  const downloadQr = () => {
+    const wrap = qrWrapRef.current;
+    const svg = wrap?.querySelector("svg");
+    
+    if (!svg) {
+      alert("QR 코드를 찾을 수 없습니다.");
+      return;
+    }
+
+    // 1. SVG 데이터를 문자열로 변환
+    const svgData = new XMLSerializer().serializeToString(svg);
+    // 2. Blob 객체 생성
+    const blob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+
+    // 3. 이미지를 로드해서 캔버스에 그림 (고화질 변환)
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      
+      // QR 해상도 설정 (넉넉하게 1000px)
+      const size = 1000;
+      canvas.width = size;
+      canvas.height = size;
+
+      if (ctx) {
+        // 배경을 흰색으로 채움 (투명하면 검은 배경에서 안 보일 수 있음)
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, size, size);
+        
+        // 이미지를 캔버스에 그림
+        ctx.drawImage(img, 0, 0, size, size);
+      }
+
+      // 4. 다운로드 링크 생성 및 클릭
+      const pngUrl = canvas.toDataURL("image/png");
+      const downloadLink = document.createElement("a");
+      downloadLink.download = `QR_${ticketCode || "ticket"}.png`;
+      downloadLink.href = pngUrl;
+      downloadLink.click();
+
+      // 메모리 해제
+      URL.revokeObjectURL(url);
+    };
+
+    img.src = url;
+  };
+
+  // QR Auto Upload
   useEffect(() => {
-    if (!AUTO_UPLOAD_QR_IMAGE) return;
-    if (!ticketCode) return;
-    if (busy) return;
+    if (!AUTO_UPLOAD_QR_IMAGE || !ticketCode || busy || qrImageSrc) return;
+    if (activeTab !== "ISSUE") return; 
 
-    // 이미 백엔드에서 받은 image가 있으면 업로드할 필요 없음
-    if (qrImageSrc) return;
-
-    (async () => {
-      // QRCode가 DOM에 렌더된 다음 프레임에 svg를 읽음
-      await new Promise<void>((r) => requestAnimationFrame(() => r()));
-
+    const timer = setTimeout(async () => {
       const wrap = qrWrapRef.current;
       const svg = wrap?.querySelector("svg");
       if (!svg) return;
-
       const dataUrl = svgToDataUrl(svg);
       setQrImageSrc(dataUrl);
-
-      // 백엔드에는 base64만 보내고 싶으면 dataUrl의 ',' 뒤만 사용
       const base64Only = dataUrl.split(",")[1] ?? "";
-
       try {
-        // ✅ 여기 key 이름(image / qrImage 등)은 백엔드 스펙에 맞춰야 함
         await updateExhibitionByCode(ticketCode, { image: base64Only } as any);
         await reloadIssued();
-      } catch {
-        // 업로드 실패는 화면 동작을 막지 않음(일단 QR은 FE에서 표시됨)
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ticketCode, busy, qrImageSrc]);
+      } catch { /* ignore */ }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [ticketCode, busy, qrImageSrc, activeTab]);
+
 
   return (
     <main className="loungePage">
       <section className="loungeWrap">
         <div className="loungeSubTop">
-          <h1 className="loungeSubTitle">전시 QR 발급</h1>
-          <Link className="loungeBackLink" to="/lounge">
-            ← 라운지로
-          </Link>
+          <h1 className="loungeSubTitle">전시 QR 관리</h1>
+          <Link className="loungeBackLink" to="/lounge">← 라운지로</Link>
         </div>
 
-        <p className="loungeSubDesc">
-          QR payload는 <strong>ticketCode</strong>만 포함합니다.
-          <br />
-          <strong>image(QR 이미지)</strong>는 조회용이며, URL 대신 base64로 백엔드에 저장할 수 있습니다.
-        </p>
-
-        <div className="loungeSubPanel">
-          <h2 className="loungeSubPanelTitle">
-            전시 정보 {editingCode ? <span style={{ opacity: 0.7 }}>(수정: {editingCode})</span> : null}
-          </h2>
-
-          <div style={{ display: "grid", gap: 10 }}>
-            <label>
-              <div className="loungeSubHint">전시 제목 *</div>
-              <input
-                value={form.title}
-                onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
-                placeholder="예: 원형하는 몸: Being Being Being"
-                style={inputStyle}
-                disabled={busy}
-              />
-            </label>
-
-            <label>
-              <div className="loungeSubHint">주소 *</div>
-              <input
-                value={form.address}
-                onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
-                placeholder="예: 서울시 ..."
-                style={inputStyle}
-                disabled={busy}
-              />
-            </label>
-
-            <label>
-              <div className="loungeSubHint">상세주소 (선택)</div>
-              <input
-                value={form.addressDetail}
-                onChange={(e) => setForm((p) => ({ ...p, addressDetail: e.target.value }))}
-                placeholder="예: 101동 ..."
-                style={inputStyle}
-                disabled={busy}
-              />
-            </label>
-
-            <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr" }}>
-              <label>
-                <div className="loungeSubHint">시작일</div>
-                <input
-                  type="date"
-                  value={form.startDate}
-                  onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))}
-                  style={inputStyle}
-                  disabled={busy}
-                />
-              </label>
-
-              <label>
-                <div className="loungeSubHint">종료일</div>
-                <input
-                  type="date"
-                  value={form.endDate}
-                  onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))}
-                  style={inputStyle}
-                  disabled={busy}
-                />
-              </label>
-            </div>
-
-            <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr" }}>
-              <label>
-                <div className="loungeSubHint">시작시간 (HH:mm)</div>
-                <input
-                  value={form.startTime}
-                  onChange={(e) => setForm((p) => ({ ...p, startTime: e.target.value }))}
-                  placeholder="10:00"
-                  style={inputStyle}
-                  disabled={busy}
-                />
-              </label>
-
-              <label>
-                <div className="loungeSubHint">종료시간 (HH:mm)</div>
-                <input
-                  value={form.endTime}
-                  onChange={(e) => setForm((p) => ({ ...p, endTime: e.target.value }))}
-                  placeholder="20:00"
-                  style={inputStyle}
-                  disabled={busy}
-                />
-              </label>
-            </div>
-          </div>
-
-          {error && <div className="loungeNotice">{error}</div>}
-
-          <div className="loungeSubActions">
-            <button className="loungeSubBtn" type="button" onClick={submit} disabled={!canSubmit}>
-              {busy ? "처리 중..." : editingCode ? "수정 저장(코드 유지)" : "QR 발급"}
-            </button>
-
-            <button className="loungeSubBtn" type="button" onClick={resetForm} disabled={busy}>
-              초기화
-            </button>
-
-            <button className="loungeSubBtn" type="button" onClick={copy} disabled={!ticketCode || busy}>
-              ticketCode 복사
-            </button>
-
-            <button className="loungeSubBtn" type="button" onClick={() => setShowIssued((v) => !v)} disabled={busy}>
-              {showIssued ? "발급 목록 닫기" : "발급 목록 보기"}
-            </button>
-          </div>
+        {/* ✅ [탭 버튼] 화면 전환 컨트롤 */}
+        <div className="loungeSegmentNav">
+          <button 
+            type="button"
+            className={`loungeSegmentBtn ${activeTab === "ISSUE" ? "active" : ""}`}
+            onClick={() => setActiveTab("ISSUE")}
+          >
+            QR 발급 / 수정
+          </button>
+          <button 
+            type="button"
+            className={`loungeSegmentBtn ${activeTab === "LIST" ? "active" : ""}`}
+            onClick={() => setActiveTab("LIST")}
+          >
+            발급 목록 ({issued.length})
+          </button>
         </div>
 
-        {/* QR 출력 */}
-        {ticketCode && (
-          <div className="loungeSubPanel">
-            <h2 className="loungeSubPanelTitle">QR</h2>
-
-            <p className="loungeSubHint">
-              <strong>ticketCode</strong>: {ticketCode}
-              <br />
-              <strong>QR payload</strong>: {qrValue}
-              <br />
-              {editingCode ? "수정해도 " : "발급 후 "}
-              <strong>ticketCode는 유지</strong>됩니다.
+        {/* =========================================================
+            VIEW 1: QR 발급 (ISSUE)
+           ========================================================= */}
+        {activeTab === "ISSUE" && (
+          <div className="fade-in">
+            <p className="loungeSubDesc">
+              전시 정보를 입력하여 관람객을 위한 <strong>QR 코드</strong>를 생성하세요.
             </p>
 
-            <div style={{ marginTop: 12, display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-              <div ref={qrWrapRef} style={{ background: "#fff", padding: 12, borderRadius: 12 }}>
-                {/* ✅ 우선순위 1) 백엔드에서 내려준 image(base64/url) */}
-                {qrImageSrc ? (
-                  <img
-                    src={qrImageSrc}
-                    alt="QR"
-                    style={{ width: 220, height: 220, display: "block" }}
-                  />
-                ) : (
-                  // ✅ 우선순위 2) 없으면 FE에서 생성(그리고 자동 업로드 옵션으로 base64 전송)
-                  <QRCode value={qrValue} size={220} />
+            <div className="loungeSubPanel" style={{ textAlign: 'left' }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
+                <h2 className="loungeSubPanelTitle" style={{ margin: 0 }}>
+                  {editingCode ? "전시 정보 수정" : "새 전시 등록"}
+                </h2>
+                {editingCode && (
+                  <button className="loungeTextBtn" onClick={resetForm}>
+                    취소하고 새로 만들기
+                  </button>
                 )}
               </div>
 
-              <div className="loungeSubHint" style={{ maxWidth: 420 }}>
-                스캔 화면에서는 ticketCode로 전시 정보를 조회합니다.
-                <br />
-                <strong>image는 조회용</strong>이며 URL 대신 <strong>base64로 저장</strong>하려면
-                (AUTO_UPLOAD_QR_IMAGE=true)처럼 발급 후 업로드 로직을 사용하면 됩니다.
+              {/* 입력 폼 */}
+              <div style={{ display: "grid", gap: 24 }}>
+                <div className="loungeInputGroup">
+                  <label className="loungeLabel">전시 제목 *</label>
+                  <input
+                    className="loungeInput"
+                    value={form.title}
+                    onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+                    placeholder="예: 원형하는 몸: Being Being Being"
+                    disabled={busy}
+                  />
+                </div>
+
+                <div className="loungeInputGroup">
+                  <label className="loungeLabel">주소 *</label>
+                  <input
+                    className="loungeInput"
+                    value={form.address}
+                    onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
+                    placeholder="기본 주소 (시/군/구)"
+                    disabled={busy}
+                  />
+                </div>
+
+                <div className="loungeInputGroup">
+                  <label className="loungeLabel">상세주소 (선택)</label>
+                  <input
+                    className="loungeInput"
+                    value={form.addressDetail}
+                    onChange={(e) => setForm((p) => ({ ...p, addressDetail: e.target.value }))}
+                    placeholder="건물명, 층수 등"
+                    disabled={busy}
+                  />
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                  <div className="loungeInputGroup">
+                    <label className="loungeLabel">시작일</label>
+                    <input
+                      type="date"
+                      className="loungeInput"
+                      value={form.startDate}
+                      onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))}
+                      disabled={busy}
+                    />
+                  </div>
+                  <div className="loungeInputGroup">
+                    <label className="loungeLabel">종료일</label>
+                    <input
+                      type="date"
+                      className="loungeInput"
+                      value={form.endDate}
+                      onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))}
+                      disabled={busy}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                  <div className="loungeInputGroup">
+                    <label className="loungeLabel">시작시간</label>
+                    <input
+                      className="loungeInput"
+                      value={form.startTime}
+                      onChange={(e) => setForm((p) => ({ ...p, startTime: e.target.value }))}
+                      placeholder="10:00"
+                      disabled={busy}
+                    />
+                  </div>
+                  <div className="loungeInputGroup">
+                    <label className="loungeLabel">종료시간</label>
+                    <input
+                      className="loungeInput"
+                      value={form.endTime}
+                      onChange={(e) => setForm((p) => ({ ...p, endTime: e.target.value }))}
+                      placeholder="20:00"
+                      disabled={busy}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {error && <div className="loungeNotice">{error}</div>}
+
+              <div className="loungeSubActions">
+                <button className="loungeSubBtn" type="button" onClick={submit} disabled={!canSubmit}>
+                  {busy ? "처리 중..." : editingCode ? "수정사항 저장" : "QR 발급하기"}
+                </button>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* 발급 목록 */}
-        {showIssued && (
-          <div className="loungeSubPanel">
-            <h2 className="loungeSubPanelTitle">발급 목록</h2>
-
-            {issued.length === 0 ? (
-              <p className="loungeSubHint">아직 발급 기록이 없습니다.</p>
-            ) : (
-              <div style={{ display: "grid", gap: 12 }}>
-                {issued.map((t) => (
-                  <div
-                    key={t.ticketCode}
-                    style={{
-                      border: "1px solid rgba(255,255,255,0.14)",
-                      borderRadius: 12,
-                      padding: 12,
-                      display: "grid",
-                      gap: 6,
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "start" }}>
-                      <div>
-                        <div style={{ fontWeight: 800 }}>{t.title}</div>
-                        <div className="loungeSubHint" style={{ marginTop: 4 }}>
-                          <div>
-                            <strong>CODE</strong>: {t.ticketCode}
-                          </div>
-                          <div>
-                            <strong>ADDRESS</strong>: {t.address} {t.addressDetail ? `(${t.addressDetail})` : ""}
-                          </div>
-                          <div>
-                            <strong>DATE</strong>: {t.startDate} ~ {t.endDate}
-                          </div>
-                          <div>
-                            <strong>TIME</strong>: {t.startTime} ~ {t.endTime}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "end" }}>
-                        <button className="loungeSubBtn" type="button" onClick={() => startEdit(t)} disabled={busy}>
-                          수정
-                        </button>
-                        <button
-                          className="loungeSubBtn"
-                          type="button"
-                          onClick={() => {
-                            setTicketCode(t.ticketCode);
-                            setQrImageSrc(normalizeImageToSrc(t.image));
-                          }}
-                          disabled={busy}
-                        >
-                          QR 보기
-                        </button>
-                        <button className="loungeSubBtn" type="button" onClick={() => remove(t.ticketCode)} disabled={busy}>
-                          삭제
-                        </button>
-                      </div>
-                    </div>
+            {/* QR 생성 결과 (발급 직후 확인용) */}
+            {ticketCode && (
+              <div className="loungeSubPanel" style={{ marginTop: 40 }}>
+                <h2 className="loungeSubPanelTitle">QR 코드 생성됨</h2>
+                
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
+                  <div ref={qrWrapRef} style={{ background: "#fff", padding: 20, borderRadius: 16 }}>
+                    {qrImageSrc ? (
+                      <img src={qrImageSrc} alt="QR" style={{ width: 220, height: 220, display: "block" }} />
+                    ) : (
+                      <QRCode value={qrValue} size={220} />
+                    )}
                   </div>
-                ))}
+                  
+                  <div className="loungeSubHint">
+                    CODE: <strong style={{ color: "#C8A97E" }}>{ticketCode}</strong>
+                  </div>
+
+                  <div className="loungeSubActions" style={{ justifyContent: 'center', marginTop: 0, gap: 12 }}>
+                    <button 
+                      className="loungeSubBtn" 
+                      onClick={() => { try { navigator.clipboard.writeText(ticketCode); alert("코드가 복사되었습니다."); } catch {} }}
+                    >
+                      코드 복사
+                    </button>
+                    
+                    {/* ✅ 저장 버튼 추가 */}
+                    <button 
+                      className="loungeSubBtn" 
+                      onClick={downloadQr}
+                      style={{ borderColor: '#fff', color: '#fff' }}
+                    >
+                      QR 이미지 저장
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
         )}
+
+        {/* =========================================================
+            VIEW 2: 발급 목록 (LIST)
+           ========================================================= */}
+        {activeTab === "LIST" && (
+          <div className="fade-in">
+            <p className="loungeSubDesc">
+              지금까지 발급한 전시 QR 목록입니다.
+            </p>
+
+            <div className="loungeSubPanel" style={{ textAlign: 'left', minHeight: 300 }}>
+              {issued.length === 0 ? (
+                <div className="loungeEmpty">
+                  발급된 내역이 없습니다.<br />
+                  'QR 발급' 탭에서 새로운 티켓을 생성해보세요.
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 16 }}>
+                  {issued.map((t) => (
+                    <div key={t.ticketCode} className="tasteCard" style={{ padding: 24, border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff' }}>{t.title}</div>
+                        <div style={{ fontSize: '0.8rem', color: '#C8A97E', fontFamily: 'monospace' }}>{t.ticketCode}</div>
+                      </div>
+                      
+                      <div style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, marginBottom: 20 }}>
+                        <div>📍 {t.address} {t.addressDetail}</div>
+                        <div>📅 {t.startDate} ~ {t.endDate} ({t.startTime}-{t.endTime})</div>
+                      </div>
+
+                      <div className="loungeSubActions" style={{ marginTop: 0, justifyContent: 'flex-start', gap: 10 }}>
+                        <button 
+                          className="loungeSubBtn" 
+                          onClick={() => startEdit(t)}
+                        >
+                          수정 / QR보기
+                        </button>
+                        <button 
+                          className="loungeSubBtn" 
+                          onClick={() => remove(t.ticketCode)} 
+                          style={{ borderColor: 'rgba(255, 107, 107, 0.5)', color: '#ff6b6b' }}
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
       </section>
     </main>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  borderRadius: 12,
-  padding: 10,
-  border: "1px solid rgba(255,255,255,0.14)",
-  background: "rgba(255,255,255,0.05)",
-  color: "inherit",
-};

@@ -1,529 +1,439 @@
-/* FE/src/pages/lounge/lounge.css */
+/* ==========================================================================
+   LOUNGE PAGE (Sophisticated Dark Mode)
+   - Layout, Tabs, Taste, Quiz, Common Components
+========================================================================== */
 
+/* --- 1. Global Layout --- */
 .loungePage {
   min-height: 100vh;
-  padding: 24px 16px 48px;
+  background-color: #050505; /* Deep Black */
+  color: #fff;
+  font-family: 'Pretendard', sans-serif;
+  padding-bottom: 100px; /* 하단 여백 확보 */
 }
 
 .loungeWrap {
-  max-width: 980px;
+  max-width: 1000px;
   margin: 0 auto;
+  padding: 0 20px;
+  position: relative;
 }
 
-.loungeHeader {
-  padding: 16px 0 10px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-}
-
-.loungeHeaderTop {
+/* --- 2. Lounge Header (Glassmorphism) --- */
+.loungeTop {
+  padding: 60px 0 40px;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  align-items: flex-start;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(5, 5, 5, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 40px;
+  transition: padding 0.3s;
 }
 
 .loungeTitle {
+  font-family: 'Playfair Display', serif;
+  font-size: 3rem;
   margin: 0;
-  font-size: 28px;
-  letter-spacing: -0.02em;
+  color: #fff;
+  line-height: 1;
 }
 
-.loungeRoleBadge {
-  font-size: 12px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.18);
-  background: rgba(255,255,255,0.06);
+.loungeDesc {
+  margin-top: 8px;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 300;
 }
 
-.loungeRoleBadge.user {
-  opacity: 0.95;
+.loungeRoleChip {
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.8);
 }
 
-.loungeRoleBadge.artist {
-  opacity: 0.95;
+/* --- 3. Tabs (Underline Style) --- */
+.loungeTabs {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 40px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  overflow-x: auto;
 }
 
-.loungeRoleBadge.unknown {
-  opacity: 0.8;
+.loungeTabBtn {
+  background: transparent;
+  border: none;
+  padding: 16px 4px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.3s ease;
+  opacity: 0.5;
+  border-bottom: 2px solid transparent;
+  min-width: 100px;
 }
 
-.loungeSubtitle {
-  margin: 8px 0 0;
-  opacity: 0.85;
-  line-height: 1.4;
+.loungeTabBtn:hover { opacity: 0.8; }
+
+.loungeTabBtn.isActive {
+  opacity: 1;
+  border-bottom-color: #fff; /* Active Color */
 }
 
-.loungeNotice {
-  margin-top: 12px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.06);
-  font-size: 13px;
-  opacity: 0.9;
+.loungeTabTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #fff;
 }
 
-.loungeSection {
-  padding: 18px 0 0;
+.loungeTabDesc {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 300;
+  white-space: nowrap;
 }
 
-.loungeSectionTitle {
-  margin: 0 0 10px;
-  font-size: 16px;
-  opacity: 0.9;
+/* --- 4. Sub Page Headers (CollectBook, Taste, Quiz) --- */
+.loungeSubTop {
+  padding: 40px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
 }
 
-.loungeGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+.loungeSubTitle {
+  font-family: 'Playfair Display', serif;
+  font-size: 2rem;
+  margin: 0;
+  color: #C8A97E; /* Sub pages use Gold Accent */
 }
 
-@media (max-width: 860px) {
-  .loungeGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 540px) {
-  .loungeGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.loungeCard {
-  display: block;
+.loungeBackLink {
+  color: rgba(255, 255, 255, 0.6);
   text-decoration: none;
-  color: inherit;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.05);
-  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+  font-size: 0.9rem;
+  transition: color 0.2s;
+}
+.loungeBackLink:hover { color: #fff; }
+
+.loungeSubDesc {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 40px;
+  line-height: 1.6;
 }
 
-.loungeCard:hover {
-  transform: translateY(-2px);
-  background: rgba(255,255,255,0.08);
-  border-color: rgba(255,255,255,0.22);
-}
-
-.loungeCard.disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.loungeCard.disabled:hover {
-  transform: none;
-  background: rgba(255,255,255,0.05);
-  border-color: rgba(255,255,255,0.14);
-}
-
-.loungeCardBody {
-  padding: 14px 14px 16px;
-}
-
-.loungeCardTitleRow {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.loungeCardTitle {
-  margin: 0;
-  font-size: 15px;
-  letter-spacing: -0.01em;
-}
-
-.loungeChevron {
-  opacity: 0.7;
-}
-
-.loungeCardDesc {
-  margin: 8px 0 0;
-  font-size: 13px;
-  opacity: 0.8;
-  line-height: 1.45;
-}
-
-.loungePanel {
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.04);
-  padding: 14px;
-}
-
-.loungePanelText {
-  margin: 0 0 10px;
-  font-size: 13px;
-  opacity: 0.85;
-  line-height: 1.5;
-}
-
-.loungeEmpty {
-  padding: 14px;
-  border-radius: 12px;
-  border: 1px dashed rgba(255,255,255,0.18);
-  opacity: 0.75;
-  font-size: 13px;
-}
-
-/* ===== Radar6 (Taste) ===== */
-.radarSvg {
-  width: 100%;
-  max-width: 360px;
-  height: auto;
-  display: block;
-  margin: 0 auto;
-}
-
-.radarGridPolygon {
-  fill: none;
-  stroke: var(--lounge-line, rgba(255, 255, 255, 0.14));
-  stroke-width: 1;
-}
-
-.radarAxisLine {
-  stroke: var(--lounge-line-strong, rgba(255, 255, 255, 0.22));
-  stroke-width: 1;
-}
-
-.radarDataFill {
-  fill: var(--lounge-accent-fill, rgba(120, 180, 255, 0.18));
-  stroke: none;
-}
-
-.radarDataStroke {
-  fill: none;
-  stroke: var(--lounge-accent, rgba(120, 180, 255, 0.85));
-  stroke-width: 2;
-}
-
-.radarLabel {
-  font-size: 12px;
-  fill: var(--lounge-text, rgba(255, 255, 255, 0.9));
-}
-
-/* Taste 레이아웃 보조 */
-.tasteChartRow {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-
-@media (min-width: 720px) {
-  .tasteChartRow {
-    grid-template-columns: 360px 1fr;
-    align-items: center;
-  }
-}
-
-.tasteTopList {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.tasteTopList li {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 10px;
-  border: 1px solid var(--lounge-line, rgba(255, 255, 255, 0.14));
-  border-radius: 10px;
-}
-
-.tasteTopList .label {
-  opacity: 0.95;
-}
-.tasteTopList .value {
-  opacity: 0.8;
-  font-variant-numeric: tabular-nums;
-}
-/* =========================
-   Taste UI (Radar + Details)
-========================= */
-
+/* --- 5. Taste & Quiz Cards (Analysis UI) --- */
 .tasteSection {
-  display: grid;
-  gap: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .tasteCard {
-  background: rgba(255, 255, 255, 0.62);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 18px;
-  padding: 16px;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(6px);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 30px;
+  backdrop-filter: blur(10px);
 }
 
 .tasteCardTitle {
-  margin: 0 0 10px;
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.2px;
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  margin: 0 0 24px;
+  color: #fff;
 }
 
+/* Chart Layout */
 .tasteChartGrid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: center;
 }
 
-@media (min-width: 860px) {
-  .tasteChartGrid {
-    grid-template-columns: 420px 1fr;
-    align-items: center;
-  }
-}
-
-
-/* ===== Radar SVG ===== */
-.radarSvg {
-  width: 100%;
-  max-width: 420px;
-  height: auto;
-  display: block;
-  margin: 0 auto;
-}
-
-.radarGridPolygon {
-  fill: none;
-  stroke: rgba(0, 0, 0, 0.08);
-  stroke-width: 1;
-}
-
-.radarAxisLine {
-  stroke: rgba(0, 0, 0, 0.10);
-  stroke-width: 1;
-}
-
-.radarDataShadow {
-  fill: rgba(0, 0, 0, 0.10);
-}
-
-.radarDataStroke {
-  fill: none;
-  stroke: rgba(70, 140, 255, 0.90);
-  stroke-width: 2.6;
-}
-
-.radarDot {
-  fill: rgba(255, 255, 255, 0.95);
-  stroke: rgba(70, 140, 255, 0.95);
-  stroke-width: 2;
-}
-
-.radarLabel {
-  font-size: 12px;
-  font-weight: 650;
-  fill: rgba(0, 0, 0, 0.50);
-}
-
-/* ===== Top6 list ===== */
+/* Bar List in Taste */
 .tasteTopList {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: grid;
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .tasteRow {
-  display: grid;
-  grid-template-columns: 90px 1fr 44px;
-  gap: 10px;
+  display: flex;
   align-items: center;
+  gap: 12px;
+  font-size: 0.9rem;
 }
 
 .tasteRowLabel {
-  font-weight: 650;
-  color: rgba(0, 0, 0, 0.66);
-}
-
-.tasteRowValue {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  color: rgba(0, 0, 0, 0.45);
+  width: 80px;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .tasteBarTrack {
-  height: 10px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.06);
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
   overflow: hidden;
 }
 
 .tasteBarFill {
   height: 100%;
-  border-radius: 999px;
-  background: rgba(70, 140, 255, 0.70);
+  background: #C8A97E; /* Gold Bar */
+  border-radius: 3px;
 }
 
-/* ===== 상세 분석 ===== */
+.tasteRowValue {
+  width: 30px;
+  text-align: right;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Detail Grid (3 columns) */
 .tasteDetailGrid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-
-@media (min-width: 860px) {
-  .tasteDetailGrid {
-    grid-template-columns: 1fr 1fr;
-  }
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
 }
 
 .detailItemList {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: grid;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .detailItem {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(0,0,0,0.06);
-  background: rgba(255,255,255,0.50);
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 8px;
 }
 
 .detailLeft {
   display: flex;
   flex-direction: column;
-  gap: 4px;
 }
+
 .detailName {
-  font-weight: 650;
-  color: rgba(0,0,0,0.62);
+  font-size: 1rem;
+  color: #fff;
 }
+
 .detailHint {
-  font-size: 12px;
-  color: rgba(0,0,0,0.40);
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .detailScore {
-  font-variant-numeric: tabular-nums;
-  color: rgba(0,0,0,0.44);
+  font-weight: 700;
+  color: #C8A97E;
 }
 
-.loungeTop {
+/* --- 6. Common Components (Buttons, Panels) --- */
+.loungeSubActions {
+  margin-top: 30px;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.loungeRoleChip {
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(0,0,0,0.08);
-  background: rgba(255,255,255,0.55);
-  font-size: 12px;
-  color: rgba(0,0,0,0.55);
-}
-
-.loungeTabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  justify-content: flex-end;
   gap: 12px;
-  margin-top: 18px;
 }
 
-.loungeTab {
-  display: block;
-  padding: 14px 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(0,0,0,0.08);
-  background: rgba(255,255,255,0.55);
-  text-decoration: none;
-  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, border-color 120ms ease;
-}
-
-.loungeTab:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 20px rgba(0,0,0,0.06);
-}
-
-.loungeTabTitle {
-  font-weight: 800;
-  color: rgba(0,0,0,0.80);
-}
-
-.loungeTabDesc {
-  margin-top: 6px;
-  font-size: 12px;
-  color: rgba(0,0,0,0.50);
-}
-
-.loungeTab.isActive {
-  border-color: rgba(70, 140, 255, 0.45);
-  background: rgba(70, 140, 255, 0.10);
-  box-shadow: 0 10px 22px rgba(70, 140, 255, 0.12);
-}
-
-.loungeBody {
-  margin-top: 14px;
-}
-.loungeTop {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.loungeRoleChip {
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(0,0,0,0.08);
-  background: rgba(255,255,255,0.55);
-  font-size: 12px;
-  color: rgba(0,0,0,0.55);
-}
-
-.loungeTabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 18px;
-}
-
-.loungeTabBtn {
-  text-align: left;
-  padding: 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(0,0,0,0.08);
-  background: rgba(255,255,255,0.55);
+.loungeSubBtn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  padding: 10px 24px;
+  border-radius: 50px;
   cursor: pointer;
-  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, border-color 120ms ease;
+  transition: all 0.3s;
+  font-size: 0.9rem;
 }
 
-.loungeTabBtn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 20px rgba(0,0,0,0.06);
+.loungeSubBtn:hover:not(:disabled) {
+  border-color: #C8A97E;
+  color: #C8A97E;
+  background: rgba(200, 169, 126, 0.1);
 }
 
-.loungeTabBtn.isActive {
-  border-color: rgba(70, 140, 255, 0.45);
-  background: rgba(70, 140, 255, 0.10);
-  box-shadow: 0 10px 22px rgba(70, 140, 255, 0.12);
+.loungeSubBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
-.loungeTabTitle {
-  font-weight: 800;
-  color: rgba(0,0,0,0.80);
+.loungeSubPanel {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 60px;
+  text-align: center;
 }
 
-.loungeTabDesc {
-  margin-top: 6px;
-  font-size: 12px;
-  color: rgba(0,0,0,0.50);
+.loungeSubPanelTitle {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  margin-bottom: 16px;
+  color: #fff;
 }
 
-.loungeBody {
-  margin-top: 14px;
+.loungeSubHint {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.loungeEmpty {
+  text-align: center;
+  padding: 60px 0;
+  color: rgba(255, 255, 255, 0.3);
+  font-style: italic;
+}
+
+.loungeNotice {
+  background: rgba(200, 50, 50, 0.1);
+  color: #ff6b6b;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 16px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* Quiz Choices Grid */
+.quizChoices {
+  display: grid;
+  gap: 12px;
+}
+.quizChoices button {
+  width: 100%;
+  text-align: center;
+  padding: 16px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.02);
+  color: #fff;
+  transition: all 0.2s;
+}
+.quizChoices button:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: #fff;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .loungeTop { padding: 40px 0 20px; flex-direction: column; gap: 16px; }
+  .loungeRoleChip { align-self: flex-start; }
+  .loungeTabs { gap: 20px; }
+  .tasteChartGrid { grid-template-columns: 1fr; }
+  .tasteDetailGrid { grid-template-columns: 1fr; }
+}
+
+/* --- Artist Form Inputs --- */
+.loungeInputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.loungeLabel {
+  font-size: 0.85rem;
+  color: #C8A97E; /* Artist Gold */
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.loungeInput {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 10px 0;
+  color: #fff;
+  font-family: 'Pretendard', sans-serif;
+  font-size: 1.1rem;
+  transition: border-color 0.3s;
+  border-radius: 0;
+}
+
+.loungeInput:focus {
+  outline: none;
+  border-bottom-color: #C8A97E;
+}
+
+.loungeInput::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+/* --- Segmented Control (Toggle Tabs) --- */
+.loungeSegmentNav {
+  display: flex;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px;
+  border-radius: 50px;
+  margin-bottom: 40px;
+  width: fit-content;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.loungeSegmentBtn {
+  padding: 10px 24px;
+  border-radius: 40px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.loungeSegmentBtn:hover {
+  color: #fff;
+}
+
+.loungeSegmentBtn.active {
+  background: #C8A97E; /* Artist Gold */
+  color: #000;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(200, 169, 126, 0.3);
+}
+
+/* --- Text Button (Simple Link-like) --- */
+.loungeTextBtn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color 0.2s;
+}
+.loungeTextBtn:hover { color: #fff; }
+
+/* Fade Animation */
+.fade-in {
+  animation: fadeIn 0.4s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
