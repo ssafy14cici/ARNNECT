@@ -1,34 +1,56 @@
-// FE/src/layouts/Navbar.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { Canvas } from "@react-three/fiber"; 
 import { useAuthStore } from "../stores/authStore";
+import HoverModel from "../components/HoverModel"; 
+import LogoutModal from "../components/common/LogoutModal"; // ✅ [추가] 모달 Import
 import "../styles/navbar.css";
-
 
 type MenuItem = {
   key: string;
   label: string;
-  type?: "logo" | "empty";
-  image?: string;
+  type?: "link" | "close";
   path?: string;
 };
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+
   const navigate = useNavigate();
   const location = useLocation();
+
+  // ✅ 모달 상태 관리
+  const [isModalOpen, setModalOpen] = useState(false);
 
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const logout = useAuthStore((s) => s.logout);
 
-  // ESC로 닫기 + 오버레이 열리면 스크롤 잠금
+  // ✅ 로그아웃 버튼 클릭 -> 모달 열기
+  const handleLogoutClick = () => {
+    setModalOpen(true);
+    setOpen(false); // 메뉴 닫기 (선택사항, 모달 뒤에 메뉴가 보여도 되면 삭제 가능)
+  };
+
+  // ✅ 모달에서 [확인] -> 실제 로그아웃 실행
+  const handleConfirmLogout = () => {
+    logout();
+    setModalOpen(false);
+    navigate("/");
+  };
+
+  // ESC 키로 메뉴 닫기 & 스크롤 잠금 처리 (기존 동일)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
 
-    document.addEventListener("keydown", onKeyDown);
-    document.body.style.overflow = open ? "hidden" : "";
+    if (open) {
+      document.addEventListener("keydown", onKeyDown);
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
 
     return () => {
       document.removeEventListener("keydown", onKeyDown);
@@ -36,150 +58,117 @@ export default function Navbar() {
     };
   }, [open]);
 
-  // ✅ 메뉴 항목(그리드용) - close 버튼은 "별도"로 만들기 때문에 여기서 제거
+  // 메뉴 아이템 정의 (기존 동일)
   const items: MenuItem[] = useMemo(
     () => [
-      {
-        key: "logo",
-        label: "LOGO",
-        type: "logo",
-        image: "/arnnect_logo_ver1.png",
-        path: "/",
-      },
-      { key: "artist", label: "예술인\nGo", path: "/yourtaste" },
+      { key: "home", label: "Home", path: "/" },
+      { key: "yourpreference", label: "너의 취향은", path: "/preference" },
       { key: "search", label: "Search", path: "/search" },
-
-      // ✅ 그리드 2x4 맞추려면 빈칸 1개 정도는 필요할 수 있음
-      { key: "empty1", label: "", type: "empty" },
-
+      { key: "close", label: "", type: "close" },
       { key: "feed", label: "Feed", path: "/feed" },
       { key: "lounge", label: "Lounge", path: "/lounge" },
       { key: "profile", label: "Profile", path: "/profile/me/feed" },
-
-      // ✅ 사용 안 하는 칸은 empty로 두기
-      { key: "guidelines", label: "Guidelines", path: "/guide" },
-
+      { key: "auth", label: "Login/Out", path: "" },
     ],
-    [],
+    []
   );
 
   const handleItemClick = (item: MenuItem) => {
-    // 빈칸은 무시
-    if (item.type === "empty") return;
-
-    // 로고 클릭: 홈
-    if (item.type === "logo") {
-      navigate("/");
+    // 1. 닫기 버튼
+    if (item.type === "close") {
       setOpen(false);
       return;
     }
 
-    // 경로가 있으면 이동
+    // 2. 로그인/로그아웃 버튼
+    if (item.key === "auth") {
+      if (!isLoggedIn) {
+        // 비로그인 -> 로그인 페이지 이동
+        navigate("/login", { state: { from: location.pathname } });
+        setOpen(false);
+      } else {
+        // ✅ 로그인 상태 -> 모달 열기 (바로 로그아웃 X)
+        handleLogoutClick();
+      }
+      return;
+    }
+
+    // 3. 일반 페이지 이동
     if (item.path) {
       navigate(item.path);
       setOpen(false);
     }
   };
 
-  const onLoginButtonClick = () => {
-    if (!isLoggedIn) {
-      // 현재 위치를 returnUrl로 넘기고 싶으면 여기서도 가능
-      // (지금 Guard 쪽에서 returnUrl 처리 이미 하고 있으면 생략 가능)
-      navigate("/login", { state: { from: location.pathname } });
-      return;
-    }
-
-    logout();
-    setOpen(false);
-    navigate("/", { replace: true });
-  };
-
   return (
     <>
-      {/* ✅ 상단 네비바 */}
+      {/* 1. 상단 고정 네비바 */}
       <header className="nav">
         <div className="navInner">
-          <button
-            className="navBrand"
-            type="button"
-            onClick={() => navigate("/")}
-          >
+          <button className="navBrand" type="button" onClick={() => navigate("/")}>
             ARNNECT
           </button>
 
-          <div className="navRight">
-            <button
-              className="navLogin"
-              type="button"
-              onClick={onLoginButtonClick}
-            >
-              {isLoggedIn ? "LOGOUT" : "LOGIN"}
-            </button>
-
-            {/* ✅ 햄버거 버튼 */}
-            <button
-              id="menu4"
-              type="button"
-              className={`menu-trigger ${open ? "active" : ""}`}
-              aria-label={open ? "Close menu" : "Open menu"}
-              aria-expanded={open}
-              onClick={() => setOpen((v) => !v)}
-            >
-              <span />
-              <span />
-              <span />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* ✅ 오버레이 메뉴 */}
-      <div className={`refMenu ${open ? "open" : ""}`} aria-hidden={!open}>
-        {/* 배경 클릭 닫기 */}
-        <button
-          type="button"
-          className="refMenuBackdrop"
-          aria-label="Close menu backdrop"
-          onClick={() => setOpen(false)}
-        />
-
-        <div className="refMenuPanel" role="dialog" aria-modal="true">
-          {/* ✅ X 버튼: 햄버거 버튼과 "같은 위치"에 fixed로 올림
-              CSS에서 .refMenuCloseBtn의 top/right를 nav padding과 동일하게 맞추면
-              픽셀 단위로 동일 좌표가 됩니다. */}
           <button
+            id="menu4"
             type="button"
-            className="refMenuCloseBtn"
-            aria-label="Close menu"
-            onClick={() => setOpen(false)}
+            className={`menu-trigger ${open ? "active" : ""}`}
+            onClick={() => setOpen(true)}
+            aria-label="Open menu"
           >
             <span />
             <span />
             <span />
           </button>
+        </div>
+      </header>
 
-          <div className="refMenuGrid">
-            {items.map((it) => (
-              <button
-                key={it.key}
-                type="button"
-                className={`refCell ${it.type === "logo" ? "refCellLogo" : ""}`}
-                onClick={() => handleItemClick(it)}
-              >
-                {it.type === "logo" ? (
-                  <img
-                    className="refLogoImg"
-                    src={it.image ?? "/arnnect_logo_ver1.png"}
-                    alt="Arnnect"
-                  />
-                ) : (
-                  <span className="refLabel">{it.label}</span>
-                )}
-              </button>
-            ))}
-          </div>
+      {/* 2. 전체 화면 오버레이 메뉴 */}
+      <div className={`refMenu ${open ? "open" : ""}`} aria-hidden={!open}>
+        <div className="refMenuGrid">
+          {items.map((it) => (
+            <button
+              key={it.key}
+              type="button"
+              className="refCell"
+              onClick={() => handleItemClick(it)}
+              onMouseEnter={() => setHoveredKey(it.key)}
+              onMouseLeave={() => setHoveredKey(null)}
+            >
+              {it.type === "close" ? (
+                <div className="refCellClose" aria-label="Close Menu" />
+              ) : (
+                <>
+                  <span className="refLabel">
+                    {it.key === "auth"
+                      ? isLoggedIn
+                        ? "LOGOUT"
+                        : "LOGIN"
+                      : it.label}
+                  </span>
+
+                  {hoveredKey === it.key && (
+                    <div className="ref3DWrapper">
+                      <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
+                        <Suspense fallback={null}>
+                          <HoverModel color="#ffffff" />
+                        </Suspense>
+                      </Canvas>
+                    </div>
+                  )}
+                </>
+              )}
+            </button>
+          ))}
         </div>
       </div>
+
+      {/* ✅ [추가] 로그아웃 모달 렌더링 */}
+      <LogoutModal
+        isOpen={isModalOpen}
+        onClose={() => setModalOpen(false)}
+        onConfirm={handleConfirmLogout}
+      />
     </>
   );
 }

@@ -123,7 +123,7 @@ export function createTempFramesRaycasted(
 
     // 이미지 번호: WP_1 -> a1.jpg ...
     const imgNum = index;
-    const url = `${basePath}/a${imgNum}.jpg`;
+    const url = `${basePath}/b${imgNum}.jpg`;
 
     const tex = texLoader.load(
       url,

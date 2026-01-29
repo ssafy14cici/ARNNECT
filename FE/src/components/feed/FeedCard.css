@@ -1,75 +1,199 @@
-/* src/components/FeedCard.css */
+/* ==========================================================================
+   LUMEN STYLE FEED CARD
+========================================================================== */
 
 .feed-card {
-  background: white;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s, box-shadow 0.2s;
+  position: relative;
   cursor: pointer;
+  background: transparent; /* 배경 투명 (부모 배경 사용) */
+  transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
+  
+  /* 폰트 설정 (전역에 import 되어 있다고 가정) */
+  font-family: 'Pretendard', sans-serif;
+  color: #fff;
 }
 
-.feed-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-}
-
-.feed-card__thumbnail {
-  width: 100%;
-  height: 200px;
+/* --- 1. Image Box --- */
+.card-img-box {
+  position: relative;
   overflow: hidden;
-  background: #f0f0f0;
+  background: #111;
+  /* 모서리를 살짝 둥글게 할지, Lumen처럼 각지게 할지 결정 (여기선 각지게) */
+  border-radius: 0; 
 }
 
-.feed-card__thumbnail img {
+.card-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+  opacity: 0.9;
 }
 
-.feed-card__info {
-  padding: 16px;
+/* 호버 시 이미지 줌인 효과 */
+.feed-card:hover .card-img {
+  transform: scale(1.08);
+  opacity: 1;
 }
 
-.feed-card__title {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0 0 12px 0;
-  color: #222;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.feed-card__artist {
+.card-placeholder {
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  color: #444;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+}
+
+/* --- 2. Badge --- */
+.card-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  z-index: 2;
+}
+
+.card-badge.artist {
+  color: #C8A97E; /* 골드 컬러 */
+  border-color: #C8A97E;
+}
+
+/* --- 3. Text Info --- */
+.card-info {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-title {
+  font-family: 'Playfair Display', serif; /* 제목은 명조 계열 */
+  font-size: 1.35rem;
+  font-weight: 400;
+  margin: 0 0 8px 0;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.card-cat {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.5);
+  display: block;
+  margin-bottom: 8px;
+}
+
+.card-desc {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.6;
+  font-weight: 300;
+  margin-bottom: 16px;
+  
+  /* 2줄 이상 말줄임 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* --- 4. Footer --- */
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 12px;
+  margin-top: auto; /* info 박스 하단 고정 */
+}
+
+.author-link {
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.3s;
+}
+
+.author-link:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.card-footer-right {
+  display: flex;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: #555;
+}
+
+/* ==========================================================================
+   VIEW MODES (Grid vs List)
+   - 부모에서 전달받은 viewMode 클래스에 따라 스타일 변경
+========================================================================== */
+
+/* GRID MODE 스타일 */
+.feed-card.mode-grid {
+  display: flex;
+  flex-direction: column;
+}
+
+.feed-card.mode-grid .card-img-box {
+  width: 100%;
+  aspect-ratio: 1 / 1.2; /* 세로형 비율 */
+}
+
+/* LIST MODE 스타일 */
+.feed-card.mode-list {
+  display: flex;
+  flex-direction: row; /* 가로 배치 */
+  align-items: center; /* 수직 중앙 정렬 */
+  gap: 40px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08); /* 하단 구분선 */
+}
+
+.feed-card.mode-list .card-img-box {
+  width: 280px; /* 고정 너비 */
+  aspect-ratio: 16 / 9; /* 와이드 비율 */
+  flex-shrink: 0;
+}
+
+.feed-card.mode-list .card-info {
+  margin-top: 0;
+  flex: 1;
+}
+
+.feed-card.mode-list .card-title {
+  font-size: 1.8rem; /* 리스트에선 제목 더 크게 */
   margin-bottom: 12px;
 }
 
-.feed-card__artist-profile {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.feed-card__artist-name {
-  font-size: 14px;
-  color: #666;
-}
-
-.feed-card__stats {
-  display: flex;
-  gap: 16px;
-  font-size: 14px;
-  color: #888;
-}
-
-.feed-card__likes,
-.feed-card__views {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+/* --- Mobile Responsive --- */
+@media (max-width: 768px) {
+  /* 모바일에선 리스트 모드여도 세로로 배치 */
+  .feed-card.mode-list {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .feed-card.mode-list .card-img-box {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+  }
 }

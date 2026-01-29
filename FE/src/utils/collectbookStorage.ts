@@ -1,25 +1,6 @@
 // FE/src/utils/collectbookStorage.ts
-export type Visibility = "private" | "public";
+import type { CollectBookItem } from "../types/collectbook";
 
-
-export type ExhibitionLite = {
-  title?: string;
-  place?: string;
-  startDate?: string;
-  endDate?: string;
-  posterUrl?: string;
-  description?: string;
-};
-
-export type CollectBookItem = {
-  id: string;
-  ticketCode: string;
-  exhibition: ExhibitionLite;
-  memo?: string;
-  visitedAt: string; // YYYY-MM-DD
-  visibility: Visibility;
-  scannedAt: string; // ISO
-};
 
 const KEY = "arnnect_collectbook_v1";
 

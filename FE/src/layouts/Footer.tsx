@@ -7,14 +7,18 @@ export default function Footer() {
       <div className="footer-content">
         <nav className="footer-links">
           <Link to="/terms" className="footer-link">
-            이용약관
+            Terms of Use
           </Link>
           <Link to="/privacy" className="footer-link policy">
-            개인정보 처리방침
+            Privacy Policy
+          </Link>
+          <Link to="/guide" className="footer-link">
+            Guide
           </Link>
         </nav>
+        
         <p className="footer-copyright">
-          © 2026 ARNNECT. All rights reserved.
+          © 2026 <span className="footer-brand-text">ARNNECT</span>. All rights reserved.
         </p>
       </div>
     </footer>

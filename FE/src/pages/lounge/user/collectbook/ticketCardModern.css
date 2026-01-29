@@ -1,0 +1,246 @@
+/* ==========================================================================
+   TICKET CARD MODERN (Premium Black & Gold Theme)
+========================================================================== */
+
+/* 1. Card Container (Levitation Effect) */
+.tcm {
+  display: flex;
+  width: 100%;
+  height: 200px;
+  background: #111; /* Matte Black */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px; /* 날렵한 모서리 */
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.6);
+  transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s ease, border-color 0.4s;
+  
+  font-family: 'Pretendard', sans-serif;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.tcm:hover {
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: 0 20px 40px rgba(200, 169, 126, 0.15); /* Gold Shadow */
+  border-color: rgba(200, 169, 126, 0.5); /* Gold Border */
+}
+
+/* 2. Left Stub (Force Black Theme) */
+.tcmStub {
+  width: 50px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  
+  /* ⚠️ TSX inline-style override */
+  background: #080808 !important; 
+  border-right: 1px dashed rgba(255, 255, 255, 0.15);
+}
+
+.tcmStubInner {
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+  padding: 12px 0;
+}
+
+.tcmStubBarcode {
+  width: 3px;
+  height: 60%;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 2px,
+    rgba(255,255,255,0.2) 2px,
+    rgba(255,255,255,0.2) 4px
+  );
+}
+
+.tcmStubText {
+  display: flex;
+  gap: 8px;
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  color: #C8A97E; /* Gold Text */
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.tcmStubBottom {
+  margin-top: auto;
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.3);
+  font-family: monospace;
+}
+
+/* Perforation (숨김 - Border Dashed로 대체) */
+.tcmPerf { display: none; }
+
+
+/* 3. Main Content */
+.tcmMain {
+  flex: 1;
+  padding: 24px 30px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  /* 은은한 배경 그라데이션 */
+  background: radial-gradient(circle at top right, rgba(255,255,255,0.03), transparent 60%);
+}
+
+/* Header */
+.tcmHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 12px;
+}
+
+.tcmTitle {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem;
+  font-weight: 500;
+  color: #fff;
+  letter-spacing: -0.02em;
+  
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tcmPrice {
+  font-size: 0.9rem;
+  color: #C8A97E; /* Price Gold */
+  font-weight: 600;
+  white-space: nowrap;
+  margin-left: 16px;
+}
+
+/* Meta Info */
+.tcmMetaRow {
+  display: flex;
+  gap: 20px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Bottom Area */
+.tcmBottomRow {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.tcmDates {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.2rem;
+  color: #fff;
+  font-style: italic;
+}
+
+/* Hero Image (Ticket Stamp) */
+.tcmHero {
+  width: 120px;
+  height: 70px;
+  position: relative;
+}
+
+.tcmHeroMedia {
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #000;
+}
+
+.tcmHeroImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(100%); /* 흑백 처리 */
+  transition: filter 0.3s;
+}
+.tcm:hover .tcmHeroImg {
+  filter: grayscale(0%); /* 호버 시 컬러 */
+}
+
+/* Hide Bubbles */
+.tcmBubble { display: none; }
+
+
+/* 4. Right Barcode */
+.tcmRight {
+  width: 60px;
+  flex-shrink: 0;
+  background: #fff; /* White Barcode Area */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  position: relative;
+}
+
+/* Serrated Edge Effect (톱니) */
+.tcmRight::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: 4px;
+  background: radial-gradient(circle, #111 2px, transparent 2.5px);
+  background-size: 4px 8px;
+  background-position: -2px 0;
+}
+
+.tcmRightBarcode {
+  flex: 1;
+  width: 100%;
+  opacity: 0.85;
+}
+
+.tcmRightCode {
+  writing-mode: vertical-rl;
+  font-family: monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  color: #000;
+  margin-top: 10px;
+  font-weight: 600;
+}
+
+/* --- Mobile Responsive --- */
+@media (max-width: 600px) {
+  .tcm {
+    height: auto;
+    flex-direction: column;
+  }
+  .tcmStub {
+    width: 100%;
+    height: 40px;
+    flex-direction: row;
+    border-right: none;
+    border-bottom: 1px dashed rgba(255,255,255,0.2);
+  }
+  .tcmStubInner {
+    writing-mode: horizontal-tb;
+    transform: none;
+    padding: 0 16px;
+  }
+  .tcmRight { display: none; }
+}

@@ -1,0 +1,183 @@
+/* ==========================================================================
+   PROFILE TABS COMMON STYLES (Dark Theme)
+========================================================================== */
+
+/* --- Layouts --- */
+.tab-container {
+  padding: 20px 0;
+  animation: fadeIn 0.5s ease;
+}
+
+.tab-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 24px;
+}
+
+.tab-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  margin: 0;
+  color: #fff;
+  font-weight: 400;
+}
+
+.tab-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* --- Buttons & Inputs --- */
+.tab-btn {
+  font-size: 0.8rem;
+  padding: 6px 14px;
+  border-radius: 50px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  transition: all 0.3s;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.tab-btn:hover {
+  border-color: var(--accent, #fff); /* 부모 테마 변수 사용 */
+  color: #fff;
+  background: rgba(255,255,255,0.05);
+}
+
+.tab-checkbox {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.5);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.tab-checkbox input {
+  accent-color: var(--accent, #fff);
+}
+
+.tab-desc {
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.5);
+  margin-bottom: 30px;
+  line-height: 1.5;
+}
+.tab-desc a {
+  color: var(--accent, #fff);
+  text-decoration: none;
+  margin-left: 6px;
+  font-weight: 600;
+}
+
+/* --- Grids --- */
+.tab-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.tab-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* 반응형 그리드 */
+  gap: 20px;
+}
+
+/* --- Cards (Collection & Portfolio) --- */
+.tab-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: transform 0.3s, border-color 0.3s;
+}
+
+.tab-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent, #fff);
+}
+
+.tab-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.tab-card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.tab-card-meta {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.4);
+}
+
+.tab-card-body {
+  padding: 16px;
+}
+
+.tab-card-info {
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.6);
+  line-height: 1.6;
+}
+
+.tab-card-code {
+  margin-top: 12px;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.3);
+  font-family: monospace;
+}
+
+/* --- Feed Item --- */
+.feed-item-btn {
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  aspect-ratio: 1 / 1;
+}
+
+.feed-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+  display: block;
+}
+
+.feed-item-btn:hover .feed-img {
+  transform: scale(1.1);
+}
+
+/* --- Empty State --- */
+.tab-empty {
+  border: 1px dashed rgba(255,255,255,0.15);
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  background: rgba(255,255,255,0.01);
+  color: rgba(255,255,255,0.4);
+}
+.tab-empty-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.7);
+  margin-bottom: 8px;
+}
+
+/* Animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

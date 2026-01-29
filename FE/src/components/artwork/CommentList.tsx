@@ -4,7 +4,7 @@ export const CommentList = ({ comments, onDelete, onUpdate, onAddReply, profileP
   const rootComments = comments.filter((c: any) => c.parentId === null);
 
   return (
-    <ul style={{ listStyle: "none", padding: 0, marginTop: 32 }}>
+    <ul className="comment-list-ul">
       {rootComments.length > 0 ? (
         rootComments.map((comment: any) => (
           <CommentItem
@@ -18,8 +18,8 @@ export const CommentList = ({ comments, onDelete, onUpdate, onAddReply, profileP
           />
         ))
       ) : (
-        <div style={{ textAlign: "center", color: "#999", padding: "40px 0", fontSize: "14px" }}>
-          첫 번째 댓글을 남겨보세요.
+        <div className="comment-empty">
+          Be the first to share your thoughts.
         </div>
       )}
     </ul>

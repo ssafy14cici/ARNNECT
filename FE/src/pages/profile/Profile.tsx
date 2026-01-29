@@ -1,4 +1,3 @@
-// FE/src/pages/profile/Profile.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import ProfileHeader from "./components/ProfileHeader";
@@ -35,7 +34,7 @@ export default function Profile() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // 요청 경합 방지(빠른 라우트 전환/role 변경 시 이전 요청 결과가 덮어쓰지 않게)
+  // 요청 경합 방지
   const reqSeq = useRef(0);
 
   /** ===============================
@@ -51,7 +50,7 @@ export default function Profile() {
 
     (async () => {
       try {
-        // ✅ 내 프로필
+        // ✅ 내 프로필 조회
         if (profileId === "me") {
           const p =
             viewerProfileRole === "ARTIST"
@@ -63,7 +62,7 @@ export default function Profile() {
           return;
         }
 
-        // ✅ 타인 프로필: fallback 전략 (artist → user)
+        // ✅ 타인 프로필: fallback 전략
         try {
           const a = await profileApi.getArtistProfile(profileId);
           if (cancelled || reqSeq.current !== mySeq) return;
@@ -96,54 +95,87 @@ export default function Profile() {
   };
 
   /** ===============================
-   * UI
+   * UI 렌더링
    * =============================== */
-  if (loading) return <div style={{ padding: 16 }}>로딩중...</div>;
-  if (error) return <div style={{ padding: 16 }}>{error}</div>;
-  if (!profile) return <div style={{ padding: 16 }}>프로필이 없습니다.</div>;
+  if (loading) {
+    return (
+      <div className="profile-loading">
+        <div className="spinner" />
+      </div>
+    );
+  }
 
-  // ✅ 탭 노출 기준은 "로그인한 내 역할"이 아니라 "지금 보고 있는 프로필의 역할"
+  if (error) {
+    return <div className="profile-error">{error}</div>;
+  }
+
+  if (!profile) {
+    return <div className="profile-error">프로필을 찾을 수 없습니다.</div>;
+  }
+
+  // ✅ 테마 결정을 위한 변수
   const viewedIsArtist = profile.role === "ARTIST";
+  const themeClass = viewedIsArtist ? "theme-artist" : "theme-user";
 
   return (
-    <div className="profilePage">
-      <ProfileHeader profile={profile} isOwner={isOwner} onProfileUpdated={setProfile} />
+    <div className={`profile-page ${themeClass}`}>
+      {/* 배경 장식 효과 */}
+      <div className="profile-bg-glow" />
 
-      <div className="profileTabs">
-        <NavLink
-          to="feed"
-          className={({ isActive }) => (isActive ? "profileTab profileTabActive" : "profileTab")}
-        >
-          피드
-        </NavLink>
+      {/* ✅ Flexbox 컨테이너 (CSS 수정 필수) */}
+      <div className="profile-container">
+        <ProfileHeader 
+          profile={profile} 
+          isOwner={isOwner} 
+          onProfileUpdated={setProfile} 
+        />
 
-        {viewedIsArtist ? (
-          <NavLink
-            to="portfolio"
-            className={({ isActive }) => (isActive ? "profileTab profileTabActive" : "profileTab")}
+        <div className="profile-tabs-wrapper">
+          <nav className="profile-tabs">
+            <NavLink
+              to="feed"
+              className={({ isActive }) => `profile-tab ${isActive ? "active" : ""}`}
+            >
+              피드
+            </NavLink>
+
+            {viewedIsArtist ? (
+              <NavLink
+                to="portfolio"
+                className={({ isActive }) => `profile-tab ${isActive ? "active" : ""}`}
+              >
+                포트폴리오
+              </NavLink>
+            ) : (
+              <NavLink
+                to="collection"
+                className={({ isActive }) => `profile-tab ${isActive ? "active" : ""}`}
+              >
+                콜렉션
+              </NavLink>
+            )}
+          </nav>
+        </div>
+
+        {/* ✅ Flex: 1로 남은 공간 차지 (CSS 수정 필수) */}
+        <main className="profile-content">
+          <Outlet context={{ profile, isOwner } satisfies ProfileOutletContext} />
+        </main>
+
+        {/* ✅ Sticky FAB Button: 컨테이너 내부, 맨 마지막에 위치 */}
+        {isOwner && (
+          <button 
+            type="button" 
+            className="profile-fab" 
+            aria-label="글쓰기" 
+            onClick={goWrite}
           >
-            포트폴리오
-          </NavLink>
-        ) : (
-          <NavLink
-            to="collection"
-            className={({ isActive }) => (isActive ? "profileTab profileTabActive" : "profileTab")}
-          >
-            콜렉션
-          </NavLink>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </button>
         )}
       </div>
-
-      <div className="profileTabPanel">
-        {/* ✅ 하위 탭에서 profile/isOwner를 그대로 쓰게 context 내려주기 */}
-        <Outlet context={{ profile, isOwner } satisfies ProfileOutletContext} />
-      </div>
-
-      {isOwner && (
-        <button type="button" className="profileFab" aria-label="글쓰기" onClick={goWrite}>
-          +
-        </button>
-      )}
     </div>
   );
 }
