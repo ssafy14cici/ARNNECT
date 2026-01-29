@@ -7,7 +7,6 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDate;
-import java.time.Year;
 
 @Getter
 @AllArgsConstructor
@@ -23,7 +22,7 @@ public class MyInfoResponse {
     /** artist **/
     private String document;
     private Integer fieldId;
-    private Year debutYear;
+    private Integer debutYear;
     private Integer genreId;
     private String snsPage;
     private String affiliation;
@@ -62,8 +61,6 @@ public class MyInfoResponse {
                 .isVerified(artist.getIsVerified())
                 .introduction(artist.getIntroduction())
                 .build();
-
-
     }
 
 

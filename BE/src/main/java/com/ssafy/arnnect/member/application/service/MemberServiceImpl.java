@@ -4,6 +4,7 @@ import com.ssafy.arnnect.common.exception.BusinessException;
 import com.ssafy.arnnect.common.exception.ErrorCode;
 import com.ssafy.arnnect.member.application.dto.request.CreateArtistRequest;
 import com.ssafy.arnnect.member.application.dto.request.CreateMemberRequest;
+import com.ssafy.arnnect.member.application.dto.response.MemberInfoResponse;
 import com.ssafy.arnnect.member.application.dto.response.MyInfoResponse;
 import com.ssafy.arnnect.member.domain.entity.Artist;
 import com.ssafy.arnnect.member.domain.entity.Member;
@@ -15,6 +16,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.Arrays;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -73,5 +77,11 @@ public class MemberServiceImpl implements MemberService{
                     ()->new BusinessException(ErrorCode.USER_NOT_FOUND)
             ));
         }
+    }
+
+    @Override
+    public MemberInfoResponse getMemberInfo(String myUuid,String memberUuid) {
+        return memberRepo.findMemberInfo(memberUuid,memberRepo.findByMemberUuid(memberUuid).orElseThrow(
+                ()-> new BusinessException(ErrorCode.USER_NOT_FOUND)).getMemberId());
     }
 }
