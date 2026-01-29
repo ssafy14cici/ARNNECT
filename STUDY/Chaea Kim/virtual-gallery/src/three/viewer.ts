@@ -2,80 +2,121 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 
-export function createViewer(canvas: HTMLCanvasElement) {
-  /* ======================================================
-   * Renderer
-   * ====================================================== */
+type Viewer = {
+  renderer: THREE.WebGLRenderer;
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+  controls: OrbitControls;
+  start: (onTick?: () => void) => void;
+};
+
+type ViewerOpts = {
+  exposure?: number;
+  backgroundColor?: number;
+  /** HDR 없이도 PBR이 죽지 않게 (권장 true) */
+  useProceduralEnvironment?: boolean;
+};
+
+export function createViewer(canvas: HTMLCanvasElement, opts: ViewerOpts = {}): Viewer {
+  const exposure = opts.exposure ?? 1.3; // ✅ 기본을 밝게
+  const backgroundColor = opts.backgroundColor ?? 0xf2f2f2;
+  const useProceduralEnvironment = opts.useProceduralEnvironment ?? true;
+
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
     alpha: false,
+    powerPreference: "high-performance",
   });
 
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
 
-  // ✅ 색/톤매핑 (Blender와 가장 “비슷한 계열”로 맞추기)
+  renderer.physicallyCorrectLights = true;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15; // 필요하면 0.9 ~ 1.6 사이로 튜닝
+  renderer.toneMappingExposure = exposure;
 
-  /* ======================================================
-   * Scene
-   * ====================================================== */
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color("#111");
+  scene.background = new THREE.Color(backgroundColor);
 
-  // ✅ 환경광(IBL) 추가: PBR 머티리얼 색감/명암이 안정됨
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  // ✅ HDR 없이도 재질(표준/피지컬) “회색 플라스틱” 방지
+  if (useProceduralEnvironment) {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
+    scene.environment = envRT.texture;
+    pmrem.dispose();
+  } else {
+    scene.environment = null;
+  }
 
-  /* ======================================================
-   * Camera
-   * ====================================================== */
-  const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.05, 5000);
-  camera.position.set(0, 2, 6);
+  const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 5000);
+  camera.position.set(0, 1.8, 6);
 
-  /* ======================================================
-   * Controls
-   * ====================================================== */
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
+  controls.enablePan = true;
+  controls.minDistance = 0.6;
+  controls.maxDistance = 80;
 
-  /* ======================================================
-   * Lights
-   * ====================================================== */
-  scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+  /* =========================
+   * Lights (HDR 없이도 따뜻하게)
+   * ========================= */
 
-  const dir = new THREE.DirectionalLight(0xffffff, 1.2);
-  dir.position.set(5, 10, 5);
-  scene.add(dir);
+  // 베이스는 약하게(과하면 평면 됨)
+  scene.add(new THREE.AmbientLight(0xffffff, 0.08));
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xd9d9d9, 0.35));
 
-  /* ======================================================
+  // ✅ 태양광: 따뜻한 색 + 그림자 ON
+  const sun = new THREE.DirectionalLight(0xfff2dc, 3.2);
+  sun.position.set(12, 18, 6);
+  sun.castShadow = true;
+
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.near = 0.5;
+  sun.shadow.camera.far = 140;
+  sun.shadow.camera.left = -45;
+  sun.shadow.camera.right = 45;
+  sun.shadow.camera.top = 45;
+  sun.shadow.camera.bottom = -45;
+
+  sun.shadow.bias = -0.00008;
+  sun.shadow.normalBias = 0.02;
+
+  scene.add(sun);
+
+  // 보조광(대비 완화)
+  const fill = new THREE.DirectionalLight(0xffffff, 0.45);
+  fill.position.set(-10, 8, -6);
+  fill.castShadow = false;
+  scene.add(fill);
+
+  /* =========================
    * Resize
-   * ====================================================== */
-  const onResize = () => {
+   * ========================= */
+  const resize = () => {
     const w = window.innerWidth;
     const h = window.innerHeight;
 
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(w, h);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   };
-  window.addEventListener("resize", onResize);
 
-  /* ======================================================
-   * Loop
-   * ====================================================== */
-  let running = false;
+  window.addEventListener("resize", resize);
+
+  resize();
+  requestAnimationFrame(resize);
+  requestAnimationFrame(resize);
 
   const start = (onTick?: () => void) => {
-    if (running) return;
-    running = true;
-
     renderer.setAnimationLoop(() => {
       onTick?.();
       controls.update();
@@ -83,19 +124,5 @@ export function createViewer(canvas: HTMLCanvasElement) {
     });
   };
 
-  const stop = () => {
-    if (!running) return;
-    running = false;
-    renderer.setAnimationLoop(null);
-  };
-
-  const dispose = () => {
-    stop();
-    window.removeEventListener("resize", onResize);
-    controls.dispose();
-    pmrem.dispose();
-    renderer.dispose();
-  };
-
-  return { renderer, scene, camera, controls, start, stop, dispose };
+  return { renderer, scene, camera, controls, start };
 }
