@@ -73,7 +73,7 @@ export function seedMyPosts(count = 8) {
   const me = readMe();
   if (!me) throw new Error("ME 정보가 없습니다. setMe()로 먼저 세팅하세요.");
 
-  const imgPool = Array.from({ length: 12 }).map((_, i) => `/art/a${i + 1}.jpg`);
+  const imgPool = Array.from({ length: 12 }).map((_, i) => `/art/b${i + 1}.jpg`);
 
   const all = safeJsonParse<MockPost[]>(localStorage.getItem(POSTS_KEY), []);
   const seeded: MockPost[] = Array.from({ length: count }).map((_, idx) => {

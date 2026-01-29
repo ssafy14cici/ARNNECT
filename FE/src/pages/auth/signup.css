@@ -1,0 +1,206 @@
+/* ==========================================================================
+   SIGNUP ENTRY PAGE (The Dual Gate)
+========================================================================== */
+.signup-page {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #050505;
+  font-family: 'Pretendard', sans-serif;
+}
+
+/* 배경 장식 텍스트 */
+.bg-decoration {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Playfair Display', serif;
+  font-size: 15vw;
+  color: rgba(255, 255, 255, 0.03);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 0;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+}
+
+/* Split Container */
+.split-container {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+/* --- Common Pane Styles --- */
+.split-pane {
+  position: relative;
+  flex: 1; /* 기본적으로 반반 차지 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: flex 0.6s cubic-bezier(0.25, 1, 0.5, 1); /* 부드러운 너비 변화 */
+  overflow: hidden;
+  border-right: 1px solid rgba(255,255,255,0.1);
+}
+
+.split-pane:last-child {
+  border-right: none;
+}
+
+/* Hover Logic: 하나가 커지면(expanded), 다른건 작아짐(shrink)은 flex 비율로 자동 처리되지만 명시적으로 */
+.split-pane.expanded {
+  flex: 1.8; /* 호버된 쪽이 더 넓어짐 */
+}
+.split-pane.shrink {
+  flex: 0.8; /* 반대쪽은 좁아짐 */
+}
+
+/* Background Images */
+.pane-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  transition: transform 10s ease;
+  z-index: 0;
+}
+
+.split-pane:hover .pane-bg {
+  transform: scale(1.1); /* 호버 시 배경 천천히 줌인 */
+}
+
+/* 이미지 URL은 프로젝트 내의 public 폴더 경로로 변경하거나 
+  Unsplash 등의 고화질 이미지를 사용하세요.
+*/
+.user-bg {
+  background-image: url('https://images.unsplash.com/photo-1518998053901-5348d3969105?q=80&w=2592&auto=format&fit=crop');
+  filter: grayscale(100%) brightness(0.7); /* 유저는 차분한 흑백톤 */
+}
+
+.artist-bg {
+  background-image: url('https://images.unsplash.com/photo-1513364776144-60967b0f800f?q=80&w=2671&auto=format&fit=crop');
+  filter: sepia(50%) brightness(0.6) contrast(1.1); /* 아티스트는 약간의 질감과 톤 */
+}
+
+/* Overlay (어둡게 처리) */
+.pane-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  transition: background 0.4s;
+  z-index: 1;
+}
+
+.split-pane:hover .pane-overlay {
+  background: rgba(0, 0, 0, 0.2); /* 호버 시 좀 더 밝게 */
+}
+
+/* --- Content --- */
+.pane-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  color: #fff;
+  padding: 40px;
+  transform: translateY(0);
+  transition: transform 0.4s ease;
+}
+
+.split-pane:hover .pane-content {
+  transform: translateY(-10px);
+}
+
+.pane-subtitle {
+  display: block;
+  font-size: 0.9rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  opacity: 0.7;
+}
+
+.pane-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 4rem;
+  font-weight: 400;
+  margin: 0 0 24px 0;
+  letter-spacing: -0.02em;
+}
+
+.pane-desc {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  opacity: 0.8;
+  margin-bottom: 40px;
+  font-weight: 300;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Button Style */
+.pane-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 32px;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 50px;
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  transition: all 0.3s;
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(4px);
+}
+
+.pane-btn svg {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.3s;
+}
+
+/* Specific Colors for Hover */
+.user-pane:hover .pane-btn {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
+}
+
+.artist-pane:hover .pane-btn {
+  background: #C8A97E; /* Artist Gold */
+  color: #000;
+  border-color: #C8A97E;
+}
+
+.split-pane:hover .pane-btn svg {
+  transform: translateX(4px);
+}
+
+/* --- Mobile Responsive --- */
+@media (max-width: 768px) {
+  .split-container {
+    flex-direction: column;
+  }
+  
+  .split-pane {
+    width: 100%;
+    flex: 1 !important; /* 모바일은 균등 분할 */
+    border-right: none;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  
+  .pane-title {
+    font-size: 3rem;
+  }
+  
+  .bg-decoration {
+    font-size: 20vw;
+    top: 50%;
+    transform: translate(-50%, -50%) rotate(90deg); /* 모바일 배경 텍스트 회전 */
+  }
+}

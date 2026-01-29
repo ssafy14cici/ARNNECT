@@ -16,8 +16,7 @@ export const CommentItem = ({
   const [isReplyOpen, setIsReplyOpen] = useState(false);
 
   const isReply = comment.parentId !== null;
-
-  const authorName = comment.authorName ?? "익명";
+  const authorName = comment.authorName ?? "Anonymous";
   const authorId = comment.authorId as string | undefined;
 
   const saveEdit = () => {
@@ -28,107 +27,76 @@ export const CommentItem = ({
   };
 
   return (
-    <li style={{ marginBottom: isReply ? 8 : 24, listStyle: "none" }}>
-      <div
-        style={{
-          background: isReply ? "#f1f1f1" : "#f9f9f9",
-          padding: "16px",
-          borderRadius: 12,
-          border: "1px solid #f0f0f0",
-        }}
-      >
-        {/* 작성자 표시 + 클릭 이동 */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 10,
-            fontSize: 12,
-          }}
-        >
+    <li className="comment-item-li">
+      <div className="comment-box">
+        {/* Header: 작성자 & 날짜 */}
+        <div className="comment-header">
           {authorId ? (
-            <Link
-              to={profilePath(authorId)}
-              style={{ fontWeight: 700, color: "#333", textDecoration: "none" }}
-            >
+            <Link to={profilePath(authorId)} className="comment-author">
               {authorName}
             </Link>
           ) : (
-            <span style={{ fontWeight: 700, color: "#333" }}>{authorName}</span>
+            <span className="comment-author">{authorName}</span>
           )}
 
-          {comment.createdAt ? (
-            <span style={{ color: "#aaa" }}>{String(comment.createdAt)}</span>
-          ) : (
-            <span />
-          )}
+          <span className="comment-date">
+            {comment.createdAt ? new Date(comment.createdAt).toLocaleDateString() : ""}
+          </span>
         </div>
 
+        {/* Content or Edit Mode */}
         {isEditing ? (
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div className="comment-edit-wrap">
             <input
+              className="comment-input"
               value={editInput}
               onChange={(e) => setEditInput(e.target.value)}
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === "Enter") saveEdit();
               }}
-              style={{
-                flex: 1,
-                padding: "8px",
-                background: "transparent",
-                border: "none",
-                outline: "none",
-              }}
             />
-            <button
-              onClick={saveEdit}
-              style={{ background: "transparent", border: "none", fontWeight: "600" }}
-            >
-              저장
-            </button>
-            <button
-              onClick={() => setIsEditing(false)}
-              style={{ background: "transparent", border: "none", color: "#888" }}
-            >
-              취소
-            </button>
+            <button className="comment-edit-btn btn-save" onClick={saveEdit}>Save</button>
+            <button className="comment-edit-btn btn-cancel" onClick={() => setIsEditing(false)}>Cancel</button>
           </div>
         ) : (
           <>
-            <div style={{ marginBottom: 12 }}>{comment.content}</div>
-            <div style={{ display: "flex", gap: 12, fontSize: "12px", color: "#999" }}>
+            <div className="comment-content">{comment.content}</div>
+            
+            {/* Action Buttons */}
+            <div className="comment-actions">
               {!isReply && (
-                <span style={{ cursor: "pointer" }} onClick={() => setIsReplyOpen(!isReplyOpen)}>
-                  답글
-                </span>
+                <button className="action-btn" onClick={() => setIsReplyOpen(!isReplyOpen)}>
+                  Reply
+                </button>
               )}
-              <span
-                style={{ cursor: "pointer" }}
+              {/* 본인 댓글일 경우만 보이게 처리하려면 조건 추가 필요 */}
+              <button 
+                className="action-btn" 
                 onClick={() => {
                   setIsEditing(true);
                   setEditInput(comment.content);
                 }}
               >
-                수정
-              </span>
-              <span
-                style={{ cursor: "pointer", color: "#ff4d4f" }}
+                Edit
+              </button>
+              <button 
+                className="action-btn delete" 
                 onClick={() => onDelete(comment.id)}
               >
-                삭제
-              </span>
+                Delete
+              </button>
             </div>
           </>
         )}
       </div>
 
+      {/* Reply Form (Toggle) */}
       {isReplyOpen && (
-        <div style={{ marginLeft: 32, marginTop: 8 }}>
+        <div className="reply-form-wrap">
           <CommentForm
             isReply
-            placeholder="답글을 입력하세요..."
+            placeholder="Write a reply..."
             onAdd={(text: string) => {
               onAddReply(comment.id, text);
               setIsReplyOpen(false);
@@ -137,6 +105,7 @@ export const CommentItem = ({
         </div>
       )}
 
+      {/* Nested Replies */}
       {!isReply && (
         <ReplyList
           parentId={comment.id}

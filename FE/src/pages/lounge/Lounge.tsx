@@ -1,68 +1,59 @@
-import { useEffect, useMemo, useState } from "react";
+// FE/src/pages/lounge/Lounge.tsx
+import { useEffect, useMemo } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import "./lounge.css";
 import { useAuthStore } from "../../stores/authStore";
 
-import CollectBook from "./user/CollectBook";
-import Taste from "./user/Taste";
-import Quiz from "./user/Quiz";
-
-import TicketQr from "./artist/TicketQr";
-import Portfolio from "./artist/Portfolio";
-import FanLetter from "./artist/FanLetter";
-
 type Role = "general" | "artist";
-type UserTab = "collectbook" | "taste" | "quiz";
-type ArtistTab = "ticket" | "portfolio" | "fan-letter";
-type Tab = UserTab | ArtistTab;
+type TabKey = "collectbook" | "taste" | "quiz" | "ticket" | "portfolio" | "fan-letter";
 
 function normalizeRole(role: any): Role {
   if (role === "artist" || role === "ARTIST") return "artist";
   return "general";
 }
 
+type Tab = {
+  key: TabKey;
+  title: string;
+  desc: string;
+  to: string;
+};
+
 export default function Lounge() {
   const rawRole = useAuthStore((s) => s.role);
   const role = normalizeRole(rawRole);
 
-  const tabs = useMemo(() => {
+  const nav = useNavigate();
+  const { pathname } = useLocation();
+
+  const tabs: Tab[] = useMemo(() => {
     return role === "artist"
-      ? ([
-          { key: "ticket", title: "QR 티켓", desc: "티켓 발급/스캔" },
-          { key: "portfolio", title: "포트폴리오", desc: "작가 정보/작품" },
-          { key: "fan-letter", title: "팬레터", desc: "질문/답변" },
-        ] as const)
-      : ([
-          { key: "collectbook", title: "컬렉트북", desc: "스캔한 티켓/작품 기록" },
-          { key: "taste", title: "취향분석", desc: "선호/활동 기반 요약" },
-          { key: "quiz", title: "퀴즈", desc: "작품/작가 기반 퀴즈" },
-        ] as const);
+      ? [
+          { key: "ticket", title: "QR 티켓", desc: "티켓 발급/관리", to: "/lounge/ticket" },
+          { key: "portfolio", title: "포트폴리오", desc: "작가 정보/작품", to: "/lounge/portfolio" },
+          { key: "fan-letter", title: "팬레터", desc: "질문/답변", to: "/lounge/fan-letter" },
+        ]
+      : [
+          { key: "collectbook", title: "컬렉트북", desc: "스캔한 티켓/작품 기록", to: "/lounge/collectbook" },
+          { key: "taste", title: "취향분석", desc: "선호/활동 기반 요약", to: "/lounge/taste" },
+          { key: "quiz", title: "퀴즈", desc: "작품/작가 기반 퀴즈", to: "/lounge/quiz" },
+        ];
   }, [role]);
 
-  // ✅ role 기준 기본 탭 (artist → ticket, general → collectbook)
-  const defaultTab: Tab = role === "artist" ? "ticket" : "collectbook";
-  const [active, setActive] = useState<Tab>(defaultTab);
+  // URL에서 현재 탭 추출: /lounge/collectbook/scan -> collectbook
+  const activeKey: TabKey = useMemo(() => {
+    const seg = pathname.replace(/\/+$/, "").split("/")[2] as TabKey | undefined;
+    const valid = tabs.some((t) => t.key === seg);
+    return valid ? (seg as TabKey) : (role === "artist" ? "ticket" : "collectbook");
+  }, [pathname, tabs, role]);
 
-  // ✅ "잘못된 탭이면 기본 탭으로 복귀"
-  // - role 변경 등으로 tabs 목록이 바뀌었는데,
-  // - 기존 active가 새 tabs에 없으면 defaultTab으로 되돌림
+  // /lounge로 들어오면 기본 탭으로 보내기 (원래 active default 느낌 유지)
   useEffect(() => {
-    const validKeys = new Set(tabs.map((t) => t.key));
-    if (!validKeys.has(active as any)) {
-      setActive(defaultTab);
+    const clean = pathname.replace(/\/+$/, "");
+    if (clean === "/lounge") {
+      nav(role === "artist" ? "/lounge/ticket" : "/lounge/collectbook", { replace: true });
     }
-  }, [active, defaultTab, tabs]);
-
-  const Content = useMemo(() => {
-    if (role === "artist") {
-      if (active === "ticket") return <TicketQr />;
-      if (active === "portfolio") return <Portfolio />;
-      return <FanLetter />;
-    } else {
-      if (active === "collectbook") return <CollectBook />;
-      if (active === "taste") return <Taste />;
-      return <Quiz />;
-    }
-  }, [active, role]);
+  }, [pathname, role, nav]);
 
   return (
     <main className="loungePage">
@@ -80,8 +71,8 @@ export default function Lounge() {
             <button
               key={t.key}
               type="button"
-              className={`loungeTabBtn ${active === t.key ? "isActive" : ""}`}
-              onClick={() => setActive(t.key as Tab)}
+              className={`loungeTabBtn ${activeKey === t.key ? "isActive" : ""}`}
+              onClick={() => nav(t.to)}
             >
               <div className="loungeTabTitle">{t.title}</div>
               <div className="loungeTabDesc">{t.desc}</div>
@@ -89,7 +80,10 @@ export default function Lounge() {
           ))}
         </div>
 
-        <section className="loungeBody">{Content}</section>
+        {/* ✅ 여기서 자식 라우트(collectbook/scan 등)가 렌더됨 */}
+        <section className="loungeBody">
+          <Outlet />
+        </section>
       </section>
     </main>
   );

@@ -1,0 +1,376 @@
+/* ==========================================================================
+   ARTIST SIGNUP PAGE (Premium Gold & Black Theme)
+========================================================================== */
+
+/* 전체 페이지 레이아웃 */
+.artist-signup-page {
+  display: flex;
+  min-height: 100vh;
+  background-color: #050505; /* Deep Black */
+  color: #fff;
+  font-family: 'Pretendard', sans-serif;
+  overflow: hidden; /* 스크롤바 이중 생김 방지 */
+}
+
+/* --- 1. Left Preview Section (Sticky & Wide) --- */
+.artist-preview-section {
+  /* 기존 width: 420px 제거 -> 비율로 변경 */
+  flex: 0 0 45%; /* 화면의 45% 차지 (넓게) */
+  background: #0a0a0a;
+  border-right: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  flex-direction: column;
+  padding: 60px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 10;
+}
+
+.preview-header { margin-bottom: auto; } /* 헤더를 위로 밀기 */
+
+.back-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255,255,255,0.4);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: color 0.3s;
+}
+.back-link:hover { color: #C8A97E; }
+
+.preview-card-wrapper {
+  flex: 1; /* 남은 공간 차지 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 1200px;
+  width: 100%;
+}
+
+.preview-footer {
+  margin-top: auto; /* 푸터를 아래로 밀기 */
+  text-align: center;
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.25);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+
+/* --- 2. Right Form Section --- */
+.artist-form-section {
+  flex: 1; /* 나머지 55% 차지 */
+  padding: 100px 80px; /* 여백 넉넉하게 */
+  overflow-y: auto; /* 내용 길면 스크롤 */
+  display: flex;
+  justify-content: center;
+  height: 100vh; /* 높이 고정하여 내부 스크롤 */
+}
+
+.form-container {
+  width: 100%;
+  max-width: 680px;
+  padding-bottom: 150px;
+  animation: fadeIn 0.6s ease;
+}
+
+.form-header { margin-bottom: 60px; }
+.form-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 4rem; /* 제목 더 크게 */
+  margin: 0 0 16px;
+  color: #C8A97E; /* Artist Gold */
+  line-height: 1.1;
+}
+.form-desc { 
+  font-size: 1.2rem;
+  color: rgba(255,255,255,0.5); 
+}
+
+/* Progress Bar */
+.progress-container { margin-bottom: 70px; }
+.progress-track {
+  height: 2px;
+  background: rgba(255,255,255,0.1);
+  margin-bottom: 16px;
+}
+.progress-fill {
+  height: 100%;
+  background: #C8A97E;
+  transition: width 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.2);
+}
+.progress-labels span.active { color: #C8A97E; font-weight: 600; }
+
+
+/* ==========================================================================
+   INPUT STYLES (수정된 부분)
+========================================================================== */
+
+/* 라벨 */
+.auth-label {
+  display: block;
+  font-size: 0.9rem;
+  color: #C8A97E; /* 골드 */
+  margin-top: 50px; /* 간격 넓게 */
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+.auth-label .req { color: #ff5f5f; margin-left: 4px; }
+
+/* 입력창 공통 스타일 */
+.auth-dark-input, 
+.auth-dark-textarea,
+.artist-form-section input[type="text"],
+.artist-form-section input[type="email"],
+.artist-form-section input[type="password"],
+.artist-form-section select,
+.artist-form-section textarea {
+  width: 100%;
+  background: transparent !important; /* 배경 투명 강제 */
+  border: none;
+  border-bottom: 2px solid rgba(255,255,255,0.15); /* 밑줄 조금 더 잘보이게 */
+  padding: 16px 0;
+  
+  /* 폰트 설정 (크게) */
+  color: #fff;
+  font-family: 'Pretendard', sans-serif;
+  font-size: 1.8rem; /* 글자 크기 대폭 확대 */
+  font-weight: 500;
+  
+  border-radius: 0;
+  margin-bottom: 10px;
+  transition: all 0.3s ease;
+}
+
+/* 포커스 효과 */
+.auth-dark-input:focus,
+.artist-form-section input:focus,
+.artist-form-section select:focus,
+.artist-form-section textarea:focus {
+  outline: none;
+  border-bottom-color: #fff; /* 포커스 시 흰색 라인 */
+}
+
+/* 플레이스홀더 (약간 흐리게) */
+.auth-dark-input::placeholder,
+.artist-form-section input::placeholder,
+.artist-form-section textarea::placeholder {
+  color: rgba(255,255,255,0.15); 
+  font-size: 1.8rem;
+  font-weight: 300;
+}
+
+/* 브라우저 자동완성 배경 제거 (크롬/엣지 등) */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #050505 inset !important;
+    -webkit-text-fill-color: #fff !important;
+    transition: background-color 5000s ease-in-out 0s;
+    font-size: 1.8rem !important; /* 자동완성 시에도 폰트 크기 유지 */
+}
+
+/* Select 화살표 커스텀 */
+select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0 center;
+  background-size: 24px;
+}
+select option {
+  background-color: #111;
+  color: #fff;
+  font-size: 1rem;
+}
+
+
+/* --- Row Layout --- */
+.auth-row2 {
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
+}
+.auth-row2 > * { flex: 1; } /* 자식 요소 균등 분배 */
+
+
+/* --- Buttons --- */
+.auth-artist-next, .next-btn {
+  padding: 18px 40px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 4px;
+  background: #C8A97E;
+  color: #000;
+  border: none;
+  transition: all 0.3s;
+  /* 버튼 위치 */
+  margin-top: 40px;
+}
+.auth-artist-next:hover:not(:disabled) {
+  background: #e0c295;
+  transform: translateY(-2px);
+}
+.auth-artist-next:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.auth-artist-prev {
+  padding: 18px 30px;
+  font-size: 1.1rem;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-top: 40px;
+}
+.auth-artist-prev:hover {
+  border-color: #fff;
+  background: rgba(255,255,255,0.05);
+}
+
+.auth-nav, .auth-artist-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 80px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 20px;
+}
+
+
+/* --- Radio & File Upload --- */
+.auth-group {
+  display: flex;
+  gap: 40px;
+  margin-top: 20px;
+}
+
+.auth-radio, .auth-toggle, .auth-consent-check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: rgba(255,255,255,0.7);
+}
+.auth-radio input, .auth-toggle input {
+  width: 20px;
+  height: 20px;
+  accent-color: #C8A97E;
+}
+
+.auth-upload { margin-top: 40px; }
+.auth-drop {
+  border: 1px dashed rgba(255,255,255,0.3);
+  padding: 50px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: rgba(255,255,255,0.02);
+  display: block;
+  font-size: 1rem;
+  color: rgba(255,255,255,0.6);
+}
+.auth-drop:hover {
+  border-color: #C8A97E;
+  background: rgba(200, 169, 126, 0.05);
+  color: #C8A97E;
+}
+.auth-file {
+  margin-top: 10px;
+  color: #C8A97E;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+.auth-help {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.4);
+}
+.auth-link-btn {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  text-decoration: underline;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+/* Footer */
+.form-footer {
+  margin-top: 80px;
+  text-align: center;
+  font-size: 1rem;
+  color: rgba(255,255,255,0.5);
+}
+.login-link { color: #C8A97E; font-weight: 600; margin-left: 8px; }
+
+
+/* Responsive (Mobile & Tablet) */
+@media (max-width: 1100px) {
+  /* 1. 레이아웃을 세로(Column)로 변경 */
+  .artist-signup-page { 
+    flex-direction: column; 
+    overflow-y: auto; /* 전체 스크롤 허용 */
+  }
+  
+  /* 2. 왼쪽 프리뷰 섹션: 높이를 줄이고 카드 숨김 */
+  .artist-preview-section { 
+    width: 100%; 
+    height: auto;       /* 높이 자동 */
+    min-height: 60px;   /* 최소 높이 */
+    position: relative; 
+    flex: none;
+    padding: 20px 24px; /* 패딩 축소 */
+    border-right: none;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    background-color: #050505; /* 배경색 통일 */
+    z-index: 20;
+  }
+
+  /* 헤더(뒤로가기 버튼) 마진 제거 */
+  .preview-header {
+    margin-bottom: 0;
+  }
+  
+  /* ✅ 핵심: 모바일에서 카드와 푸터 텍스트 숨기기 */
+  .preview-card-wrapper,
+  .preview-footer { 
+    display: none !important; 
+  }
+  
+  /* 3. 오른쪽 폼 섹션: 여백 조정 */
+  .artist-form-section { 
+    padding: 40px 20px 80px; /* 상단 여백 줄임 */
+    height: auto; 
+    flex: none;
+  }
+
+  .form-title {
+    font-size: 2.5rem; /* 모바일에서 제목 크기 조절 */
+  }
+  
+  .auth-label {
+    margin-top: 30px; /* 모바일에서 간격 조금 좁힘 */
+  }
+}

@@ -56,7 +56,7 @@ npm run preview
 npm i react-router-dom zustand
 npm i gsap @studio-freight/lenis
 npm i react-qr-code @zxing/browser
-
+npm install three @types/three @react-three/fiber @react-three/drei
 
 ```
 

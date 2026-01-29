@@ -19,18 +19,18 @@ type FeedItem = {
  * public/art 안의 이미지 자체를 더미 데이터로 사용
  */
 const ART_IMAGES = [
-  "/art/a1.jpg",
-  "/art/a2.jpg",
-  "/art/a3.jpg",
-  "/art/a4.jpg",
-  "/art/a5.jpg",
-  "/art/a6.jpg",
-  "/art/a7.jpg",
-  "/art/a8.jpg",
-  "/art/a9.jpg",
-  "/art/a10.jpg",
-  "/art/a11.jpg",
-  "/art/a12.jpg",
+  "/art/b1.jpg",
+  "/art/b2.jpg",
+  "/art/b3.jpg",
+  "/art/b4.jpg",
+  "/art/b5.jpg",
+  "/art/b6.jpg",
+  "/art/b7.jpg",
+  "/art/b8.jpg",
+  "/art/b9.jpg",
+  "/art/b10.jpg",
+  "/art/b11.jpg",
+  "/art/b12.jpg",
 ];
 
 function buildImageMockFeeds(): FeedItem[] {
