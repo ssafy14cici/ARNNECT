@@ -1,16 +1,21 @@
+// FE/src/layouts/Navbar.tsx
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Canvas } from "@react-three/fiber"; 
+import { Canvas } from "@react-three/fiber";
 import { useAuthStore } from "../stores/authStore";
-import HoverModel from "../components/HoverModel"; 
-import LogoutModal from "../components/common/LogoutModal"; // ✅ [추가] 모달 Import
+import HoverModel from "../components/HoverModel";
+import LogoutModal from "../components/common/LogoutModal";
 import "../styles/navbar.css";
+
+// ✅ 3D 도형 타입 정의
+type ShapeType = "knot" | "sphere" | "box" | "octahedron" | "torus";
 
 type MenuItem = {
   key: string;
   label: string;
   type?: "link" | "close";
   path?: string;
+  shape?: ShapeType;
 };
 
 export default function Navbar() {
@@ -26,20 +31,20 @@ export default function Navbar() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const logout = useAuthStore((s) => s.logout);
 
-  // ✅ 로그아웃 버튼 클릭 -> 모달 열기
+  // 1. 로그아웃 버튼 클릭 -> 모달 열기
   const handleLogoutClick = () => {
     setModalOpen(true);
-    setOpen(false); // 메뉴 닫기 (선택사항, 모달 뒤에 메뉴가 보여도 되면 삭제 가능)
+    // setOpen(false); // 메뉴를 닫고 싶으면 주석 해제
   };
 
-  // ✅ 모달에서 [확인] -> 실제 로그아웃 실행
+  // 2. 모달에서 '확인' -> 실제 로그아웃
   const handleConfirmLogout = () => {
     logout();
     setModalOpen(false);
     navigate("/");
   };
 
-  // ESC 키로 메뉴 닫기 & 스크롤 잠금 처리 (기존 동일)
+  // ESC 키로 메뉴 닫기 & 스크롤 잠금 처리
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -58,17 +63,18 @@ export default function Navbar() {
     };
   }, [open]);
 
-  // 메뉴 아이템 정의 (기존 동일)
+  // ✅ 메뉴 아이템 정의 (Shape 포함)
   const items: MenuItem[] = useMemo(
     () => [
-      { key: "home", label: "Home", path: "/" },
-      { key: "yourpreference", label: "너의 취향은", path: "/preference" },
-      { key: "search", label: "Search", path: "/search" },
-      { key: "close", label: "", type: "close" },
-      { key: "feed", label: "Feed", path: "/feed" },
-      { key: "lounge", label: "Lounge", path: "/lounge" },
-      { key: "profile", label: "Profile", path: "/profile/me/feed" },
-      { key: "auth", label: "Login/Out", path: "" },
+      { key: "home", label: "Home", path: "/", shape: "knot" },
+      { key: "yourpreference", label: "너의 취향은", path: "/preference", shape: "octahedron" },
+      { key: "search", label: "Search", path: "/search", shape: "sphere" },
+      { key: "close", label: "", type: "close" }, // 닫기 버튼은 3D 없음
+
+      { key: "feed", label: "Feed", path: "/feed", shape: "box" },
+      { key: "lounge", label: "Lounge", path: "/lounge", shape: "torus" },
+      { key: "profile", label: "Profile", path: "/profile/me/feed", shape: "sphere" },
+      { key: "auth", label: "Login/Out", path: "", shape: "knot" },
     ],
     []
   );
@@ -83,11 +89,10 @@ export default function Navbar() {
     // 2. 로그인/로그아웃 버튼
     if (item.key === "auth") {
       if (!isLoggedIn) {
-        // 비로그인 -> 로그인 페이지 이동
         navigate("/login", { state: { from: location.pathname } });
         setOpen(false);
       } else {
-        // ✅ 로그인 상태 -> 모달 열기 (바로 로그아웃 X)
+        // ✅ 바로 로그아웃 하지 않고 모달 열기
         handleLogoutClick();
       }
       return;
@@ -147,11 +152,15 @@ export default function Navbar() {
                       : it.label}
                   </span>
 
+                  {/* ✨ 3D 영역: Shape 프롭 전달 ✨ */}
                   {hoveredKey === it.key && (
                     <div className="ref3DWrapper">
                       <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
                         <Suspense fallback={null}>
-                          <HoverModel color="#ffffff" />
+                          <HoverModel 
+                            color="#ffffff" 
+                            shape={it.shape} 
+                          />
                         </Suspense>
                       </Canvas>
                     </div>
@@ -163,7 +172,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* ✅ [추가] 로그아웃 모달 렌더링 */}
+      {/* ✅ [추가] 로그아웃 모달 */}
       <LogoutModal
         isOpen={isModalOpen}
         onClose={() => setModalOpen(false)}
