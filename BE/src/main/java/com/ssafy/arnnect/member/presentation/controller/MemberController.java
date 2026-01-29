@@ -3,6 +3,7 @@ package com.ssafy.arnnect.member.presentation.controller;
 import com.ssafy.arnnect.member.application.dto.request.CreateArtistRequest;
 import com.ssafy.arnnect.member.application.dto.request.CreateMemberRequest;
 import com.ssafy.arnnect.member.application.dto.request.UpdateMemberRequest;
+import com.ssafy.arnnect.member.application.dto.response.MemberInfoResponse;
 import com.ssafy.arnnect.member.application.dto.response.MyInfoResponse;
 import com.ssafy.arnnect.member.application.service.MemberService;
 import com.ssafy.arnnect.member.domain.entity.UserRole;
@@ -62,8 +63,9 @@ public class MemberController {
 
     //프로필 조회
     @GetMapping("/{memberUuid}")
-    public ResponseEntity<Void> GetMemberInfo(@PathVariable String memberUuid){
-        return ResponseEntity.ok().build();
+    public ResponseEntity<MemberInfoResponse> GetMemberInfo(@PathVariable String memberUuid){
+        String myUuid = SecurityUtil.getCurrentMemberUuid();
+        return ResponseEntity.ok(service.getMemberInfo(myUuid, memberUuid));
     }
 
 }

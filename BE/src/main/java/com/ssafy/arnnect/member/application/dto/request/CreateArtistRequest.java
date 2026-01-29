@@ -7,7 +7,6 @@ import jakarta.validation.constraints.*;
 import lombok.*;
 
 import java.time.LocalDate;
-import java.time.Year;
 import java.util.UUID;
 
 @Getter
@@ -56,9 +55,8 @@ public class CreateArtistRequest {
     @Min(value = 1, message = "장르 ID는 1 이상이어야 합니다.")
     private Integer genreId;  // art_genre.genre_id FK
 
-    @Min(value = 1900, message = "데뷔 연도는 1900년 이후여야 합니다.")
     @Max(value = 2100)
-    private Year debutYear;  // year 타입
+    private Integer debutYear;  // year 타입
 
     @Size(max = 500)
     private String snsPage;

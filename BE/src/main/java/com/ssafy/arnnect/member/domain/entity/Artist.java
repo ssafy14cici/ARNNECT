@@ -2,9 +2,6 @@ package com.ssafy.arnnect.member.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.ManyToAny;
-
-import java.time.Year;
 
 @Entity
 @Table(name = "artist")
@@ -31,7 +28,7 @@ public class Artist {
     private Integer genreId;
 
     @Column(name = "debut_year")
-    private Year debutYear;
+    private Integer debutYear;
 
     @Column(name = "sns_page", length = 500)
     private String snsPage;
