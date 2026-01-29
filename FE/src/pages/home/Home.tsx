@@ -12,10 +12,10 @@ export default function Home() {
   const sections = useMemo(
     () => [
       { 
-        key: "yourtaste", 
+        key: "yourpreference", 
         label: "너의 취향은", 
-        path: "/yourtaste", 
-        desc: "Discover Your Taste" 
+        path: "/yourpreference", 
+        desc: "Discover Your Preference" 
       },
       { 
         key: "search", 

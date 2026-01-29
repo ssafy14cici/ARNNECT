@@ -1,3 +1,4 @@
+//FE\src\pages\lounge\artist\qr\QrEntry.tsx
 import { useNavigate } from "react-router-dom";
 import "./qr.css";
 

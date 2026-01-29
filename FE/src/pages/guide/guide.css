@@ -1,47 +1,236 @@
-/* ===== Guide Flow ===== */
-
-.flowRow {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 16px;
+/* ==========================================================================
+   GUIDE PAGE (Sophisticated Dark Mode)
+========================================================================== */
+.guide-page {
+  min-height: 100vh;
+  background-color: #050505; /* Deep Black */
+  color: #fff;
+  font-family: 'Pretendard', sans-serif;
+  padding-bottom: 120px;
 }
 
-.flowStep {
-  min-width: 120px;
-  padding: 14px 16px;
-  border: 1px solid #e5e2d9;
-  border-radius: 12px;
-  background: #faf8f3;
+/* --- Hero Section --- */
+.guide-hero {
+  text-align: center;
+  padding: 120px 20px 80px;
+  background: radial-gradient(circle at top, #1a1a1a 0%, #050505 70%);
+}
+
+.guide-hero-title {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(3rem, 6vw, 5rem);
+  font-weight: 400;
+  margin: 0 0 20px;
+  letter-spacing: -0.02em;
+  background: linear-gradient(to bottom, #fff, #888);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.guide-hero-sub {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: rgba(255,255,255,0.6);
+  font-weight: 300;
+}
+
+.guide-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 120px; /* 섹션 간격 넓게 */
+}
+
+
+/* ==========================================================================
+   FLOW SECTION (Timeline Style)
+========================================================================== */
+.guide-section {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+.guide-section.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* --- Themes --- */
+/* User (Silver/White) */
+.theme-user {
+  --guide-accent: #fff;
+  --guide-dim: rgba(255,255,255,0.1);
+  --guide-text: rgba(255,255,255,0.7);
+}
+/* Artist (Gold) */
+.theme-artist {
+  --guide-accent: #C8A97E;
+  --guide-dim: rgba(200, 169, 126, 0.15);
+  --guide-text: rgba(200, 169, 126, 0.8);
+}
+
+/* Header */
+.guide-role-header {
+  margin-bottom: 60px;
   text-align: center;
 }
+.role-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  border: 1px solid var(--guide-accent);
+  color: var(--guide-accent);
+  font-size: 0.8rem;
+  border-radius: 50px;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.role-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.5rem;
+  margin: 0 0 10px;
+  color: #fff;
+}
+.role-desc {
+  font-size: 1rem;
+  color: rgba(255,255,255,0.5);
+}
 
-.flowTitle {
-  display: block;
+
+/* Flow Diagram */
+.flow-container {
+  position: relative;
+}
+
+/* Connecting Line */
+.flow-line-bg {
+  position: absolute;
+  top: 40px; /* 아이콘/숫자 높이 중앙 */
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: var(--guide-dim);
+  z-index: 0;
+}
+
+.flow-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Step Card */
+.flow-step-card {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 30px;
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  transition: transform 0.3s, border-color 0.3s;
+  position: relative;
+}
+
+.flow-step-card:hover {
+  transform: translateY(-10px);
+  border-color: var(--guide-accent);
+  background: rgba(255,255,255,0.04);
+}
+
+.step-number {
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--guide-dim); /* 은은하게 배경처럼 */
+  position: absolute;
+  top: 10px;
+  right: 20px;
+  font-family: 'Playfair Display', serif;
+  line-height: 1;
+  opacity: 0.5;
+}
+
+.step-icon {
+  font-size: 2.5rem;
+  margin-bottom: 20px;
+  filter: grayscale(100%); /* 아이콘 흑백처리로 차분하게 */
+  transition: filter 0.3s;
+}
+.flow-step-card:hover .step-icon {
+  filter: none; /* 호버 시 컬러 */
+}
+
+.step-title {
+  font-size: 1.2rem;
   font-weight: 600;
-  margin-bottom: 4px;
+  margin: 0 0 10px;
+  color: #fff;
 }
 
-.flowDesc {
-  font-size: 13px;
-  color: #666;
+.step-desc {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: rgba(255,255,255,0.6);
+  margin: 0;
 }
 
-.flowArrow {
-  font-size: 20px;
-  color: #aaa;
+
+/* --- CTA Section --- */
+.guide-cta {
+  text-align: center;
+  margin-top: 150px;
+  padding: 60px 20px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+.guide-cta p {
+  font-size: 1.5rem;
+  margin-bottom: 30px;
+  font-family: 'Playfair Display', serif;
+  color: #fff;
 }
 
-/* ===== Flow Group ===== */
-
-.flowGroup {
-  margin-top: 24px;
+.cta-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
 }
 
-.flowRole {
-  margin-bottom: 12px;
-  font-size: 16px;
+.cta-btn {
+  padding: 14px 32px;
+  border-radius: 50px;
+  text-decoration: none;
   font-weight: 600;
-  color: #333;
+  font-size: 1rem;
+  transition: transform 0.2s, opacity 0.2s;
+}
+.cta-btn:hover { transform: translateY(-2px); opacity: 0.9; }
+
+.cta-btn.user {
+  background: #fff;
+  color: #000;
+}
+.cta-btn.artist {
+  background: #C8A97E;
+  color: #000;
+}
+
+
+/* --- Responsive --- */
+@media (max-width: 900px) {
+  .flow-steps {
+    grid-template-columns: 1fr; /* 모바일: 세로 일렬 */
+    gap: 20px;
+  }
+  
+  .flow-line-bg {
+    /* 모바일에서는 가로선 대신 세로선 */
+    width: 1px;
+    height: 100%;
+    left: 40px; /* 카드 왼쪽 여백에 맞춤 */
+    top: 0;
+  }
+  
+  .guide-content { gap: 80px; }
 }

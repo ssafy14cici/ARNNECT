@@ -1,63 +1,112 @@
+import { useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import "./guide.css";
 
-function GuideFlow() {
+// 스크롤 시 페이드인 애니메이션 훅 (간단 버전)
+function useScrollFadeIn() {
+  const dom = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!dom.current) return;
+      const top = dom.current.getBoundingClientRect().top;
+      const windowHeight = window.innerHeight;
+      if (top < windowHeight * 0.85) {
+        dom.current.classList.add("visible");
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+    handleScroll(); // 초기 실행
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  return dom;
+}
+
+function FlowSection({ role, title, desc, steps, theme }: any) {
+  const ref = useScrollFadeIn();
+
   return (
-    <section style={{ margin: "40px 0" }}>
-      <h2>이용 흐름</h2>
-
-      {/* 👤 일반 이용자 */}
-      <div className="flowGroup">
-        <h3 className="flowRole">일반 이용자</h3>
-
-        <div className="flowRow">
-          <div className="flowStep">
-            <span className="flowTitle">전시 감상</span>
-            <span className="flowDesc">작품을 직접 감상</span>
-          </div>
-          <div className="flowArrow">→</div>
-          <div className="flowStep">
-            <span className="flowTitle">QR 스캔</span>
-            <span className="flowDesc">작품 페이지 이동</span>
-          </div>
-          <div className="flowArrow">→</div>
-          <div className="flowStep">
-            <span className="flowTitle">팬레터</span>
-            <span className="flowDesc">감상 전달</span>
-          </div>
-        </div>
+    <div ref={ref} className={`guide-section ${theme}`}>
+      <div className="guide-role-header">
+        <span className="role-badge">{role}</span>
+        <h2 className="role-title">{title}</h2>
+        <p className="role-desc">{desc}</p>
       </div>
 
-      {/* 🎨 예술인 */}
-      <div className="flowGroup">
-        <h3 className="flowRole">예술인</h3>
+      <div className="flow-container">
+        {/* 연결선 (배경) */}
+        <div className="flow-line-bg">
+          <div className="flow-line-progress" />
+        </div>
 
-        <div className="flowRow">
-          <div className="flowStep">
-            <span className="flowTitle">작품 등록</span>
-            <span className="flowDesc">라운지에서 작품 관리</span>
-          </div>
-          <div className="flowArrow">→</div>
-          <div className="flowStep">
-            <span className="flowTitle">QR 발급</span>
-            <span className="flowDesc">작품별 QR 생성</span>
-          </div>
-          <div className="flowArrow">→</div>
-          <div className="flowStep">
-            <span className="flowTitle">팬레터 확인</span>
-            <span className="flowDesc">관객 반응 확인</span>
-          </div>
+        <div className="flow-steps">
+          {steps.map((step: any, idx: number) => (
+            <div key={idx} className="flow-step-card">
+              <div className="step-number">0{idx + 1}</div>
+              <div className="step-icon">{step.icon}</div>
+              <h3 className="step-title">{step.title}</h3>
+              <p className="step-desc">{step.desc}</p>
+            </div>
+          ))}
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 
 export default function Guide() {
+  const userSteps = [
+    { title: "전시 감상", desc: "오프라인 전시회나 온라인 갤러리에서 작품을 감상하세요.", icon: "🖼️" },
+    { title: "QR 스캔", desc: "작품 옆의 QR 코드를 스캔하여 작품 상세 페이지로 이동합니다.", icon: "📱" },
+    { title: "팬레터 & 소통", desc: "감상을 남기고 작가와 소통하며 나만의 취향을 수집하세요.", icon: "💌" },
+  ];
+
+  const artistSteps = [
+    { title: "작품 등록", desc: "라운지에서 당신의 작품 포트폴리오를 쉽고 간편하게 등록하세요.", icon: "🎨" },
+    { title: "QR 발급", desc: "작품별 고유 QR 코드를 생성하여 전시회에 활용할 수 있습니다.", icon: "🏷️" },
+    { title: "반응 확인", desc: "관객들이 남긴 팬레터와 감상평을 실시간으로 확인하세요.", icon: "✨" },
+  ];
+
   return (
-    <div style={{ padding: 24 }}>
-      <h1>이용 가이드</h1>
-      <GuideFlow />
-      {/* 이하 텍스트 가이드 */}
+    <div className="guide-page">
+      {/* Hero Section */}
+      <header className="guide-hero">
+        <h1 className="guide-hero-title">User Guide</h1>
+        <p className="guide-hero-sub">
+          예술과 기술이 만나는 곳, <br />
+          ARNNECT를 100% 즐기는 방법을 소개합니다.
+        </p>
+      </header>
+
+      <div className="guide-content">
+        {/* 1. User Flow (Silver Theme) */}
+        <FlowSection
+          role="COLLECTOR"
+          title="For Art Lovers"
+          desc="숨겨진 예술을 발견하고 수집하는 여정"
+          steps={userSteps}
+          theme="theme-user"
+        />
+
+        {/* 2. Artist Flow (Gold Theme) */}
+        <FlowSection
+          role="ARTIST"
+          title="For Creators"
+          desc="당신의 작품을 세상과 연결하는 방법"
+          steps={artistSteps}
+          theme="theme-artist"
+        />
+      </div>
+
+      {/* Footer CTA */}
+      <div className="guide-cta">
+        <p>지금 바로 시작해보세요.</p>
+        <div className="cta-buttons">
+          <Link to="/signup?type=user" className="cta-btn user">일반 회원가입</Link>
+          <Link to="/signup?type=artist" className="cta-btn artist">예술인 회원가입</Link>
+        </div>
+      </div>
     </div>
   );
 }

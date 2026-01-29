@@ -1,3 +1,4 @@
+//FE\src\pages\lounge\user\Taste.tsx
 import { Link } from "react-router-dom";
 import "../lounge.css";
 import Radar6, { type RadarItem } from "../../../components/charts/Radar6";
