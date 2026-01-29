@@ -4,10 +4,15 @@ import { Link, useNavigate } from "react-router-dom";
 import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
 import type { Result } from "@zxing/library";
 import { NotFoundException } from "@zxing/library";
+import "../../lounge.css";
+import { addCollectBookItem } from "../../../../utils/collectbookStorage";
+import { getExhibitionByCode, redeemTicket } from "../../../../api/tickets";
 
-import "../lounge.css";
-import { addCollectBookItem } from "../../../utils/collectbookStorage";
-import { getExhibitionByCode, redeemTicket } from "../../../api/tickets";
+// TODO(BE 연동):
+// - redeemTicket은 의미상 collectbook 도메인이라 api/collectbook.ts로 옮기는 게 깔끔함.
+// - 백엔드가 붙으면 "서버에 등록 성공" 후 서버가 준 collect_book_id로 상세 이동하는 흐름이 정석.
+//   (지금처럼 localStorage에 addCollectBookItem 하는 건 mock/오프라인 캐시 용도로만 유지)
+
 
 type Step = "scan" | "preview";
 type Visibility = "private" | "public";
@@ -83,6 +88,12 @@ function getErrorMessage(e: unknown, fallback: string) {
 }
 
 function normalizeExhibition(data: unknown): Exhibition | null {
+  // TODO(BE 연동 - 이미지):
+  // 등록 시 이미지를 "파일 업로드"로 보내더라도,
+  // 조회 시에는 FE가 <img src="...">로 그릴 수 있는 값이 필요함.
+  // - (권장) BE 응답에 posterUrl/imageUrl(접근 가능한 URL) 제공
+  // - 또는 imageId를 주고, GET /files/:id 같은 다운로드 엔드포인트를 제공 → FE에서 URL로 변환 필요
+
   if (!data || typeof data !== "object") return null;
 
   const obj = data as Record<string, unknown>;
@@ -249,6 +260,18 @@ export default function CollectBookScan() {
         visitedAt: form.visitedAt,
         visibility: form.visibility,
       });
+      // TODO(BE 연동):
+      // redeemTicket(POST /api/v1/collectbook)은 서버에 "티켓북 등록"을 생성하고,
+      // 응답으로 collect_book_id를 반환할 가능성이 큼.
+      //
+      // ✅ 백엔드 연동 후 정석 흐름:
+      // const { collect_book_id } = await redeemTicket(...)
+      // nav(`/lounge/collectbook/${collect_book_id}`, { replace: true });
+      //
+      // ✅ 그리고 localStorage 저장(addCollectBookItem)은 선택 사항:
+      // - (옵션1) 완전히 제거: 서버 데이터만 사용 (권장)
+      // - (옵션2) 낙관적 캐시: 화면 빠르게 보이게 하고, 목록/상세는 서버에서 재조회
+
 
       // ✅ 로컬 저장(전시 조회 실패해도 저장은 됨)
       const saved = addCollectBookItem({

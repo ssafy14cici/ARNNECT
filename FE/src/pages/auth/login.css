@@ -1,0 +1,348 @@
+/* ==========================================================================
+   AUTH PAGE (Split Layout & Dark Theme)
+========================================================================== */
+.auth-page {
+  display: flex;
+  min-height: 100vh;
+  background-color: #050505; /* Deep Black */
+  color: #fff;
+  font-family: 'Pretendard', sans-serif;
+  overflow: hidden;
+}
+
+/* --- 1. Left Visual Section --- */
+.auth-visual {
+  flex: 1.2; /* 왼쪽이 조금 더 넓게 */
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  padding: 60px;
+  background-color: #111;
+}
+
+.visual-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.6;
+  transition: transform 10s ease; /* 천천히 줌인 효과 */
+}
+
+.auth-page:hover .visual-img {
+  transform: scale(1.05);
+}
+
+.visual-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.9), transparent 60%);
+  z-index: 1;
+}
+
+.visual-text {
+  position: relative;
+  z-index: 2;
+  opacity: 0;
+  animation: fadeUp 1s ease 0.5s forwards;
+}
+
+.visual-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 4rem;
+  margin: 0;
+  line-height: 1;
+  color: #fff;
+}
+
+.visual-desc {
+  font-size: 1.1rem;
+  margin-top: 16px;
+  letter-spacing: 0.05em;
+  color: rgba(255,255,255,0.7);
+}
+
+/* --- 2. Right Form Section --- */
+.auth-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  background: #050505;
+  position: relative;
+}
+
+.auth-inner {
+  width: 100%;
+  max-width: 420px;
+  animation: fadeIn 0.8s ease;
+}
+
+/* Header */
+.auth-header {
+  margin-bottom: 40px;
+}
+
+.auth-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.8rem;
+  font-weight: 400;
+  margin: 0 0 10px 0;
+}
+
+.auth-sub {
+  font-size: 0.95rem;
+  color: rgba(255,255,255,0.5);
+  font-weight: 300;
+}
+
+/* Role Switcher (Sliding Toggle) */
+.role-switch-container {
+  margin-bottom: 40px;
+}
+
+.role-track {
+  position: relative;
+  display: flex;
+  background: rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.role-btn {
+  flex: 1;
+  position: relative;
+  z-index: 2;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  padding: 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.role-btn.active {
+  color: #000; /* 활성 텍스트는 검정 (배경이 밝아지므로) */
+  font-weight: 600;
+}
+
+/* Slider Background */
+.role-slider {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  background: #fff;
+  border-radius: 6px;
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), background 0.3s;
+  z-index: 1;
+}
+
+/* Artist 모드일 때 슬라이더 이동 및 색상 변경 */
+.role-slider.ARTIST {
+  transform: translateX(100%);
+  background: #C8A97E; /* Artist Gold */
+}
+
+/* ==========================================================================
+   auth.css 수정
+========================================================================== */
+
+/* ... (이전 코드들) */
+
+/* Form Inputs (Floating Label Style) */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.input-group {
+  position: relative;
+}
+
+.minimal-input {
+  width: 100%;
+  background: transparent !important;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+  padding: 12px 0;
+  color: #fff;
+  font-size: 1rem;
+  border-radius: 0;
+  transition: border-color 0.3s;
+  position: relative;
+  z-index: 1;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #050505 inset !important;
+  -webkit-text-fill-color: #fff !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.minimal-input:focus {
+  outline: none;
+  border-bottom-color: #fff;
+}
+
+/* Artist 모드일 때 포커스 컬러 변경 */
+.mode-artist .minimal-input:focus {
+  border-bottom-color: #C8A97E;
+}
+
+.floating-label {
+  position: absolute;
+  left: 0;
+  top: 12px;
+  color: rgba(255,255,255,0.5);
+  font-size: 1rem;
+  pointer-events: none;
+  transition: all 0.3s ease;
+  z-index: 2;
+}
+
+
+/* 입력값이 있거나 포커스 되면 라벨 위로 이동 */
+.minimal-input:focus ~ .floating-label,
+.minimal-input:not(:placeholder-shown) ~ .floating-label {
+  top: -10px;
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.8);
+}
+
+.pw-toggle {
+  position: absolute;
+  right: 0;
+  top: 10px;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.4);
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+/* Options */
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.custom-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: rgba(255,255,255,0.7);
+}
+
+.forgot-btn {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.forgot-btn:hover { text-decoration: underline; }
+
+/* Submit Button */
+.submit-btn {
+  margin-top: 10px;
+  padding: 16px;
+  background: #fff;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: transform 0.2s, background 0.3s;
+}
+
+.submit-btn:hover {
+  transform: translateY(-2px);
+}
+
+.mode-artist .submit-btn {
+  background: #C8A97E; /* Artist Gold */
+}
+
+.error-message {
+  color: #ff6b6b;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+/* Footer */
+.auth-footer {
+  margin-top: 40px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.5);
+}
+
+.signup-link {
+  color: #fff;
+  font-weight: 600;
+  margin-left: 5px;
+  position: relative;
+}
+.signup-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: #fff;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.3s;
+}
+.signup-link:hover::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+
+/* --- Responsive --- */
+@media (max-width: 900px) {
+  .auth-page {
+    flex-direction: column;
+  }
+  
+  .auth-visual {
+    display: none; /* 모바일에서는 비주얼 영역 숨김 (깔끔하게) */
+  }
+
+  .auth-content {
+    padding: 20px;
+  }
+}
+
+/* Animations */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

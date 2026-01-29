@@ -1,3 +1,5 @@
+//FE\src\router\routes.tsx
+
 import type { RouteObject } from "react-router-dom";
 import { Navigate } from "react-router-dom";
 import Guard from "../components/common/Guard";
@@ -6,7 +8,6 @@ import Guide from "../pages/guide/Guide";
 
 import Home from "../pages/home/Home";
 import Search from "../pages/search/Search";
-import Recover from "../pages/auth/Recover";
 
 import Login from "../pages/auth/Login";
 import Signup from "../pages/auth/Signup";
@@ -15,7 +16,10 @@ import Feed from "../pages/feed/Feed";
 
 import Lounge from "../pages/lounge/Lounge";
 import LoungeIndex from "../pages/lounge/LoungeIndex";
-import CollectBook from "../pages/lounge/user/CollectBook";
+import CollectBook from "../pages/lounge/user/collectbook/CollectBook";
+import CollectBookScan from "../pages/lounge/user/collectbook/CollectBookScan";
+import CollectBookDetail from "../pages/lounge/user/collectbook/CollectBookDetail";
+
 import Taste from "../pages/lounge/user/Taste";
 import Quiz from "../pages/lounge/user/Quiz";
 
@@ -38,7 +42,6 @@ import NotFound from "../pages/notfound/NotFound";
 import PrivacyPolicyContent from "../components/legal/PrivacyPolicyContent";
 import TermsOfServiceContent from "../components/legal/TermsOfServiceContent";
 
-import { yourTasteRoutes } from "../pages/yourpreference";
 
 
 
@@ -51,15 +54,12 @@ export const routes: RouteObject[] = [
        * ========================= */
       { path: "/", element: <Home /> },
       { path: "home", element: <Home /> },
-      yourTasteRoutes,
       { path: "search", element: <Search /> },
       { path: "guide", element: <Guide /> },
 
       // ✅ ARNNECT 정책 페이지 경로 추가
       { path: "privacy", element: <PrivacyPolicyContent /> },
       { path: "terms", element: <TermsOfServiceContent /> },
-
-      { path: "recover", element: <Recover /> },
 
       /* =========================
        * ✅ Guest Only (게스트만)
@@ -95,10 +95,15 @@ export const routes: RouteObject[] = [
                 element: <Lounge />,
                 children: [
                   { index: true, element: <LoungeIndex /> },
+
                   {
                     path: "collectbook",
                     element: <Guard requireRole="general" />,
-                    children: [{ index: true, element: <CollectBook /> }],
+                    children: [
+                      { index: true, element: <CollectBook /> },
+                      { path: "scan", element: <CollectBookScan /> }, 
+                      { path: ":id", element: <CollectBookDetail /> }, 
+                    ],
                   },
                   {
                     path: "taste",

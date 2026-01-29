@@ -1,0 +1,350 @@
+/* ==========================================================================
+   USER (COLLECTOR) SIGNUP PAGE (White & Black Theme)
+========================================================================== */
+
+/* 전체 페이지 레이아웃 */
+.user-signup-page {
+  display: flex;
+  min-height: 100vh;
+  background-color: #050505; /* Deep Black */
+  color: #fff;
+  font-family: 'Pretendard', sans-serif;
+  overflow: hidden;
+}
+
+/* --- 1. Left Preview Section --- */
+.user-preview-section {
+  flex: 0 0 45%; /* 화면의 45% */
+  background: #0a0a0a;
+  border-right: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  flex-direction: column;
+  padding: 60px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 10;
+}
+
+.preview-header { margin-bottom: auto; }
+
+.back-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255,255,255,0.4);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: color 0.3s;
+}
+.back-link:hover { color: #fff; } /* 화이트 호버 */
+
+.preview-card-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 1200px;
+  width: 100%;
+}
+
+/* Card Override for User (Silver/White Theme) */
+.user-preview-section .auth-preview-card {
+  border-color: rgba(255, 255, 255, 0.3); /* White Border */
+}
+.user-preview-section .auth-preview-card::before {
+  /* 배경 장식도 화이트/실버 톤 */
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 60%);
+}
+.user-preview-section .auth-preview-badge {
+  background: #fff; /* Badge White */
+  color: #000;
+}
+.user-preview-section .auth-preview-step {
+  color: #fff; /* Step Text White */
+}
+
+.preview-footer {
+  margin-top: auto;
+  text-align: center;
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.25);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+
+/* --- 2. Right Form Section --- */
+.user-form-section {
+  flex: 1;
+  padding: 100px 80px;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  height: 100vh;
+}
+
+.form-container {
+  width: 100%;
+  max-width: 680px;
+  padding-bottom: 150px;
+  animation: fadeIn 0.6s ease;
+}
+
+.form-header { margin-bottom: 60px; }
+.form-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 4rem;
+  margin: 0 0 16px;
+  color: #fff; /* User Title White */
+  line-height: 1.1;
+}
+.form-desc { 
+  font-size: 1.2rem;
+  color: rgba(255,255,255,0.5); 
+}
+
+/* Progress Bar (White Theme) */
+.progress-container { margin-bottom: 70px; }
+.progress-track {
+  height: 2px;
+  background: rgba(255,255,255,0.1);
+  margin-bottom: 16px;
+}
+.progress-fill {
+  height: 100%;
+  background: #fff; /* White Fill */
+  transition: width 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.2);
+}
+.progress-labels span.active { color: #fff; font-weight: 600; } /* Active White */
+
+
+/* ==========================================================================
+   INPUT STYLES OVERRIDE (White Accent)
+   TSX 컴포넌트 내부의 클래스(.auth-dark-input 등)에 스타일 주입
+========================================================================== */
+
+/* Label */
+.auth-label {
+  display: block;
+  font-size: 0.9rem;
+  color: #fff; /* White Label */
+  margin-top: 50px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+.auth-label .req { color: #ff5f5f; margin-left: 4px; }
+
+/* Inputs */
+.auth-dark-input, 
+.user-form-section input[type="text"],
+.user-form-section input[type="email"],
+.user-form-section input[type="password"] {
+  width: 100%;
+  background: transparent !important;
+  border: none;
+  border-bottom: 2px solid rgba(255,255,255,0.15);
+  padding: 16px 0;
+  color: #fff;
+  font-family: 'Pretendard', sans-serif;
+  font-size: 1.8rem; /* Large Font */
+  font-weight: 500;
+  border-radius: 0;
+  margin-bottom: 10px;
+  transition: all 0.3s ease;
+}
+
+.auth-dark-input:focus,
+.user-form-section input:focus {
+  outline: none;
+  border-bottom-color: #fff; /* Focus White */
+}
+
+.auth-dark-input::placeholder,
+.user-form-section input::placeholder {
+  color: rgba(255,255,255,0.15);
+  font-size: 1.8rem;
+  font-weight: 300;
+}
+
+/* Autofill Fix */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #050505 inset !important;
+    -webkit-text-fill-color: #fff !important;
+    transition: background-color 5000s ease-in-out 0s;
+    font-size: 1.8rem !important;
+}
+
+/* Row Layout */
+.auth-row2 {
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
+}
+.auth-row2 > * { flex: 1; }
+
+/* Buttons (White Theme) */
+.auth-artist-next, .next-btn {
+  padding: 18px 40px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 4px;
+  background: #fff; /* White Button */
+  color: #000;
+  border: none;
+  transition: all 0.3s;
+  margin-top: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.auth-artist-next:hover:not(:disabled) {
+  background: #dcdcdc;
+  transform: translateY(-2px);
+}
+.auth-artist-next:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Previous Button */
+.auth-artist-prev {
+  padding: 18px 30px;
+  font-size: 1.1rem;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-top: 40px;
+}
+.auth-artist-prev:hover {
+  border-color: #fff;
+  background: rgba(255,255,255,0.1);
+}
+
+.form-actions {
+  display: flex;
+  margin-top: 40px;
+}
+.form-actions.right { justify-content: flex-end; }
+
+.auth-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 80px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 20px;
+}
+
+/* Checkbox (Consent) */
+.auth-consent-box {
+  background: rgba(255,255,255,0.03);
+  padding: 24px;
+  height: 200px;
+  overflow-y: auto;
+  border: 1px solid rgba(255,255,255,0.1);
+  margin-bottom: 20px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: rgba(255,255,255,0.7);
+}
+.auth-consent-h {
+  color: #fff; /* White Highlight */
+  margin-top: 16px;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.auth-consent-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: rgba(255,255,255,0.6);
+  transition: color 0.3s;
+}
+.auth-consent-check input {
+  width: 20px;
+  height: 20px;
+  accent-color: #fff; /* White Checkbox */
+}
+.auth-consent-check:hover { color: #fff; }
+
+/* Footer */
+.form-footer {
+  margin-top: 80px;
+  text-align: center;
+  font-size: 1rem;
+  color: rgba(255,255,255,0.5);
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding-top: 20px;
+}
+.login-link { color: #fff; font-weight: 600; margin-left: 8px; }
+
+/* Error Msg */
+.auth-error {
+  color: #ff6b6b;
+  margin-top: 10px;
+  font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .user-signup-page { 
+    flex-direction: column; 
+    overflow-y: auto; 
+  }
+  
+  .user-preview-section { 
+    width: 100%; 
+    height: auto; 
+    min-height: 60px;
+    position: relative; 
+    flex: none;
+    padding: 20px 24px;
+    border-right: none;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    background-color: #050505;
+    z-index: 20;
+  }
+
+  .preview-header { margin-bottom: 0; }
+  
+  /* 모바일에서 카드 숨김 */
+  .preview-card-wrapper, .preview-footer { 
+    display: none !important; 
+  }
+  
+  .user-form-section { 
+    padding: 40px 20px 80px; 
+    height: auto; 
+    flex: none;
+  }
+
+  .form-title { font-size: 2.5rem; }
+  .auth-label { margin-top: 30px; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

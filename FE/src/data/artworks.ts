@@ -2,11 +2,11 @@
 export const artworks = [
   {
     id: "a1",
-    src: "/art/a1.jpg",
+    src: "/art/b1.jpg",
     title: "Nocturne Study",
     artistName: "A. Kim",
     artistProfile: "/avatar/default-artist.png",
-    thumbnail: "/art/a1.jpg",
+    thumbnail: "/art/b1.jpg",
     likes: 128,
     views: 1420,
     size: "1200x1600",

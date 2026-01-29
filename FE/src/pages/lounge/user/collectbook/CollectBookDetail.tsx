@@ -1,10 +1,10 @@
 // FE/src/pages/lounge/user/CollectBookDetail.tsx
 import { Link, useParams } from "react-router-dom";
-import "../lounge.css";
-import TicketCardModern from "../../../components/lounge/TicketCardModern";
-import "../../../components/lounge/ticketCardModern.css";
+import "../../lounge.css";
+import TicketCardModern from "./TicketCardModern";
+import "./ticketCardModern.css";
 
-import { getCollectBookItemById } from "../../../utils/collectbookStorage";
+import { getCollectBookItemById } from "../../../../utils/collectbookStorage";
 
 export default function CollectBookDetail() {
   const { id } = useParams<{ id: string }>();
@@ -28,7 +28,22 @@ export default function CollectBookDetail() {
     );
   }
 
+  // TODO(BE 연동):
+  // 현재는 localStorage에서 id로 조회(getCollectBookItemById).
+  // 백엔드 연동 시에는:
+  // - GET /api/v1/collectbook/:collect_book_id 로 교체
+  // - 라우트 param id는 "local uuid"가 아니라 서버가 준 collect_book_id를 사용
+  //
+  // 또한 상세 화면에서 앞으로 하게 될 작업:
+  // - 메모 수정: PATCH /api/v1/collectbook/:id { memo }
+  // - 공개/비공개: PATCH /api/v1/collectbook/:id { visibility }
+  // - 관람일 수정: PATCH /api/v1/collectbook/:id { visitedAt }
+  // - 삭제: DELETE /api/v1/collectbook/:id
+  //
+  // => 결국 이 파일도 async로 바꾸고,
+  //    useEffect로 item을 fetch해서 state로 들고 있게 될 가능성이 높음.
   const item = getCollectBookItemById(id);
+
 
   if (!item) {
     return (

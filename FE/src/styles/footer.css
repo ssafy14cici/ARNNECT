@@ -1,11 +1,22 @@
-/* src/styles/footer.css */
+/* ==========================================================================
+   FOOTER (Minimalist Dark Theme)
+========================================================================== */
+
 .footer {
-  /* 이미지 톤에 맞춘 따뜻한 라이트 그레이 배경 */
-  background-color: #f6f5f2; 
-  border-top: 1px solid #edece8;
-  padding: 60px 20px;
+  /* 메인 페이지 배경(#050505)과 동일하게 하여 경계선을 없앰 */
+  background-color: #050505;
+  
+  /* 아주 얇고 투명한 상단 라인으로 은은하게 구분 */
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  
+  padding: 80px 20px 60px; /* 여백을 넉넉하게 주어 답답하지 않게 */
   width: 100%;
   box-sizing: border-box;
+  font-family: 'Pretendard', sans-serif;
+  
+  /* 맨 아래에 위치하도록 z-index 관리 (필요 시) */
+  position: relative;
+  z-index: 10;
 }
 
 .footer-content {
@@ -14,41 +25,71 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24px;
+  gap: 32px;
 }
 
+/* --- Links --- */
 .footer-links {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* 작대기 대신 여백으로 구분 */
-  gap: 40px; 
+  gap: 40px; /* 링크 간 간격 */
 }
 
 .footer-link {
-  font-size: 14px;
-  /* 배경과 어울리는 웜 그레이 컬러 */
-  color: #8a8883; 
+  font-size: 0.8rem;
+  /* 대문자로 변경하여 더 정돈된 느낌 */
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  
+  /* 기본 색상은 어둡게 눌러줌 */
+  color: rgba(255, 255, 255, 0.4);
+  
   text-decoration: none;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  transition: color 0.2s ease;
+  font-weight: 400;
+  transition: all 0.3s ease;
+  position: relative;
 }
 
+/* 호버 시 하이라이트 */
 .footer-link:hover {
-  /* 호버 시에는 조금 더 진하게 */
-  color: #4a4945; 
+  color: #fff;
 }
 
+/* 개인정보처리방침 강조 (선택사항) */
 .footer-link.policy {
-  /* 개인정보 처리방침은 조금 더 명확한 톤으로 */
-  color: #63615e;
-  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+}
+.footer-link.policy:hover {
+  color: #fff;
 }
 
+/* --- Copyright --- */
 .footer-copyright {
-  font-size: 13px;
-  /* 저작권 문구는 아주 연하게 처리 */
-  color: #b0aeaa;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.25); /* 아주 연하게 */
   margin: 0;
+  letter-spacing: 0.05em;
+}
+
+/* 브랜드명만 우아한 폰트로 포인트 */
+.footer-brand-text {
+  font-family: 'Playfair Display', serif;
+  font-weight: 400;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0 4px;
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  .footer {
+    padding: 60px 20px 40px;
+  }
+  
+  .footer-links {
+    flex-direction: column; /* 모바일에서는 세로 정렬 */
+    gap: 20px;
+  }
 }

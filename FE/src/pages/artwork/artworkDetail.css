@@ -1,266 +1,464 @@
-.artworkDetailPage {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 40px 24px 80px;
-  font-family: sans-serif;
-}
+/* ==========================================================================
+   ARTWORK DETAIL (Immersive Gallery Theme with Parallax)
+========================================================================== */
 
-.artworkDetailCenter {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 100px 24px;
-  font-family: sans-serif;
-  text-align: center;
-}
-
-.loadingText {
-  font-size: 18px;
-  color: #666;
-  margin-bottom: 20px;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #333;
-  border-radius: 50%;
-  margin: 0 auto;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* NotFound */
-.nfImageWrap { margin-bottom: 24px; }
-.nfImage { max-width: 200px; opacity: 0.6; margin: 0 auto; display: block; }
-.nfTitle { font-size: 24px; font-weight: 700; margin-bottom: 16px; }
-.nfDesc { color: #666; margin-bottom: 32px; }
-.nfHint { color: #999; margin-top: 16px; font-size: 14px; }
-
-.primaryBtn {
-  padding: 12px 24px;
-  font-size: 16px;
-  font-weight: 600;
+/* 페이지 전체 컨테이너 */
+.artwork-detail-page {
+  background-color: #050505; /* Deep Black */
   color: #fff;
-  background: #333;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-/* Hero */
-.artworkHero {
-  border-radius: 12px;
-  overflow: hidden;
-  margin-bottom: 32px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-
-.artworkHeroImage {
+  font-family: 'Pretendard', sans-serif;
   width: 100%;
-  display: block;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden; /* 가로 스크롤 방지 */
 }
 
-.artworkHeroPlaceholder {
+/* --- 1. Hero Section (Parallax Effect) --- */
+.artwork-hero {
+  height: 100vh; /* 화면 꽉 채움 */
   width: 100%;
-  aspect-ratio: 16/9;
-  background: #f5f5f5;
+  position: sticky; /* 스크롤 시 잠시 고정되는 느낌 */
+  top: 0;
+  z-index: 1; /* 컨텐츠보다 뒤에 위치 */
+  
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 80px 20px 40px;
+  
+  /* 배경을 살짝 어둡게 해서 글씨가 잘 보이게 */
+  background: radial-gradient(circle at center, #1a1a1a 0%, #050505 80%);
+}
+
+.hero-content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-
-.heroFallbackImage { max-width: 120px; opacity: 0.4; }
-.heroFallbackText { color: #999; font-size: 14px; }
-
-/* Header */
-.artworkHeader {
+  gap: 40px;
+  width: 100%;
+  max-width: 1400px;
   text-align: center;
-  margin-bottom: 32px;
+  animation: fadeUp 1s ease;
+  /* 스크롤 내려가도 내용이 살짝 보이게 투명도 조절 */
+  transition: opacity 0.5s ease;
 }
 
-.artworkTitle {
-  font-size: 32px;
-  font-weight: 700;
-  margin: 0 0 16px 0;
-  line-height: 1.3;
+.hero-title {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  font-weight: 400;
+  margin: 0;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  text-shadow: 0 10px 30px rgba(0,0,0,0.5);
 }
 
-.artworkMetaRow {
+.hero-artist {
+  font-size: 1.1rem;
+  color: rgba(255,255,255,0.8);
+  font-family: 'Playfair Display', serif; 
+  font-style: italic;
+}
+
+/* Frame (Image) */
+.hero-frame {
+  position: relative;
+  max-height: 60vh;
+  height: auto;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.6); /* 그림자 강화 */
+  transition: transform 0.5s ease;
+}
+
+.hero-img {
+  max-height: 60vh;
+  max-width: 100%;
+  width: auto;
+  display: block;
+  object-fit: contain;
+}
+
+/* Scroll Indicator */
+.scroll-indicator {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
+  gap: 10px;
+  opacity: 0.6;
+  animation: blink 2s infinite;
+  z-index: 10;
+}
+.scroll-indicator span {
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.scroll-line {
+  width: 1px;
+  height: 60px;
+  background: linear-gradient(to bottom, #fff, transparent);
 }
 
-.artworkArtist { font-size: 18px; color: #666; }
 
-.followBtn {
-  padding: 8px 20px;
-  background: #d4b87a;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.followBtn.following {
-  background: #f7cc70;
-}
-
-/* Actions */
-.artworkActions {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-  padding-bottom: 32px;
-  border-bottom: 1px solid #eee;
-  margin-bottom: 40px;
-}
-
-.likeBtn, .ghostBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 24px;
-  background: #fff;
-  color: #333;
-  border: 1px solid #e0e0e0;
-  border-radius: 24px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-}
-
-.likeBtn.liked {
-  background: #ff4d4f;
-  color: #fff;
-  border-color: #ff4d4f;
-}
-
-.likeIcon { display: block; }
-
-/* Desc */
-.descSection { margin-bottom: 48px; }
-.sectionTitle {
-  font-size: 24px;
-  font-weight: 700;
-  margin-bottom: 20px;
-  text-align: center;
-}
-.descText {
-  font-size: 15px;
-  line-height: 1.8;
-  color: #555;
-  text-align: center;
+/* --- 2. Body Content (Scroll Up Effect) --- */
+.artwork-body {
+  position: relative;
+  z-index: 2; /* Hero보다 위에 위치 */
+  background-color: #050505; /* 본문 배경색 (Hero를 덮음) */
+  margin-top: 100vh; /* Hero 높이만큼 띄워서 시작하는 것처럼 보이지만... */
+  /* 사실 margin-top은 sticky 효과랑 충돌 날 수 있으므로 padding-top으로 조정하거나
+     그냥 자연스럽게 흐르도록 둠. 여기서는 position: relative로 덮는 방식 사용. */
+  
+  width: 100%;
+  min-height: 100vh; /* 최소 높이 확보 */
+  box-shadow: 0 -50px 100px rgba(0,0,0,1); /* 상단 그림자로 자연스러운 연결 */
+  
+  /* 실제 컨텐츠 레이아웃 */
+  max-width: 1000px;
   margin: 0 auto;
-  max-width: 600px;
+  padding: 100px 24px 150px; /* 상단 패딩 넉넉하게 */
 }
 
-/* Tags */
-.tagList {
+/* Action Bar */
+.action-bar {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 80px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.follow-btn {
+  padding: 12px 30px;
+  border: 1px solid rgba(255,255,255,0.3);
+  background: transparent;
+  color: #fff;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+}
+.follow-btn:hover { border-color: #fff; background: rgba(255,255,255,0.1); }
+.follow-btn.active { background: #fff; color: #000; border-color: #fff; font-weight: 600; }
+
+.action-right { display: flex; gap: 20px; }
+.like-btn, .share-btn {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-bottom: 48px;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: color 0.3s;
 }
-.tagChip {
-  padding: 6px 14px;
-  background: #f5f5f5;
-  border-radius: 20px;
-  font-size: 13px;
-  color: #666;
+.like-btn:hover, .share-btn:hover { color: #fff; }
+.like-btn.active { color: #ff5f5f; }
+.like-btn svg { fill: currentColor; }
+
+
+/* Info Section */
+.info-section { margin-bottom: 100px; }
+.section-label {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: #C8A97E; /* Gold Accent */
+  margin-bottom: 24px;
+  font-weight: 600;
 }
+.desc-text {
+  font-size: 1.15rem;
+  line-height: 1.8;
+  color: rgba(255,255,255,0.9);
+  margin-bottom: 40px;
+  white-space: pre-wrap;
+  font-weight: 300;
+}
+.tags-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.tag-pill {
+  padding: 8px 16px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 50px;
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.7);
+  transition: all 0.3s;
+}
+.tag-pill:hover { border-color: #C8A97E; color: #C8A97E; }
+
 
 /* Comments */
-.commentsSection { margin-bottom: 60px; }
-.commentsHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-.commentsTitle { font-size: 14px; font-weight: 600; margin: 0; color: #666; }
-.commentsCount { font-size: 14px; color: #999; font-weight: 500; }
+.comments-section { margin-bottom: 120px; }
+.comments-section .count { font-weight: 400; color: rgba(255,255,255,0.5); }
 
-/* Grids */
-.gridSection {
-  border-top: 1px solid #eee;
-  padding-top: 40px;
-  margin-bottom: 60px;
-}
-.gridTitle { margin-bottom: 24px; font-size: 20px; font-weight: 700; }
 
-.gridRow {
-  display: flex;
-  gap: 12px;
-  width: 100%;
-  justify-content: space-between;
+/* Discovery Grid */
+.discovery-section {
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 100px;
+}
+.section-heading {
+  font-family: 'Playfair Display', serif;
+  font-size: 3rem;
+  text-align: center;
+  margin-bottom: 80px;
+  font-weight: 400;
+  color: #fff;
 }
 
-.artworkCard {
-  flex: 1;
-  aspect-ratio: 1/1;
+.grid-group { margin-bottom: 80px; }
+.grid-label {
+  font-size: 1.1rem;
+  margin-bottom: 30px;
+  color: #C8A97E;
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  border-left: 2px solid #C8A97E;
+  padding-left: 16px;
+}
+
+.artwork-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+
+.grid-card {
+  aspect-ratio: 3 / 4; /* 세로형 비율 */
   position: relative;
-  cursor: pointer;
-  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  transition: transform 0.3s ease;
+  cursor: pointer;
+  background: #111;
 }
-
-.artworkCard:hover { transform: scale(1.02); }
-
-.artworkCardImage {
+.grid-card img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
-  transition: filter 0.3s ease;
+  transition: transform 0.6s ease;
+  filter: grayscale(30%);
 }
-
-.artworkCard:hover .artworkCardImage { filter: grayscale(0); }
-
-.artworkCardOverlay {
+.grid-card:hover img {
+  transform: scale(1.05);
+  filter: grayscale(0%);
+}
+.card-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,0.3);
+  background: rgba(0,0,0,0.4);
   display: flex;
-  flex-direction: column;
-  justify-content: center;
   align-items: center;
-  color: #fff;
-  text-align: center;
-  padding: 10px;
+  justify-content: center;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s;
+}
+.grid-card:hover .card-overlay { opacity: 1; }
+.card-overlay span {
+  border: 1px solid #fff;
+  padding: 10px 20px;
+  border-radius: 50px;
+  font-size: 0.8rem;
+  color: #fff;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
-.artworkCard:hover .artworkCardOverlay { opacity: 1; }
 
-.overlayTitle {
-  font-weight: 700;
-  font-size: 13px;
-  margin-bottom: 4px;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+/* Responsive */
+@media (max-width: 1024px) {
+  .artwork-grid { grid-template-columns: repeat(2, 1fr); }
+  .hero-title { font-size: 3rem; }
 }
 
-.overlaySub {
-  font-size: 11px;
-  opacity: 0.9;
-  letter-spacing: 0.5px;
+@media (max-width: 768px) {
+  /* 모바일에서는 Parallax 끄고 일반 스크롤 */
+  .artwork-hero { position: relative; height: auto; min-height: 80vh; }
+  .artwork-body { margin-top: 0; }
+  
+  .hero-title { font-size: 2.2rem; }
+  .action-bar { flex-direction: column; gap: 20px; align-items: flex-start; }
+  .action-right { width: 100%; justify-content: space-between; }
+  .artwork-grid { grid-template-columns: 1fr; }
+}
+
+/* Animations */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes blink { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.8; } }
+
+/* ==========================================================================
+   COMMENT SECTION (Minimalist Dark Theme)
+   기존 artworkDetail.css 하단에 추가하세요.
+========================================================================== */
+
+/* --- Comment Form (Input) --- */
+.comment-form {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end; /* 밑줄 라인 맞춤 */
+  margin-bottom: 40px;
+  background: transparent;
+}
+
+.comment-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+  padding: 12px 0;
+  color: #fff;
+  font-family: 'Pretendard', sans-serif;
+  font-size: 1rem;
+  border-radius: 0;
+  transition: border-color 0.3s ease;
+}
+
+.comment-input:focus {
+  outline: none;
+  border-bottom-color: #fff; /* 포커스 시 흰색 */
+}
+
+.comment-input::placeholder {
+  color: rgba(255,255,255,0.3);
+}
+
+.comment-submit-btn {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.3s;
+  white-space: nowrap;
+  height: 40px;
+}
+
+.comment-submit-btn:hover {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
+}
+
+
+/* --- Comment List --- */
+.comment-list-ul {
+  list-style: none;
+  padding: 0;
+  margin-top: 40px;
+}
+
+/* --- Comment Item --- */
+.comment-item-li {
+  margin-bottom: 40px;
+  animation: fadeIn 0.5s ease;
+}
+
+.comment-box {
+  /* 박스 배경 제거, 투명하고 미니멀하게 */
+  background: transparent; 
+  padding: 0;
+  border: none;
+  position: relative;
+}
+
+/* Header: 작성자 + 날짜 */
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.comment-author {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fff; /* White */
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.comment-author:hover { color: #C8A97E; /* Gold hover */ }
+
+.comment-date {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.3);
+}
+
+/* Body: 내용 */
+.comment-content {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: rgba(255,255,255,0.8);
+  margin-bottom: 12px;
+  white-space: pre-wrap; /* 줄바꿈 허용 */
+}
+
+/* Actions: 답글/수정/삭제 */
+.comment-actions {
+  display: flex;
+  gap: 16px;
+  font-size: 0.8rem;
+}
+
+.action-btn {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s;
+}
+.action-btn:hover { color: #fff; text-decoration: underline; }
+.action-btn.delete:hover { color: #ff5f5f; }
+
+
+/* --- Edit Mode --- */
+.comment-edit-wrap {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  width: 100%;
+}
+.comment-edit-btn {
+  font-size: 0.85rem;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: none;
+}
+.btn-save { background: #C8A97E; color: #000; font-weight: 600; }
+.btn-cancel { background: rgba(255,255,255,0.1); color: #fff; }
+
+
+/* --- Reply Section --- */
+.reply-container {
+  margin-top: 20px;
+  margin-left: 0;
+  padding-left: 20px;
+  border-left: 1px solid rgba(255,255,255,0.1); /* 계층 구조 선 */
+}
+
+.reply-form-wrap {
+  margin-top: 16px;
+  padding-left: 20px;
+  border-left: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Empty State */
+.comment-empty {
+  text-align: center;
+  color: rgba(255,255,255,0.3);
+  padding: 60px 0;
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  font-style: italic;
 }

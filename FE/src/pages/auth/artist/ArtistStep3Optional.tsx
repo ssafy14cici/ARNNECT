@@ -1,4 +1,4 @@
-// FE/src/pages/auth/components/ArtistStep3Optional.tsx
+// FE\src\pages\auth\artist\ArtistStep3Optional.tsx
 import type React from "react";
 
 type ArtistStep3Value = {

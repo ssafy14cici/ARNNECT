@@ -5,7 +5,7 @@ export const ReplyList = ({ parentId, allComments, onDelete, onUpdate, onAddRepl
   if (replies.length === 0) return null;
 
   return (
-    <ul style={{ padding: 0, marginLeft: 32, marginTop: 8 }}>
+    <ul className="comment-list-ul reply-container">
       {replies.map((reply: any) => (
         <CommentItem
           key={reply.id}

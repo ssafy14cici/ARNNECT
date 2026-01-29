@@ -1,4 +1,4 @@
-// src/pages/auth/components/ArtistStep2Profile.tsx
+// FE\src\pages\auth\artist\ArtistStep2Profile.tsx
 import type React from "react";
 import type { ArtistStep2 } from "../../../types/auth";
 

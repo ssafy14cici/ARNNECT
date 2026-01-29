@@ -1,3 +1,4 @@
+//FE/src/pages/artwork/ArtworkDetail.tsx
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 // @ts-ignore
