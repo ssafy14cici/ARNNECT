@@ -32,28 +32,33 @@ const KEY_FOLLOWS = "arnnect_mock_follows_v1";
 type PageResult<T> = { items: T[]; nextCursor?: string | null };
 
 /** =========================
- * RUNTIME FLAGS (도커/배포 대응)
+ * ENV / MODE SWITCH (✅ 도커에서도 mock로 돌릴 수 있게)
  * ========================= */
-const ENV = ((import.meta as any).env ?? {}) as Record<string, unknown>;
-const RAW_BASE_URL =
-  typeof ENV.VITE_API_BASE_URL === "string" ? (ENV.VITE_API_BASE_URL as string).trim() : "";
-const RAW_USE_MOCK = typeof ENV.VITE_USE_MOCK === "string" ? (ENV.VITE_USE_MOCK as string) : "";
+const RAW_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
+const BASE_URL = (RAW_BASE_URL ?? "").trim();
 
-const ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
+const RAW_USE_MOCK = (import.meta as any).env?.VITE_USE_MOCK as string | undefined;
+
+const getOrigin = () => (typeof window !== "undefined" ? window.location.origin : "");
+const ORIGIN = getOrigin();
 
 /**
- * tickets/api.ts랑 동일한 철학:
- * - baseURL 없으면(mock)
- * - use_mock=true면(mock)
- * - dev면(mock)
- * - 실수로 프론트 origin 넣었으면(mock)
+ * ✅ tickets/api.ts랑 같은 컨셉:
+ * - VITE_USE_MOCK=true면 무조건 mock
+ * - BASE_URL 비었거나 ORIGIN이랑 같으면(프론트만 가리키면) mock
+ * - 개발환경은 mock
  */
 const USE_MOCK =
   RAW_USE_MOCK === "true" ||
-  !RAW_BASE_URL ||
-  RAW_BASE_URL === ORIGIN ||
-  RAW_BASE_URL.includes("localhost:5173") ||
-  Boolean((import.meta as any).env?.DEV);
+  !BASE_URL ||
+  BASE_URL === ORIGIN ||
+  BASE_URL.includes("localhost:5173") ||
+  import.meta.env.DEV;
+
+function apiUrl(path: string) {
+  // BASE_URL이 비어있으면 same-origin 호출
+  return `${BASE_URL}${path}`;
+}
 
 /** =========================
  * HELPERS
@@ -78,7 +83,7 @@ function saveFeatured(role: ProfileRole, id: string, badgeIds: string[]) {
 }
 
 function getMyId() {
-  // ✅ mock 유지 시 기본 내 ID
+  // mock에서만 의미 있음
   return "mock-user-0001";
 }
 
@@ -87,16 +92,13 @@ const DEFAULT_BADGES = [
   { id: "b_first_ticket", label: "첫 티켓", description: "티켓 1개 수집" },
 ];
 
-// mock id가 실API로 섞였을 때 바로 잡기용 방어
-function assertNotMockId(id: string) {
-  if (id.startsWith("mock-")) {
-    throw new Error(`실API 호출인데 mock id가 들어왔습니다: ${id} (mock 분기/로그인 id 확인)`);
-  }
-}
-
-async function httpGet<T>(url: string): Promise<T> {
+async function httpGet<T>(path: string): Promise<T> {
+  const url = apiUrl(path);
   const res = await fetch(url, { credentials: "include" });
-  if (!res.ok) throw new Error(`GET ${url} failed (${res.status})`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `GET ${url} failed (${res.status})`);
+  }
   return res.json();
 }
 
@@ -130,10 +132,7 @@ export const profileApi = {
       };
     }
 
-    // ✅ 실API로 붙일 때: mock id 차단
-    assertNotMockId(id);
-
-    return httpGet<ArtistProfile>(`/api/artists/${encodeURIComponent(id)}`);
+    return httpGet<ArtistProfile>(`/api/artists/${id}`);
   },
 
   getUserProfile: async (id: string): Promise<UserProfile> => {
@@ -159,9 +158,7 @@ export const profileApi = {
       };
     }
 
-    assertNotMockId(id);
-
-    return httpGet<UserProfile>(`/api/users/${encodeURIComponent(id)}`);
+    return httpGet<UserProfile>(`/api/users/${id}`);
   },
 
   getArtistFeed: async (id: string, _cursor?: string | null) => {
@@ -178,11 +175,8 @@ export const profileApi = {
       return { items, nextCursor: null } as PageResult<FeedItem>;
     }
 
-    assertNotMockId(id);
-
-    const cursor = _cursor ? encodeURIComponent(_cursor) : "";
     return httpGet<PageResult<FeedItem>>(
-      `/api/artists/${encodeURIComponent(id)}/feeds?cursor=${cursor}`,
+      `/api/artists/${id}/feeds?cursor=${encodeURIComponent(_cursor ?? "")}`,
     );
   },
 
@@ -191,10 +185,9 @@ export const profileApi = {
       return { items: [], nextCursor: null } as PageResult<FeedItem>;
     }
 
-    assertNotMockId(id);
-
-    const cursor = _cursor ? encodeURIComponent(_cursor) : "";
-    return httpGet<PageResult<FeedItem>>(`/api/users/${encodeURIComponent(id)}/feeds?cursor=${cursor}`);
+    return httpGet<PageResult<FeedItem>>(
+      `/api/users/${id}/feeds?cursor=${encodeURIComponent(_cursor ?? "")}`,
+    );
   },
 
   follow: async (targetId: string) => {
@@ -208,9 +201,7 @@ export const profileApi = {
       return;
     }
 
-    assertNotMockId(targetId);
-
-    await fetch(`/api/follows/${encodeURIComponent(targetId)}`, { method: "POST", credentials: "include" });
+    await fetch(apiUrl(`/api/follows/${targetId}`), { method: "POST", credentials: "include" });
   },
 
   unfollow: async (targetId: string) => {
@@ -222,17 +213,13 @@ export const profileApi = {
       return;
     }
 
-    assertNotMockId(targetId);
-
-    await fetch(`/api/unfollows/${encodeURIComponent(targetId)}`, { method: "POST", credentials: "include" });
+    await fetch(apiUrl(`/api/unfollows/${targetId}`), { method: "POST", credentials: "include" });
   },
 
   submitQuestionToArtist: async (_artistId: string, _payload: { message: string }) => {
     if (USE_MOCK) return;
 
-    assertNotMockId(_artistId);
-
-    await fetch(`/api/artists/${encodeURIComponent(_artistId)}/questions`, {
+    await fetch(apiUrl(`/api/artists/${_artistId}/questions`), {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -246,9 +233,7 @@ export const profileApi = {
       return;
     }
 
-    assertNotMockId(profileId);
-
-    await fetch(`/api/profiles/${encodeURIComponent(profileId)}/badges/featured`, {
+    await fetch(apiUrl(`/api/profiles/${profileId}/badges/featured`), {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
