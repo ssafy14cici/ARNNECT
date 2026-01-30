@@ -1,12 +1,101 @@
+// src/main.ts
 import "./style.css";
-import { mountMainHallFree } from "./viewer/mainHallFree";
+import "./intro/intro.css";
+
+import { mountIntro, type CameraPose } from "./viewer/intro";
+import { mountExitOverlay } from "./viewer/exitOverlay";
 
 const canvas = document.createElement("canvas");
 canvas.id = "canvas";
 document.body.appendChild(canvas);
 
-mountMainHallFree(canvas, {
-  glbUrl: `${import.meta.env.BASE_URL}models/main_hall0.glb`,
-  spawnPanelName: "panel1",
-  offsetMeters: 2.0,
-});
+const POSE_KEY = "ARNNECT_EXTERIOR_POSE";
+
+let introRuntime: { dispose: () => void } | null = null;
+let exitUiDispose: (() => void) | null = null;
+
+/** localStorage에서 외부 포즈 복원(있으면 1회 사용 후 삭제) */
+function readSavedPose(): CameraPose | undefined {
+  try {
+    const raw = localStorage.getItem(POSE_KEY);
+    if (!raw) return undefined;
+    localStorage.removeItem(POSE_KEY);
+    return JSON.parse(raw) as CameraPose;
+  } catch {
+    return undefined;
+  }
+}
+
+/** localStorage에 외부 포즈 저장 */
+function savePose(pose: CameraPose) {
+  try {
+    localStorage.setItem(POSE_KEY, JSON.stringify(pose));
+  } catch {
+    /* ignore */
+  }
+}
+
+function startIntro() {
+  if (exitUiDispose) {
+    exitUiDispose();
+    exitUiDispose = null;
+  }
+  if (introRuntime) {
+    introRuntime.dispose();
+    introRuntime = null;
+  }
+
+  const restoredPose = readSavedPose();
+
+  mountIntro(canvas, {
+    glbUrl: `${import.meta.env.BASE_URL}models/intro.glb`,
+    prefetchUrl: `${import.meta.env.BASE_URL}models/main_hall0.glb`,
+
+    // ✅ 스샷 기준 이름(0)
+    doorName: "USA0_USA0_0",
+
+    holdMs: 1000,
+
+    // ✅ 내부에서 돌아오면 동일 시점 복원
+    startPose: restoredPose,
+
+    // ✅ Enter 되기 직전 포즈 저장(리로드 복귀용)
+    onReady: (pose) => {
+      // 최신 포즈를 계속 저장해두면, 내부에서 나갈 때 바로 동일 시점 복원 가능
+      savePose(pose);
+    },
+
+    onEntered: startInterior,
+  }).then((rt) => {
+    introRuntime = rt;
+  });
+}
+
+async function startInterior() {
+  // intro 정리
+  if (introRuntime) {
+    introRuntime.dispose();
+    introRuntime = null;
+  }
+
+  // ✅ IMPORTANT:
+  // 내부 모듈을 동적 import로 바꿔서 "인트로 화면에서도 내부 루프가 돌아가는" 문제를 차단
+  const { mountMainHallFree } = await import("./viewer/mainHallFree");
+
+  mountMainHallFree(canvas, {
+    glbUrl: `${import.meta.env.BASE_URL}models/main_hall0.glb`,
+    spawnPanelName: "panel1",
+    offsetMeters: 2.0,
+  });
+
+  // ✅ 임시 Exit 버튼: 안전하게 리로드로 종료(내부 rAF/이벤트 잔존 방지)
+  exitUiDispose = mountExitOverlay({
+    label: "Back to exterior",
+    onExit: () => {
+      // startIntro에서 readSavedPose로 복원됨
+      window.location.reload();
+    },
+  });
+}
+
+startIntro();

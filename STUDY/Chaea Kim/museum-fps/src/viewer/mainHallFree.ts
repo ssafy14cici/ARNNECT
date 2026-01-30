@@ -386,7 +386,33 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     }
 
     if (missing.length) console.warn("[art] missing planes:", missing);
+
+    // 각 작품 위에 스폿라이트 추가
+    for (const mesh of attached) {
+      addArtSpotlight(mesh);
+    }
+
     return attached;
+  }
+
+  function addArtSpotlight(mesh: THREE.Mesh) {
+    const pos = new THREE.Vector3();
+    mesh.getWorldPosition(pos);
+
+    // 작품 법선 방향 추정 (plane이므로 localZ가 법선)
+    const normal = new THREE.Vector3(0, 0, 1);
+    normal.applyQuaternion(mesh.getWorldQuaternion(new THREE.Quaternion()));
+
+    // 법선 방향 + 위쪽으로 살짝 오프셋한 위치에서 비춤
+    const lightPos = pos.clone()
+      .addScaledVector(normal, 3)   // 작품 앞으로 3m
+      .add(new THREE.Vector3(0, 4, 0)); // 위로 4m
+
+    const spot = new THREE.SpotLight(0xfff4e0, 7.0, 35, Math.PI / 4.5, 0.45, 0.8);
+    spot.position.copy(lightPos);
+    spot.target.position.copy(pos);
+    scene.add(spot);
+    scene.add(spot.target);
   }
 
   async function attachToMeshPlane(planeMesh: THREE.Mesh, item: ArtworkItem) {
