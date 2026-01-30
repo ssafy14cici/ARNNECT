@@ -56,12 +56,17 @@ function startIntro() {
 
     holdMs: 1000,
 
+    // ✅ HDRI 배경
+    hdriUrl: `${import.meta.env.BASE_URL}textures/rosendal_park_sunset_puresky_2k.hdr`,
+    exposure: 0.55,       // 전체 밝기 (낮을수록 어둡게)
+    envIntensity: 0.35,   // 건물 반사량 (낮을수록 원래 색 유지)
+    lightIntensity: 1.2,  // 디렉셔널 라이트 (건물 자체 조명)
+
     // ✅ 내부에서 돌아오면 동일 시점 복원
     startPose: restoredPose,
 
     // ✅ Enter 되기 직전 포즈 저장(리로드 복귀용)
     onReady: (pose) => {
-      // 최신 포즈를 계속 저장해두면, 내부에서 나갈 때 바로 동일 시점 복원 가능
       savePose(pose);
     },
 

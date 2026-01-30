@@ -1,14 +1,13 @@
-// src/viewer/navigator.ts
 import * as THREE from "three";
 import type { Pose, Waypoint } from "./waypoints";
 
 export type NavigatorOptions = {
-  moveSpeedMps?: number; // m/s, default 2.4 (걷기)
-  turnSpeedRadps?: number; // rad/s, default 1.8 (고개 회전)
-  clearance?: number; // default 2.8
-  lockY?: boolean; // default true
-  bobAmount?: number; // default 0.05 (m)  너무 크면 멀미
-  swayAmount?: number; // default 0.025 (m)
+  moveSpeedMps?: number;     // m/s, default 2.4 (걷기)
+  turnSpeedRadps?: number;   // rad/s, default 1.8 (고개 회전)
+  clearance?: number;        // default 2.8
+  lockY?: boolean;           // default true
+  bobAmount?: number;        // default 0.05 (m)  너무 크면 멀미
+  swayAmount?: number;       // default 0.025 (m)
 };
 
 export function createWaypointNavigator(args: {
@@ -102,6 +101,14 @@ export function createWaypointNavigator(args: {
     };
   }
 
+  function lerpYawShortest(a: number, b: number, t: number) {
+    let bb = b;
+    const dy = bb - a;
+    if (dy > Math.PI) bb -= Math.PI * 2;
+    if (dy < -Math.PI) bb += Math.PI * 2;
+    return THREE.MathUtils.lerp(a, bb, t);
+  }
+
   // yaw/pitch를 “속도 제한”으로 따라가게 (look lag)
   function stepAngle(current: number, target: number, maxDelta: number) {
     let delta = target - current;
@@ -140,10 +147,10 @@ export function createWaypointNavigator(args: {
     }
     const totalLen = segments.reduce((acc, s) => acc + s.len, 0) || 1;
 
-    // 걷기 시간 = 거리 / 속도
+    // 걷기 시간 = 거리 / 속도 (실제 걷는 느낌)
     const totalTime = totalLen / SPEED; // seconds
 
-    // 시작/끝에서 조금 더 여유
+    // 시작/끝에서 조금 더 여유(사람이 “정지”하는 느낌)
     const minTime = 0.9;
     const maxTime = 3.8;
     const T = THREE.MathUtils.clamp(totalTime, minTime, maxTime);
@@ -163,7 +170,7 @@ export function createWaypointNavigator(args: {
       const tick = () => {
         const now = performance.now();
         const t = (now - t0) / (T * 1000);
-        const u = smoothSCurve(clamp01(t));
+        const u = smoothSCurve(clamp01(t)); // ✅ 걷기 느낌 가속/감속
 
         // u를 path 진행률로 변환(호 길이 기준)
         let dist = u * totalLen;
@@ -180,7 +187,7 @@ export function createWaypointNavigator(args: {
 
         // head bob/sway (이동할 때만 아주 약하게)
         const speedFactor = Math.sin(Math.PI * clamp01(t)); // 0->1->0
-        bobPhase += SPEED * 2.2 * (1 / 60);
+        bobPhase += (SPEED * 2.2) * (1 / 60); // 대략적인 진행 (프레임 의존 완화)
         const bob = Math.sin(bobPhase * 2.0) * BOB * speedFactor;
         const sway = Math.sin(bobPhase) * SWAY * speedFactor;
 
@@ -194,7 +201,7 @@ export function createWaypointNavigator(args: {
         camera.position.addScaledVector(right, sway);
 
         // look lag: 목표 각도로 “속도 제한” 따라가기
-        const dt = 1 / 60;
+        const dt = 1 / 60; // 충분히 자연스러운 근사
         const maxDelta = TURN * dt;
 
         yaw = stepAngle(yaw, yawTarget, maxDelta);
@@ -222,55 +229,19 @@ export function createWaypointNavigator(args: {
     });
   }
 
-  // ✅ 좌/우 이동용 route를 한 번 만든다 (id 순서 무관)
-  const lrRoute = buildLeftRightRoute(waypoints);
-
-  function nextId(currentId: number) {
-    const i = lrRoute.indexOf(currentId);
-    if (i < 0) return lrRoute[0];
-    return lrRoute[(i + 1) % lrRoute.length];
+  function nextId(current: number) {
+    return (current + 1) % waypoints.length; // 6->0
   }
-
-  function prevId(currentId: number) {
-    const i = lrRoute.indexOf(currentId);
-    if (i < 0) return lrRoute[0];
-    return lrRoute[(i - 1 + lrRoute.length) % lrRoute.length];
+  function prevId(current: number) {
+    return (current - 1 + waypoints.length) % waypoints.length; // 0->6
   }
 
   return {
     goTo,
     nextId,
     prevId,
-    getRoute: () => lrRoute.slice(),
     get isTransitioning() {
       return isTransitioning;
     },
   };
-}
-
-// ✅ waypoints 좌표로 “좌측/우측 + 중앙” route 자동 생성
-function buildLeftRightRoute(waypoints: Waypoint[]) {
-  if (!waypoints.length) return [];
-
-  // 중앙 후보: |x|가 가장 작은 포인트 (현재 데이터면 id=0)
-  const center = waypoints.reduce((best, w) => {
-    const bx = Math.abs(best.pose.pos[0]);
-    const wx = Math.abs(w.pose.pos[0]);
-    return wx < bx ? w : best;
-  }, waypoints[0]);
-
-  const cx = center.pose.pos[0];
-
-  const left = waypoints
-    .filter((w) => w.id !== center.id && w.pose.pos[0] < cx)
-    // left: "사용자에서 먼 -> 가까운" (z 오름차순)
-    .sort((a, b) => a.pose.pos[2] - b.pose.pos[2]);
-
-  const right = waypoints
-    .filter((w) => w.id !== center.id && w.pose.pos[0] > cx)
-    // right: "가까운 -> 먼" (z 내림차순)
-    .sort((a, b) => b.pose.pos[2] - a.pose.pos[2]);
-
-  // 예: [3,2,1,0,6,5,4]
-  return [...left.map((w) => w.id), center.id, ...right.map((w) => w.id)];
 }

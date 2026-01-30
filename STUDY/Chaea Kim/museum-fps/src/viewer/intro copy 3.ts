@@ -1,7 +1,6 @@
 // src/viewer/intro.ts
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 import gsap from "gsap";
 
 export type CameraPose = {
@@ -18,14 +17,6 @@ export type MountIntroOptions = {
   startPose?: CameraPose;
   onReady?: (pose: CameraPose) => void;
   onEntered: () => void;
-
-  // ✅ HDRI (public 폴더 기준 경로)
-  hdriUrl?: string;
-
-  // ✅ 초기값(너무 어두우면 exposure 올리고, 너무 하얗게 뜨면 envIntensity 내리기)
-  exposure?: number; // default 0.75
-  envIntensity?: number; // default 0.65
-  lightIntensity?: number; // default 0.85
 };
 
 export type IntroRuntime = {
@@ -51,49 +42,16 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-
-  // ✅ 톤매핑(노출로 밝기 조절)
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-
-  // 초기값: “어둡다”가 기본이면 조금 올려서 시작
-  let exposure = opts.exposure ?? 0.75;
-  renderer.toneMappingExposure = exposure;
-
-  // HDR 로딩 실패 대비 기본 배경
-  renderer.setClearColor(new THREE.Color("#0f1115"), 1);
+  renderer.setClearColor(new THREE.Color("#f5f2ee"), 1);
 
   const scene = new THREE.Scene();
-  scene.fog = null;
 
   const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.05, 5000);
 
-  // ✅ 라이트(너무 낮추면 지금처럼 어두워짐)
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.30);
-  scene.add(hemi);
-
-  const dir = new THREE.DirectionalLight(0xffffff, opts.lightIntensity ?? 0.85);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xdedede, 0.9));
+  const dir = new THREE.DirectionalLight(0xffffff, 1.0);
   dir.position.set(10, 18, 10);
   scene.add(dir);
-
-  // ✅ HDRI (PMREM)
-  let hdriBg: THREE.Texture | null = null; // 배경(원본 HDR)
-  let hdriEnv: THREE.Texture | null = null; // 환경(PMREM)
-  if (opts.hdriUrl) {
-    try {
-      const loaded = await loadHdriWithPmrem(renderer, opts.hdriUrl);
-      hdriBg = loaded.background;
-      hdriEnv = loaded.environment;
-      scene.background = hdriBg;
-      scene.environment = hdriEnv;
-    } catch (e) {
-      console.warn("[Intro] HDRI load failed:", e);
-      scene.background = new THREE.Color("#0f1115");
-      scene.environment = null;
-    }
-  } else {
-    scene.background = new THREE.Color("#0f1115");
-    scene.environment = null;
-  }
 
   const loader = new GLTFLoader();
   const gltfScene = await new Promise<THREE.Group>((resolve, reject) => {
@@ -131,53 +89,21 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   camera.far = Math.max(5000, maxDim * 50);
   camera.updateProjectionMatrix();
 
-  // ✅ env intensity (재질이 하얗게/검게 뜨는 걸 여기로 잡음)
-  let envIntensity = opts.envIntensity ?? 0.65;
-  const applyEnvIntensity = (v: number) => {
-    envIntensity = clamp(v, 0.0, 3.0);
-    gltfScene.traverse((obj) => {
-      const mesh = obj as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      const mat = mesh.material as any;
-      const apply = (m: any) => {
-        if (m && "envMapIntensity" in m) {
-          m.envMapIntensity = envIntensity;
-          m.needsUpdate = true;
-        }
-      };
-      if (Array.isArray(mat)) mat.forEach(apply);
-      else apply(mat);
-    });
-    ui.setDebugValue("env", envIntensity);
-  };
-  applyEnvIntensity(envIntensity);
-
-  // ✅ 포즈 결정(초기 시점)
+  // 포즈 결정(초기 시점)
   const computedPose = opts.startPose ?? computeDoorFacingPose(gltfScene, opts.doorName, maxDim);
   console.log("[Intro] pose:", computedPose);
+
   applyPose(camera, computedPose);
 
+  // ✅ enter(진입)용: 문 기준으로 더 "아래쪽"을 바라보게 + 더 "가까이" 멈추게
   const enterTarget = computeEnterTarget(gltfScene, opts.doorName, new THREE.Vector3(...computedPose.target));
   const enterStopDistance = computeEnterStopDistance(gltfScene, opts.doorName, maxDim);
   console.log("[Intro] enterTarget:", enterTarget, "enterStopDistance:", enterStopDistance);
 
-  // ✅ 디버그 버튼(밝기 튜닝)
-  ui.setDebugValue("exp", exposure);
-  ui.setDebugValue("light", dir.intensity);
-
-  ui.onExpDelta = (d) => {
-    exposure = clamp(exposure + d, 0.05, 2.5);
-    renderer.toneMappingExposure = exposure;
-    ui.setDebugValue("exp", exposure);
-  };
-  ui.onEnvDelta = (d) => applyEnvIntensity(envIntensity + d);
-  ui.onLightDelta = (d) => {
-    dir.intensity = clamp(dir.intensity + d, 0.0, 5.0);
-    ui.setDebugValue("light", dir.intensity);
-  };
-
+  // ✅ 1프레임 먼저 렌더 후 UI ready
   renderer.render(scene, camera);
   requestAnimationFrame(() => ui.setState("ready"));
+
   opts.onReady?.(computedPose);
 
   // 루프(약한 패럴럭스)
@@ -252,13 +178,17 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
           camera,
           basePos,
           baseTarget,
-          target: enterTarget,
+          target: enterTarget, // ✅ 문 기준 아래 타겟
           fadeEl: ui.fadeEl,
-          stopDistance: enterStopDistance,
+          stopDistance: enterStopDistance, // ✅ 문 기준 가까운 stop
           onWhiteCovered: () => {
             const carried = ui.carryFadeToBody();
             dispose({ keepCarriedFade: true });
+
             opts.onEntered();
+
+            // 내부 준비 완료되면 아래 이벤트를 내부에서 dispatch 해도 됨:
+            // window.dispatchEvent(new Event("intro:clear-fade"));
             scheduleFadeCleanup(carried, 500);
           },
         });
@@ -284,7 +214,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   ui.enterBtn.addEventListener("pointercancel", endHold);
   ui.enterBtn.addEventListener("pointerleave", endHold);
 
-  const dispose = (_opt?: { keepCarriedFade?: boolean }) => {
+  const dispose = (opt?: { keepCarriedFade?: boolean }) => {
     alive = false;
     cancelAnimationFrame(raf);
     cancelAnimationFrame(holdRaf);
@@ -311,13 +241,9 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
       else disposeMaterial(mat);
     });
 
-    // HDR 리소스 해제
-    if (scene.background === hdriBg) scene.background = null;
-    if (scene.environment === hdriEnv) scene.environment = null;
-    hdriBg?.dispose?.();
-    hdriEnv?.dispose?.();
-
     renderer.dispose();
+
+    // carryFadeToBody() 한 경우에도 root만 제거하면 됨(페이드는 body에 남아있음)
     ui.root.remove();
   };
 
@@ -338,26 +264,6 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   return { dispose: () => dispose(), setPose };
 }
 
-/* ---------- HDRI helpers ---------- */
-
-async function loadHdriWithPmrem(renderer: THREE.WebGLRenderer, url: string) {
-  const rgbe = new RGBELoader();
-  const hdr = await rgbe.loadAsync(url);
-  hdr.mapping = THREE.EquirectangularReflectionMapping;
-
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  pmrem.compileEquirectangularShader();
-
-  const env = pmrem.fromEquirectangular(hdr).texture;
-  pmrem.dispose();
-
-  return { background: hdr, environment: env };
-}
-
-function clamp(v: number, a: number, b: number) {
-  return Math.max(a, Math.min(b, v));
-}
-
 /* ---------- helpers ---------- */
 
 function applyPose(camera: THREE.PerspectiveCamera, pose: CameraPose) {
@@ -373,6 +279,7 @@ function computeDoorFacingPose(root: THREE.Object3D, doorName: string, maxDim: n
 
   const door = findByName(root, doorName);
 
+  // 문 못 찾으면 정면(Z)에서 fit
   if (!door || maxDim <= 0) {
     const fov = 50;
     const halfFov = THREE.MathUtils.degToRad(fov * 0.5);
@@ -386,6 +293,7 @@ function computeDoorFacingPose(root: THREE.Object3D, doorName: string, maxDim: n
   const doorPos = new THREE.Vector3();
   door.getWorldPosition(doorPos);
 
+  // center -> door 방향으로 바깥을 잡음(회전 안 믿고 기하학으로)
   let outward = doorPos.clone().sub(center);
   if (outward.lengthSq() < 1e-8) outward = new THREE.Vector3(0, 0, 1);
   outward.normalize();
@@ -410,6 +318,10 @@ function findByName(root: THREE.Object3D, name: string): THREE.Object3D | null {
   return found;
 }
 
+/**
+ * ✅ enter 타겟을 "문 기준 아래쪽"으로 내림 (창문 라인 뚫는 문제 방지)
+ * - 값 조정 포인트: AIM_DOWN (0.18~0.30 추천)
+ */
 function computeEnterTarget(root: THREE.Object3D, doorName: string, fallbackTarget: THREE.Vector3) {
   const door = findByName(root, doorName);
   if (!door) return fallbackTarget.clone();
@@ -418,13 +330,17 @@ function computeEnterTarget(root: THREE.Object3D, doorName: string, fallbackTarg
   const c = doorBox.getCenter(new THREE.Vector3());
   const s = doorBox.getSize(new THREE.Vector3());
 
-  const AIM_DOWN = 0.24;
+  const AIM_DOWN = 0.24; // ⬅️ 더 아래로: 0.28 / 덜 아래로: 0.18
   const aim = c.clone();
   aim.y = c.y - Math.max(0.0, s.y) * AIM_DOWN;
 
   return aim;
 }
 
+/**
+ * ✅ enter stopDistance를 "문 크기" 기반으로 더 가깝게
+ * - 값 조정 포인트: byDoor 계수(작을수록 더 가까이)
+ */
 function computeEnterStopDistance(root: THREE.Object3D, doorName: string, maxDim: number) {
   const door = findByName(root, doorName);
   if (!door) return Math.max(0.22, maxDim * 0.006);
@@ -433,12 +349,17 @@ function computeEnterStopDistance(root: THREE.Object3D, doorName: string, maxDim
   const s = doorBox.getSize(new THREE.Vector3());
 
   const widthLike = Math.max(s.x, s.z, 0.0001);
-  const byDoor = widthLike * 0.18;
+  const byDoor = widthLike * 0.18; // ⬅️ 더 가까이: 0.14~0.16 / 덜 가까이: 0.22
   const byScale = maxDim * 0.004;
 
   return Math.max(0.18, byDoor, byScale);
 }
 
+/**
+ * ✅ 단일 가속(2단계 없음):
+ * - basePos/baseTarget을 GSAP tween → tick()이 따라가며 "빨려들기"
+ * - 후반에 white fade가 완전히 덮인 뒤 onWhiteCovered 실행
+ */
 function runEnterSequence(args: {
   camera: THREE.PerspectiveCamera;
   basePos: THREE.Vector3;
@@ -450,6 +371,7 @@ function runEnterSequence(args: {
 }) {
   const { camera, basePos, baseTarget, target, fadeEl, stopDistance, onWhiteCovered } = args;
 
+  // fade overlay 안전 리셋
   fadeEl.style.display = "block";
   fadeEl.style.opacity = "0";
   fadeEl.style.pointerEvents = "none";
@@ -458,24 +380,35 @@ function runEnterSequence(args: {
   fadeEl.style.inset = "0";
   fadeEl.style.zIndex = "99999";
 
+  // 목표점 기준으로 직선 접근
   const dir = target.clone().sub(basePos);
   if (dir.lengthSq() < 1e-8) dir.set(0, 0, -1);
   dir.normalize();
 
   const toPos = target.clone().addScaledVector(dir, -Math.max(0.01, stopDistance));
+
+  // 빨려드는 느낌: fov 약간 증가
   const toFov = Math.min(70, camera.fov + 12);
 
+  // ✅ "문 근처"에서 즉시 페이드 트리거
+  // - 더 빨리 덮고 싶으면 1.6 -> 2.0
+  // - 더 늦게 덮고 싶으면 1.6 -> 1.3
   const fadeTriggerDist = Math.max(0.22, stopDistance * 25.0);
 
   let fadeStarted = false;
   const startFadeNow = () => {
     if (fadeStarted) return;
     fadeStarted = true;
-    gsap.to(fadeEl, { opacity: 1, duration: 0.08, ease: "power2.in" });
+    gsap.to(fadeEl, { 
+      opacity: 1, 
+      duration: 0.08, 
+      ease: "power2.in",
+       });
   };
 
   const tl = gsap.timeline();
 
+  // 이동 + 타겟 고정
   tl.to(
     basePos,
     {
@@ -485,6 +418,7 @@ function runEnterSequence(args: {
       duration: 1.2,
       ease: "power3.inOut",
       onUpdate: () => {
+        // ✅ 거리 기반: 문 근처 오면 바로 흰 화면
         if (!fadeStarted && basePos.distanceTo(target) <= fadeTriggerDist) startFadeNow();
       },
     },
@@ -504,16 +438,18 @@ function runEnterSequence(args: {
     0.12,
   );
 
+  // ✅ 혹시 트리거가 안 걸렸으면, 끝에서라도 무조건 덮고 넘어감
   tl.call(() => {
     startFadeNow();
     gsap.to(fadeEl, {
       opacity: 1,
-      duration: 0.08,
+      duration: 0.08, // 완전 덮기 마무리
       ease: "none",
       onComplete: () => requestAnimationFrame(onWhiteCovered),
     });
   });
 }
+
 
 function scheduleFadeCleanup(fadeEl: HTMLElement | null, fallbackMs: number) {
   if (!fadeEl) return;
@@ -550,6 +486,7 @@ function createIntroUI() {
   root.id = "intro-ui";
   root.dataset.state = "loading";
 
+  /* --- loader (thin bar + percent) --- */
   const loader = document.createElement("div");
   loader.id = "loader-container";
 
@@ -566,6 +503,7 @@ function createIntroUI() {
   loader.appendChild(track);
   loader.appendChild(percent);
 
+  /* --- text reveal (ART / USER / CONNECT / ARNNECT) --- */
   const textReveal = document.createElement("div");
   textReveal.className = "intro-text-reveal";
 
@@ -581,6 +519,7 @@ function createIntroUI() {
     lineEls.push(el);
   }
 
+  /* --- enter content (subtitle + button) --- */
   const content = document.createElement("div");
   content.className = "intro-content";
 
@@ -606,6 +545,7 @@ function createIntroUI() {
   content.appendChild(subtitle);
   content.appendChild(enterBtn);
 
+  /* --- fade overlay --- */
   const fade = document.createElement("div");
   fade.className = "intro-fade";
   fade.style.position = "fixed";
@@ -616,102 +556,22 @@ function createIntroUI() {
   fade.style.pointerEvents = "none";
   fade.style.zIndex = "99999";
 
+  /* --- opaque backdrop (covers canvas during loading + text) --- */
   const backdrop = document.createElement("div");
   backdrop.className = "intro-backdrop";
   backdrop.appendChild(loader);
   backdrop.appendChild(textReveal);
 
-  // ✅ 밝기 조절 버튼(임시 디버그 UI)
-  const dbg = document.createElement("div");
-  dbg.style.cssText = [
-    "position:fixed",
-    "right:14px",
-    "bottom:14px",
-    "z-index:100000",
-    "display:flex",
-    "flex-direction:column",
-    "gap:8px",
-    "padding:10px 10px",
-    "border-radius:12px",
-    "background:rgba(0,0,0,0.45)",
-    "backdrop-filter: blur(6px)",
-    "color:#fff",
-    "font: 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
-    "user-select:none",
-  ].join(";");
-
-  const makeRow = (label: string) => {
-    const row = document.createElement("div");
-    row.style.cssText = "display:flex; align-items:center; gap:8px;";
-
-    const t = document.createElement("div");
-    t.textContent = label;
-    t.style.cssText = "width:58px; opacity:0.9;";
-
-    const minus = document.createElement("button");
-    minus.type = "button";
-    minus.textContent = "−";
-    minus.style.cssText =
-      "width:34px;height:28px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.12);color:#fff;";
-
-    const plus = document.createElement("button");
-    plus.type = "button";
-    plus.textContent = "+";
-    plus.style.cssText =
-      "width:34px;height:28px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.12);color:#fff;";
-
-    const v = document.createElement("div");
-    v.textContent = "0.00";
-    v.style.cssText = "width:54px; text-align:right; font-variant-numeric: tabular-nums; opacity:0.95;";
-
-    row.appendChild(t);
-    row.appendChild(minus);
-    row.appendChild(plus);
-    row.appendChild(v);
-
-    // 버튼 터치가 enter 버튼 hold에 간섭 안 하게
-    row.addEventListener("pointerdown", (e) => e.stopPropagation(), true);
-    row.addEventListener("pointerup", (e) => e.stopPropagation(), true);
-
-    return { row, minus, plus, valueEl: v };
-  };
-
-  const rExp = makeRow("Exposure");
-  const rEnv = makeRow("Env");
-  const rLight = makeRow("Light");
-
-  dbg.appendChild(rExp.row);
-  dbg.appendChild(rEnv.row);
-  dbg.appendChild(rLight.row);
-
   root.appendChild(backdrop);
   root.appendChild(content);
   root.appendChild(fade);
-  root.appendChild(dbg);
 
   document.body.appendChild(root);
 
-  const values = { exp: 0, env: 0, light: 0 };
-
-  const setValue = (k: "exp" | "env" | "light", v: number) => {
-    values[k] = v;
-    const txt = v.toFixed(2);
-    if (k === "exp") rExp.valueEl.textContent = txt;
-    if (k === "env") rEnv.valueEl.textContent = txt;
-    if (k === "light") rLight.valueEl.textContent = txt;
-  };
-
-  const api = {
+  return {
     root,
     enterBtn,
     fadeEl: fade,
-
-    // mountIntro에서 델타 핸들러를 연결함
-    onExpDelta: (d: number) => void d,
-    onEnvDelta: (d: number) => void d,
-    onLightDelta: (d: number) => void d,
-
-    setDebugValue: (k: "exp" | "env" | "light", v: number) => setValue(k, v),
 
     carryFadeToBody: () => {
       fade.id = "intro-fade-carry";
@@ -725,17 +585,20 @@ function createIntroUI() {
 
     setState: (s: "loading" | "ready" | "entering") => {
       if (s === "ready") {
+        // Phase 1: fade out loader
         gsap.to(loader, {
           opacity: 0,
           duration: 0.6,
           onComplete: () => {
             loader.style.display = "none";
 
+            // Phase 2: text reveal on opaque backdrop
             textReveal.style.opacity = "1";
             const [art, user, connect, arnnect] = lineEls;
 
             const tl = gsap.timeline({
               onComplete: () => {
+                // Phase 3: hold briefly, then fade backdrop to reveal 3D
                 gsap.to(backdrop, {
                   opacity: 0,
                   duration: 1.4,
@@ -795,20 +658,9 @@ function createIntroUI() {
     },
 
     beginEnter: () => {
+      // 진입 중 UI가 가리면 바로 숨김
       gsap.to(content, { opacity: 0, duration: 0.2, ease: "power1.out" });
       root.dataset.state = "entering";
     },
   };
-
-  // ✅ 버튼 이벤트 연결(단위는 손으로 찾기 좋게 설정)
-  rExp.minus.addEventListener("click", () => api.onExpDelta(-0.08));
-  rExp.plus.addEventListener("click", () => api.onExpDelta(+0.08));
-
-  rEnv.minus.addEventListener("click", () => api.onEnvDelta(-0.10));
-  rEnv.plus.addEventListener("click", () => api.onEnvDelta(+0.10));
-
-  rLight.minus.addEventListener("click", () => api.onLightDelta(-0.10));
-  rLight.plus.addEventListener("click", () => api.onLightDelta(+0.10));
-
-  return api;
 }
