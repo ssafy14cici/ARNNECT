@@ -84,4 +84,9 @@ public class MemberServiceImpl implements MemberService{
         return memberRepo.findMemberInfo(memberUuid,memberRepo.findByMemberUuid(memberUuid).orElseThrow(
                 ()-> new BusinessException(ErrorCode.USER_NOT_FOUND)).getMemberId());
     }
+
+    public Long getMemberId(String memberUuid){
+        return memberRepo.findByMemberUuid(memberUuid).orElseThrow(
+                ()-> new BusinessException(ErrorCode.USER_NOT_FOUND)).getMemberId();
+    }
 }
