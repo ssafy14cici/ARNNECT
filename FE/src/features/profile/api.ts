@@ -32,33 +32,17 @@ const KEY_FOLLOWS = "arnnect_mock_follows_v1";
 type PageResult<T> = { items: T[]; nextCursor?: string | null };
 
 /** =========================
- * ENV / MODE SWITCH (✅ 도커에서도 mock로 돌릴 수 있게)
+ * ✅ TEST SITE에서는 mock 강제 (env 없이)
  * ========================= */
-const RAW_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
-const BASE_URL = (RAW_BASE_URL ?? "").trim();
-
-const RAW_USE_MOCK = (import.meta as any).env?.VITE_USE_MOCK as string | undefined;
-
-const getOrigin = () => (typeof window !== "undefined" ? window.location.origin : "");
-const ORIGIN = getOrigin();
-
-/**
- * ✅ tickets/api.ts랑 같은 컨셉:
- * - VITE_USE_MOCK=true면 무조건 mock
- * - BASE_URL 비었거나 ORIGIN이랑 같으면(프론트만 가리키면) mock
- * - 개발환경은 mock
- */
-const USE_MOCK =
-  RAW_USE_MOCK === "true" ||
-  !BASE_URL ||
-  BASE_URL === ORIGIN ||
-  BASE_URL.includes("localhost:5173") ||
-  import.meta.env.DEV;
-
-function apiUrl(path: string) {
-  // BASE_URL이 비어있으면 same-origin 호출
-  return `${BASE_URL}${path}`;
+function isTestHost() {
+  if (typeof window === "undefined") return true;
+  const host = window.location.hostname;
+  // ✅ ssafy 도메인(예: i14e107.p.ssafy.io)에서는 무조건 mock
+  return host.endsWith("ssafy.io");
 }
+
+// ✅ 여기 한 줄이 핵심: 배포(테스트)에서도 mock 강제
+const USE_MOCK = import.meta.env.DEV || isTestHost();
 
 /** =========================
  * HELPERS
@@ -92,8 +76,7 @@ const DEFAULT_BADGES = [
   { id: "b_first_ticket", label: "첫 티켓", description: "티켓 1개 수집" },
 ];
 
-async function httpGet<T>(path: string): Promise<T> {
-  const url = apiUrl(path);
+async function httpGet<T>(url: string): Promise<T> {
   const res = await fetch(url, { credentials: "include" });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -175,9 +158,7 @@ export const profileApi = {
       return { items, nextCursor: null } as PageResult<FeedItem>;
     }
 
-    return httpGet<PageResult<FeedItem>>(
-      `/api/artists/${id}/feeds?cursor=${encodeURIComponent(_cursor ?? "")}`,
-    );
+    return httpGet<PageResult<FeedItem>>(`/api/artists/${id}/feeds?cursor=${_cursor ?? ""}`);
   },
 
   getUserFeed: async (id: string, _cursor?: string | null) => {
@@ -185,9 +166,7 @@ export const profileApi = {
       return { items: [], nextCursor: null } as PageResult<FeedItem>;
     }
 
-    return httpGet<PageResult<FeedItem>>(
-      `/api/users/${id}/feeds?cursor=${encodeURIComponent(_cursor ?? "")}`,
-    );
+    return httpGet<PageResult<FeedItem>>(`/api/users/${id}/feeds?cursor=${_cursor ?? ""}`);
   },
 
   follow: async (targetId: string) => {
@@ -201,7 +180,7 @@ export const profileApi = {
       return;
     }
 
-    await fetch(apiUrl(`/api/follows/${targetId}`), { method: "POST", credentials: "include" });
+    await fetch(`/api/follows/${targetId}`, { method: "POST", credentials: "include" });
   },
 
   unfollow: async (targetId: string) => {
@@ -213,13 +192,12 @@ export const profileApi = {
       return;
     }
 
-    await fetch(apiUrl(`/api/unfollows/${targetId}`), { method: "POST", credentials: "include" });
+    await fetch(`/api/unfollows/${targetId}`, { method: "POST", credentials: "include" });
   },
 
   submitQuestionToArtist: async (_artistId: string, _payload: { message: string }) => {
     if (USE_MOCK) return;
-
-    await fetch(apiUrl(`/api/artists/${_artistId}/questions`), {
+    await fetch(`/api/artists/${_artistId}/questions`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -233,7 +211,7 @@ export const profileApi = {
       return;
     }
 
-    await fetch(apiUrl(`/api/profiles/${profileId}/badges/featured`), {
+    await fetch(`/api/profiles/${profileId}/badges/featured`, {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },

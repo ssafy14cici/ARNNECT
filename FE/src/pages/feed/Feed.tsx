@@ -6,11 +6,15 @@ import { useAuthStore } from "../../features/auth/store";
 import {
   createPost,
   listPosts,
-  seedMyPosts,
   setMe,
   type PostRole,
+  ensureBaseSeedOnce as ensureBaseSeedOnceFeed, // ✅ alias로 충돌 방지
 } from "../../features/feed/mockData";
+
 import "./feed.css";
+import { ensureBaseSeedOnce } from "../../features/feed/mockData";
+ensureBaseSeedOnce(60);
+
 
 const DETAIL_PATH = (id: string) => `/artworks/${id}`;
 const PROFILE_PATH = (authorId: string) => `/profile/${authorId}`;
@@ -52,53 +56,9 @@ function pickExcerpt(content?: string, max = 120) {
 
 // ✅ 최초 1회: 기본 더미(공용) 생성
 const BASE_SEED_KEY = "comet_mock_posts_seeded_v1";
-function ensureBaseSeedOnce() {
-  if (localStorage.getItem(BASE_SEED_KEY) === "1") return;
-
-  const existing = listPosts();
-  if (existing.length > 0) {
-    localStorage.setItem(BASE_SEED_KEY, "1");
-    return;
-  }
-
-  const artistNames = ["A. KIM", "S. LEE", "J. PARK", "H. CHOI"];
-  const userNames = ["U. PARK", "U. CHOI", "U. KANG", "U. HAN"];
-
-  for (let i = 0; i < 24; i++) {
-    const role: PostRole = i % 2 === 0 ? "ARTIST" : "USER";
-    const authorName =
-      role === "ARTIST"
-        ? artistNames[i % artistNames.length]
-        : userNames[i % userNames.length];
-    const authorId =
-      role === "ARTIST" ? `artist-${(i % 6) + 1}` : `user-${(i % 10) + 1}`;
-
-    createPost({
-      authorId,
-      authorName,
-      role,
-      title: role === "ARTIST" ? `Untitled No.${i + 1}` : `Exhibition Review #${i + 1}`,
-      content: role === "ARTIST" ? "작품 업로드 목업 포스트입니다." : "감상평 목업 포스트입니다.",
-      imageUrls: [ART_IMAGES[i % ART_IMAGES.length]],
-      tags: ["mock"],
-      meta: { seeded: true },
-    });
-  }
-
-  localStorage.setItem(BASE_SEED_KEY, "1");
-}
 
 // ✅ 로그인 유저별 1회: 내 글 더미 생성
 const MY_SEED_PREFIX = "comet_mock_my_posts_seeded_v1";
-function ensureMySeedOnce(me: { id: string; name: string; role: PostRole }, count = 6) {
-  const key = `${MY_SEED_PREFIX}.${me.id}`;
-  if (localStorage.getItem(key) === "1") return;
-
-  setMe(me);
-  seedMyPosts(count);
-
-  localStorage.setItem(key, "1");
-}
 
 function mapPostsToFeeds(): FeedItem[] {
   return listPosts()
@@ -134,8 +94,8 @@ export default function Feed() {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
-  // ✅ seed는 멱등(키로 1회만)이라 렌더 중 호출해도 중복 생성 안 됨
-  ensureBaseSeedOnce();
+  ensureBaseSeedOnceFeed(60);
+
 
   const me =
     isLoggedIn && user
@@ -145,8 +105,6 @@ export default function Feed() {
           role: appRole === "artist" ? "ARTIST" : "USER",
         } as const)
       : null;
-
-  if (me) ensureMySeedOnce(me, 6);
 
   // ✅ PostCreate 갔다가 돌아오면 보통 Feed가 리마운트/리렌더 됨.
   //    혹시 같은 화면 유지되는 케이스 대비로 location.key를 참조해서 리스트 다시 읽음.

@@ -12,6 +12,7 @@ import Login from "../../pages/auth/Login";
 import Signup from "../../pages/auth/Signup";
 
 import Feed from "../../pages/feed/Feed";
+import FeedDetail from "../../pages/feed/FeedDetail";
 
 import Lounge from "../../pages/lounge/Lounge";
 import LoungeIndex from "../../pages/lounge/LoungeIndex";
@@ -26,7 +27,6 @@ import TicketQr from "../../pages/lounge/artist/TicketQr";
 import Portfolio from "../../pages/lounge/artist/Portfolio";
 import FanLetter from "../../pages/lounge/artist/FanLetter";
 
-import PostDetail from "../../pages/posts/PostDetail";
 import PostCreate from "../../pages/posts/PostCreate";
 import PostCreateRedirect from "../../pages/posts/PostCreateRedirect";
 
@@ -79,12 +79,13 @@ export const routes: RouteObject[] = [
         element: <Guard requireAuth />,
         children: [
           { path: "feed", element: <Feed /> },
+          { path: "artworks/:id", element: <FeedDetail /> },
+          { path: "posts/:id", element: <FeedDetail /> },
 
           /* ---------- Posts ---------- */
           { path: "posts/create", element: <PostCreateRedirect /> },
           { path: "posts/create/artist", element: <PostCreate mode="ARTIST" /> },
           { path: "posts/create/user", element: <PostCreate mode="USER" /> },
-          { path: "posts/:id", element: <PostDetail /> },
 
           /* ---------- Lounge ---------- */
           {
