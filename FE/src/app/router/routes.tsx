@@ -138,15 +138,22 @@ export const routes: RouteObject[] = [
 
           /* ---------- Profile ---------- */
           {
-            path:  "profile/:type",
-            element: <Profile />,
+            path: "profile/user",
+            element: <Profile role="USER" />,
             children: [
-              { index: true, element: <Navigate to="feed" relative="path" replace /> },
               { path: "feed", element: <FeedTab /> },
               { path: "collection", element: <CollectionTab /> },
+            ],
+          },
+          {
+            path: "profile/artist",
+            element: <Profile role="ARTIST" />,
+            children: [
+              { path: "feed", element: <FeedTab /> },
               { path: "portfolio", element: <PortfolioTab /> },
             ],
           },
+
         ],
       },
 

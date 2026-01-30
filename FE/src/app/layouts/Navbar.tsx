@@ -65,6 +65,10 @@ export default function Navbar() {
 
   const appRole = useAuthStore((s) => s.role);
 
+   // ✅ role 기반 프로필 경로
+  const profilePath =
+    appRole === "artist" ? "/profile/artist/feed" : "/profile/user/feed";
+
   // ✅ 메뉴 아이템 정의 (Shape 포함)
   const items: MenuItem[] = useMemo(
     () => [
@@ -75,13 +79,7 @@ export default function Navbar() {
 
       { key: "feed", label: "Feed", path: "/feed", shape: "box" },
       { key: "lounge", label: "Lounge", path: "/lounge", shape: "torus" },
-      {
-      key: "profile",
-      label: "Profile",
-      path: appRole === "artist" ? "/profile/artist/feed" : "/profile/user/feed",
-      shape: "sphere",
-    },
-
+      { key: "profile", label: "Profile", path: profilePath, shape: "sphere" },
       { key: "auth", label: "Login/Out", path: "", shape: "knot" },
     ],
     []

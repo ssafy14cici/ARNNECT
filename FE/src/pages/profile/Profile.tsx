@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
-import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
+// FE/src/pages/profile/Profile.tsx
+import { useEffect, useMemo, useState } from "react";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import ProfileHeader from "./components/ProfileHeader";
-import { profileApi } from "../../features/profile/api";
-import type { ArtistProfile, UserProfile } from "../../features/profile/types";
 import "./profile.css";
+
+import { profileApi } from "../../features/profile/api";
+import type { ArtistProfile, UserProfile, ProfileRole } from "../../features/profile/types";
 
 type ProfileModel = ArtistProfile | UserProfile;
 
@@ -12,37 +14,43 @@ export type ProfileOutletContext = {
   isOwner: boolean;
 };
 
-export default function Profile() {
-  const { type } = useParams(); // ✅ "user" | "artist"
+type ProfileProps = {
+  role: ProfileRole; // "USER" | "ARTIST"  (routes.tsx에서 주입)
+};
+
+export default function Profile({ role }: ProfileProps) {
   const navigate = useNavigate();
+
+  // ✅ 단순 로직: 이 페이지는 "내 프로필" 전용
+  const isOwner = true;
 
   const [profile, setProfile] = useState<ProfileModel | null>(null);
 
-  const viewedIsArtist = type === "artist";
-  const isOwner = true; // ✅ 이제 '내 프로필' 고정 구조
-
+  // ✅ 네트워크 X: profileApi가 하드코딩 반환(Promise)
   useEffect(() => {
     (async () => {
-      if (viewedIsArtist) {
-        const p = await profileApi.getArtistProfile("me"); // mock 기준이면 OK
+      if (role === "ARTIST") {
+        const p = await profileApi.getArtistProfile("artist");
         setProfile(p);
       } else {
-        const p = await profileApi.getUserProfile("me");
+        const p = await profileApi.getUserProfile("user");
         setProfile(p);
       }
     })();
-  }, [viewedIsArtist]);
+  }, [role]);
+
+  const viewedIsArtist = useMemo(() => role === "ARTIST", [role]);
+  const themeClass = viewedIsArtist ? "theme-artist" : "theme-user";
 
   const goWrite = () => navigate("/posts/create");
 
   if (!profile) return <div className="profile-loading">Loading...</div>;
 
-  const themeClass = viewedIsArtist ? "theme-artist" : "theme-user";
-
   return (
     <div className={`profile-page ${themeClass}`}>
       <div className="profile-bg-glow" />
       <div className="profile-container">
+        {/* ✅ ProfileHeader 유지 */}
         <ProfileHeader profile={profile} isOwner={isOwner} onProfileUpdated={setProfile} />
 
         <div className="profile-tabs-wrapper">
@@ -68,7 +76,9 @@ export default function Profile() {
         </main>
 
         {isOwner && (
-          <button type="button" className="profile-fab" onClick={goWrite}>+</button>
+          <button type="button" className="profile-fab" onClick={goWrite}>
+            +
+          </button>
         )}
       </div>
     </div>
