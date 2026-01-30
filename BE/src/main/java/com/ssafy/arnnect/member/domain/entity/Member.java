@@ -40,7 +40,7 @@ public class Member {
     @Column(name = "nickname", nullable = false, length = 50)
     private String nickname;
 
-    @Column(name = "profile_image", length = 255)
+    @Column(name = "profile_image", length = 255) // 원본 이미지
     private String profileImage;
 
     // tinyint(1) -> Boolean 매핑

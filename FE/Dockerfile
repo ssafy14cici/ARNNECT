@@ -13,5 +13,6 @@ RUN chown -R nginx:nginx /usr/share/nginx/html && \
     chmod -R 755 /usr/share/nginx/html
 
 # 4. 실행
+
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
