@@ -1,4 +1,3 @@
-// FE/src/pages/profile/Profile.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import ProfileHeader from "./components/ProfileHeader";
@@ -19,11 +18,11 @@ function toProfileRole(role: "general" | "artist" | null): ProfileRole {
 }
 
 export default function Profile() {
-  const { id } = useParams(); // "me" or 실제 id
+  const { id } = useParams();
   const profileId = id ?? "";
 
-  const authRole = useAuthStore((s) => s.role); // "general" | "artist" | null
-  const authUser = useAuthStore((s) => s.user); // { memberUuid, name } | null
+  const authRole = useAuthStore((s) => s.role);
+  const authUser = useAuthStore((s) => s.user);
 
   const viewerProfileRole = toProfileRole(authRole);
   const isOwner = useMemo(() => profileId === "me", [profileId]);
@@ -44,16 +43,13 @@ export default function Profile() {
 
     (async () => {
       try {
-        // ✅ 내 프로필 조회
         if (profileId === "me") {
-          // 로그인이 안 되어 있을 경우를 대비한 방어 로직
+          // 🚨 [방어 코드] 새로고침 등으로 스토어가 비었을 때 앱 죽음 방지
           if (!authUser?.memberUuid) {
-            // 여기서는 에러로 처리하여 UI에 표시하거나 리다이렉트
-            throw new Error("로그인이 필요합니다.");
+            throw new Error("로그인 정보가 없습니다.");
           }
 
           const myUuid = authUser.memberUuid;
-          // 역할에 따라 다른 API 호출
           const p =
             viewerProfileRole === "ARTIST"
               ? await profileApi.getArtistProfile(myUuid)
@@ -64,7 +60,6 @@ export default function Profile() {
           return;
         }
 
-        // ✅ 타인 프로필 조회 (아티스트 시도 -> 실패시 유저 시도)
         try {
           const a = await profileApi.getArtistProfile(profileId);
           if (cancelled || reqSeq.current !== mySeq) return;
@@ -100,13 +95,13 @@ export default function Profile() {
     );
   }
 
-  // 에러 발생 시 (로그인 필요 등)
+  // 🚨 [수정] 에러 시 로그인 버튼 노출
   if (error) {
     return (
       <div className="profile-error">
         <p>{error}</p>
-        <button className="profile-retry-btn" onClick={goLogin}>
-          로그인 페이지로 이동
+        <button className="profile-retry-btn" onClick={goLogin} style={{ marginTop: 10 }}>
+          다시 로그인하기
         </button>
       </div>
     );

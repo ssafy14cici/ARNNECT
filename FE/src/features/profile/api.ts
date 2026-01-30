@@ -31,11 +31,9 @@ const KEY_FOLLOWS = "arnnect_mock_follows_v1";
 type PageResult<T> = { items: T[]; nextCursor?: string | null };
 
 /** =========================
- * 🚨 [중요] 프론트 단독 배포용 설정
+ * 🚨 [핵심 수정] 배포/도커 환경에서도 무조건 Mock 데이터 사용 강제
  * ========================= */
-// 제출용이므로 조건 따지지 말고 무조건 true로 고정합니다.
-// 이렇게 해야 도커(Nginx) 환경에서도 백엔드를 찾지 않고 Mock 데이터를 보여줍니다.
-const USE_MOCK = true; 
+const USE_MOCK = true;
 
 /** =========================
  * HELPERS
@@ -82,21 +80,21 @@ async function httpGet<T>(url: string): Promise<T> {
  * ========================= */
 export const profileApi = {
   getArtistProfile: async (id: string): Promise<ArtistProfile> => {
+    // 1. 무조건 Mock 로직 실행
     if (USE_MOCK) {
       const users = lsGet<StoredUser[]>(KEY_USERS, []);
       let user = users.find((u) => u.memberUuid === id);
       const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
       const myId = getMyId();
 
-      // 🚨 [수정] 데이터가 없으면 에러 대신 '임시 프로필'을 반환 (심사위원용 안전장치)
+      // 🚨 2. [안전장치] 로컬스토리지가 비어있어도 에러 내지 않고 임시 데이터 생성
       if (!user) {
-        // 만약 내 프로필 조회 중이었다면 내 ID로 간주
-        const isMe = id === myId; 
+        const isMe = id === myId;
         user = {
-            memberUuid: id,
-            name: isMe ? "내 아티스트 (Mock)" : "Unknown Artist",
-            role: "ARTIST",
-            displayName: isMe ? "Me" : undefined
+          memberUuid: id,
+          name: isMe ? "내 아티스트 (Mock)" : "Unknown Artist",
+          displayName: isMe ? "Me" : undefined,
+          role: "ARTIST",
         };
       }
 
@@ -105,7 +103,7 @@ export const profileApi = {
         role: "ARTIST",
         name: user.displayName || user.name,
         imageUrl: "",
-        bio: `${user.name} 작가의 프로필입니다.`,
+        bio: `${user.name} 작가의 프로필입니다. (Mock Data)`,
         genre: "Painting",
         contactEnabled: true,
         contactUrl: "https://example.com",
@@ -116,7 +114,6 @@ export const profileApi = {
         isFollowing: follows.some((f) => f.from === myId && f.to === id),
       };
     }
-
     return httpGet<ArtistProfile>(`/api/artists/${id}`);
   },
 
@@ -127,14 +124,14 @@ export const profileApi = {
       const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
       const myId = getMyId();
 
-      // 🚨 [수정] 데이터가 없으면 안전장치 가동
+      // 🚨 2. [안전장치] 유저가 없어도 임시 데이터 생성
       if (!user) {
-         const isMe = id === myId;
-         user = {
-            memberUuid: id,
-            name: isMe ? "내 유저 (Mock)" : "Unknown User",
-            role: "USER"
-         };
+        const isMe = id === myId;
+        user = {
+          memberUuid: id,
+          name: isMe ? "내 유저 (Mock)" : "Unknown User",
+          role: "USER",
+        };
       }
 
       return {
@@ -150,7 +147,6 @@ export const profileApi = {
         isFollowing: follows.some((f) => f.from === myId && f.to === id),
       };
     }
-
     return httpGet<UserProfile>(`/api/users/${id}`);
   },
 
@@ -164,10 +160,8 @@ export const profileApi = {
           imageUrl: art.imageUrl || "https://picsum.photos/400",
           createdAt: art.createdAt,
         }));
-
       return { items, nextCursor: null } as PageResult<FeedItem>;
     }
-
     return httpGet<PageResult<FeedItem>>(`/api/artists/${id}/feeds?cursor=${_cursor ?? ""}`);
   },
 
@@ -175,7 +169,6 @@ export const profileApi = {
     if (USE_MOCK) {
       return { items: [], nextCursor: null } as PageResult<FeedItem>;
     }
-
     return httpGet<PageResult<FeedItem>>(`/api/users/${id}/feeds?cursor=${_cursor ?? ""}`);
   },
 
@@ -189,7 +182,6 @@ export const profileApi = {
       }
       return;
     }
-
     await fetch(`/api/follows/${targetId}`, { method: "POST", credentials: "include" });
   },
 
@@ -201,7 +193,6 @@ export const profileApi = {
       lsSet(KEY_FOLLOWS, nextFollows);
       return;
     }
-
     await fetch(`/api/unfollows/${targetId}`, { method: "POST", credentials: "include" });
   },
 
@@ -220,7 +211,6 @@ export const profileApi = {
       saveFeatured(role, profileId, badgeIds);
       return;
     }
-
     await fetch(`/api/profiles/${profileId}/badges/featured`, {
       method: "PATCH",
       credentials: "include",
