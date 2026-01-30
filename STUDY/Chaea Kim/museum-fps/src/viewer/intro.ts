@@ -148,7 +148,6 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
       if (Array.isArray(mat)) mat.forEach(apply);
       else apply(mat);
     });
-    ui.setDebugValue("env", envIntensity);
   };
   applyEnvIntensity(envIntensity);
 
@@ -160,21 +159,6 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   const enterTarget = computeEnterTarget(gltfScene, opts.doorName, new THREE.Vector3(...computedPose.target));
   const enterStopDistance = computeEnterStopDistance(gltfScene, opts.doorName, maxDim);
   console.log("[Intro] enterTarget:", enterTarget, "enterStopDistance:", enterStopDistance);
-
-  // ✅ 디버그 버튼(밝기 튜닝)
-  ui.setDebugValue("exp", exposure);
-  ui.setDebugValue("light", dir.intensity);
-
-  ui.onExpDelta = (d) => {
-    exposure = clamp(exposure + d, 0.05, 2.5);
-    renderer.toneMappingExposure = exposure;
-    ui.setDebugValue("exp", exposure);
-  };
-  ui.onEnvDelta = (d) => applyEnvIntensity(envIntensity + d);
-  ui.onLightDelta = (d) => {
-    dir.intensity = clamp(dir.intensity + d, 0.0, 5.0);
-    ui.setDebugValue("light", dir.intensity);
-  };
 
   renderer.render(scene, camera);
   requestAnimationFrame(() => ui.setState("ready"));
@@ -621,97 +605,16 @@ function createIntroUI() {
   backdrop.appendChild(loader);
   backdrop.appendChild(textReveal);
 
-  // ✅ 밝기 조절 버튼(임시 디버그 UI)
-  const dbg = document.createElement("div");
-  dbg.style.cssText = [
-    "position:fixed",
-    "right:14px",
-    "bottom:14px",
-    "z-index:100000",
-    "display:flex",
-    "flex-direction:column",
-    "gap:8px",
-    "padding:10px 10px",
-    "border-radius:12px",
-    "background:rgba(0,0,0,0.45)",
-    "backdrop-filter: blur(6px)",
-    "color:#fff",
-    "font: 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
-    "user-select:none",
-  ].join(";");
-
-  const makeRow = (label: string) => {
-    const row = document.createElement("div");
-    row.style.cssText = "display:flex; align-items:center; gap:8px;";
-
-    const t = document.createElement("div");
-    t.textContent = label;
-    t.style.cssText = "width:58px; opacity:0.9;";
-
-    const minus = document.createElement("button");
-    minus.type = "button";
-    minus.textContent = "−";
-    minus.style.cssText =
-      "width:34px;height:28px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.12);color:#fff;";
-
-    const plus = document.createElement("button");
-    plus.type = "button";
-    plus.textContent = "+";
-    plus.style.cssText =
-      "width:34px;height:28px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.12);color:#fff;";
-
-    const v = document.createElement("div");
-    v.textContent = "0.00";
-    v.style.cssText = "width:54px; text-align:right; font-variant-numeric: tabular-nums; opacity:0.95;";
-
-    row.appendChild(t);
-    row.appendChild(minus);
-    row.appendChild(plus);
-    row.appendChild(v);
-
-    // 버튼 터치가 enter 버튼 hold에 간섭 안 하게
-    row.addEventListener("pointerdown", (e) => e.stopPropagation(), true);
-    row.addEventListener("pointerup", (e) => e.stopPropagation(), true);
-
-    return { row, minus, plus, valueEl: v };
-  };
-
-  const rExp = makeRow("Exposure");
-  const rEnv = makeRow("Env");
-  const rLight = makeRow("Light");
-
-  dbg.appendChild(rExp.row);
-  dbg.appendChild(rEnv.row);
-  dbg.appendChild(rLight.row);
-
   root.appendChild(backdrop);
   root.appendChild(content);
   root.appendChild(fade);
-  root.appendChild(dbg);
 
   document.body.appendChild(root);
-
-  const values = { exp: 0, env: 0, light: 0 };
-
-  const setValue = (k: "exp" | "env" | "light", v: number) => {
-    values[k] = v;
-    const txt = v.toFixed(2);
-    if (k === "exp") rExp.valueEl.textContent = txt;
-    if (k === "env") rEnv.valueEl.textContent = txt;
-    if (k === "light") rLight.valueEl.textContent = txt;
-  };
 
   const api = {
     root,
     enterBtn,
     fadeEl: fade,
-
-    // mountIntro에서 델타 핸들러를 연결함
-    onExpDelta: (d: number) => void d,
-    onEnvDelta: (d: number) => void d,
-    onLightDelta: (d: number) => void d,
-
-    setDebugValue: (k: "exp" | "env" | "light", v: number) => setValue(k, v),
 
     carryFadeToBody: () => {
       fade.id = "intro-fade-carry";
@@ -799,16 +702,6 @@ function createIntroUI() {
       root.dataset.state = "entering";
     },
   };
-
-  // ✅ 버튼 이벤트 연결(단위는 손으로 찾기 좋게 설정)
-  rExp.minus.addEventListener("click", () => api.onExpDelta(-0.08));
-  rExp.plus.addEventListener("click", () => api.onExpDelta(+0.08));
-
-  rEnv.minus.addEventListener("click", () => api.onEnvDelta(-0.10));
-  rEnv.plus.addEventListener("click", () => api.onEnvDelta(+0.10));
-
-  rLight.minus.addEventListener("click", () => api.onLightDelta(-0.10));
-  rLight.plus.addEventListener("click", () => api.onLightDelta(+0.10));
 
   return api;
 }
