@@ -1,3 +1,4 @@
+// FE/src/pages/profile/Profile.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import ProfileHeader from "./components/ProfileHeader";
@@ -14,7 +15,6 @@ export type ProfileOutletContext = {
 };
 
 function toProfileRole(role: "general" | "artist" | null): ProfileRole {
-  // 로그인 안 했으면 기본 USER 취급(혹은 throw 하고 싶으면 여기서 처리)
   return role === "artist" ? "ARTIST" : "USER";
 }
 
@@ -44,14 +44,16 @@ export default function Profile() {
 
     (async () => {
       try {
-        // ✅ 내 프로필: "me"를 API로 넘기지 말고, 진짜 uuid로 조회
+        // ✅ 내 프로필 조회
         if (profileId === "me") {
+          // 로그인이 안 되어 있을 경우를 대비한 방어 로직
           if (!authUser?.memberUuid) {
-            throw new Error("로그인이 필요합니다. (memberUuid 없음)");
+            // 여기서는 에러로 처리하여 UI에 표시하거나 리다이렉트
+            throw new Error("로그인이 필요합니다.");
           }
 
           const myUuid = authUser.memberUuid;
-
+          // 역할에 따라 다른 API 호출
           const p =
             viewerProfileRole === "ARTIST"
               ? await profileApi.getArtistProfile(myUuid)
@@ -62,7 +64,7 @@ export default function Profile() {
           return;
         }
 
-        // ✅ 타인 프로필: artist → 실패 시 user fallback
+        // ✅ 타인 프로필 조회 (아티스트 시도 -> 실패시 유저 시도)
         try {
           const a = await profileApi.getArtistProfile(profileId);
           if (cancelled || reqSeq.current !== mySeq) return;
@@ -88,6 +90,7 @@ export default function Profile() {
 
   const navigate = useNavigate();
   const goWrite = () => navigate("/posts/create");
+  const goLogin = () => navigate("/login");
 
   if (loading) {
     return (
@@ -97,7 +100,18 @@ export default function Profile() {
     );
   }
 
-  if (error) return <div className="profile-error">{error}</div>;
+  // 에러 발생 시 (로그인 필요 등)
+  if (error) {
+    return (
+      <div className="profile-error">
+        <p>{error}</p>
+        <button className="profile-retry-btn" onClick={goLogin}>
+          로그인 페이지로 이동
+        </button>
+      </div>
+    );
+  }
+
   if (!profile) return <div className="profile-error">프로필을 찾을 수 없습니다.</div>;
 
   const viewedIsArtist = profile.role === "ARTIST";
