@@ -50,11 +50,9 @@ function pickExcerpt(content?: string, max = 120) {
   return s.length > max ? `${s.slice(0, max)}…` : s;
 }
 
-// ✅ 최초 1회: 기본 더미(공용) 생성
-const BASE_SEED_KEY = "comet_mock_posts_seeded_v1";
+const BASE_SEED_KEY = "comet_mock_posts_seeded_v2_FINAL"; 
 
-// ✅ 로그인 유저별 1회: 내 글 더미 생성
-const MY_SEED_PREFIX = "comet_mock_my_posts_seeded_v1";
+const MY_SEED_PREFIX = "comet_mock_my_posts_seeded_v2_FINAL";
 
 function mapPostsToFeeds(): FeedItem[] {
   return listPosts()

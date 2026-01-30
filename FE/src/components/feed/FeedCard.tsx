@@ -1,27 +1,28 @@
 import React from 'react';
 import './FeedCard.css';
 
-// ✅ 1. 별도 파일 없이 여기에 타입을 직접 정의합니다.
+// ✅ 1. 타입 정의
 export type ViewMode = 'GRID' | 'LIST';
 export type FeedRole = 'ARTIST' | 'USER';
+export type postRole = 'ARTWORK' | 'REVIEW'; // 이 타입을 활용합니다.
 
 export interface FeedData {
   id: string;
   role: FeedRole;     // 'ARTIST' 또는 'USER'
   title: string;
-  excerpt?: string;   // 요약글 (있을 수도 없을 수도 있음)
+  excerpt?: string;
   authorName: string;
   authorId: string;
   createdAt: string;
-  imageUrl?: string;  // 이미지 URL (없으면 텍스트 모드)
-  category?: string;
+  imageUrl?: string;
+  // category?: string; // 로직으로 처리하므로 이 필드는 굳이 필요 없으나, 데이터에 있다면 유지해도 됩니다.
   likes?: number;
   views?: number;
 }
 
 interface FeedCardProps {
-  feed: FeedData;     // 위에서 정의한 타입 사용
-  viewMode: ViewMode; 
+  feed: FeedData;
+  viewMode: ViewMode;
   onClick?: () => void;
   onAuthorClick?: (e: React.MouseEvent) => void;
 }
@@ -62,6 +63,9 @@ export const FeedCard: React.FC<FeedCardProps> = ({
   // imageUrl이 있는지 여부 확인
   const hasImage = Boolean(feed.imageUrl);
 
+  // ✅ 2. role에 따라 카테고리 텍스트 결정 (postRole 타입 사용)
+  const categoryLabel: postRole = feed.role === 'ARTIST' ? 'ARTWORK' : 'REVIEW';
+
   return (
     <article 
       className={`feed-card ${hasImage ? '' : 'no-image'} ${viewMode === 'LIST' ? 'mode-list' : 'mode-grid'}`}
@@ -88,7 +92,8 @@ export const FeedCard: React.FC<FeedCardProps> = ({
         <h3 className="card-title">{feed.title}</h3>
 
         <div className="card-meta">
-          <span className="card-cat">{feed.category || 'Artwork'}</span>
+          {/* ✅ 3. 결정된 카테고리 텍스트 출력 */}
+          <span className="card-cat">{categoryLabel}</span>
           
           {/* 리스트 모드일 때만 요약글 표시 */}
           {viewMode === 'LIST' && feed.excerpt && (

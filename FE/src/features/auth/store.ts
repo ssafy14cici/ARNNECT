@@ -25,7 +25,7 @@ type AuthState = {
   hydrate: () => void; // ✅ AppLayout에서 호출
 };
 
-const KEY = "comet_mock_auth_v1";
+const KEY = "comet_mock_auth_v2";
 
 function load(): PersistShape | null {
   try {
