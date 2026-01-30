@@ -1,3 +1,4 @@
+//FE\src\pages\posts\PostCreate.tsx
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./postCreate.css";

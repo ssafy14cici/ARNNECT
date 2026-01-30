@@ -32,6 +32,30 @@ const KEY_FOLLOWS = "arnnect_mock_follows_v1";
 type PageResult<T> = { items: T[]; nextCursor?: string | null };
 
 /** =========================
+ * RUNTIME FLAGS (도커/배포 대응)
+ * ========================= */
+const ENV = ((import.meta as any).env ?? {}) as Record<string, unknown>;
+const RAW_BASE_URL =
+  typeof ENV.VITE_API_BASE_URL === "string" ? (ENV.VITE_API_BASE_URL as string).trim() : "";
+const RAW_USE_MOCK = typeof ENV.VITE_USE_MOCK === "string" ? (ENV.VITE_USE_MOCK as string) : "";
+
+const ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
+
+/**
+ * tickets/api.ts랑 동일한 철학:
+ * - baseURL 없으면(mock)
+ * - use_mock=true면(mock)
+ * - dev면(mock)
+ * - 실수로 프론트 origin 넣었으면(mock)
+ */
+const USE_MOCK =
+  RAW_USE_MOCK === "true" ||
+  !RAW_BASE_URL ||
+  RAW_BASE_URL === ORIGIN ||
+  RAW_BASE_URL.includes("localhost:5173") ||
+  Boolean((import.meta as any).env?.DEV);
+
+/** =========================
  * HELPERS
  * ========================= */
 function featuredKey(role: ProfileRole, id: string) {
@@ -54,6 +78,7 @@ function saveFeatured(role: ProfileRole, id: string, badgeIds: string[]) {
 }
 
 function getMyId() {
+  // ✅ mock 유지 시 기본 내 ID
   return "mock-user-0001";
 }
 
@@ -61,6 +86,13 @@ const DEFAULT_BADGES = [
   { id: "b_first_review", label: "첫 리뷰", description: "리뷰 1개 달성" },
   { id: "b_first_ticket", label: "첫 티켓", description: "티켓 1개 수집" },
 ];
+
+// mock id가 실API로 섞였을 때 바로 잡기용 방어
+function assertNotMockId(id: string) {
+  if (id.startsWith("mock-")) {
+    throw new Error(`실API 호출인데 mock id가 들어왔습니다: ${id} (mock 분기/로그인 id 확인)`);
+  }
+}
 
 async function httpGet<T>(url: string): Promise<T> {
   const res = await fetch(url, { credentials: "include" });
@@ -73,11 +105,9 @@ async function httpGet<T>(url: string): Promise<T> {
  * ========================= */
 export const profileApi = {
   getArtistProfile: async (id: string): Promise<ArtistProfile> => {
-    if (import.meta.env.DEV) {
-      // ✅ any 대신 StoredUser[] 사용
+    if (USE_MOCK) {
       const users = lsGet<StoredUser[]>(KEY_USERS, []);
       const user = users.find((u) => u.memberUuid === id);
-      // ✅ any 대신 FollowEdge[] 사용
       const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
       const myId = getMyId();
 
@@ -99,11 +129,15 @@ export const profileApi = {
         isFollowing: follows.some((f) => f.from === myId && f.to === id),
       };
     }
-    return httpGet<ArtistProfile>(`/api/artists/${id}`);
+
+    // ✅ 실API로 붙일 때: mock id 차단
+    assertNotMockId(id);
+
+    return httpGet<ArtistProfile>(`/api/artists/${encodeURIComponent(id)}`);
   },
 
   getUserProfile: async (id: string): Promise<UserProfile> => {
-    if (import.meta.env.DEV) {
+    if (USE_MOCK) {
       const users = lsGet<StoredUser[]>(KEY_USERS, []);
       const user = users.find((u) => u.memberUuid === id);
       const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
@@ -124,12 +158,14 @@ export const profileApi = {
         isFollowing: follows.some((f) => f.from === myId && f.to === id),
       };
     }
-    return httpGet<UserProfile>(`/api/users/${id}`);
+
+    assertNotMockId(id);
+
+    return httpGet<UserProfile>(`/api/users/${encodeURIComponent(id)}`);
   },
 
   getArtistFeed: async (id: string, _cursor?: string | null) => {
-    if (import.meta.env.DEV) {
-      // ✅ any 대신 StoredArtwork[] 사용
+    if (USE_MOCK) {
       const artworks = lsGet<StoredArtwork[]>(KEY_ARTWORKS, []);
       const items: FeedItem[] = artworks
         .filter((art) => art.authorId === id)
@@ -141,18 +177,28 @@ export const profileApi = {
 
       return { items, nextCursor: null } as PageResult<FeedItem>;
     }
-    return httpGet<PageResult<FeedItem>>(`/api/artists/${id}/feeds?cursor=${_cursor ?? ""}`);
+
+    assertNotMockId(id);
+
+    const cursor = _cursor ? encodeURIComponent(_cursor) : "";
+    return httpGet<PageResult<FeedItem>>(
+      `/api/artists/${encodeURIComponent(id)}/feeds?cursor=${cursor}`,
+    );
   },
 
   getUserFeed: async (id: string, _cursor?: string | null) => {
-    if (import.meta.env.DEV) {
+    if (USE_MOCK) {
       return { items: [], nextCursor: null } as PageResult<FeedItem>;
     }
-    return httpGet<PageResult<FeedItem>>(`/api/users/${id}/feeds?cursor=${_cursor ?? ""}`);
+
+    assertNotMockId(id);
+
+    const cursor = _cursor ? encodeURIComponent(_cursor) : "";
+    return httpGet<PageResult<FeedItem>>(`/api/users/${encodeURIComponent(id)}/feeds?cursor=${cursor}`);
   },
 
   follow: async (targetId: string) => {
-    if (import.meta.env.DEV) {
+    if (USE_MOCK) {
       const myId = getMyId();
       const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
       if (!follows.some((f) => f.from === myId && f.to === targetId)) {
@@ -161,23 +207,32 @@ export const profileApi = {
       }
       return;
     }
-    await fetch(`/api/follows/${targetId}`, { method: "POST", credentials: "include" });
+
+    assertNotMockId(targetId);
+
+    await fetch(`/api/follows/${encodeURIComponent(targetId)}`, { method: "POST", credentials: "include" });
   },
 
   unfollow: async (targetId: string) => {
-    if (import.meta.env.DEV) {
+    if (USE_MOCK) {
       const myId = getMyId();
       const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
       const nextFollows = follows.filter((f) => !(f.from === myId && f.to === targetId));
       lsSet(KEY_FOLLOWS, nextFollows);
       return;
     }
-    await fetch(`/api/unfollows/${targetId}`, { method: "POST", credentials: "include" });
+
+    assertNotMockId(targetId);
+
+    await fetch(`/api/unfollows/${encodeURIComponent(targetId)}`, { method: "POST", credentials: "include" });
   },
 
   submitQuestionToArtist: async (_artistId: string, _payload: { message: string }) => {
-    if (import.meta.env.DEV) return;
-    await fetch(`/api/artists/${_artistId}/questions`, {
+    if (USE_MOCK) return;
+
+    assertNotMockId(_artistId);
+
+    await fetch(`/api/artists/${encodeURIComponent(_artistId)}/questions`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -186,11 +241,14 @@ export const profileApi = {
   },
 
   updateFeaturedBadges: async (role: ProfileRole, profileId: string, badgeIds: string[]) => {
-    if (import.meta.env.DEV) {
+    if (USE_MOCK) {
       saveFeatured(role, profileId, badgeIds);
       return;
     }
-    await fetch(`/api/profiles/${profileId}/badges/featured`, {
+
+    assertNotMockId(profileId);
+
+    await fetch(`/api/profiles/${encodeURIComponent(profileId)}/badges/featured`, {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },

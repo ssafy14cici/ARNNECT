@@ -102,20 +102,22 @@ function ensureMySeedOnce(me: { id: string; name: string; role: PostRole }, coun
 
 function mapPostsToFeeds(): FeedItem[] {
   return listPosts()
-    .map((p): FeedItem => ({
+    .map((p: any): FeedItem => ({
       id: p.id,
-      role: p.role, // "ARTIST" | "USER"
+      role: p.role,
       title: p.title,
       excerpt: pickExcerpt(p.content),
       authorName: p.authorName,
       authorId: p.authorId,
       createdAt: p.createdAt,
-      imageUrl: p.imageUrls?.[0],
+      imageUrl: (Array.isArray(p.imageUrls) ? p.imageUrls[0] : undefined) ?? p.imageUrl,
+
       likes: p.likes,
       views: p.views,
     }))
     .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
 }
+
 
 export default function Feed() {
   const navigate = useNavigate();
