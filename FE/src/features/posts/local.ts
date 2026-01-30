@@ -11,6 +11,8 @@ export type LocalPost = {
   content: string;
 
   imageUrl?: string;     // ✅ dataURL or "/art/a1.jpg"
+  imageUrls?: string[];
+
   tags?: string[];
   artworkId?: number;    // 리뷰면 연결용
 
@@ -89,6 +91,7 @@ export async function createLocalPost(input: {
     title: input.title,
     content: input.content,
     imageUrl,
+    imageUrls: imageUrl ? [imageUrl] : [],
     tags: input.tags ?? [],
     artworkId: input.artworkId,
     createdAt: new Date().toISOString(),
