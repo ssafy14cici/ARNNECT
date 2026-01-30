@@ -40,29 +40,46 @@ function fromLocalPosts(): FeedItem[] {
   const reviews = postsMock.loadReviews();
   const artworks = postsMock.loadArtworks();
 
-  const reviewItems: FeedItem[] = reviews.map((r) => ({
-    id: `review-${r.id}`,
-    role: r.role,
-    title: r.title,
-    authorName: r.authorName,
-    authorId: r.authorId,
-    createdAt: r.createdAt,
-    imageUrl: r.imageUrl,
-    likes: r.likes,
-    views: r.views,
-  }));
+  const reviewItems: FeedItem[] = reviews.map((r) => {
+    // 1. 파일명을 추출하는 변수 생성
+    // 예: "/art/a12.jpg" -> split으로 자르고 pop으로 "a12.jpg" 가져옴 -> .jpg를 빈문자열로 치환 -> "a12"
+    const imageName = r.imageUrl 
+      ? r.imageUrl.split('/').pop()?.replace('.jpg', '') 
+      : null;
 
-  const artworkItems: FeedItem[] = artworks.map((a) => ({
-    id: `artwork-${a.id}`,
-    role: "ARTIST",
-    title: a.title,
-    authorName: a.authorName,
-    authorId: a.authorId,
-    createdAt: a.createdAt,
-    imageUrl: a.imageUrl,
-    likes: a.likes,
-    views: a.views,
-  }));
+    return {
+      // 2. 추출한 파일명이 있으면 그것을 ID로, 없으면 기존 방식 사용
+      id: imageName || `review-${r.id}`, 
+      role: r.role,
+      title: r.title,
+      authorName: r.authorName,
+      authorId: r.authorId,
+      createdAt: r.createdAt,
+      imageUrl: r.imageUrl,
+      likes: r.likes,
+      views: r.views,
+    };
+  });
+
+  const artworkItems: FeedItem[] = artworks.map((a) => {
+    // 1. 파일명을 추출하는 변수 생성
+    const imageName = a.imageUrl 
+      ? a.imageUrl.split('/').pop()?.replace('.jpg', '') 
+      : null;
+
+    return {
+      // 2. 추출한 파일명이 있으면 그것을 ID로, 없으면 기존 방식 사용
+      id: imageName || `artwork-${a.id}`,
+      role: "ARTIST",
+      title: a.title,
+      authorName: a.authorName,
+      authorId: a.authorId,
+      createdAt: a.createdAt,
+      imageUrl: a.imageUrl,
+      likes: a.likes,
+      views: a.views,
+    };
+  });
 
   return [...reviewItems, ...artworkItems].sort((x, y) => y.createdAt.localeCompare(x.createdAt));
 }
