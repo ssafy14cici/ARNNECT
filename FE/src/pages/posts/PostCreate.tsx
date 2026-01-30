@@ -1,24 +1,20 @@
-// FE/src/pages/posts/PostCreate.tsx
+//FE\src\pages\posts\PostCreate.tsx
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./postCreate.css";
 
-import { createArtwork, createReview } from "../../features/posts/api";
 import { useAuthStore } from "../../features/auth/store";
-import type { PostRole } from "../../features/feed/mockData";
+import { createLocalPost } from "../../features/posts/local";
 
 type Mode = "ARTIST" | "USER";
-
-type Props = {
-  mode: Mode;
-};
+type Props = { mode: Mode };
 
 export default function PostCreate({ mode }: Props) {
   const navigate = useNavigate();
   const isArtist = useMemo(() => mode === "ARTIST", [mode]);
 
   const authUser = useAuthStore((s) => s.user);
-  const appRole = useAuthStore((s) => s.role); // "general" | "artist" | null
+  const appRole = useAuthStore((s) => s.role);
 
   const [loading, setLoading] = useState(false);
 
@@ -44,36 +40,29 @@ export default function PostCreate({ mode }: Props) {
     [tags],
   );
 
-  const author = useMemo(() => {
-    const id = authUser?.memberUuid ?? "guest";
-    const name = authUser?.name ?? "Guest";
-    const role: PostRole =
-      mode === "ARTIST" || appRole === "artist" ? "ARTIST" : "USER";
-    return { id, name, role };
-  }, [authUser?.memberUuid, authUser?.name, mode, appRole]);
-
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    setImageFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
+    if (file) {
+      setImageFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
   };
 
   const validate = () => {
+    if (!authUser?.memberUuid) return "로그인 후 이용해주세요.";
     if (!imageFile) return "이미지를 선택해주세요.";
 
     if (isArtist) {
       if (!title.trim()) return "작품 제목을 입력해주세요.";
       if (!field.trim()) return "분야(field)를 입력해주세요.";
       if (!genre.trim()) return "장르(genre)를 입력해주세요.";
-      if (!year.trim() || Number.isNaN(Number(year))) return "제작년도는 숫자여야 합니다.";
+      if (!year.trim() || isNaN(Number(year))) return "제작년도는 숫자여야 합니다.";
       return null;
     }
 
     if (!reviewTitle.trim()) return "제목을 입력해주세요.";
     if (!reviewText.trim()) return "내용을 입력해주세요.";
-    if (!artworkId.trim() || Number.isNaN(Number(artworkId))) return "작품 ID는 숫자여야 합니다.";
+    if (!artworkId.trim() || isNaN(Number(artworkId))) return "작품 ID는 숫자여야 합니다.";
     return null;
   };
 
@@ -81,38 +70,45 @@ export default function PostCreate({ mode }: Props) {
     const err = validate();
     if (err) return alert(err);
 
-    if (!imageFile) return;
-
     setLoading(true);
     try {
+      const authorId = authUser!.memberUuid;
+      const authorName = authUser!.name;
+
       if (isArtist) {
-        await createArtwork({
+        await createLocalPost({
+          mode: "ARTIST",
+          authorId,
+          authorName,
           title: title.trim(),
-          description: description.trim(),
-          field: field.trim(),
-          genre: genre.trim(),
-          productionDate: Number(year),
-          size: size.trim(),
-          tags: parsedTags,
+          content: [
+            description?.trim(),
+            `field: ${field.trim()}`,
+            `genre: ${genre.trim()}`,
+            `year: ${year.trim()}`,
+            size ? `size: ${size.trim()}` : "",
+          ].filter(Boolean).join("\n"),
           imageFile,
-          author,
+          tags: parsedTags,
         });
       } else {
-        await createReview({
+        await createLocalPost({
+          mode: "USER",
+          authorId,
+          authorName,
           title: reviewTitle.trim(),
           content: reviewText.trim(),
-          artworkId: Number(artworkId),
-          tags: parsedTags,
           imageFile,
-          author,
+          tags: parsedTags,
+          artworkId: Number(artworkId),
         });
       }
 
-      alert("등록되었습니다.");
+      alert("등록되었습니다. (로컬 저장)");
       navigate(-1);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "등록 중 오류가 발생했습니다.";
-      alert(msg);
+    } catch (e) {
+      console.error(e);
+      alert("등록 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }

@@ -3,156 +3,100 @@ export type LocalMode = "ARTIST" | "USER";
 
 export type LocalPost = {
   id: string;
-  mode: LocalMode;
-
-  authorId: string;       // ✅ memberUuid 사용
+  mode: LocalMode; // ARTIST=작품, USER=리뷰
+  authorId: string;      // ✅ memberUuid
   authorName: string;
 
   title: string;
   content: string;
 
-  imageUrl?: string;      // ✅ dataURL 또는 "/art/a1.jpg" 같은 public path
-  createdAt: string;
+  imageUrl?: string;     // ✅ dataURL or "/art/a1.jpg"
+  imageUrls?: string[];
 
-  meta?: Record<string, unknown>;
-  isDeleted?: boolean;
+  tags?: string[];
+  artworkId?: number;    // 리뷰면 연결용
+
+  createdAt: string;
 };
 
-const POSTS_KEY = "comet_mock_posts_v1";
+const KEY = "comet_mock_posts_v1";
+const EVT = "comet_posts_updated";
 
-function safeParse<T>(raw: string | null, fallback: T): T {
-  try {
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function uid(prefix = "post") {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return `${prefix}-${crypto.randomUUID()}`;
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+function uid() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function readAll(): LocalPost[] {
-  const all = safeParse<LocalPost[]>(localStorage.getItem(POSTS_KEY), []);
-  return all.filter((p) => !p.isDeleted);
+  try {
+    const raw = localStorage.getItem(KEY);
+    return raw ? (JSON.parse(raw) as LocalPost[]) : [];
+  } catch {
+    return [];
+  }
 }
 
-function writeAll(posts: LocalPost[]) {
-  localStorage.setItem(POSTS_KEY, JSON.stringify(posts));
+function writeAll(list: LocalPost[]) {
+  localStorage.setItem(KEY, JSON.stringify(list));
+  window.dispatchEvent(new Event(EVT));
 }
 
-// -------------------------
-// pub-sub
-// -------------------------
-type Unsub = () => void;
-const subs = new Set<() => void>();
-
-function emitPostsUpdated() {
-  subs.forEach((fn) => fn());
-}
-
-export function subscribePostsUpdated(cb: () => void): Unsub {
-  subs.add(cb);
-  return () => subs.delete(cb);
-}
-
-// -------------------------
-// read APIs
-// -------------------------
-export function listPosts(mode?: LocalMode): LocalPost[] {
-  const all = readAll();
-  const filtered = mode ? all.filter((p) => p.mode === mode) : all;
-  return filtered.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
-}
-
-export function listPostsByAuthor(authorId: string, mode?: LocalMode): LocalPost[] {
-  if (!authorId) return [];
-  const all = readAll();
-  return all
-    .filter((p) => p.authorId === authorId)
-    .filter((p) => (mode ? p.mode === mode : true))
-    .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
-}
-
-// -------------------------
-// write APIs
-// -------------------------
-export function createPost(input: Omit<LocalPost, "id" | "createdAt">): LocalPost {
-  if (!input.authorId) throw new Error("authorId is required");
-  if (!input.authorName) throw new Error("authorName is required");
-  if (!input.title?.trim()) throw new Error("title is required");
-
-  const next: LocalPost = {
-    id: uid("post"),
-    createdAt: new Date().toISOString(),
-    ...input,
-    title: input.title.trim(),
-    content: input.content?.trim() ?? "",
+export function subscribePostsUpdated(cb: () => void) {
+  const h = () => cb();
+  window.addEventListener(EVT, h);
+  window.addEventListener("storage", h); // 다른 탭 대비(선택)
+  return () => {
+    window.removeEventListener(EVT, h);
+    window.removeEventListener("storage", h);
   };
-
-  const all = safeParse<LocalPost[]>(localStorage.getItem(POSTS_KEY), []);
-  writeAll([next, ...all]);
-  emitPostsUpdated();
-  return next;
 }
 
-export function softDeletePost(id: string) {
-  const all = safeParse<LocalPost[]>(localStorage.getItem(POSTS_KEY), []);
-  const next = all.map((p) => (p.id === id ? { ...p, isDeleted: true } : p));
-  writeAll(next);
-  emitPostsUpdated();
+export function listPosts(mode?: LocalMode) {
+  const all = readAll();
+  return mode ? all.filter((p) => p.mode === mode) : all;
 }
 
-// -------------------------
-// file -> dataURL (local image 저장)
-// -------------------------
-export function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onerror = () => reject(new Error("File read failed"));
-    fr.onload = () => resolve(String(fr.result));
-    fr.readAsDataURL(file);
+export function listPostsByAuthor(authorId: string, mode?: LocalMode) {
+  const all = readAll();
+  return all.filter((p) => p.authorId === authorId && (!mode || p.mode === mode));
+}
+
+export async function fileToDataUrl(file: File) {
+  return await new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(new Error("파일 읽기 실패"));
+    r.readAsDataURL(file);
   });
 }
 
-// -------------------------
-// seed (내 피드 비었을 때만 자동 생성 옵션)
-// -------------------------
-const SEED_PREFIX = "comet_mock_seed_author_v1";
-
-const ART_IMAGES = Array.from({ length: 12 }).map((_, i) => `/art/a${i + 1}.jpg`);
-
-export function ensureSeedForAuthor(params: {
+export async function createLocalPost(input: {
+  mode: LocalMode;
   authorId: string;
   authorName: string;
-  mode: LocalMode;
-  count?: number;
+  title: string;
+  content: string;
+  imageFile?: File | null;
+  tags?: string[];
+  artworkId?: number;
 }) {
-  const { authorId, authorName, mode, count = 6 } = params;
-  const key = `${SEED_PREFIX}.${authorId}.${mode}`;
-  if (localStorage.getItem(key) === "1") return;
+  const all = readAll();
+  const imageUrl = input.imageFile ? await fileToDataUrl(input.imageFile) : undefined;
 
-  const mine = listPostsByAuthor(authorId, mode);
-  if (mine.length > 0) {
-    localStorage.setItem(key, "1");
-    return;
-  }
+  const post: LocalPost = {
+    id: uid(),
+    mode: input.mode,
+    authorId: input.authorId,
+    authorName: input.authorName,
+    title: input.title,
+    content: input.content,
+    imageUrl,
+    imageUrls: imageUrl ? [imageUrl] : [],
+    tags: input.tags ?? [],
+    artworkId: input.artworkId,
+    createdAt: new Date().toISOString(),
+  };
 
-  for (let i = 0; i < count; i++) {
-    createPost({
-      mode,
-      authorId,
-      authorName,
-      title: mode === "ARTIST" ? `My Artwork #${i + 1}` : `My Review #${i + 1}`,
-      content: "목업 자동 생성 포스트입니다. (나중에 작성글로 교체)",
-      imageUrl: ART_IMAGES[i % ART_IMAGES.length],
-      meta: {},
-    });
-  }
-
-  localStorage.setItem(key, "1");
+  writeAll([post, ...all]);
+  return post;
 }

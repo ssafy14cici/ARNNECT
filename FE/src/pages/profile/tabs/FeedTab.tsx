@@ -1,16 +1,21 @@
 // FE/src/pages/profile/tabs/FeedTab.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
-import type { FeedItem } from "../../../features/profile/types";
 import {
   listPostsByAuthor,
   subscribePostsUpdated,
-  ensureSeedForAuthor,
   type LocalMode,
 } from "../../../features/posts/local";
+
 import { useAuthStore } from "../../../features/auth/store";
 import type { ProfileOutletContext } from "../Profile";
 import "./profileTabs.css";
+
+type GridItem = {
+  id: string;
+  imageUrl: string;
+  createdAt: string;
+};
 
 export default function FeedTab() {
   const nav = useNavigate();
@@ -37,26 +42,21 @@ export default function FeedTab() {
     return () => unsub();
   }, []);
 
-  // ✅ "me"인데 내 글이 아예 없으면 목업 생성(원치 않으면 이 effect 삭제)
-  useEffect(() => {
-    if (rawProfileId !== "me") return;
-    if (!authUser?.memberUuid || !authUser?.name) return;
-
-    ensureSeedForAuthor({
-      authorId: authUser.memberUuid,
-      authorName: authUser.name,
-      mode,
-      count: 6,
-    });
-  }, [rawProfileId, authUser?.memberUuid, authUser?.name, mode]);
-
-  const items: FeedItem[] = useMemo(() => {
+  const items: GridItem[] = useMemo(() => {
     if (!effectiveProfileId) return [];
 
     const posts = listPostsByAuthor(effectiveProfileId, mode);
+
     return posts
-      .filter((p) => typeof p.imageUrl === "string" && p.imageUrl.trim().length > 0)
-      .map((p) => ({ id: p.id, imageUrl: p.imageUrl! }));
+      .filter(
+        (p) => typeof p.imageUrl === "string" && p.imageUrl.trim().length > 0,
+      )
+      .map((p) => ({
+        id: p.id,
+        imageUrl: p.imageUrl!,
+        createdAt: p.createdAt ?? "",
+      }))
+      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
   }, [effectiveProfileId, mode, tick]);
 
   const goDetail = (contentId: string) => {
