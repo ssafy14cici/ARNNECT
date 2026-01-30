@@ -1,189 +1,74 @@
 import type { ArtistProfile, UserProfile, FeedItem, ProfileRole } from "./types";
-import { lsGet, lsSet } from "../../mocks/storage";
 
-/** =========================
- * TYPES
- * ========================= */
-interface StoredUser {
-  memberUuid: string;
-  name: string;
-  displayName?: string;
-  role: "USER" | "ARTIST";
-}
+// =====================================================================
+// 🚨 [네트워크 완전 차단] 하드코딩 데이터 반환 버전
+// =====================================================================
 
-interface StoredArtwork {
-  id: string;
-  authorId: string;
-  imageUrl?: string;
-  createdAt: string;
-}
+const MOCK_ARTIST_ID = "hardcoded-artist-id";
+const MOCK_USER_ID = "hardcoded-user-id";
 
-interface FollowEdge {
-  from: string;
-  to: string;
-  createdAt: string;
-}
+// 1. 하드코딩된 아티스트 프로필 객체
+const FIXED_ARTIST_PROFILE: ArtistProfile = {
+  id: MOCK_ARTIST_ID,
+  role: "ARTIST",
+  name: "Mock Artist",
+  imageUrl: "", // 필요하면 "/art/profile.jpg" 등으로 변경
+  bio: "네트워크 요청 없이 표시되는 하드코딩 아티스트입니다.",
+  genre: "Painting",
+  contactEnabled: true,
+  contactUrl: "https://open.kakao.com/me/artist",
+  followersCount: 123,
+  followingsCount: 10,
+  badges: [
+    { id: "b1", label: "인기 작가", description: "조회수 1만 달성" }
+  ],
+  featuredBadgeIds: ["b1"],
+  isFollowing: false,
+};
 
-const KEY_USERS = "comet_mock_users_v1";
-const KEY_ARTWORKS = "arnnect_mock_artworks_v1";
-const KEY_FOLLOWS = "arnnect_mock_follows_v1";
+// 2. 하드코딩된 유저 프로필 객체
+const FIXED_USER_PROFILE: UserProfile = {
+  id: MOCK_USER_ID,
+  role: "USER",
+  name: "Mock User",
+  imageUrl: "",
+  bio: "네트워크 요청 없이 표시되는 하드코딩 유저입니다.",
+  followersCount: 5,
+  followingsCount: 12,
+  badges: [],
+  featuredBadgeIds: [],
+  isFollowing: false,
+};
 
-type PageResult<T> = { items: T[]; nextCursor?: string | null };
-
-/** =========================
- * HELPERS
- * ========================= */
-function featuredKey(role: ProfileRole, id: string) {
-  return `arnnect.profile.featuredBadges.${role}.${id}`;
-}
-
-function loadFeatured(role: ProfileRole, id: string): string[] {
-  const raw = localStorage.getItem(featuredKey(role, id));
-  if (!raw) return [];
-  try {
-    const v = JSON.parse(raw);
-    return Array.isArray(v) ? v : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveFeatured(role: ProfileRole, id: string, badgeIds: string[]) {
-  localStorage.setItem(featuredKey(role, id), JSON.stringify(badgeIds));
-}
-
-// 목업 환경에서의 내 ID
-function getMyId() {
-  return "mock-user-0001";
-}
-
-const DEFAULT_BADGES = [
-  { id: "b_first_review", label: "첫 리뷰", description: "리뷰 1개 달성" },
-  { id: "b_first_ticket", label: "첫 티켓", description: "티켓 1개 수집" },
-];
-
-/** =========================
- * 🚨 [긴급 수정] 무조건 로컬 데이터만 반환하는 API 객체
- * fetch 코드를 전부 제거했습니다.
- * ========================= */
 export const profileApi = {
-  
-  // 1. 아티스트 프로필 조회
+  // 어떤 ID가 들어오든 무조건 위에서 만든 아티스트 객체 리턴
   getArtistProfile: async (id: string): Promise<ArtistProfile> => {
-    // 로컬 스토리지에서 찾아봄
-    const users = lsGet<StoredUser[]>(KEY_USERS, []);
-    let user = users.find((u) => u.memberUuid === id);
-    const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
-    const myId = getMyId();
-
-    // 🚨 데이터가 없으면? 에러 내지 말고 그냥 가짜 데이터 리턴 (앱 죽음 방지)
-    if (!user) {
-      user = {
-        memberUuid: id,
-        name: "Mock Artist",
-        displayName: "임시 아티스트",
-        role: "ARTIST",
-      };
-    }
-
-    return {
-      id: user.memberUuid,
-      role: "ARTIST",
-      name: user.displayName || user.name,
-      imageUrl: "", // 이미지가 없으면 기본 이미지 들어감
-      bio: "이것은 도커 환경을 위한 임시 아티스트 프로필입니다.",
-      genre: "Painting",
-      contactEnabled: true,
-      contactUrl: "https://example.com",
-      followersCount: follows.filter((f) => f.to === id).length,
-      followingsCount: follows.filter((f) => f.from === id).length,
-      badges: DEFAULT_BADGES,
-      featuredBadgeIds: loadFeatured("ARTIST", id),
-      isFollowing: follows.some((f) => f.from === myId && f.to === id),
-    };
+    return { ...FIXED_ARTIST_PROFILE, id: id }; // ID만 맞춰서 반환
   },
 
-  // 2. 유저 프로필 조회
+  // 어떤 ID가 들어오든 무조건 위에서 만든 유저 객체 리턴
   getUserProfile: async (id: string): Promise<UserProfile> => {
-    const users = lsGet<StoredUser[]>(KEY_USERS, []);
-    let user = users.find((u) => u.memberUuid === id);
-    const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
-    const myId = getMyId();
-
-    // 🚨 데이터 없으면 가짜 리턴
-    if (!user) {
-      user = {
-        memberUuid: id,
-        name: "Mock User",
-        role: "USER",
-      };
-    }
-
-    return {
-      id: user.memberUuid,
-      role: "USER",
-      name: user.name,
-      imageUrl: "",
-      bio: "이것은 도커 환경을 위한 임시 유저 프로필입니다.",
-      followersCount: follows.filter((f) => f.to === id).length,
-      followingsCount: follows.filter((f) => f.from === id).length,
-      badges: DEFAULT_BADGES,
-      featuredBadgeIds: loadFeatured("USER", id),
-      isFollowing: follows.some((f) => f.from === myId && f.to === id),
-    };
+    return { ...FIXED_USER_PROFILE, id: id };
   },
 
-  // 3. 아티스트 피드 조회
+  // 피드: 무조건 하드코딩된 이미지 3개 반환
   getArtistFeed: async (id: string, _cursor?: string | null) => {
-    const artworks = lsGet<StoredArtwork[]>(KEY_ARTWORKS, []);
-    
-    // 로컬 데이터 기반으로 매핑, 없으면 빈 배열
-    const items: FeedItem[] = artworks
-      .filter((art) => art.authorId === id)
-      .map((art) => ({
-        id: art.id,
-        imageUrl: art.imageUrl || "/art/a1.jpg", // 기본 이미지 안전장치
-        createdAt: art.createdAt,
-      }));
-
-    return { items, nextCursor: null } as PageResult<FeedItem>;
+    const items: FeedItem[] = [
+      { id: "art1", imageUrl: "/art/a1.jpg", createdAt: new Date().toISOString() },
+      { id: "art2", imageUrl: "/art/a2.jpg", createdAt: new Date().toISOString() },
+      { id: "art3", imageUrl: "/art/a3.jpg", createdAt: new Date().toISOString() },
+    ];
+    return { items, nextCursor: null };
   },
 
-  // 4. 유저 피드 조회
+  // 유저 피드: 빈 배열 반환
   getUserFeed: async (id: string, _cursor?: string | null) => {
-    // 유저 피드는 일단 빈 배열로 리턴 (에러 방지)
-    return { items: [], nextCursor: null } as PageResult<FeedItem>;
+    return { items: [], nextCursor: null };
   },
 
-  // 5. 팔로우 (로컬 스토리지에만 저장)
-  follow: async (targetId: string) => {
-    const myId = getMyId();
-    const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
-    if (!follows.some((f) => f.from === myId && f.to === targetId)) {
-      follows.push({ from: myId, to: targetId, createdAt: new Date().toISOString() });
-      lsSet(KEY_FOLLOWS, follows);
-    }
-    return;
-  },
-
-  // 6. 언팔로우 (로컬 스토리지에서만 삭제)
-  unfollow: async (targetId: string) => {
-    const myId = getMyId();
-    const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
-    const nextFollows = follows.filter((f) => !(f.from === myId && f.to === targetId));
-    lsSet(KEY_FOLLOWS, nextFollows);
-    return;
-  },
-
-  // 7. 질문하기 (콘솔만 찍고 성공 처리)
-  submitQuestionToArtist: async (_artistId: string, _payload: { message: string }) => {
-    console.log("Mock 질문 전송 성공:", _payload);
-    return;
-  },
-
-  // 8. 뱃지 설정 (로컬 스토리지에만 저장)
-  updateFeaturedBadges: async (role: ProfileRole, profileId: string, badgeIds: string[]) => {
-    saveFeatured(role, profileId, badgeIds);
-    return;
-  },
+  // 기능 함수들: 아무 동작 안 하고 성공 처리 (콘솔만 찍음)
+  follow: async (targetId: string) => { console.log("하드코딩 팔로우 성공"); },
+  unfollow: async (targetId: string) => { console.log("하드코딩 언팔로우 성공"); },
+  submitQuestionToArtist: async () => { console.log("질문 전송 흉내"); },
+  updateFeaturedBadges: async () => { console.log("뱃지 변경 흉내"); },
 };

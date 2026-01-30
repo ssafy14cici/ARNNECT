@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import ProfileHeader from "./components/ProfileHeader";
 import { profileApi } from "../../features/profile/api";
@@ -13,101 +13,52 @@ export type ProfileOutletContext = {
   isOwner: boolean;
 };
 
-function toProfileRole(role: "general" | "artist" | null): ProfileRole {
-  return role === "artist" ? "ARTIST" : "USER";
-}
-
 export default function Profile() {
-  const { id } = useParams();
-  const profileId = id ?? "";
+  const { id } = useParams(); 
+  // URL이 /profile/me 면 내 프로필, 아니면 남의 프로필
+  const profileId = id ?? "mock-user"; 
 
-  const authRole = useAuthStore((s) => s.role);
-  const authUser = useAuthStore((s) => s.user);
-
-  const viewerProfileRole = toProfileRole(authRole);
-  const isOwner = useMemo(() => profileId === "me", [profileId]);
+  const authRole = useAuthStore((s) => s.role); 
+  const isOwner = profileId === "me";
 
   const [profile, setProfile] = useState<ProfileModel | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const reqSeq = useRef(0);
 
   useEffect(() => {
-    let cancelled = false;
-    const mySeq = ++reqSeq.current;
-
-    setLoading(true);
-    setError(null);
-    setProfile(null);
-
     (async () => {
-      try {
-        if (profileId === "me") {
-          // 🚨 [방어 코드] 새로고침 등으로 스토어가 비었을 때 앱 죽음 방지
-          if (!authUser?.memberUuid) {
-            throw new Error("로그인 정보가 없습니다.");
-          }
-
-          const myUuid = authUser.memberUuid;
-          const p =
-            viewerProfileRole === "ARTIST"
-              ? await profileApi.getArtistProfile(myUuid)
-              : await profileApi.getUserProfile(myUuid);
-
-          if (cancelled || reqSeq.current !== mySeq) return;
+      // 1. 만약 URL이 /profile/me 라면?
+      if (profileId === "me") {
+        // 내 역할이 아티스트면 아티스트 프로필, 아니면 유저 프로필 호출
+        // (API가 하드코딩되어 있어서 무조건 성공함)
+        if (authRole === "artist") {
+          const p = await profileApi.getArtistProfile("me");
           setProfile(p);
-          return;
+        } else {
+          const p = await profileApi.getUserProfile("me");
+          setProfile(p);
         }
+        return;
+      }
 
-        try {
-          const a = await profileApi.getArtistProfile(profileId);
-          if (cancelled || reqSeq.current !== mySeq) return;
-          setProfile(a);
-        } catch {
-          const u = await profileApi.getUserProfile(profileId);
-          if (cancelled || reqSeq.current !== mySeq) return;
-          setProfile(u);
-        }
-      } catch (e) {
-        if (cancelled || reqSeq.current !== mySeq) return;
-        setError(e instanceof Error ? e.message : "프로필 로딩 실패");
-      } finally {
-        if (cancelled || reqSeq.current !== mySeq) return;
-        setLoading(false);
+      // 2. 남의 프로필(/profile/some-id)이라면?
+      // 일단 아티스트로 찔러보고, 아니면 유저로 (화면 구성을 위해)
+      // 여기서는 그냥 '아티스트'로 간주하고 띄웁니다. (원하시면 로직 변경 가능)
+      // 하드코딩 상황이므로 그냥 랜덤하게 하나 띄워도 됩니다.
+      
+      // 테스트: ID에 'user'가 포함되면 유저 프로필, 아니면 아티스트 프로필 리턴
+      if (profileId.includes("user")) {
+         const u = await profileApi.getUserProfile(profileId);
+         setProfile(u);
+      } else {
+         const a = await profileApi.getArtistProfile(profileId);
+         setProfile(a);
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [profileId, viewerProfileRole, authUser?.memberUuid]);
+  }, [profileId, authRole]);
 
   const navigate = useNavigate();
   const goWrite = () => navigate("/posts/create");
-  const goLogin = () => navigate("/login");
 
-  if (loading) {
-    return (
-      <div className="profile-loading">
-        <div className="spinner" />
-      </div>
-    );
-  }
-
-  // 🚨 [수정] 에러 시 로그인 버튼 노출
-  if (error) {
-    return (
-      <div className="profile-error">
-        <p>{error}</p>
-        <button className="profile-retry-btn" onClick={goLogin} style={{ marginTop: 10 }}>
-          다시 로그인하기
-        </button>
-      </div>
-    );
-  }
-
-  if (!profile) return <div className="profile-error">프로필을 찾을 수 없습니다.</div>;
+  if (!profile) return <div className="profile-loading">Loading...</div>;
 
   const viewedIsArtist = profile.role === "ARTIST";
   const themeClass = viewedIsArtist ? "theme-artist" : "theme-user";
@@ -115,12 +66,12 @@ export default function Profile() {
   return (
     <div className={`profile-page ${themeClass}`}>
       <div className="profile-bg-glow" />
-
       <div className="profile-container">
         <ProfileHeader profile={profile} isOwner={isOwner} onProfileUpdated={setProfile} />
 
         <div className="profile-tabs-wrapper">
           <nav className="profile-tabs">
+            {/* 탭 누르면 /feed, /portfolio 등으로 이동 */}
             <NavLink to="feed" className={({ isActive }) => `profile-tab ${isActive ? "active" : ""}`}>
               피드
             </NavLink>
@@ -142,11 +93,7 @@ export default function Profile() {
         </main>
 
         {isOwner && (
-          <button type="button" className="profile-fab" aria-label="글쓰기" onClick={goWrite}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </button>
+          <button type="button" className="profile-fab" onClick={goWrite}>+</button>
         )}
       </div>
     </div>
