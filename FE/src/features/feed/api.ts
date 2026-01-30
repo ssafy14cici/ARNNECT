@@ -1,6 +1,7 @@
 // FE/src/features/feed/api.ts
 import { http } from "../../shared/api/http";
 import { __mock as postsMock } from "../posts/api";
+import { useMock } from "../../mocks/useMock";
 
 type FeedRole = "ARTIST" | "USER";
 
@@ -36,20 +37,21 @@ function buildImageMockFeeds(): FeedItem[] {
   }));
 }
 
+function fileBaseName(url?: string) {
+  if (!url) return null;
+  const last = url.split("/").pop() ?? "";
+  if (!last) return null;
+  return last.replace(/\.(png|jpg|jpeg|webp)$/i, "");
+}
+
 function fromLocalPosts(): FeedItem[] {
   const reviews = postsMock.loadReviews();
   const artworks = postsMock.loadArtworks();
 
   const reviewItems: FeedItem[] = reviews.map((r) => {
-    // 1. 파일명을 추출하는 변수 생성
-    // 예: "/art/a12.jpg" -> split으로 자르고 pop으로 "a12.jpg" 가져옴 -> .jpg를 빈문자열로 치환 -> "a12"
-    const imageName = r.imageUrl 
-      ? r.imageUrl.split('/').pop()?.replace('.jpg', '') 
-      : null;
-
+    const imageName = fileBaseName(r.imageUrl);
     return {
-      // 2. 추출한 파일명이 있으면 그것을 ID로, 없으면 기존 방식 사용
-      id: imageName || `review-${r.id}`, 
+      id: imageName || `review-${r.id}`,
       role: r.role,
       title: r.title,
       authorName: r.authorName,
@@ -62,13 +64,8 @@ function fromLocalPosts(): FeedItem[] {
   });
 
   const artworkItems: FeedItem[] = artworks.map((a) => {
-    // 1. 파일명을 추출하는 변수 생성
-    const imageName = a.imageUrl 
-      ? a.imageUrl.split('/').pop()?.replace('.jpg', '') 
-      : null;
-
+    const imageName = fileBaseName(a.imageUrl);
     return {
-      // 2. 추출한 파일명이 있으면 그것을 ID로, 없으면 기존 방식 사용
       id: imageName || `artwork-${a.id}`,
       role: "ARTIST",
       title: a.title,
@@ -81,25 +78,20 @@ function fromLocalPosts(): FeedItem[] {
     };
   });
 
-  return [...reviewItems, ...artworkItems].sort((x, y) => y.createdAt.localeCompare(x.createdAt));
+  return [...reviewItems, ...artworkItems].sort((x, y) =>
+    y.createdAt.localeCompare(x.createdAt),
+  );
 }
-
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true" || import.meta.env.DEV;
 
 /** 피드 목록 조회 */
 export const getFeedList = async (): Promise<FeedItem[]> => {
-  // ✅ mock이면: 로컬 작성글/작품을 먼저 보여줌
-  if (USE_MOCK) {
+  // ✅ 런타임 판별
+  if (useMock()) {
     const local = fromLocalPosts();
     return local.length > 0 ? local : buildImageMockFeeds();
   }
 
-  // ✅ real API 시도
-  try {
-    const res = await http.get("/feeds");
-    if (Array.isArray(res?.data)) return res.data as FeedItem[];
-    return buildImageMockFeeds();
-  } catch {
-    return buildImageMockFeeds();
-  }
+  // ✅ real API
+  const res = await http.get("/feeds");
+  return Array.isArray(res?.data) ? (res.data as FeedItem[]) : [];
 };

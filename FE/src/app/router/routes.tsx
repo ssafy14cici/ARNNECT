@@ -138,7 +138,7 @@ export const routes: RouteObject[] = [
 
           /* ---------- Profile ---------- */
           {
-            path: "profile/:id",
+            path:  "profile/:type",
             element: <Profile />,
             children: [
               { index: true, element: <Navigate to="feed" relative="path" replace /> },

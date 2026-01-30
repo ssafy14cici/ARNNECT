@@ -63,6 +63,8 @@ export default function Navbar() {
     };
   }, [open]);
 
+  const appRole = useAuthStore((s) => s.role);
+
   // ✅ 메뉴 아이템 정의 (Shape 포함)
   const items: MenuItem[] = useMemo(
     () => [
@@ -73,7 +75,13 @@ export default function Navbar() {
 
       { key: "feed", label: "Feed", path: "/feed", shape: "box" },
       { key: "lounge", label: "Lounge", path: "/lounge", shape: "torus" },
-      { key: "profile", label: "Profile", path: "/profile/me/feed", shape: "sphere" },
+      {
+      key: "profile",
+      label: "Profile",
+      path: appRole === "artist" ? "/profile/artist/feed" : "/profile/user/feed",
+      shape: "sphere",
+    },
+
       { key: "auth", label: "Login/Out", path: "", shape: "knot" },
     ],
     []

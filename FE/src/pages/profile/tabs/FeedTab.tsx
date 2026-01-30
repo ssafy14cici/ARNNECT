@@ -23,15 +23,13 @@ export default function FeedTab() {
   const { id } = useParams();
   const { profile } = useOutletContext<ProfileOutletContext>();
 
-  const authUser = useAuthStore((s) => s.user); // { memberUuid, name } | null
+  const authUser = useAuthStore((s) => s.user);
+  const effectiveProfileId = authUser?.memberUuid ?? "";
+
   const rawProfileId = id ?? "";
   const [tick, setTick] = useState(0);
 
-  const effectiveProfileId = useMemo(() => {
-    if (!rawProfileId) return "";
-    if (rawProfileId === "me") return authUser?.memberUuid ?? "";
-    return rawProfileId;
-  }, [rawProfileId, authUser?.memberUuid]);
+
 
   // ✅ mode 변수명 및 타입을 role로 통일 (local.ts와 맞춤)
   const role: LocalRole = useMemo(
