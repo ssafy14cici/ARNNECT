@@ -31,11 +31,6 @@ const KEY_FOLLOWS = "arnnect_mock_follows_v1";
 type PageResult<T> = { items: T[]; nextCursor?: string | null };
 
 /** =========================
- * 🚨 [핵심 수정] 배포/도커 환경에서도 무조건 Mock 데이터 사용 강제
- * ========================= */
-const USE_MOCK = true;
-
-/** =========================
  * HELPERS
  * ========================= */
 function featuredKey(role: ProfileRole, id: string) {
@@ -57,6 +52,7 @@ function saveFeatured(role: ProfileRole, id: string, badgeIds: string[]) {
   localStorage.setItem(featuredKey(role, id), JSON.stringify(badgeIds));
 }
 
+// 목업 환경에서의 내 ID
 function getMyId() {
   return "mock-user-0001";
 }
@@ -66,156 +62,128 @@ const DEFAULT_BADGES = [
   { id: "b_first_ticket", label: "첫 티켓", description: "티켓 1개 수집" },
 ];
 
-async function httpGet<T>(url: string): Promise<T> {
-  const res = await fetch(url, { credentials: "include" });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(text || `GET ${url} failed (${res.status})`);
-  }
-  return res.json();
-}
-
 /** =========================
- * API OBJECT
+ * 🚨 [긴급 수정] 무조건 로컬 데이터만 반환하는 API 객체
+ * fetch 코드를 전부 제거했습니다.
  * ========================= */
 export const profileApi = {
+  
+  // 1. 아티스트 프로필 조회
   getArtistProfile: async (id: string): Promise<ArtistProfile> => {
-    // 1. 무조건 Mock 로직 실행
-    if (USE_MOCK) {
-      const users = lsGet<StoredUser[]>(KEY_USERS, []);
-      let user = users.find((u) => u.memberUuid === id);
-      const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
-      const myId = getMyId();
+    // 로컬 스토리지에서 찾아봄
+    const users = lsGet<StoredUser[]>(KEY_USERS, []);
+    let user = users.find((u) => u.memberUuid === id);
+    const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
+    const myId = getMyId();
 
-      // 🚨 2. [안전장치] 로컬스토리지가 비어있어도 에러 내지 않고 임시 데이터 생성
-      if (!user) {
-        const isMe = id === myId;
-        user = {
-          memberUuid: id,
-          name: isMe ? "내 아티스트 (Mock)" : "Unknown Artist",
-          displayName: isMe ? "Me" : undefined,
-          role: "ARTIST",
-        };
-      }
-
-      return {
-        id: user.memberUuid,
+    // 🚨 데이터가 없으면? 에러 내지 말고 그냥 가짜 데이터 리턴 (앱 죽음 방지)
+    if (!user) {
+      user = {
+        memberUuid: id,
+        name: "Mock Artist",
+        displayName: "임시 아티스트",
         role: "ARTIST",
-        name: user.displayName || user.name,
-        imageUrl: "",
-        bio: `${user.name} 작가의 프로필입니다. (Mock Data)`,
-        genre: "Painting",
-        contactEnabled: true,
-        contactUrl: "https://example.com",
-        followersCount: follows.filter((f) => f.to === id).length,
-        followingsCount: follows.filter((f) => f.from === id).length,
-        badges: DEFAULT_BADGES,
-        featuredBadgeIds: loadFeatured("ARTIST", id),
-        isFollowing: follows.some((f) => f.from === myId && f.to === id),
       };
     }
-    return httpGet<ArtistProfile>(`/api/artists/${id}`);
+
+    return {
+      id: user.memberUuid,
+      role: "ARTIST",
+      name: user.displayName || user.name,
+      imageUrl: "", // 이미지가 없으면 기본 이미지 들어감
+      bio: "이것은 도커 환경을 위한 임시 아티스트 프로필입니다.",
+      genre: "Painting",
+      contactEnabled: true,
+      contactUrl: "https://example.com",
+      followersCount: follows.filter((f) => f.to === id).length,
+      followingsCount: follows.filter((f) => f.from === id).length,
+      badges: DEFAULT_BADGES,
+      featuredBadgeIds: loadFeatured("ARTIST", id),
+      isFollowing: follows.some((f) => f.from === myId && f.to === id),
+    };
   },
 
+  // 2. 유저 프로필 조회
   getUserProfile: async (id: string): Promise<UserProfile> => {
-    if (USE_MOCK) {
-      const users = lsGet<StoredUser[]>(KEY_USERS, []);
-      let user = users.find((u) => u.memberUuid === id);
-      const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
-      const myId = getMyId();
+    const users = lsGet<StoredUser[]>(KEY_USERS, []);
+    let user = users.find((u) => u.memberUuid === id);
+    const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
+    const myId = getMyId();
 
-      // 🚨 2. [안전장치] 유저가 없어도 임시 데이터 생성
-      if (!user) {
-        const isMe = id === myId;
-        user = {
-          memberUuid: id,
-          name: isMe ? "내 유저 (Mock)" : "Unknown User",
-          role: "USER",
-        };
-      }
-
-      return {
-        id: user.memberUuid,
+    // 🚨 데이터 없으면 가짜 리턴
+    if (!user) {
+      user = {
+        memberUuid: id,
+        name: "Mock User",
         role: "USER",
-        name: user.name,
-        imageUrl: "",
-        bio: "Mock 유저 프로필입니다.",
-        followersCount: follows.filter((f) => f.to === id).length,
-        followingsCount: follows.filter((f) => f.from === id).length,
-        badges: DEFAULT_BADGES,
-        featuredBadgeIds: loadFeatured("USER", id),
-        isFollowing: follows.some((f) => f.from === myId && f.to === id),
       };
     }
-    return httpGet<UserProfile>(`/api/users/${id}`);
+
+    return {
+      id: user.memberUuid,
+      role: "USER",
+      name: user.name,
+      imageUrl: "",
+      bio: "이것은 도커 환경을 위한 임시 유저 프로필입니다.",
+      followersCount: follows.filter((f) => f.to === id).length,
+      followingsCount: follows.filter((f) => f.from === id).length,
+      badges: DEFAULT_BADGES,
+      featuredBadgeIds: loadFeatured("USER", id),
+      isFollowing: follows.some((f) => f.from === myId && f.to === id),
+    };
   },
 
+  // 3. 아티스트 피드 조회
   getArtistFeed: async (id: string, _cursor?: string | null) => {
-    if (USE_MOCK) {
-      const artworks = lsGet<StoredArtwork[]>(KEY_ARTWORKS, []);
-      const items: FeedItem[] = artworks
-        .filter((art) => art.authorId === id)
-        .map((art) => ({
-          id: art.id,
-          imageUrl: art.imageUrl || "https://picsum.photos/400",
-          createdAt: art.createdAt,
-        }));
-      return { items, nextCursor: null } as PageResult<FeedItem>;
-    }
-    return httpGet<PageResult<FeedItem>>(`/api/artists/${id}/feeds?cursor=${_cursor ?? ""}`);
+    const artworks = lsGet<StoredArtwork[]>(KEY_ARTWORKS, []);
+    
+    // 로컬 데이터 기반으로 매핑, 없으면 빈 배열
+    const items: FeedItem[] = artworks
+      .filter((art) => art.authorId === id)
+      .map((art) => ({
+        id: art.id,
+        imageUrl: art.imageUrl || "/art/a1.jpg", // 기본 이미지 안전장치
+        createdAt: art.createdAt,
+      }));
+
+    return { items, nextCursor: null } as PageResult<FeedItem>;
   },
 
+  // 4. 유저 피드 조회
   getUserFeed: async (id: string, _cursor?: string | null) => {
-    if (USE_MOCK) {
-      return { items: [], nextCursor: null } as PageResult<FeedItem>;
-    }
-    return httpGet<PageResult<FeedItem>>(`/api/users/${id}/feeds?cursor=${_cursor ?? ""}`);
+    // 유저 피드는 일단 빈 배열로 리턴 (에러 방지)
+    return { items: [], nextCursor: null } as PageResult<FeedItem>;
   },
 
+  // 5. 팔로우 (로컬 스토리지에만 저장)
   follow: async (targetId: string) => {
-    if (USE_MOCK) {
-      const myId = getMyId();
-      const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
-      if (!follows.some((f) => f.from === myId && f.to === targetId)) {
-        follows.push({ from: myId, to: targetId, createdAt: new Date().toISOString() });
-        lsSet(KEY_FOLLOWS, follows);
-      }
-      return;
+    const myId = getMyId();
+    const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
+    if (!follows.some((f) => f.from === myId && f.to === targetId)) {
+      follows.push({ from: myId, to: targetId, createdAt: new Date().toISOString() });
+      lsSet(KEY_FOLLOWS, follows);
     }
-    await fetch(`/api/follows/${targetId}`, { method: "POST", credentials: "include" });
+    return;
   },
 
+  // 6. 언팔로우 (로컬 스토리지에서만 삭제)
   unfollow: async (targetId: string) => {
-    if (USE_MOCK) {
-      const myId = getMyId();
-      const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
-      const nextFollows = follows.filter((f) => !(f.from === myId && f.to === targetId));
-      lsSet(KEY_FOLLOWS, nextFollows);
-      return;
-    }
-    await fetch(`/api/unfollows/${targetId}`, { method: "POST", credentials: "include" });
+    const myId = getMyId();
+    const follows = lsGet<FollowEdge[]>(KEY_FOLLOWS, []);
+    const nextFollows = follows.filter((f) => !(f.from === myId && f.to === targetId));
+    lsSet(KEY_FOLLOWS, nextFollows);
+    return;
   },
 
+  // 7. 질문하기 (콘솔만 찍고 성공 처리)
   submitQuestionToArtist: async (_artistId: string, _payload: { message: string }) => {
-    if (USE_MOCK) return;
-    await fetch(`/api/artists/${_artistId}/questions`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(_payload),
-    });
+    console.log("Mock 질문 전송 성공:", _payload);
+    return;
   },
 
+  // 8. 뱃지 설정 (로컬 스토리지에만 저장)
   updateFeaturedBadges: async (role: ProfileRole, profileId: string, badgeIds: string[]) => {
-    if (USE_MOCK) {
-      saveFeatured(role, profileId, badgeIds);
-      return;
-    }
-    await fetch(`/api/profiles/${profileId}/badges/featured`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ badgeIds }),
-    });
+    saveFeatured(role, profileId, badgeIds);
+    return;
   },
 };
