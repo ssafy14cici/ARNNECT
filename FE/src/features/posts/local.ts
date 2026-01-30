@@ -1,20 +1,22 @@
 // FE/src/features/posts/local.ts
-export type LocalMode = "ARTIST" | "USER";
+
+// 1️⃣ 타입 이름 변경 (Mode -> Role)
+export type LocalRole = "ARTIST" | "USER";
 
 export type LocalPost = {
   id: string;
-  mode: LocalMode; // ARTIST=작품, USER=리뷰
-  authorId: string;      // ✅ memberUuid
+  role: LocalRole; // 2️⃣ 속성명 변경: mode -> role
+  authorId: string;
   authorName: string;
 
   title: string;
   content: string;
 
-  imageUrl?: string;     // ✅ dataURL or "/art/a1.jpg"
+  imageUrl?: string;
   imageUrls?: string[];
 
   tags?: string[];
-  artworkId?: number;    // 리뷰면 연결용
+  artworkId?: number;
 
   createdAt: string;
 };
@@ -44,21 +46,23 @@ function writeAll(list: LocalPost[]) {
 export function subscribePostsUpdated(cb: () => void) {
   const h = () => cb();
   window.addEventListener(EVT, h);
-  window.addEventListener("storage", h); // 다른 탭 대비(선택)
+  window.addEventListener("storage", h);
   return () => {
     window.removeEventListener(EVT, h);
     window.removeEventListener("storage", h);
   };
 }
 
-export function listPosts(mode?: LocalMode) {
+// 3️⃣ 필터링 파라미터 및 로직 변경 (mode -> role)
+export function listPosts(role?: LocalRole) {
   const all = readAll();
-  return mode ? all.filter((p) => p.mode === mode) : all;
+  // 저장된 데이터에 role이 없을 경우(구버전 데이터) 대비 안전장치 추가 가능
+  return role ? all.filter((p) => p.role === role) : all;
 }
 
-export function listPostsByAuthor(authorId: string, mode?: LocalMode) {
+export function listPostsByAuthor(authorId: string, role?: LocalRole) {
   const all = readAll();
-  return all.filter((p) => p.authorId === authorId && (!mode || p.mode === mode));
+  return all.filter((p) => p.authorId === authorId && (!role || p.role === role));
 }
 
 export async function fileToDataUrl(file: File) {
@@ -70,8 +74,9 @@ export async function fileToDataUrl(file: File) {
   });
 }
 
+// 4️⃣ 생성 함수 파라미터 변경 (mode -> role)
 export async function createLocalPost(input: {
-  mode: LocalMode;
+  role: LocalRole; // 👈 여기가 중요합니다 (PostCreate와 일치)
   authorId: string;
   authorName: string;
   title: string;
@@ -85,7 +90,7 @@ export async function createLocalPost(input: {
 
   const post: LocalPost = {
     id: uid(),
-    mode: input.mode,
+    role: input.role, // 👈 저장할 때도 role 이름으로 저장
     authorId: input.authorId,
     authorName: input.authorName,
     title: input.title,

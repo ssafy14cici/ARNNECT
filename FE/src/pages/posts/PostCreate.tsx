@@ -77,7 +77,7 @@ export default function PostCreate({ mode }: Props) {
 
       if (isArtist) {
         await createLocalPost({
-          mode: "ARTIST",
+          role: "ARTIST", // 👈 기존 mode: "ARTIST" 에서 수정
           authorId,
           authorName,
           title: title.trim(),
@@ -93,7 +93,7 @@ export default function PostCreate({ mode }: Props) {
         });
       } else {
         await createLocalPost({
-          mode: "USER",
+          role: "USER", // 👈 기존 mode: "USER" 에서 수정
           authorId,
           authorName,
           title: reviewTitle.trim(),
@@ -113,6 +113,8 @@ export default function PostCreate({ mode }: Props) {
       setLoading(false);
     }
   };
+
+
 
   return (
     <div className={`post-create-page ${isArtist ? "theme-artist" : "theme-user"}`}>

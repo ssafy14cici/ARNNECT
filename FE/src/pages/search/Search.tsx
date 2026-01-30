@@ -2,7 +2,13 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "../../features/auth/store";
-import { artworks as rawArtworks } from "../../features/artwork/data";
+
+// 🔴 기존 정적 데이터 import 제거
+// import { artworks as rawArtworks } from "../../features/artwork/data";
+
+// 🟢 Feed와 동일하게 동적 데이터(listPosts) import
+import { listPosts } from "../../features/feed/mockData";
+
 import "./search.css";
 
 import gsap from "gsap";
@@ -21,6 +27,7 @@ type Sort = "latest" | "oldest" | "views";
 
 type Artwork = {
   id: string;
+  role: "ARTIST" | "USER";
   src: string;
   title?: string;
   artist?: string;
@@ -54,7 +61,8 @@ type Agg = {
   thumb: string;
 };
 
-const artworks = rawArtworks as unknown as Artwork[];
+// 🔴 전역변수 artworks 제거 (컴포넌트 내부에서 계산)
+// const artworks = rawArtworks as unknown as Artwork[];
 
 // --- Helper Functions ---
 function hashCode(str: string) {
@@ -123,6 +131,30 @@ export default function Search() {
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  // 🟢 데이터 로드: listPosts()를 사용하여 내 글 포함된 최신 데이터 가져오기
+  // location.key가 바뀔 때(페이지 진입 시) 다시 계산하여 로컬스토리지 최신화 반영
+  const artworks = useMemo<Artwork[]>(() => {
+    const posts = listPosts();
+    
+    return posts.map((p: any) => {
+      const img = (Array.isArray(p.imageUrls) ? p.imageUrls[0] : p.imageUrl) || "/art/a1.jpg";
+      
+      return {
+        id: p.id,
+        role: p.role, // 👈 FeedItem의 role("ARTIST" | "USER")을 그대로 가져옴
+        src: img,
+        thumbnail: img,
+        title: p.title,
+        artist: p.authorName,
+        uploader: p.authorId,
+        likes: p.likes ?? 0,
+        views: p.views ?? 0,
+        createdAt: p.createdAt,
+        tags: [], // Feed 데이터에 태그가 없다면 비워둠 (getTags 헬퍼가 자동 생성함)
+      };
+    });
+  }, [location.key]); // 페이지 이동 등으로 다시 마운트될 때 갱신
+
   const isLocked = useCallback((t: Tab) => (t === "tag" || t === "user") && !isLoggedIn, [isLoggedIn]);
 
   const onChangeTab = (t: Tab) => {
@@ -144,7 +176,7 @@ export default function Search() {
     return `${basePath}?${p.toString()}`;
   }, [basePath, sort]);
 
-  // URL Sync - Initial Load (set-state-in-effect 방지 위해 의존성 최소화)
+  // URL Sync - Initial Load
   useEffect(() => {
     const t = params.get("tab");
     const qq = params.get("q");
@@ -156,9 +188,9 @@ export default function Search() {
     if (s && (["latest", "oldest", "views"] as string[]).includes(s)) setSort(s as Sort);
     if (p) setPage(Number(p));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 마운트 시에만 한 번 실행
+  }, []);
 
-  // Update URL Params (Sync state to URL)
+  // Update URL Params
   useEffect(() => {
     const next = new URLSearchParams();
     next.set("tab", tab);
@@ -177,7 +209,7 @@ export default function Search() {
 
   const controlsDisabled = isLocked(tab);
 
-  // ✅ 1. 전체 데이터 필터링 & 정렬 (isLocked, makeHrefToArtworkSearch 의존성 추가)
+  // ✅ 1. 전체 데이터 필터링 & 정렬 (artworks 변수 사용)
   const allFilteredItems = useMemo<GalleryItem[]>(() => {
     if (isLocked(tab)) return [];
 
@@ -185,7 +217,10 @@ export default function Search() {
     const includes = (hay: string) => !term ? true : hay.toLowerCase().includes(term);
 
     if (tab === "artwork") {
-      let list = [...artworks];
+      // 🟢 여기서 role이 ARTIST인 것만 1차로 거릅니다.
+      // (만약 추후 'POST' 탭을 만든다면 거기서는 role === 'USER'로 필터링하면 됩니다)
+      let list = artworks.filter(a => a.role === "ARTIST");
+
       if (term) {
         list = list.filter((x) => {
           const tags = getTags(x).join(" ");
@@ -253,8 +288,9 @@ export default function Search() {
       metaRight: "",
       dateIso: sort === "oldest" ? x.oldestIso : x.latestIso,
     }));
-  }, [tab, q, sort, isLocked, makeHrefToArtworkSearch]);
+  }, [tab, q, sort, isLocked, makeHrefToArtworkSearch, artworks]); // artworks 의존성 추가
 
+  // ... (이하 렌더링 로직은 기존과 동일)
   const totalItems = allFilteredItems.length;
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
 
@@ -274,7 +310,6 @@ export default function Search() {
     }
   };
 
-  // GSAP & Lenis Setup (isLocked 의존성 추가 및 smooth 옵션 수정)
   useEffect(() => {
     if (isLocked(tab)) return;
     const grid = containerRef.current?.querySelector(".search-gallery-grid");
@@ -283,7 +318,6 @@ export default function Search() {
     const lenis = new Lenis({
       duration: 1.2,
       easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      // smooth: true 속성은 타입 정의에서 빠졌을 수 있으므로 lerp 사용 권장
       lerp: 0.1,
     });
 

@@ -1,81 +1,93 @@
-// FE/src/pages/feed/FeedDetail.tsx
 import { useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { bumpViews, getPostById } from "../../features/feed/mockData";
-import "./feed.css";
+import "./feedDetail.css"; // ✅ 새로운 CSS 파일 연결
 
 export default function FeedDetail() {
   const nav = useNavigate();
   const { id = "" } = useParams();
-
   const post = useMemo(() => (id ? getPostById(id) : null), [id]);
 
+  // 페이지 진입 시 스크롤 최상단 이동 & 조회수 증가
   useEffect(() => {
+    window.scrollTo(0, 0);
     if (post?.id) bumpViews(post.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post?.id]);
 
   if (!post) {
     return (
-      <div style={{ padding: 24 }}>
-        <button type="button" onClick={() => nav(-1)} style={{ marginBottom: 16 }}>
-          ← 뒤로
-        </button>
-        <div>게시물을 찾을 수 없습니다.</div>
+      <div className="feed-detail-page">
+        <div className="feed-error">
+          <p>게시물을 찾을 수 없습니다.</p>
+          <button className="back-btn" onClick={() => nav(-1)}>
+            ← Back to Feed
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 980, margin: "0 auto" }}>
-      <button type="button" onClick={() => nav(-1)} style={{ marginBottom: 16 }}>
-        ← 뒤로
-      </button>
+    <div className="feed-detail-page">
+      <div className="feed-detail-container">
+        
+        {/* 1. Navigation */}
+        <nav className="detail-nav">
+          <button className="back-btn" onClick={() => nav(-1)}>
+            &larr; BACK
+          </button>
+          <div className="detail-nav-right">
+            <span className="meta-views">VIEWS {post.views}</span>
+          </div>
+        </nav>
 
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
-        <h1 style={{ margin: 0 }}>{post.title}</h1>
-        <div style={{ opacity: 0.8, fontSize: 14 }}>
-          {post.role} · {post.createdAt.slice(0, 10)} · views {post.views}
-        </div>
+        {/* 2. Header (Title & Author) */}
+        <header className="detail-header fade-in-up">
+          <div className="detail-role-badge">{post.role}</div>
+          <h1 className="detail-title">{post.title}</h1>
+          
+          <div className="detail-author-row">
+            <span className="meta-date">{post.createdAt.slice(0, 10)}</span>
+            <span className="divider">|</span>
+            <button 
+              className="author-link" 
+              onClick={() => nav(`/profile/${post.authorId}`)}
+            >
+              Created by <span className="author-name">@{post.authorName}</span>
+            </button>
+          </div>
+        </header>
+
+        {/* 3. Hero Image */}
+        {post.imageUrls?.[0] && (
+          <figure className="detail-image-wrapper fade-in-up delay-1">
+            <img 
+              src={post.imageUrls[0]} 
+              alt={post.title} 
+              className="detail-image" 
+            />
+            {/* 이미지 하단 그라데이션 오버레이 (선택사항) */}
+            <div className="image-overlay"></div>
+          </figure>
+        )}
+
+        {/* 4. Content Body */}
+        <article className="detail-content fade-in-up delay-2">
+          <p>{post.content}</p>
+        </article>
+
+        {/* 5. Tags & Footer */}
+        {post.tags?.length ? (
+          <footer className="detail-footer fade-in-up delay-3">
+            <div className="tag-list">
+              {post.tags.map((t) => (
+                <span key={t} className="tag-item">#{t}</span>
+              ))}
+            </div>
+          </footer>
+        ) : null}
+        
       </div>
-
-      <div style={{ marginTop: 8, opacity: 0.9 }}>
-        <button type="button" onClick={() => nav(`/profile/${post.authorId}`)}>
-          @{post.authorName}
-        </button>
-      </div>
-
-      {post.imageUrls?.[0] && (
-        <div style={{ marginTop: 16 }}>
-          <img
-            src={post.imageUrls[0]}
-            alt=""
-            style={{ width: "100%", maxHeight: 520, objectFit: "cover", borderRadius: 16 }}
-          />
-        </div>
-      )}
-
-      <pre
-        style={{
-          marginTop: 16,
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-          lineHeight: 1.6,
-          opacity: 0.95,
-        }}
-      >
-        {post.content}
-      </pre>
-
-      {post.tags?.length ? (
-        <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {post.tags.map((t) => (
-            <span key={t} style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.15)" }}>
-              #{t}
-            </span>
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }

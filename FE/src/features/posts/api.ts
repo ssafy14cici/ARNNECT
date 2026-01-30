@@ -114,3 +114,6 @@ export async function createArtwork(data: ArtworkCreateReq) {
   const res = await http.post("/api/v1/artworks", fd);
   return res.data;
 }
+
+// ✅ legacy compat (features/feed/api.ts에서 참조)
+export const __mock = {} as any;

@@ -1,10 +1,11 @@
 // FE/src/pages/profile/tabs/FeedTab.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
+// ✅ LocalMode -> LocalRole로 변경된 타입 반영
 import {
   listPostsByAuthor,
   subscribePostsUpdated,
-  type LocalMode,
+  type LocalRole,
 } from "../../../features/posts/local";
 
 import { useAuthStore } from "../../../features/auth/store";
@@ -32,7 +33,8 @@ export default function FeedTab() {
     return rawProfileId;
   }, [rawProfileId, authUser?.memberUuid]);
 
-  const mode: LocalMode = useMemo(
+  // ✅ mode 변수명 및 타입을 role로 통일 (local.ts와 맞춤)
+  const role: LocalRole = useMemo(
     () => (profile.role === "ARTIST" ? "ARTIST" : "USER"),
     [profile.role],
   );
@@ -45,22 +47,28 @@ export default function FeedTab() {
   const items: GridItem[] = useMemo(() => {
     if (!effectiveProfileId) return [];
 
-    const posts = listPostsByAuthor(effectiveProfileId, mode);
+    // ✅ listPostsByAuthor 호출 시 role 전달
+    const posts = listPostsByAuthor(effectiveProfileId, role);
 
     return posts
-      .filter(
-        (p) => typeof p.imageUrl === "string" && p.imageUrl.trim().length > 0,
-      )
-      .map((p) => ({
-        id: p.id,
-        imageUrl: p.imageUrl!,
-        createdAt: p.createdAt ?? "",
-      }))
+      .map((p) => {
+        // ✅ [핵심 수정] 이미지가 배열(imageUrls)에 있든 문자열(imageUrl)에 있든 다 찾아냄
+        const img = (Array.isArray(p.imageUrls) ? p.imageUrls[0] : undefined) ?? p.imageUrl;
+        
+        return {
+          id: p.id,
+          imageUrl: img ?? "",
+          createdAt: p.createdAt ?? "",
+        };
+      })
+      // ✅ 이미지가 존재하는 것만 필터링 (빈 문자열 제외)
+      .filter((p) => p.imageUrl.trim().length > 0)
       .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
-  }, [effectiveProfileId, mode, tick]);
+  }, [effectiveProfileId, role, tick]);
 
   const goDetail = (contentId: string) => {
-    if (mode === "ARTIST") nav(`/artworks/${contentId}`);
+    // ✅ Role에 따라 상세 페이지 분기
+    if (role === "ARTIST") nav(`/artworks/${contentId}`);
     else nav(`/posts/${contentId}`);
   };
 
@@ -78,6 +86,7 @@ export default function FeedTab() {
               src={it.imageUrl}
               alt=""
               className="feed-img"
+              loading="lazy"
               onError={(e) => {
                 e.currentTarget.style.visibility = "hidden";
               }}

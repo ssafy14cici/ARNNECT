@@ -3,20 +3,16 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { FeedCard, type ViewMode } from "../../components/feed/FeedCard";
 import { useAuthStore } from "../../features/auth/store";
-import {
-  createPost,
-  listPosts,
-  setMe,
-  type PostRole,
-  ensureBaseSeedOnce as ensureBaseSeedOnceFeed, // ✅ alias로 충돌 방지
-} from "../../features/feed/mockData";
-
+import { listPosts, ensureBaseSeedOnce } from "../../features/feed/mockData";
 import "./feed.css";
-import { ensureBaseSeedOnce } from "../../features/feed/mockData";
-ensureBaseSeedOnce(60);
 
 
-const DETAIL_PATH = (id: string) => `/artworks/${id}`;
+ensureBaseSeedOnce();
+
+
+const ARTWORK_PATH = (id: string) => `/artworks/${id}`;
+const POST_PATH = (id: string) => `/posts/${id}`; 
+
 const PROFILE_PATH = (authorId: string) => `/profile/${authorId}`;
 
 export type FeedRole = "ARTIST" | "USER";
@@ -94,7 +90,6 @@ export default function Feed() {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
-  ensureBaseSeedOnceFeed(60);
 
 
   const me =
@@ -146,7 +141,14 @@ export default function Feed() {
     return () => observerRef.current?.disconnect();
   }, [hasMore]);
 
-  const goDetail = (id: string) => navigate(DETAIL_PATH(id));
+  const goDetail = (id: string, role: FeedRole) => {
+    if (role === "ARTIST") {
+      navigate(ARTWORK_PATH(id));
+    } else {
+      navigate(POST_PATH(id));
+    }
+  };
+
   const goProfile = (authorId: string) => navigate(PROFILE_PATH(authorId));
 
   return (
@@ -201,7 +203,8 @@ export default function Feed() {
             key={item.id}
             feed={item}
             viewMode={viewMode}
-            onClick={() => goDetail(item.id)}
+            // ✅ onClick에서 role을 확인하여 올바른 경로로 이동
+            onClick={() => goDetail(item.id, item.role)}
             onAuthorClick={(e) => {
               e?.stopPropagation?.();
               goProfile(item.authorId);
