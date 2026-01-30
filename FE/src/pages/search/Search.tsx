@@ -1,8 +1,8 @@
 // FE/src/pages/search/Search.tsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
-import { useAuthStore } from "../../stores/authStore";
-import { artworks as rawArtworks } from "../../data/artworks"; // 데이터 경로 확인 필요
+import { useAuthStore } from "../../features/auth/store";
+import { artworks as rawArtworks } from "../../features/artwork/data";
 import "./search.css";
 
 import gsap from "gsap";
@@ -57,18 +57,17 @@ type Agg = {
 const artworks = rawArtworks as unknown as Artwork[];
 
 // --- Helper Functions ---
-function formatDate(iso?: string) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("ko-KR");
-}
-
 function hashCode(str: string) {
   let h = 0;
   for (let i = 0; i < str.length; i++) h = (h << 5) - h + str.charCodeAt(i);
   return Math.abs(h);
 }
 
-const TAG_POOL = ["회화", "드로잉", "사진", "조각", "추상", "인물", "풍경", "모노톤", "컬러풀", "미니멀"];
+const TAG_POOL = [
+  "회화", "드로잉", "사진", "조각", "추상",
+  "인물", "풍경", "모노톤", "컬러풀", "미니멀",
+];
+
 function genTags(seed: string) {
   const h = hashCode(seed);
   return [TAG_POOL[h % TAG_POOL.length]];
@@ -119,25 +118,33 @@ export default function Search() {
   const [tab, setTab] = useState<Tab>("artwork");
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<Sort>("latest");
-  const [page, setPage] = useState(1); // 페이지네이션 상태
+  const [page, setPage] = useState(1);
   const [isFocused, setIsFocused] = useState(false);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const isLocked = (t: Tab) => (t === "tag" || t === "user") && !isLoggedIn;
+  const isLocked = useCallback((t: Tab) => (t === "tag" || t === "user") && !isLoggedIn, [isLoggedIn]);
 
   const onChangeTab = (t: Tab) => {
     if (isLocked(t)) return;
     setTab(t);
-    setPage(1); // 탭 변경 시 1페이지로
+    setPage(1);
   };
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setPage(1); // 검색 시 1페이지로
+    setPage(1);
   };
 
-  // URL Sync
+  const makeHrefToArtworkSearch = useCallback((term: string) => {
+    const p = new URLSearchParams();
+    p.set("tab", "artwork");
+    p.set("sort", sort);
+    if (term) p.set("q", term);
+    return `${basePath}?${p.toString()}`;
+  }, [basePath, sort]);
+
+  // URL Sync - Initial Load (set-state-in-effect 방지 위해 의존성 최소화)
   useEffect(() => {
     const t = params.get("tab");
     const qq = params.get("q");
@@ -145,11 +152,13 @@ export default function Search() {
     const p = params.get("page");
 
     if (t && (TABS as string[]).includes(t)) setTab(t as Tab);
-    if (qq != null) setQ(qq);
+    if (qq !== null) setQ(qq);
     if (s && (["latest", "oldest", "views"] as string[]).includes(s)) setSort(s as Sort);
     if (p) setPage(Number(p));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 마운트 시에만 한 번 실행
 
+  // Update URL Params (Sync state to URL)
   useEffect(() => {
     const next = new URLSearchParams();
     next.set("tab", tab);
@@ -168,25 +177,15 @@ export default function Search() {
 
   const controlsDisabled = isLocked(tab);
 
-  const makeHrefToArtworkSearch = (term: string) => {
-    const p = new URLSearchParams();
-    p.set("tab", "artwork");
-    p.set("sort", sort);
-    if (term) p.set("q", term);
-    return `${basePath}?${p.toString()}`;
-  };
-
-  // ✅ 1. 전체 데이터 필터링 & 정렬 (Pagination 전 단계)
+  // ✅ 1. 전체 데이터 필터링 & 정렬 (isLocked, makeHrefToArtworkSearch 의존성 추가)
   const allFilteredItems = useMemo<GalleryItem[]>(() => {
     if (isLocked(tab)) return [];
 
     const term = q.trim().toLowerCase();
-    const includes = (hay: string) => (!term ? true : hay.toLowerCase().includes(term));
+    const includes = (hay: string) => !term ? true : hay.toLowerCase().includes(term);
 
-    // Case A: Artwork Tab
     if (tab === "artwork") {
       let list = [...artworks];
-
       if (term) {
         list = list.filter((x) => {
           const tags = getTags(x).join(" ");
@@ -197,9 +196,9 @@ export default function Search() {
       }
 
       if (sort === "latest") {
-        list.sort((a, b) => (toMs(b.createdAt) ?? Number.NEGATIVE_INFINITY) - (toMs(a.createdAt) ?? Number.NEGATIVE_INFINITY));
+        list.sort((a, b) => (toMs(b.createdAt) ?? -Infinity) - (toMs(a.createdAt) ?? -Infinity));
       } else if (sort === "oldest") {
-        list.sort((a, b) => (toMs(a.createdAt) ?? Number.POSITIVE_INFINITY) - (toMs(b.createdAt) ?? Number.POSITIVE_INFINITY));
+        list.sort((a, b) => (toMs(a.createdAt) ?? Infinity) - (toMs(b.createdAt) ?? Infinity));
       } else {
         list.sort((a, b) => (b.views ?? 0) - (a.views ?? 0));
       }
@@ -215,47 +214,28 @@ export default function Search() {
       }));
     }
 
-    // Case B: Aggregation Tabs (Artist, Tag, User)
     const map = new Map<string, Agg>();
-
     for (const a of artworks) {
       const createdMs = toMs(a.createdAt);
       const thumb = a.thumbnail ?? a.src;
       const views = a.views ?? 0;
       const likes = a.likes ?? 0;
 
-      const keys =
-        tab === "artist"
-          ? [a.artist ?? "Unknown"]
-          : tab === "tag"
-            ? getTags(a).map((t) => t.trim()).filter(Boolean)
-            : [getUploader(a)];
+      const keys = tab === "artist" ? [a.artist ?? "Unknown"] : tab === "tag" ? getTags(a).map(t => t.trim()).filter(Boolean) : [getUploader(a)];
 
       for (const key of keys) {
         if (!key) continue;
         const prev = map.get(key);
         if (!prev) {
-          map.set(key, {
-            name: key, count: 1, totalViews: views, totalLikes: likes,
-            latestAtMs: createdMs, oldestAtMs: createdMs,
-            latestIso: a.createdAt, oldestIso: a.createdAt, thumb,
-          });
+          map.set(key, { name: key, count: 1, totalViews: views, totalLikes: likes, latestAtMs: createdMs, oldestAtMs: createdMs, latestIso: a.createdAt, oldestIso: a.createdAt, thumb });
           continue;
         }
         prev.count += 1;
         prev.totalViews += views;
         prev.totalLikes += likes;
-
         if (createdMs != null) {
-          if (prev.latestAtMs == null || createdMs > prev.latestAtMs) {
-            prev.latestAtMs = createdMs;
-            prev.latestIso = a.createdAt;
-            prev.thumb = thumb;
-          }
-          if (prev.oldestAtMs == null || createdMs < prev.oldestAtMs) {
-            prev.oldestAtMs = createdMs;
-            prev.oldestIso = a.createdAt;
-          }
+          if (prev.latestAtMs == null || createdMs > prev.latestAtMs) { prev.latestAtMs = createdMs; prev.latestIso = a.createdAt; prev.thumb = thumb; }
+          if (prev.oldestAtMs == null || createdMs < prev.oldestAtMs) { prev.oldestAtMs = createdMs; prev.oldestIso = a.createdAt; }
         }
       }
     }
@@ -273,23 +253,20 @@ export default function Search() {
       metaRight: "",
       dateIso: sort === "oldest" ? x.oldestIso : x.latestIso,
     }));
-  }, [tab, q, sort, isLoggedIn, basePath]);
+  }, [tab, q, sort, isLocked, makeHrefToArtworkSearch]);
 
-  // ✅ 2. Pagination Calculation
   const totalItems = allFilteredItems.length;
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
-  
+
   const currentItems = useMemo(() => {
     const start = (page - 1) * ITEMS_PER_PAGE;
     return allFilteredItems.slice(start, start + ITEMS_PER_PAGE);
   }, [allFilteredItems, page]);
 
-  // ✅ 3. Grid Columns Distribution (Current Page Only)
   const col1 = useMemo(() => currentItems.filter((_, i) => i % 3 === 0), [currentItems]);
   const col2 = useMemo(() => currentItems.filter((_, i) => i % 3 === 1), [currentItems]);
   const col3 = useMemo(() => currentItems.filter((_, i) => i % 3 === 2), [currentItems]);
 
-  // Page Change Handler
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setPage(newPage);
@@ -297,7 +274,7 @@ export default function Search() {
     }
   };
 
-  // GSAP & Lenis Setup
+  // GSAP & Lenis Setup (isLocked 의존성 추가 및 smooth 옵션 수정)
   useEffect(() => {
     if (isLocked(tab)) return;
     const grid = containerRef.current?.querySelector(".search-gallery-grid");
@@ -306,7 +283,8 @@ export default function Search() {
     const lenis = new Lenis({
       duration: 1.2,
       easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      smooth: true,
+      // smooth: true 속성은 타입 정의에서 빠졌을 수 있으므로 lerp 사용 권장
+      lerp: 0.1,
     });
 
     lenis.on("scroll", ScrollTrigger.update);
@@ -319,16 +297,31 @@ export default function Search() {
 
     const ctx = gsap.context(() => {
       gsap.to(".search-col-2", {
-        yPercent: 15, ease: "none",
-        scrollTrigger: { trigger: ".search-gallery-grid", start: "top top", end: "bottom bottom", scrub: true },
+        yPercent: 15,
+        ease: "none",
+        scrollTrigger: {
+          trigger: ".search-gallery-grid",
+          start: "top top",
+          end: "bottom bottom",
+          scrub: true,
+        },
       });
       gsap.to(".search-col-1, .search-col-3", {
-        yPercent: -10, ease: "none",
-        scrollTrigger: { trigger: ".search-gallery-grid", start: "top top", end: "bottom bottom", scrub: true },
+        yPercent: -10,
+        ease: "none",
+        scrollTrigger: {
+          trigger: ".search-gallery-grid",
+          start: "top top",
+          end: "bottom bottom",
+          scrub: true,
+        },
       });
-      // Fade In Animation for Items
       gsap.from(".search-card", {
-        y: 60, opacity: 0, duration: 1, stagger: 0.05, ease: "power3.out",
+        y: 60,
+        opacity: 0,
+        duration: 1,
+        stagger: 0.05,
+        ease: "power3.out",
       });
     }, containerRef);
 
@@ -337,7 +330,7 @@ export default function Search() {
       lenis.destroy();
       ctx.revert();
     };
-  }, [tab, isLoggedIn, currentItems]); // currentItems 변경 시 애니메이션 리셋
+  }, [tab, isLocked, currentItems]);
 
   const renderCol = (colClass: string, items: GalleryItem[]) => (
     <div className={`search-gallery-col ${colClass}`}>
@@ -345,9 +338,7 @@ export default function Search() {
         <Link to={it.href} key={it.key} className="search-card">
           <div className="search-card-media">
             <img src={it.thumb} alt={it.title} loading="lazy" />
-            <div className="search-card-overlay">
-              <span className="view-btn">View Detail</span>
-            </div>
+            <div className="search-card-overlay"><span className="view-btn">View Detail</span></div>
           </div>
           <div className="search-card-info">
             <h3 className="card-title">{it.title}</h3>
@@ -360,7 +351,6 @@ export default function Search() {
 
   return (
     <div className="search-page" ref={containerRef}>
-      {/* 1. Header Area */}
       <header className={`search-header ${isFocused ? "focused" : ""}`}>
         <div className="search-container">
           <form className="search-input-wrapper" onSubmit={onSubmit}>
@@ -376,7 +366,7 @@ export default function Search() {
             />
             <button type="submit" className="search-icon-btn" disabled={controlsDisabled}>
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z"/>
+                <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" />
               </svg>
             </button>
           </form>
@@ -397,14 +387,8 @@ export default function Search() {
                 );
               })}
             </nav>
-
             <div className="search-sort">
-              <select 
-                value={sort} 
-                onChange={(e) => setSort(e.target.value as Sort)} 
-                disabled={controlsDisabled}
-                className="sort-select"
-              >
+              <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} disabled={controlsDisabled} className="sort-select">
                 <option value="latest">Latest</option>
                 <option value="oldest">Oldest</option>
                 <option value="views">Popular</option>
@@ -414,59 +398,28 @@ export default function Search() {
         </div>
       </header>
 
-      {/* 2. Results Body */}
       <main className="search-body">
         {isLocked(tab) ? (
-          <div className="search-empty">
-            <p>Please log in to search by {tab}.</p>
-          </div>
+          <div className="search-empty"><p>Please log in to search by {tab}.</p></div>
         ) : totalItems === 0 ? (
-          <div className="search-empty">
-            <p>No results found.</p>
-          </div>
+          <div className="search-empty"><p>No results found.</p></div>
         ) : (
           <>
-            {/* Grid */}
             <div className="search-gallery-grid">
               {renderCol("search-col-1", col1)}
               {renderCol("search-col-2", col2)}
               {renderCol("search-col-3", col3)}
             </div>
 
-            {/* Pagination Controls */}
             {totalPages > 1 && (
               <div className="search-pagination">
-                <button 
-                  className="page-control-btn" 
-                  disabled={page === 1}
-                  onClick={() => handlePageChange(page - 1)}
-                >
-                  &larr; Prev
-                </button>
-                
+                <button className="page-control-btn" disabled={page === 1} onClick={() => handlePageChange(page - 1)}>&larr; Prev</button>
                 <div className="page-numbers">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
-                    // 페이지가 너무 많을 경우 생략 로직이 필요할 수 있으나, 여기선 전체 표시 (또는 간단히 5개만 표시 등)
-                    // MVP: 최대 10페이지 정도면 그냥 다 보여줌
-                    return (
-                      <button
-                        key={p}
-                        className={`page-number-btn ${p === page ? "active" : ""}`}
-                        onClick={() => handlePageChange(p)}
-                      >
-                        {p}
-                      </button>
-                    );
-                  })}
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                    <button key={p} className={`page-number-btn ${p === page ? "active" : ""}`} onClick={() => handlePageChange(p)}>{p}</button>
+                  ))}
                 </div>
-
-                <button 
-                  className="page-control-btn" 
-                  disabled={page === totalPages}
-                  onClick={() => handlePageChange(page + 1)}
-                >
-                  Next &rarr;
-                </button>
+                <button className="page-control-btn" disabled={page === totalPages} onClick={() => handlePageChange(page + 1)}>Next &rarr;</button>
               </div>
             )}
           </>

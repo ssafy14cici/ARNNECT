@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Link, useRouteError } from "react-router-dom"; // 라우터 에러 핸들링 시 필요
+import { Link} from "react-router-dom"; // 라우터 에러 핸들링 시 필요
 import "./notfound.css";
 
 type Props = {

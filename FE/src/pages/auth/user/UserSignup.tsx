@@ -5,9 +5,8 @@ import "./usersignup.css"; // CSS 파일명 확인
 import Step1Account from "./UserStep1Account";
 import SignupPreviewCard from "./UserSignupPreviewCard";
 import StepConsent from "./UserStep2Consent";
-
-import { apiSignupUser } from "../../../api/auth";
-import { validateAccountStep, validateConsent, maskPw, type AccountStepValue } from "../utils/validation";
+import { apiSignupUser } from "../../../features/auth/api";
+import { validateAccountStep, validateConsent, type AccountStepValue } from "../utils/validation";
 import { checkEmailDupMock } from "../utils/emailDupCheck";
 
 export default function UserSignup({ onBack }: { onBack: () => void }) {

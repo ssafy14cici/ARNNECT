@@ -53,6 +53,7 @@ npm run preview
 라우팅/상태관리 세팅을 위해 아래 패키지를 설치합니다.
 
 ```bash
+npm i axios
 npm i react-router-dom zustand
 npm i gsap @studio-freight/lenis
 npm i react-qr-code @zxing/browser

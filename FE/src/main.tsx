@@ -2,15 +2,18 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
-import { router } from "./router";
+import { router } from "./app/router/routes";
 import "./styles/global.css";
+import { useAuthStore } from "./features/auth/store";
 
-// ✅ 추가
-import { seedMockAccounts } from "./mocks/authMock";
+if (import.meta.env.DEV) {
+  (window as any).__auth = useAuthStore; // 콘솔에서 __auth.getState() 가능
+}
 
-// ✅ 백엔드 미연결 기간엔 기본 true 유지 추천
-const USE_MOCK = import.meta.env.VITE_USE_MOCK_AUTH !== "false";
-if (USE_MOCK) seedMockAccounts();
+
+import { seedMockDB } from "./mocks"; // ✅
+const USE_MOCK = import.meta.env.VITE_USE_MOCK !== "false";
+if (USE_MOCK) seedMockDB();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

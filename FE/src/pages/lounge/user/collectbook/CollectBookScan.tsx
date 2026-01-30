@@ -5,8 +5,8 @@ import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser"
 import type { Result } from "@zxing/library";
 import { NotFoundException } from "@zxing/library";
 import "../../lounge.css";
-import { addCollectBookItem } from "../../../../utils/collectbookStorage";
-import { getExhibitionByCode, redeemTicket } from "../../../../api/tickets";
+import { addCollectBookItem } from "../../../../features/collectbook/storage";
+import { getExhibitionByCode, redeemTicket } from "../../../../features/tickets/api";
 
 // TODO(BE 연동):
 // - redeemTicket은 의미상 collectbook 도메인이라 api/collectbook.ts로 옮기는 게 깔끔함.

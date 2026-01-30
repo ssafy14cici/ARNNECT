@@ -1,5 +1,5 @@
 // src/pages/auth/_utils/emailDupCheck.ts
-import { apiCheckEmailDup } from "../../../api/auth";
+import { apiCheckEmailDup } from "../../../features/auth/api";
 
 // UI에서 쓰기 편한 형태로 래핑
 export type EmailDupCheckResult = {

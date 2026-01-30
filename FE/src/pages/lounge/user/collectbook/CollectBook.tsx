@@ -7,7 +7,7 @@ import "../../lounge.css";
 import TicketCardModern from "./TicketCardModern";
 import "./ticketCardModern.css";
 
-import { getCollectBookItems } from "../../../../utils/collectbookStorage";
+import { getCollectBookItems } from "../../../../features/collectbook/storage";
 
 const STUB_COLORS = ["#8FB2D9", "#E9A9B0", "#D7C08A", "#9FD3C7", "#B7A6F6"];
 

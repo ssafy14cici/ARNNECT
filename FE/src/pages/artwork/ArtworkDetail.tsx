@@ -1,14 +1,18 @@
 //FE/src/pages/artwork/ArtworkDetail.tsx
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-// @ts-ignore
-import { artworks } from "../../data/artworks";
+import { artworks } from "../../features/artwork/data";
 
 import "./artworkDetail.css";
 
-import { useAuthStore } from "../../stores/authStore";
+import { useAuthStore } from "../../features/auth/store";
 import { ArtworkDetailView } from "./ArtworkDetailView";
-import { findArtworkById, getMockArtworkData, type Comment, type ArtworkBase } from "./artworkDetail.helpers";
+import {
+  findArtworkById,
+  getMockArtworkData,
+  type Comment,
+  type ArtworkBase,
+} from "../../features/artwork/helpers";
 
 export const PROFILE_PATH = (authorId: string) => `/profile/${authorId}`;
 
@@ -29,9 +33,15 @@ export default function ArtworkDetail() {
 
   const ARTWORKS = artworks as unknown as readonly ArtworkBase[];
 
-  const baseArtwork = useMemo(() => findArtworkById(ARTWORKS, id), [ARTWORKS, id]);
+  const baseArtwork = useMemo(
+    () => findArtworkById(ARTWORKS, id),
+    [ARTWORKS, id],
+  );
 
-  const artwork = useMemo(() => (baseArtwork ? getMockArtworkData(baseArtwork) : null), [baseArtwork]);
+  const artwork = useMemo(
+    () => (baseArtwork ? getMockArtworkData(baseArtwork) : null),
+    [baseArtwork],
+  );
 
   const similarArtworks = useMemo(() => {
     if (!artwork) return [];
@@ -71,8 +81,8 @@ export default function ArtworkDetail() {
       return;
     }
 
-    const authorId = user?.memberUuid ?? "me";   // ✅ user 없으면 /profile/me 로
-    const authorName = user?.name ?? "나";      // ✅ user 없으면 임시 표시
+    const authorId = user?.memberUuid ?? "me"; // ✅ user 없으면 /profile/me 로
+    const authorName = user?.name ?? "나"; // ✅ user 없으면 임시 표시
 
     setComments((prev) => [
       ...prev,
@@ -109,18 +119,20 @@ export default function ArtworkDetail() {
     ]);
   };
 
-
-  
   const deleteComment = (commentId: string) => {
     if (window.confirm("삭제하시겠습니까?")) {
-      setComments((prev) => prev.filter((c) => c.id !== commentId && c.parentId !== commentId));
+      setComments((prev) =>
+        prev.filter((c) => c.id !== commentId && c.parentId !== commentId),
+      );
     }
   };
 
   const updateComment = (commentId: string, newContent: string) => {
     const value = newContent.trim();
     if (!value) return; // 빈 값 저장 방지
-    setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, content: value } : c)));
+    setComments((prev) =>
+      prev.map((c) => (c.id === commentId ? { ...c, content: value } : c)),
+    );
   };
 
   const goHome = () => navigate("/");
