@@ -164,29 +164,79 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   requestAnimationFrame(() => ui.setState("ready"));
   opts.onReady?.(computedPose);
 
-  // 루프(약한 패럴럭스)
+  // 루프(마우스에 따른 "살짝 둘러보기": look + tiny orbit parallax)
   let alive = true;
   let raf = 0;
   let isEntering = false;
 
-  const pointer = { x: 0, y: 0 };
+  // pointer: target(즉시 입력) / smooth(감쇠 적용)
+  const pointerT = { x: 0, y: 0 };
+  const pointerS = { x: 0, y: 0 };
+
   const onMove = (e: PointerEvent) => {
-    pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
-    pointer.y = (e.clientY / window.innerHeight) * 2 - 1;
+    const nx = (e.clientX / window.innerWidth) * 2 - 1; // -1..1
+    const ny = (e.clientY / window.innerHeight) * 2 - 1; // top=-1, bottom=+1
+    pointerT.x = clamp(nx, -1, 1);
+    // 위로 올리면 +가 되도록 뒤집어줌
+    pointerT.y = clamp(-ny, -1, 1);
   };
   window.addEventListener("pointermove", onMove, { passive: true });
 
   const basePos = new THREE.Vector3(...computedPose.position);
   const baseTarget = new THREE.Vector3(...computedPose.target);
 
+  const tmpForward = new THREE.Vector3();
+  const tmpRight = new THREE.Vector3();
+  const tmpUp = new THREE.Vector3();
+  const tmpPos = new THREE.Vector3();
+  const tmpTgt = new THREE.Vector3();
+
   const tick = () => {
     if (!alive) return;
 
-    const wobble = isEntering ? 0 : 0.12;
-    const t = baseTarget.clone().add(new THREE.Vector3(pointer.x * wobble, -pointer.y * wobble, 0));
+    // entering 중엔 흔들림/오비트 꺼서 깔끔하게
+    const active = isEntering ? 0 : 1;
 
-    camera.position.copy(basePos);
-    camera.lookAt(t);
+    // damping (값 올리면 더 즉각적, 내리면 더 부드러움)
+    const DAMP = 0.10;
+    pointerS.x = lerp(pointerS.x, pointerT.x, DAMP);
+    pointerS.y = lerp(pointerS.y, pointerT.y, DAMP);
+
+    // 거리 기반 스케일링: 모델 크기/카메라 거리 달라도 "항상 살짝"로 유지
+    const dist = basePos.distanceTo(baseTarget);
+
+    // ✅ “주변을 살짝 볼 수” 있게 만드는 핵심 파라미터
+    // - ORBIT: 카메라 위치 자체를 미세 이동(패럴럭스)
+    // - LOOK : 시선(target)을 미세 이동(고개 돌리기)
+    const ORBIT = clamp(dist * 0.035, 0.03, dist * 0.08) * active; // 3.5% 정도
+    const LOOK = clamp(dist * 0.020, 0.02, dist * 0.06) * active;  // 2% 정도
+
+    // basis vectors (basePos->baseTarget 기준)
+    tmpForward.copy(baseTarget).sub(basePos);
+    if (tmpForward.lengthSq() < 1e-8) tmpForward.set(0, 0, -1);
+    tmpForward.normalize();
+
+    tmpRight.crossVectors(tmpForward, camera.up);
+    if (tmpRight.lengthSq() < 1e-8) tmpRight.set(1, 0, 0);
+    tmpRight.normalize();
+
+    tmpUp.crossVectors(tmpRight, tmpForward);
+    if (tmpUp.lengthSq() < 1e-8) tmpUp.set(0, 1, 0);
+    tmpUp.normalize();
+
+    // camera position: basePos + right/up 오프셋(패럴럭스)
+    tmpPos.copy(basePos)
+      .addScaledVector(tmpRight, pointerS.x * ORBIT)
+      .addScaledVector(tmpUp, pointerS.y * ORBIT);
+
+    camera.position.copy(tmpPos);
+
+    // look target: baseTarget + right/up 오프셋(고개 돌리기)
+    tmpTgt.copy(baseTarget)
+      .addScaledVector(tmpRight, pointerS.x * LOOK)
+      .addScaledVector(tmpUp, pointerS.y * LOOK);
+
+    camera.lookAt(tmpTgt);
 
     renderer.render(scene, camera);
     raf = requestAnimationFrame(tick);
@@ -340,6 +390,10 @@ async function loadHdriWithPmrem(renderer: THREE.WebGLRenderer, url: string) {
 
 function clamp(v: number, a: number, b: number) {
   return Math.max(a, Math.min(b, v));
+}
+
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t;
 }
 
 /* ---------- helpers ---------- */

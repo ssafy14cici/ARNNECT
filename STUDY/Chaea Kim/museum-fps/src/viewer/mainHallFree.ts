@@ -17,23 +17,25 @@ type Mode = "NAV" | "FREE";
 type ArtworkItem = {
   id: number;
   artist: string;
-  artworkTitle: string; // 임시
+  artworkTitle: string;
   imageUrl: string;
-  // 블렌더에서 만든 아트 plane 이름 (ART_1 ~ ART_6)
-  anchorName: string;
+  anchorName: string; // ART_1 ~ ART_6
+  wpId?: number; // (선택) 수동 웨이포인트 고정
 };
 
 type LogoAttachOptions = {
-  wallName: string; // 벽 mesh 이름
-  imageUrl: string; // public/logo/...
-  widthM: number; // meters
-  heightM: number; // meters
-  offsetM: number; // 벽에서 살짝 띄우기
+  wallName: string;
+  imageUrl: string;
+  widthM: number;
+  heightM: number;
+  offsetM: number;
 };
 
 export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {}) {
   const glbUrl = opts.glbUrl ?? `${import.meta.env.BASE_URL}models/main_hall1.glb`;
   const NAV_SIZE = opts.navSizePx ?? 68;
+
+  const ORIGIN_ID = 0;
 
   /* Renderer */
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
@@ -45,8 +47,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
   applyGalleryLighting(scene, renderer, { exposure: 1.35, background: "#0f0f0f" });
 
-  // ✅ 시작 포즈(너가 원하는 pos)
-  // yaw/pitch는 WAYPOINTS[0] 기준 유지(원하면 여기서도 바꿔도 됨)
+  // 시작 포즈
   const START = WAYPOINTS[0]?.pose ?? { pos: [0, 10, 50], yaw: 0, pitch: 0 };
   camera.position.set(0.9291789044332271, 14.956010437011718, 84.5461687224954);
   camera.rotation.set(START.pitch ?? 0, START.yaw ?? 0, 0, "YXZ");
@@ -96,56 +97,57 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     overlayTimer = window.setTimeout(() => (overlay.style.opacity = "0"), 750);
   }
 
-  /* Modal (작품 클릭 안내 + 버튼) */
-  const modal = document.createElement("div");
-  modal.style.position = "fixed";
-  modal.style.left = "50%";
-  modal.style.top = "50%";
-  modal.style.transform = "translate(-50%,-50%)";
-  modal.style.padding = "18px 18px";
-  modal.style.borderRadius = "16px";
-  modal.style.background = "rgba(0,0,0,0.72)";
-  modal.style.border = "1px solid rgba(255,255,255,0.22)";
-  modal.style.color = "rgba(255,255,255,0.92)";
-  modal.style.fontFamily = "ui-sans-serif, system-ui, -apple-system, Segoe UI";
-  modal.style.fontSize = "16px";
-  modal.style.fontWeight = "650";
-  modal.style.boxShadow = "0 20px 60px rgba(0,0,0,0.45)";
-  modal.style.backdropFilter = "blur(10px)";
-  modal.style.display = "none";
-  modal.style.zIndex = "10000";
-  modal.style.minWidth = "280px";
-  modal.style.textAlign = "center";
-  document.body.appendChild(modal);
+  /* ===== "원점(=0번)으로" 버튼 ===== */
+  const backBtn = document.createElement("button");
+  backBtn.type = "button";
+  backBtn.textContent = "↩ 원점으로 돌아가기";
+  backBtn.style.position = "fixed";
+  backBtn.style.left = "50%";
+  backBtn.style.bottom = "28px";
+  backBtn.style.transform = "translateX(-50%)";
+  backBtn.style.padding = "12px 16px";
+  backBtn.style.borderRadius = "999px";
+  backBtn.style.border = "1px solid rgba(255,255,255,0.28)";
+  backBtn.style.background = "rgba(0,0,0,0.35)";
+  backBtn.style.backdropFilter = "blur(8px)";
+  backBtn.style.color = "rgba(255,255,255,0.92)";
+  backBtn.style.fontFamily = "ui-sans-serif, system-ui, -apple-system, Segoe UI";
+  backBtn.style.fontSize = "15px";
+  backBtn.style.fontWeight = "800";
+  backBtn.style.cursor = "pointer";
+  backBtn.style.zIndex = "9999";
+  backBtn.style.display = "none";
+  backBtn.style.transition = "transform 120ms ease, background 120ms ease, opacity 120ms ease";
+  backBtn.style.opacity = "0.92";
 
-  const modalText = document.createElement("div");
-  modalText.style.marginBottom = "12px";
-  modal.appendChild(modalText);
-
-  const modalBtn = document.createElement("button");
-  modalBtn.type = "button";
-  modalBtn.textContent = "예술가 프로필 바로가기";
-  modalBtn.style.width = "100%";
-  modalBtn.style.padding = "10px 12px";
-  modalBtn.style.borderRadius = "12px";
-  modalBtn.style.border = "1px solid rgba(255,255,255,0.28)";
-  modalBtn.style.background = "rgba(255,255,255,0.10)";
-  modalBtn.style.color = "rgba(255,255,255,0.92)";
-  modalBtn.style.cursor = "pointer";
-  modalBtn.style.fontWeight = "750";
-  modalBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    // 링크 연결은 나중에
-    modal.style.display = "none";
+  backBtn.addEventListener("mouseenter", () => {
+    backBtn.style.background = "rgba(0,0,0,0.48)";
+    backBtn.style.transform = "translateX(-50%) scale(1.04)";
   });
-  modal.appendChild(modalBtn);
+  backBtn.addEventListener("mouseleave", () => {
+    backBtn.style.background = "rgba(0,0,0,0.35)";
+    backBtn.style.transform = "translateX(-50%) scale(1)";
+  });
 
-  let modalTimer: number | null = null;
-  function showArtworkModal(artist: string, artworkTitle: string) {
-    modalText.textContent = `이 작품은 "${artist}"의 "${artworkTitle}"입니다`;
-    modal.style.display = "block";
-    if (modalTimer) window.clearTimeout(modalTimer);
-    modalTimer = window.setTimeout(() => (modal.style.display = "none"), 2000);
+  // pointer lock 방해 방지
+  backBtn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  document.body.appendChild(backBtn);
+
+  function setBackBtnVisible(v: boolean) {
+    backBtn.style.display = v ? "inline-flex" : "none";
+    backBtn.disabled = false;
+    backBtn.textContent = "↩ 원점으로 돌아가기";
+    backBtn.style.opacity = v ? "0.92" : "0";
+  }
+
+  function setBackBtnBusy(v: boolean) {
+    backBtn.disabled = v;
+    backBtn.textContent = v ? "원점으로 이동 중…" : "↩ 원점으로 돌아가기";
+    backBtn.style.opacity = v ? "0.85" : "0.92";
   }
 
   /* Nav UI */
@@ -192,7 +194,6 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       btn.style.transform = "translateY(-50%) scale(1)";
     });
 
-    // pointerlock 방해 방지
     btn.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -222,6 +223,57 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
         pitch: e.x,
       })
     );
+  }
+
+  /* ===== NAV wobble (cursor-follow) : rotation-only, no position 영향 ===== */
+  const pointerT = new THREE.Vector2(0, 0);
+  const pointerS = new THREE.Vector2(0, 0);
+
+  // “적당히 아주 조금”
+  const WOBBLE_YAW = 0.055; // rad
+  const WOBBLE_PITCH = 0.035; // rad
+  const WOBBLE_DAMP = 0.10;
+
+  // 이전 프레임에 적용한 wobble(누적 방지용)
+  let wobYawApplied = 0;
+  let wobPitchApplied = 0;
+
+  function updateNavWobble(dt: number) {
+    // FREE에서는 wobble을 완전히 제거(포인터락/마우스룩에 간섭 방지)
+    if (mode !== "NAV") {
+      if (Math.abs(wobYawApplied) > 1e-6 || Math.abs(wobPitchApplied) > 1e-6) {
+        const e = new THREE.Euler().setFromQuaternion(camera.quaternion, "YXZ");
+        const baseYaw = e.y - wobYawApplied;
+        const basePitch = e.x - wobPitchApplied;
+        camera.rotation.set(basePitch, baseYaw, 0, "YXZ");
+        camera.updateMatrixWorld(true);
+        wobYawApplied = 0;
+        wobPitchApplied = 0;
+      }
+      pointerT.set(0, 0);
+      pointerS.lerp(pointerT, 0.25);
+      return;
+    }
+
+    const t = 1 - Math.pow(1 - WOBBLE_DAMP, Math.max(1, dt * 60));
+    pointerS.x = lerp(pointerS.x, pointerT.x, t);
+    pointerS.y = lerp(pointerS.y, pointerT.y, t);
+
+    const e = new THREE.Euler().setFromQuaternion(camera.quaternion, "YXZ");
+    const baseYaw = e.y - wobYawApplied;
+    const basePitch = e.x - wobPitchApplied;
+
+    const wobYaw = pointerS.x * WOBBLE_YAW;
+    const wobPitch = pointerS.y * WOBBLE_PITCH;
+
+    const nextPitch = clamp(basePitch + wobPitch, -Math.PI / 2 + 0.05, Math.PI / 2 - 0.05);
+    const nextYaw = baseYaw + wobYaw;
+
+    camera.rotation.set(nextPitch, nextYaw, 0, "YXZ");
+    camera.updateMatrixWorld(true);
+
+    wobYawApplied = wobYaw;
+    wobPitchApplied = wobPitch;
   }
 
   /* ===== FREE movement ===== */
@@ -256,7 +308,17 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     mode = mode === "NAV" ? "FREE" : "NAV";
     setNavUiVisible(mode === "NAV");
     flashOverlay(mode === "NAV" ? `NAV ${currentId}` : "FREE");
+
     if (mode === "NAV" && controls.isLocked) controls.unlock();
+
+    // 버튼은 모드 상관 없이 유지(특정 영역에서 FREE로 갔다가도 원점 복귀 가능하게)
+    // 단, 원점에 있으면 숨김
+    if (currentId === ORIGIN_ID) setBackBtnVisible(false);
+
+    if (mode !== "NAV") {
+      pointerT.set(0, 0);
+      // wobble은 updateNavWobble에서 자동 제거됨
+    }
   }
 
   /* ===== GLB load + colliders + ART + LOGO ===== */
@@ -267,22 +329,88 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     const m = o as THREE.Mesh;
     if (!m.isMesh) return false;
     const name = (m.name ?? "").toLowerCase();
-    // ART plane / panel 같은 건 충돌체에서 제외(시점 이동 안정)
     if (name.includes("art_")) return false;
     if (name.includes("panel")) return false;
     if (name.includes("light") || name.includes("camera")) return false;
     return true;
   }
 
-  let currentId = 0;
+  let currentId = ORIGIN_ID;
   let navigator: ReturnType<typeof createWaypointNavigator> | null = null;
 
-  // ✅ 클릭 가능한 “작품 plane”들
   const clickableArtMeshes: THREE.Mesh[] = [];
+
+  // ✅ 원점 복귀가 특정 영역에서 막히는 경우를 위한 “강제 스냅” 안전장치
+  let returnPending = false;
+  let returnStart = 0;
+
+  function getWaypointPose(id: number) {
+    return WAYPOINTS.find((w) => w.id === id)?.pose ?? null;
+  }
+
+  function forceSnapToWaypoint(id: number) {
+    const pose = getWaypointPose(id);
+    if (!pose) return;
+
+    // wobble 제거 후 스냅
+    wobYawApplied = 0;
+    wobPitchApplied = 0;
+    pointerT.set(0, 0);
+    pointerS.set(0, 0);
+
+    camera.position.set(pose.pos[0], pose.pos[1], pose.pos[2]);
+    camera.rotation.set(pose.pitch ?? 0, pose.yaw ?? 0, 0, "YXZ");
+    camera.updateMatrixWorld(true);
+
+    onArrive(id);
+  }
+
+  function finishReturnToOrigin() {
+    returnPending = false;
+    setBackBtnBusy(false);
+    setBackBtnVisible(false);
+  }
+
+  function returnToOrigin() {
+    // FREE에서 눌러도 동작하도록 NAV로 강제 전환 + 포인터락 해제
+    if (controls.isLocked) controls.unlock();
+    mode = "NAV";
+    setNavUiVisible(true);
+
+    // 버튼 눌렀으니 “이동 중” 상태
+    setBackBtnVisible(true);
+    setBackBtnBusy(true);
+
+    // navigator가 없으면 바로 스냅
+    if (!navigator) {
+      forceSnapToWaypoint(ORIGIN_ID);
+      finishReturnToOrigin();
+      return;
+    }
+
+    // goTo 시도 + watchdog
+    returnPending = true;
+    returnStart = performance.now();
+
+    try {
+      navigator.goTo(ORIGIN_ID);
+    } catch {
+      forceSnapToWaypoint(ORIGIN_ID);
+      finishReturnToOrigin();
+    }
+  }
 
   function onArrive(id: number) {
     currentId = id;
     flashOverlay(`NAV ${id}`);
+
+    // ✅ 0번 도착 시 버튼 자동 숨김/상태 해제
+    if (id === ORIGIN_ID) finishReturnToOrigin();
+    else {
+      // 원점이 아니면 버튼은 유지(작품 이동 후 항상 귀환 가능)
+      if (backBtn.style.display !== "inline-flex") setBackBtnVisible(true);
+      setBackBtnBusy(false);
+    }
   }
 
   function nextWaypoint() {
@@ -297,7 +425,6 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     navigator.goTo(prev);
   }
 
-  // ✅ 너가 요청한 6명 + 이미지
   const ART_ITEMS: ArtworkItem[] = [
     { id: 1, anchorName: "ART_1", artist: "최수원", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/b1.jpg` },
     { id: 2, anchorName: "ART_2", artist: "김민성", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/b2.jpg` },
@@ -307,9 +434,8 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     { id: 6, anchorName: "ART_6", artist: "김혜령", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/b6.jpg` },
   ];
 
-  // ✅ 로고(정면 벽)
   const LOGO: LogoAttachOptions = {
-    wallName: "pCube19_lambert1_0", // 네 스샷에서 본 벽
+    wallName: "pCube19_lambert1_0",
     imageUrl: `${import.meta.env.BASE_URL}logo/arnnect_logo_ver1.png`,
     widthM: 75,
     heightM: 75,
@@ -325,19 +451,23 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     return found;
   }
 
-  async function loadTexture(url: string) {
+  // 텍스처 상하 반전 보정 포함
+  async function loadTexture(url: string, flipV = true) {
     const tex = await new THREE.TextureLoader().loadAsync(url);
     tex.colorSpace = THREE.SRGBColorSpace;
-    // ✅ GLB/plane용은 flipY=false가 안정적인 편
-    tex.flipY = true;
+
+    // glTF mesh에 덮어씌울 때 보통 false가 맞음
+    tex.flipY = false;
+
+    if (flipV) {
+      tex.wrapS = THREE.ClampToEdgeWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(1, -1);
+      tex.offset.set(0, 1);
+    }
+
     tex.needsUpdate = true;
     return tex;
-  }
-
-  function computeWorldNormalFromLocalZ(obj: THREE.Object3D) {
-    const q = new THREE.Quaternion();
-    obj.getWorldQuaternion(q);
-    return new THREE.Vector3(0, 0, 1).applyQuaternion(q).normalize();
   }
 
   function computeWorldPos(obj: THREE.Object3D) {
@@ -346,67 +476,41 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     return v;
   }
 
-  function computeWorldSizeOfMesh(mesh: THREE.Mesh) {
-    mesh.updateWorldMatrix(true, false);
-    const box = new THREE.Box3().setFromObject(mesh);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    return size;
-  }
+  function pickWaypointForArtwork(artWorldPos: THREE.Vector3): number {
+    let bestId = WAYPOINTS[0]?.id ?? ORIGIN_ID;
+    let bestScore = Number.POSITIVE_INFINITY;
 
-  // ✅ ART plane(블렌더에서 만든 평면)에 "꽉" 맞게 이미지 붙이기
-  async function attachArtToPlanes(root: THREE.Object3D) {
-    const missing: string[] = [];
-    const attached: THREE.Mesh[] = [];
+    for (const wp of WAYPOINTS) {
+      const wpPos = new THREE.Vector3(...(wp.pose?.pos ?? [0, 0, 0]));
+      const dist = wpPos.distanceTo(artWorldPos);
 
-    for (const item of ART_ITEMS) {
-      const obj = findObjectByName(root, item.anchorName);
-      if (!obj) {
-        missing.push(item.anchorName);
-        continue;
-      }
-      if (!(obj as any).isMesh) {
-        // mesh가 아니면 자식에서 mesh 찾기
-        let meshChild: THREE.Mesh | null = null;
-        obj.traverse((o) => {
-          if (meshChild) return;
-          if ((o as any).isMesh) meshChild = o as THREE.Mesh;
-        });
-        if (!meshChild) {
-          missing.push(item.anchorName);
-          continue;
-        }
-        await attachToMeshPlane(meshChild, item);
-        attached.push(meshChild);
-      } else {
-        const mesh = obj as THREE.Mesh;
-        await attachToMeshPlane(mesh, item);
-        attached.push(mesh);
+      const yaw = wp.pose?.yaw ?? 0;
+      const pitch = wp.pose?.pitch ?? 0;
+
+      const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(pitch, yaw, 0, "YXZ")).normalize();
+      const toArt = artWorldPos.clone().sub(wpPos).normalize();
+      const facing = forward.dot(toArt);
+
+      const facePenalty = facing < 0.1 ? 2000 : (1 - facing) * 20;
+      const score = dist + facePenalty;
+
+      if (score < bestScore) {
+        bestScore = score;
+        bestId = wp.id;
       }
     }
 
-    if (missing.length) console.warn("[art] missing planes:", missing);
-
-    // 각 작품 위에 스폿라이트 추가
-    for (const mesh of attached) {
-      addArtSpotlight(mesh);
-    }
-
-    return attached;
+    return bestId;
   }
 
   function addArtSpotlight(mesh: THREE.Mesh) {
     const pos = new THREE.Vector3();
     mesh.getWorldPosition(pos);
 
-    // 작품 법선 방향 추정 (plane이므로 localZ가 법선)
     const normal = new THREE.Vector3(0, 0, 1);
     normal.applyQuaternion(mesh.getWorldQuaternion(new THREE.Quaternion()));
 
-    // 법선 방향 + 위쪽으로 살짝 오프셋한 위치에서 비춤
-    const lightPos = pos.clone()
-      .addScaledVector(normal, 3)   // 작품 앞으로 3m
-      .add(new THREE.Vector3(0, 4, 0)); // 위로 4m
+    const lightPos = pos.clone().addScaledVector(normal, 3).add(new THREE.Vector3(0, 4, 0));
 
     const spot = new THREE.SpotLight(0xfff4e0, 7.0, 35, Math.PI / 4.5, 0.45, 0.8);
     spot.position.copy(lightPos);
@@ -416,39 +520,60 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   }
 
   async function attachToMeshPlane(planeMesh: THREE.Mesh, item: ArtworkItem) {
-    const tex = await loadTexture(item.imageUrl);
+    const tex = await loadTexture(item.imageUrl, true);
 
-    // ✅ 기존 메테리얼 덮어쓰기: plane에 그림이 꽉 차게
     const mat = new THREE.MeshStandardMaterial({
       map: tex,
       roughness: 0.9,
       metalness: 0.0,
-      side: THREE.DoubleSide, // 앞/뒤 보이게
+      side: THREE.DoubleSide,
     });
 
-    planeMesh.material = mat;
-
-    // ✅ 뒤집힘(상하 반전)이 남으면 여기서 보정
-    // (flipY=false 기준. 만약 뒤집혀 보이면 아래 한 줄만 true로 바꿔서 테스트)
-    // tex.flipY = true; tex.needsUpdate = true;
-
-    // 클릭 데이터
-    planeMesh.userData.__artId = item.id;
-    planeMesh.userData.__artist = item.artist;
-    planeMesh.userData.__title = item.artworkTitle;
-
-    // 클릭 레이캐스트 대상에 포함
-    clickableArtMeshes.push(planeMesh);
-
-    // 안정: z-fighting 줄이기(plane이 벽에 딱 붙으면 지지직)
-    // plane이 이미 벽에서 살짝 떠있게 모델링 되어있다면 영향 적음.
-    // 그래도 화면 지지직이면 polygonOffset으로 해결
     mat.polygonOffset = true;
     mat.polygonOffsetFactor = -2;
     mat.polygonOffsetUnits = -2;
+
+    planeMesh.material = mat;
+
+    const artPos = computeWorldPos(planeMesh);
+    const wpId = typeof item.wpId === "number" ? item.wpId : pickWaypointForArtwork(artPos);
+    planeMesh.userData.__wpId = wpId;
+
+    clickableArtMeshes.push(planeMesh);
+
+    addArtSpotlight(planeMesh);
   }
 
-  // ✅ 정면 벽에 로고 plane을 새로 만들어서 붙임(박힘/뒤집힘 자동보정)
+  async function attachArtToPlanes(root: THREE.Object3D) {
+    const missing: string[] = [];
+
+    for (const item of ART_ITEMS) {
+      const obj = findObjectByName(root, item.anchorName);
+      if (!obj) {
+        missing.push(item.anchorName);
+        continue;
+      }
+
+      let mesh: THREE.Mesh | null = null;
+      if ((obj as any).isMesh) mesh = obj as THREE.Mesh;
+      else {
+        obj.traverse((o) => {
+          if (mesh) return;
+          if ((o as any).isMesh) mesh = o as THREE.Mesh;
+        });
+      }
+
+      if (!mesh) {
+        missing.push(item.anchorName);
+        continue;
+      }
+
+      await attachToMeshPlane(mesh, item);
+    }
+
+    if (missing.length) console.warn("[art] missing planes:", missing);
+  }
+
   async function attachLogoToWall(root: THREE.Object3D) {
     const wall = findObjectByName(root, LOGO.wallName);
     if (!wall || !(wall as any).isMesh) {
@@ -457,7 +582,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     }
     const wallMesh = wall as THREE.Mesh;
 
-    const tex = await loadTexture(LOGO.imageUrl);
+    const tex = await loadTexture(LOGO.imageUrl, true);
 
     const logoGeo = new THREE.PlaneGeometry(LOGO.widthM, LOGO.heightM);
     const logoMat = new THREE.MeshStandardMaterial({
@@ -468,38 +593,26 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       side: THREE.DoubleSide,
     });
 
-    // z-fighting 방지
     logoMat.polygonOffset = true;
     logoMat.polygonOffsetFactor = -3;
     logoMat.polygonOffsetUnits = -3;
 
     const logo = new THREE.Mesh(logoGeo, logoMat);
 
-    // 벽 월드 포즈
-    const wallPos = computeWorldPos(wallMesh);
+    const wallPos = new THREE.Vector3();
+    wallMesh.getWorldPosition(wallPos);
+
     const wallQuat = new THREE.Quaternion();
     wallMesh.getWorldQuaternion(wallQuat);
 
-    // 벽의 "앞 방향" 후보: local +Z
-    let n = computeWorldNormalFromLocalZ(wallMesh);
-
-    // ✅ 카메라 쪽을 향하도록 normal 방향 자동 교정(박힘 해결)
+    const n = new THREE.Vector3(0, 0, 1).applyQuaternion(wallQuat).normalize();
     const toCam = new THREE.Vector3().subVectors(camera.position, wallPos).normalize();
-    if (n.dot(toCam) < 0) n.multiplyScalar(-1);
+    const nn = n.dot(toCam) < 0 ? n.clone().multiplyScalar(-1) : n;
 
-    // 로고의 회전: 벽과 동일한 평면에 붙이기(벽 회전 사용)
     logo.quaternion.copy(wallQuat);
+    logo.position.copy(wallPos).addScaledVector(nn, LOGO.offsetM);
 
-    // 로고 위치: 벽 중심 + n * offset
-    logo.position.copy(wallPos).addScaledVector(n, LOGO.offsetM);
-
-    // ✅ 상하 뒤집힘이 남으면 여기서 고정 (flipY=false 기준)
-    // 필요할 때만 켜기:
-    // logo.scale.y *= -1;
-
-    // scene에 추가 (root에 붙이면 벽 transform 따라가므로 root에 붙여도 됨)
     scene.add(logo);
-
     return logo;
   }
 
@@ -508,7 +621,6 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     async (gltf) => {
       scene.add(gltf.scene);
 
-      // colliders
       const tmp: THREE.Object3D[] = [];
       gltf.scene.traverse((o) => {
         if (isColliderMesh(o)) tmp.push(o);
@@ -520,36 +632,29 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
         waypoints: WAYPOINTS,
         colliders,
         options: {
-          // ✅ 여기 숫자 올리면 “NAV 이동 속도” 빨라짐
           moveSpeedMps: 3.6,
           turnSpeedRadps: 1.8,
           clearance: 2.8,
           lockY: true,
-
-          // ✅ 흔들림 싫으면 0으로
           bobAmount: 0.0,
           swayAmount: 0.0,
         },
         onArrive,
       });
 
-      // ✅ ART plane 붙이기
       await attachArtToPlanes(gltf.scene);
-
-      // ✅ 로고 붙이기
       await attachLogoToWall(gltf.scene);
 
-      // ✅ 시작을 확실히 0번으로 스냅(시작 pos 바꿔도 뒤틀림 방지)
+      // 시작을 0번으로
       try {
-        // navigator 구현에 immediate 옵션이 없다면 이 호출만으로도 대부분 안정
-        navigator.goTo(0);
+        navigator.goTo(ORIGIN_ID);
       } catch {
-        // ignore
+        forceSnapToWaypoint(ORIGIN_ID);
       }
-      onArrive(0);
+      onArrive(ORIGIN_ID);
 
       console.log("[viewer] glb loaded. colliders:", colliders.length, "artClickable:", clickableArtMeshes.length);
-      console.log("[hint] NAV: ←/→ or buttons, click artwork => modal. Q: NAV<->FREE. P: log cam");
+      console.log("[hint] NAV: ←/→ or buttons, click artwork => go to its waypoint. Q: NAV<->FREE. P: log cam. H/0: origin");
     },
     undefined,
     (err) => console.error("[viewer] GLB load failed:", err)
@@ -572,31 +677,66 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   }
 
   function onPointerMove(e: PointerEvent) {
+    // NAV wobble용 포인터 정규화
+    const rect = renderer.domElement.getBoundingClientRect();
+    const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const ny = 1 - ((e.clientY - rect.top) / rect.height) * 2;
+    pointerT.set(clamp(nx, -1, 1), clamp(ny, -1, 1));
+
     if (mode !== "NAV") {
       renderer.domElement.style.cursor = "";
       return;
     }
+
     const hit = raycastArtwork(e.clientX, e.clientY);
     renderer.domElement.style.cursor = hit ? "pointer" : "";
   }
 
   function onPointerDown(e: PointerEvent) {
     if (mode === "FREE") {
+      // 자유 모드에서는 캔버스 클릭 시 포인터락
       if (!controls.isLocked) controls.lock();
       return;
     }
 
     const hit = raycastArtwork(e.clientX, e.clientY);
-    if (hit) {
-      const artist = (hit.userData?.__artist ?? "예술가") as string;
-      const title = (hit.userData?.__title ?? "작품명") as string;
-      showArtworkModal(artist, title);
+    if (!hit) return;
+
+    const wpId = hit.userData?.__wpId as number | undefined;
+
+    // 작품 클릭 => 해당 waypoint 이동 + 원점 버튼 표시
+    if (typeof wpId === "number") {
+      setBackBtnVisible(true);
+      setBackBtnBusy(false);
+
+      if (navigator) {
+        try {
+          navigator.goTo(wpId);
+        } catch {
+          // 그래도 안전하게는 스냅 (작품 이동이 막히면 사용성 박살나서)
+          const pose = getWaypointPose(wpId);
+          if (pose) {
+            camera.position.set(pose.pos[0], pose.pos[1], pose.pos[2]);
+            camera.rotation.set(pose.pitch ?? 0, pose.yaw ?? 0, 0, "YXZ");
+            camera.updateMatrixWorld(true);
+            onArrive(wpId);
+          }
+        }
+      }
       return;
     }
   }
 
   renderer.domElement.addEventListener("pointermove", onPointerMove);
   renderer.domElement.addEventListener("pointerdown", onPointerDown);
+
+  // 돌아가기 버튼: 항상 0번으로 + watchdog(막히면 강제 스냅)
+  const onBackClick = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    returnToOrigin();
+  };
+  backBtn.addEventListener("click", onBackClick);
 
   /* Keyboard */
   function onKeyDown(e: KeyboardEvent) {
@@ -608,6 +748,13 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     if (e.code === "KeyP") {
       e.preventDefault();
       logCameraPose();
+      return;
+    }
+
+    // ✅ 키로도 원점 복귀 가능 (특정 영역 이슈 회피용)
+    if (e.code === "KeyH" || e.code === "Digit0") {
+      e.preventDefault();
+      returnToOrigin();
       return;
     }
 
@@ -655,6 +802,32 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
     if (mode === "FREE") tickFree(dt);
 
+    // NAV wobble (rotation-only)
+    updateNavWobble(dt);
+
+    // ✅ 원점 복귀 watchdog:
+    // goTo(0)가 특정 구간에서 막히면 2.2초 후 강제 스냅
+    if (returnPending) {
+      const pose0 = getWaypointPose(ORIGIN_ID);
+      if (pose0) {
+        const p0 = new THREE.Vector3(pose0.pos[0], pose0.pos[1], pose0.pos[2]);
+        const d = camera.position.distanceTo(p0);
+
+        // 도착 판정(여유있게)
+        if (d < 0.55) {
+          onArrive(ORIGIN_ID);
+          finishReturnToOrigin();
+        } else if (now - returnStart > 2200) {
+          forceSnapToWaypoint(ORIGIN_ID);
+          finishReturnToOrigin();
+        }
+      } else {
+        // pose0 자체가 없으면 그냥 종료
+        returnPending = false;
+        setBackBtnBusy(false);
+      }
+    }
+
     renderer.render(scene, camera);
     requestAnimationFrame(loop);
   }
@@ -669,15 +842,24 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       renderer.domElement.removeEventListener("pointermove", onPointerMove);
       renderer.domElement.removeEventListener("pointerdown", onPointerDown);
 
+      backBtn.removeEventListener("click", onBackClick);
+
       if (overlayTimer) window.clearTimeout(overlayTimer);
-      if (modalTimer) window.clearTimeout(modalTimer);
 
       overlay.remove();
-      modal.remove();
       navLeft.remove();
       navRight.remove();
+      backBtn.remove();
 
       renderer.dispose();
     },
   };
+}
+
+/* ===== tiny utils ===== */
+function clamp(v: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, v));
+}
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t;
 }
