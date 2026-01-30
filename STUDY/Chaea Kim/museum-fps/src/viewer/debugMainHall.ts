@@ -4,11 +4,11 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 type DebugViewerOptions = {
-  glbUrl?: string; // default "/models/main_hall1.glb"
+  glbUrl?: string; // default "/models/main_hall0.glb"
 };
 
 export function mountDebugMainHall(canvas: HTMLCanvasElement, opts: DebugViewerOptions = {}) {
-  const glbUrl = opts.glbUrl ?? "/models/main_hall1.glb";
+  const glbUrl = opts.glbUrl ?? "/models/main_hall0.glb";
   // =========================
   // Renderer (사이즈 강제)
   // =========================

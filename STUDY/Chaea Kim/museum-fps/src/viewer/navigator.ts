@@ -20,8 +20,8 @@ export function createWaypointNavigator(args: {
   const { camera, waypoints, colliders, onArrive } = args;
   const opt = args.options ?? {};
 
-  const SPEED = opt.moveSpeedMps ?? 4.0;
-  const TURN = opt.turnSpeedRadps ?? 1.8;
+  const SPEED = opt.moveSpeedMps ?? 8.0;
+  const TURN = opt.turnSpeedRadps ?? 5.0;
   const CLEAR = opt.clearance ?? 2.8;
   const LOCK_Y = opt.lockY ?? true;
 

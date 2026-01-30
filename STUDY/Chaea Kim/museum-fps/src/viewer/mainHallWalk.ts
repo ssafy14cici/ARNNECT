@@ -22,7 +22,7 @@ const WAYPOINTS: Waypoint[] = [
 ];
 
 export function mountMainHallWalk(canvas: HTMLCanvasElement, opts: Options = {}) {
-  const glbUrl = opts.glbUrl ?? `${import.meta.env.BASE_URL}models/main_hall1.glb`;
+  const glbUrl = opts.glbUrl ?? `${import.meta.env.BASE_URL}models/main_hall0.glb`;
 
   /* =========================
    * Renderer
@@ -168,7 +168,7 @@ export function mountMainHallWalk(canvas: HTMLCanvasElement, opts: Options = {})
 
   const EYE_HEIGHT = 1.6;
   const GRAVITY = -28;
-  const MOVE_SPEED = 4.2;
+  const MOVE_SPEED = 2.4;
 
   function updateWalk(dt: number) {
     if (!controls.isLocked) return;

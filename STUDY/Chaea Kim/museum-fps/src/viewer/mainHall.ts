@@ -4,13 +4,13 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
 
 type Options = {
-  glbUrl?: string; // default: "/models/main_hall1.glb"
+  glbUrl?: string; // default: "/models/main_hall0.glb"
   moveSpeed?: number; // units/sec
   lookSpeed?: number; // PointerLockControls는 내부적으로 처리, 여기선 따로 안 씀
 };
 
 export function mountMainHallViewer(canvas: HTMLCanvasElement, opts: Options = {}) {
-  const glbUrl = opts.glbUrl ?? "/models/main_hall1.glb";
+  const glbUrl = opts.glbUrl ?? "/models/main_hall0.glb";
   const moveSpeed = opts.moveSpeed ?? 3.5;
 
   /* ---------------------------

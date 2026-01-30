@@ -14,7 +14,7 @@ type Options = {
 type Mode = "NAV" | "FREE";
 
 export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {}) {
-  const glbUrl = opts.glbUrl ?? `${import.meta.env.BASE_URL}models/main_hall1.glb`;
+  const glbUrl = opts.glbUrl ?? `${import.meta.env.BASE_URL}models/main_hall0.glb`;
   const NAV_SIZE = opts.navSizePx ?? 68;
 
   /* Renderer */
