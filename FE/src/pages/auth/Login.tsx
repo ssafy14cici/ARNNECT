@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiLogin } from "../../features/auth/api";
 import type { UserRole } from "../../features/auth/types";
 import { useAuthStore } from "../../features/auth/store";
-import { setMe, seedMyPosts, type PostRole } from "../../features/feed/mockData";
+import { setMe, type PostRole } from "../../features/feed/mockData";
 import "./login.css";
 
 const MY_SEED_PREFIX = "comet_mock_my_posts_seeded_v1";
@@ -53,7 +53,7 @@ export default function Login() {
       const seedKey = `${MY_SEED_PREFIX}.${res.memberUuid}`;
       if (localStorage.getItem(seedKey) !== "1") {
         try {
-          seedMyPosts(8);
+          
         } catch {
           // seedMyPosts 내부에서 me 없으면 throw 가능 -> 위에서 setMe 했으니 보통 안 남
         }
