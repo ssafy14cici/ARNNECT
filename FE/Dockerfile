@@ -8,4 +8,5 @@ COPY nginx-conf/default.conf /etc/nginx/conf.d/default.conf
 COPY dist /usr/share/nginx/html
 
 # 3. 실행
+
 CMD ["nginx", "-g", "daemon off;"]
