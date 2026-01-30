@@ -207,6 +207,7 @@ export default function TicketQr() {
       }
       await reloadIssued();
     } catch (e: unknown) {
+      console.error(e);
       setError(e instanceof Error ? e.message : "처리 실패");
     } finally {
       setBusy(false);

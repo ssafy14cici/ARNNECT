@@ -61,10 +61,13 @@ export type RedeemTicketResponse = {
 // ----------------------------
 // REAL API (나중에 붙일 때)
 // ----------------------------
-const RAW_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
-const BASE_URL = (RAW_BASE_URL ?? "").trim();
 
-const RAW_USE_MOCK = (import.meta as any).env?.VITE_USE_MOCK as string | undefined;
+// ✅ .env 없어도 안전하게(=undefined.trim 방지)
+const ENV = ((import.meta as any).env ?? {}) as Record<string, unknown>;
+const RAW_BASE_URL = typeof ENV.VITE_API_BASE_URL === "string" ? (ENV.VITE_API_BASE_URL as string) : "";
+const BASE_URL = RAW_BASE_URL.trim();
+
+const RAW_USE_MOCK = typeof ENV.VITE_USE_MOCK === "string" ? (ENV.VITE_USE_MOCK as string) : undefined;
 
 const getOrigin = () => (typeof window !== "undefined" ? window.location.origin : "");
 const ORIGIN = getOrigin();
@@ -75,16 +78,14 @@ const USE_MOCK =
   !BASE_URL ||
   BASE_URL === ORIGIN ||
   BASE_URL.includes("localhost:5173") ||
-  import.meta.env.DEV;
+  // Vite DEV 플래그(타입 미선언 환경에서도 안전하게)
+  Boolean((import.meta as any).env?.DEV);
 
 const ENDPOINTS = {
   CREATE_EXHIBITION_TICKET: "/api/v1/exhibitions", // POST
-  GET_EXHIBITION_BY_CODE: (code: string) =>
-    `/api/v1/exhibitions/by-code/${encodeURIComponent(code)}`, // GET
-  UPDATE_EXHIBITION_BY_CODE: (code: string) =>
-    `/api/v1/exhibitions/by-code/${encodeURIComponent(code)}`, // PATCH
-  DELETE_EXHIBITION_BY_CODE: (code: string) =>
-    `/api/v1/exhibitions/by-code/${encodeURIComponent(code)}`, // DELETE
+  GET_EXHIBITION_BY_CODE: (code: string) => `/api/v1/exhibitions/by-code/${encodeURIComponent(code)}`, // GET
+  UPDATE_EXHIBITION_BY_CODE: (code: string) => `/api/v1/exhibitions/by-code/${encodeURIComponent(code)}`, // PATCH
+  DELETE_EXHIBITION_BY_CODE: (code: string) => `/api/v1/exhibitions/by-code/${encodeURIComponent(code)}`, // DELETE
   REDEEM_TICKET: "/api/v1/collectbook", // POST
 };
 
@@ -157,29 +158,59 @@ function writeOrder(list: string[]) {
   localStorage.setItem(KEY_ISSUED_ORDER, JSON.stringify(list));
 }
 
-function normalizePayload(payload: ExhibitionCreateRequest): ExhibitionCreateRequest {
-  const feeType = payload.feeType ?? "free";
+// ----------------------------
+// HELPERS (safe normalize)
+// ----------------------------
+const trimStr = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+const trimOpt = (v: unknown) => {
+  const t = trimStr(v);
+  return t ? t : undefined;
+};
+const toFeeType = (v: unknown): FeeType => (v === "paid" ? "paid" : "free");
+const toNumber = (v: unknown) => {
+  if (typeof v === "number") return v;
+  if (typeof v === "string" && v.trim() !== "") return Number(v);
+  return NaN;
+};
+
+// ✅ payload가 any로 들어와도 절대 undefined.trim() 안 나게
+function normalizePayload(payload: unknown): ExhibitionCreateRequest {
+  const p = (payload ?? {}) as Record<string, unknown>;
+
+  // (구버전/다른 호출부 대비) place가 없으면 address로도 받아줌
+  const title = trimStr(p.title);
+  const place = trimStr(p.place ?? p.address);
+
+  const startDate = trimStr(p.startDate);
+  const endDate = trimStr(p.endDate);
+
+  if (!title) throw new Error("전시 제목(title)이 비어있습니다.");
+  if (!place) throw new Error("전시 장소(place)가 비어있습니다.");
+  if (!startDate || !endDate) throw new Error("전시 기간(startDate/endDate)이 비어있습니다.");
+
+  const feeType = toFeeType(p.feeType);
+
+  const priceNum = toNumber(p.price);
   const price =
     feeType === "paid"
-      ? typeof payload.price === "number"
-        ? payload.price
-        : Number(payload.price ?? 0)
+      ? Number.isFinite(priceNum)
+        ? priceNum
+        : 0
       : undefined;
 
+  const durNum = toNumber(p.durationMinutes);
+  const durationMinutes = Number.isFinite(durNum) ? durNum : undefined;
+
   return {
-    ...payload,
+    title,
+    place,
+    startDate,
+    endDate,
     feeType,
-    price: feeType === "paid" ? (Number.isFinite(price) ? price : 0) : undefined,
-    durationMinutes:
-      typeof payload.durationMinutes === "number"
-        ? payload.durationMinutes
-        : payload.durationMinutes
-        ? Number(payload.durationMinutes)
-        : undefined,
-    posterUrl: payload.posterUrl?.trim() || undefined,
-    description: payload.description?.trim() || undefined,
-    title: payload.title.trim(),
-    place: payload.place.trim(),
+    price,
+    durationMinutes,
+    posterUrl: trimOpt(p.posterUrl),
+    description: trimOpt(p.description),
   };
 }
 
@@ -217,6 +248,7 @@ export async function listIssuedExhibitions(): Promise<ExhibitionByCodeResponse[
 
 /** 전시 생성 + ticket_code 발급 */
 export async function createExhibitionTicket(payload: ExhibitionCreateRequest) {
+  // ✅ 여기서 undefined.trim 방지 + (place/address) 호환
   const normalized = normalizePayload(payload);
 
   if (!USE_MOCK) {
