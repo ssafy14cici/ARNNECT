@@ -170,7 +170,7 @@ function showPanelModal(label: string) {
 
   const box = document.createElement("div");
   box.style.cssText =
-    "background:#fff;border-radius:12px;padding:40px 48px;text-align:center;font-family:system-ui,sans-serif;min-width:280px;";
+    "background:#fff;border-radius:12px;padding:40px 48px;text-align:center;font-family:MuseumClassic,system-ui,sans-serif;min-width:280px;";
 
   const title = document.createElement("h2");
   title.style.cssText = "margin:0 0 12px;font-size:22px;color:#222;";

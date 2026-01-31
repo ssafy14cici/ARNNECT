@@ -80,7 +80,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   overlay.style.left = "50%";
   overlay.style.top = "10%";
   overlay.style.transform = "translateX(-50%)";
-  overlay.style.fontFamily = "ui-sans-serif, system-ui, -apple-system, Segoe UI";
+  overlay.style.fontFamily = "MuseumClassic, ui-sans-serif, system-ui, -apple-system, Segoe UI";
   overlay.style.fontSize = "40px";
   overlay.style.fontWeight = "800";
   overlay.style.color = "rgba(255,255,255,0.92)";
@@ -113,7 +113,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   backBtn.style.background = "rgba(0,0,0,0.35)";
   backBtn.style.backdropFilter = "blur(8px)";
   backBtn.style.color = "rgba(255,255,255,0.92)";
-  backBtn.style.fontFamily = "ui-sans-serif, system-ui, -apple-system, Segoe UI";
+  backBtn.style.fontFamily = "MuseumClassic, ui-sans-serif, system-ui, -apple-system, Segoe UI";
   backBtn.style.fontSize = "15px";
   backBtn.style.fontWeight = "800";
   backBtn.style.cursor = "pointer";
@@ -547,7 +547,11 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     scene.add(spot.target);
   }
 
-  function applyNameToPanel(mesh: THREE.Mesh, text: string) {
+  async function applyNameToPanel(mesh: THREE.Mesh, text: string) {
+    // Ensure MuseumClassic font is loaded before drawing on canvas
+    try {
+      await document.fonts.load('500 36px "MuseumClassic"');
+    } catch { /* fallback to Noto Sans KR */ }
     const canvas = document.createElement("canvas");
     canvas.width = 512;
     canvas.height = 128;
@@ -561,7 +565,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.scale(-1, 1);
     ctx.fillStyle = "#222222";
-    ctx.font = '500 36px "Noto Sans KR", sans-serif';
+    ctx.font = '500 36px "MuseumClassic", "Noto Sans KR", sans-serif';
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(text, 0, 0);
@@ -660,7 +664,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
           if ((nameObj as any).isMesh) nameMesh = nameObj as THREE.Mesh;
           else nameObj.traverse((o: THREE.Object3D) => { if (!nameMesh && (o as THREE.Mesh).isMesh) nameMesh = o as THREE.Mesh; });
           if (nameMesh) {
-            applyNameToPanel(nameMesh, `${item.artist} — ${item.artworkTitle}`);
+            await applyNameToPanel(nameMesh, `${item.artist} — ${item.artworkTitle}`);
             console.log(`[art] name panel found: ${item.nameAnchor}`);
           }
         } else {
@@ -728,7 +732,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
     const label = document.createElement("div");
     label.style.cssText =
-      "font-size:11px;color:rgba(255,255,255,0.85);font-family:'Noto Sans KR',system-ui,sans-serif;letter-spacing:0.04em;text-shadow:0 1px 4px rgba(0,0,0,0.6);white-space:nowrap;";
+      "font-size:11px;color:rgba(255,255,255,0.85);font-family:'MuseumClassic','Noto Sans KR',system-ui,sans-serif;letter-spacing:0.04em;text-shadow:0 1px 4px rgba(0,0,0,0.6);white-space:nowrap;";
     label.textContent = "클릭하세요";
 
     el.appendChild(ring);
@@ -1021,7 +1025,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
     const box = document.createElement("div");
     box.style.cssText =
-      "pointer-events:auto;background:rgba(0,0,0,0.72);backdrop-filter:blur(10px);border-radius:16px;padding:28px 36px;max-width:560px;width:100%;text-align:center;font-family:'Noto Sans KR',system-ui,sans-serif;color:rgba(255,255,255,0.95);font-size:17px;line-height:1.7;display:flex;flex-direction:column;align-items:center;gap:18px;";
+      "pointer-events:auto;background:rgba(0,0,0,0.72);backdrop-filter:blur(10px);border-radius:16px;padding:28px 36px;max-width:560px;width:100%;text-align:center;font-family:'MuseumClassic','Noto Sans KR',system-ui,sans-serif;color:rgba(255,255,255,0.95);font-size:17px;line-height:1.7;display:flex;flex-direction:column;align-items:center;gap:18px;";
 
     const msgEl = document.createElement("div");
     msgEl.textContent = TUTORIAL_MESSAGES[0];
@@ -1088,7 +1092,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
     const box = document.createElement("div");
     box.style.cssText =
-      "background:#fff;border-radius:12px;padding:40px 48px;text-align:center;font-family:'Noto Sans KR',system-ui,sans-serif;min-width:280px;";
+      "background:#fff;border-radius:12px;padding:40px 48px;text-align:center;font-family:'MuseumClassic','Noto Sans KR',system-ui,sans-serif;min-width:280px;";
 
     const title = document.createElement("h2");
     title.style.cssText = "margin:0 0 12px;font-size:22px;color:#222;";

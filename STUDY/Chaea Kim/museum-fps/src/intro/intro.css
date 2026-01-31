@@ -2,21 +2,21 @@
 /* ✅ Museum classic (self-host) */
 @font-face {
   font-family: "MuseumClassic";
-  src: url("/fonts/MuseumClassic-L.woff2") format("woff2");
+  src: url("/fonts/MuseumClassic-L.fixed.woff2") format("woff2");
   font-weight: 300;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "MuseumClassic";
-  src: url("/fonts/MuseumClassic-M.woff2") format("woff2");
-  font-weight: 500;
+  src: url("/fonts/MuseumClassic-M.fixed.woff2") format("woff2");
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "MuseumClassic";
-  src: url("/fonts/MuseumClassic-B.woff2") format("woff2");
+  src: url("/fonts/MuseumClassic-B.fixed.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -47,7 +47,7 @@ body {
   z-index: 1;
   pointer-events: none;
   color: #1a1a1a;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial;
+  font-family: "MuseumClassic", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial;
 }
 
 /* ---------- Opaque loading backdrop ---------- */
@@ -88,7 +88,7 @@ body {
   margin-top: 8px;
   font-size: 11px;
   letter-spacing: 1px;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  font-family: "MuseumClassic", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
   color: #1a1a1a;
   opacity: 0.75;
 }
@@ -107,7 +107,7 @@ body {
   max-width: 900px;
   pointer-events: none;
   opacity: 0;
-  font-family: serif, "Times New Roman", serif;
+  font-family: "MuseumClassic", serif, "Times New Roman", serif;
 }
 
 .intro-line {
@@ -242,7 +242,7 @@ body {
   cursor: pointer;
   opacity: 0;
 
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  font-family: "MuseumClassic", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
   font-size: 13px;
   letter-spacing: 0.12em;
   color: #1a1a1a;

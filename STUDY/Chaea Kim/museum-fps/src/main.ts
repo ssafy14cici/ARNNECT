@@ -53,7 +53,7 @@ function startIntro() {
   sessionStorage.removeItem(SKIP_KEY);
 
   mountIntro(canvas, {
-    glbUrl: `${import.meta.env.BASE_URL}models/intro.glb`,
+    glbUrl: `${import.meta.env.BASE_URL}models/intro_2.glb`,
     prefetchUrl: `${import.meta.env.BASE_URL}models/mh_add_5.glb`,
 
     // ✅ 스샷 기준 이름(0)
