@@ -10,9 +10,12 @@ canvas.id = "canvas";
 document.body.appendChild(canvas);
 
 const POSE_KEY = "ARNNECT_EXTERIOR_POSE";
+const SKIP_KEY = "ARNNECT_SKIP_LOADING";
 
 let introRuntime: { dispose: () => void } | null = null;
 let exitUiDispose: (() => void) | null = null;
+let interiorRuntime: { destroy: () => void } | null = null;
+let lastPose: CameraPose | undefined;
 
 /** localStorage에서 외부 포즈 복원(있으면 1회 사용 후 삭제) */
 function readSavedPose(): CameraPose | undefined {
@@ -46,10 +49,12 @@ function startIntro() {
   }
 
   const restoredPose = readSavedPose();
+  const skipLoading = !!sessionStorage.getItem(SKIP_KEY);
+  sessionStorage.removeItem(SKIP_KEY);
 
   mountIntro(canvas, {
     glbUrl: `${import.meta.env.BASE_URL}models/intro.glb`,
-    prefetchUrl: `${import.meta.env.BASE_URL}models/main_hall0.glb`,
+    prefetchUrl: `${import.meta.env.BASE_URL}models/mh_add_5.glb`,
 
     // ✅ 스샷 기준 이름(0)
     doorName: "USA0_USA0_0",
@@ -61,6 +66,9 @@ function startIntro() {
     exposure: 0.55,       // 전체 밝기 (낮을수록 어둡게)
     envIntensity: 0.35,   // 건물 반사량 (낮을수록 원래 색 유지)
     lightIntensity: 1.2,  // 디렉셔널 라이트 (건물 자체 조명)
+
+    // ✅ 내부에서 돌아올 때 로딩 건너뛰기
+    skipLoading,
 
     // ✅ 내부에서 돌아오면 동일 시점 복원
     startPose: restoredPose,
@@ -88,16 +96,19 @@ async function startInterior() {
   const { mountMainHallFree } = await import("./viewer/mainHallFree");
 
   mountMainHallFree(canvas, {
-    glbUrl: `${import.meta.env.BASE_URL}models/main_hall0.glb`,
-    spawnPanelName: "panel1",
-    offsetMeters: 2.0,
+    glbUrl: `${import.meta.env.BASE_URL}models/mh_add_5.glb`,
+    onReady: () => {
+      // Interior fully loaded — clear the intro white fade
+      window.dispatchEvent(new Event("intro:clear-fade"));
+    },
   });
 
   // ✅ 임시 Exit 버튼: 안전하게 리로드로 종료(내부 rAF/이벤트 잔존 방지)
   exitUiDispose = mountExitOverlay({
     label: "Back to exterior",
     onExit: () => {
-      // startIntro에서 readSavedPose로 복원됨
+      // 로딩 애니메이션 건너뛰기 플래그 설정
+      sessionStorage.setItem(SKIP_KEY, "1");
       window.location.reload();
     },
   });

@@ -10,6 +10,7 @@ import { createWaypointNavigator } from "./navigator";
 type Options = {
   glbUrl?: string;
   navSizePx?: number;
+  onReady?: () => void;
 };
 
 type Mode = "NAV" | "FREE";
@@ -20,7 +21,8 @@ type ArtworkItem = {
   artworkTitle: string;
   imageUrl: string;
   anchorName: string; // ART_1 ~ ART_6
-  wpId?: number; // (선택) 수동 웨이포인트 고정
+  nameAnchor?: string; // ART_1_NAME etc.
+  wpId?: number;
 };
 
 type LogoAttachOptions = {
@@ -45,7 +47,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(65, 1, 0.01, 8000);
 
-  applyGalleryLighting(scene, renderer, { exposure: 1.35, background: "#0f0f0f" });
+  applyGalleryLighting(scene, renderer);
 
   // 시작 포즈
   const START = WAYPOINTS[0]?.pose ?? { pos: [0, 10, 50], yaw: 0, pitch: 0 };
@@ -282,6 +284,17 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   const FREE_MOVE = 9.5;
   const FREE_MOVE_SLOW = 3.2;
 
+  const collisionRay = new THREE.Raycaster();
+  const COLLISION_MARGIN = 1.5; // meters from wall before blocking
+
+  function canMove(from: THREE.Vector3, dir: THREE.Vector3, dist: number): boolean {
+    if (colliders.length === 0) return true;
+    collisionRay.set(from, dir);
+    collisionRay.far = dist + COLLISION_MARGIN;
+    const hits = collisionRay.intersectObjects(colliders, true);
+    return hits.length === 0 || hits[0].distance > dist + COLLISION_MARGIN;
+  }
+
   function tickFree(dt: number) {
     const speed = keys.has("ControlLeft") || keys.has("ControlRight") ? FREE_MOVE_SLOW : FREE_MOVE;
 
@@ -299,8 +312,11 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
     if (move.lengthSq() > 0) {
       move.normalize().multiplyScalar(speed * dt);
-      camera.position.add(move);
-      camera.updateMatrixWorld(true);
+      const dir = move.clone().normalize();
+      if (canMove(camera.position, dir, move.length())) {
+        camera.position.add(move);
+        camera.updateMatrixWorld(true);
+      }
     }
   }
 
@@ -425,14 +441,26 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     navigator.goTo(prev);
   }
 
+  // Preload all art textures immediately (parallel with GLB load)
+  const preloadedTextures = new Map<string, THREE.Texture>();
+  const artTexturePromises: Promise<void>[] = [];
+
   const ART_ITEMS: ArtworkItem[] = [
-    { id: 1, anchorName: "ART_1", artist: "최수원", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/b1.jpg` },
-    { id: 2, anchorName: "ART_2", artist: "김민성", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/b2.jpg` },
-    { id: 3, anchorName: "ART_3", artist: "이수진", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/b3.jpg` },
-    { id: 4, anchorName: "ART_4", artist: "김지윤", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/b4.jpg` },
-    { id: 5, anchorName: "ART_5", artist: "김채아", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/b5.jpg` },
-    { id: 6, anchorName: "ART_6", artist: "김혜령", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/b6.jpg` },
+    { id: 1, anchorName: "ART_1", nameAnchor: "ART_1_NAME", artist: "최수원", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/b1.jpg` },
+    { id: 2, anchorName: "ART_2", nameAnchor: "ART_2_NAME", artist: "김민성", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/b2.jpg` },
+    { id: 3, anchorName: "ART_3", nameAnchor: "ART_3_NAME", artist: "이수진", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/b3.jpg` },
+    { id: 4, anchorName: "ART_4", nameAnchor: "ART_4_NAME", artist: "김지윤", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/b4.jpg` },
+    { id: 5, anchorName: "ART_5", nameAnchor: "ART_5_NAME", artist: "김채아", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/b5.jpg` },
+    { id: 6, anchorName: "ART_6", nameAnchor: "ART_6_NAME", artist: "김혜령", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/b6.jpg` },
   ];
+
+  // Kick off all art texture loads in parallel (runs alongside GLB load)
+  for (const item of ART_ITEMS) {
+    const p = loadTexture(item.imageUrl, true).then((tex) => {
+      preloadedTextures.set(item.imageUrl, tex);
+    }).catch(() => {});
+    artTexturePromises.push(p);
+  }
 
   const LOGO: LogoAttachOptions = {
     wallName: "pCube19_lambert1_0",
@@ -519,29 +547,82 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     scene.add(spot.target);
   }
 
-  async function attachToMeshPlane(planeMesh: THREE.Mesh, item: ArtworkItem) {
-    const tex = await loadTexture(item.imageUrl, true);
+  function applyNameToPanel(mesh: THREE.Mesh, text: string) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext("2d")!;
 
-    const mat = new THREE.MeshStandardMaterial({
+    // Draw upside-down on canvas so glTF UV (flipY=false) shows it correctly
+    ctx.fillStyle = "#f0f0f0";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.scale(-1, 1);
+    ctx.fillStyle = "#222222";
+    ctx.font = '500 36px "Noto Sans KR", sans-serif';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, 0, 0);
+    ctx.restore();
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.flipY = false;
+
+    mesh.material = new THREE.MeshStandardMaterial({
+      map: tex,
+      roughness: 0.9,
+      metalness: 0.0,
+      side: THREE.DoubleSide,
+    });
+  }
+
+  async function attachToMeshPlane(planeMesh: THREE.Mesh, item: ArtworkItem) {
+    const tex = preloadedTextures.get(item.imageUrl) ?? await loadTexture(item.imageUrl, true);
+
+    planeMesh.material = new THREE.MeshStandardMaterial({
       map: tex,
       roughness: 0.9,
       metalness: 0.0,
       side: THREE.DoubleSide,
     });
 
-    mat.polygonOffset = true;
-    mat.polygonOffsetFactor = -2;
-    mat.polygonOffsetUnits = -2;
-
-    planeMesh.material = mat;
-
     const artPos = computeWorldPos(planeMesh);
+
+    // 작품 클릭용 데이터
+    planeMesh.userData.__artist = item.artist;
+    planeMesh.userData.__artworkTitle = item.artworkTitle;
+
     const wpId = typeof item.wpId === "number" ? item.wpId : pickWaypointForArtwork(artPos);
     planeMesh.userData.__wpId = wpId;
 
     clickableArtMeshes.push(planeMesh);
 
     addArtSpotlight(planeMesh);
+  }
+
+  const SIDE_MAT = new THREE.MeshStandardMaterial({
+    color: new THREE.Color("#2a2a2a"),
+    roughness: 1.0,
+    metalness: 0.0,
+  });
+
+  function paintArtSideFaces(parentObj: THREE.Object3D, artMesh: THREE.Mesh) {
+    // Paint all sibling/child meshes that aren't the art face with a dark material
+    parentObj.traverse((o: THREE.Object3D) => {
+      if (o === artMesh) return;
+      if (!(o as THREE.Mesh).isMesh) return;
+      (o as THREE.Mesh).material = SIDE_MAT;
+    });
+
+    // If the art mesh itself has geometry groups, apply dark material to non-first groups
+    const geo = artMesh.geometry;
+    if (geo.groups && geo.groups.length > 1) {
+      const artMat = artMesh.material as THREE.Material;
+      artMesh.material = [artMat, ...Array(geo.groups.length - 1).fill(SIDE_MAT)];
+    }
   }
 
   async function attachArtToPlanes(root: THREE.Object3D) {
@@ -569,6 +650,23 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       }
 
       await attachToMeshPlane(mesh, item);
+      paintArtSideFaces(obj, mesh);
+
+      // Name panel (ART_X_NAME)
+      if (item.nameAnchor) {
+        const nameObj = findObjectByName(root, item.nameAnchor);
+        if (nameObj) {
+          let nameMesh: THREE.Mesh | null = null;
+          if ((nameObj as any).isMesh) nameMesh = nameObj as THREE.Mesh;
+          else nameObj.traverse((o: THREE.Object3D) => { if (!nameMesh && (o as THREE.Mesh).isMesh) nameMesh = o as THREE.Mesh; });
+          if (nameMesh) {
+            applyNameToPanel(nameMesh, `${item.artist} — ${item.artworkTitle}`);
+            console.log(`[art] name panel found: ${item.nameAnchor}`);
+          }
+        } else {
+          console.warn(`[art] name panel not found: ${item.nameAnchor}`);
+        }
+      }
     }
 
     if (missing.length) console.warn("[art] missing planes:", missing);
@@ -616,6 +714,63 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     return logo;
   }
 
+  /* ===== Cat pointer indicator ===== */
+  let catPointerEl: HTMLElement | null = null;
+
+  function createCatPointer(catObj: THREE.Object3D) {
+    const el = document.createElement("div");
+    el.style.cssText =
+      "position:fixed;z-index:9990;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:4px;transition:opacity 0.3s ease;";
+
+    const ring = document.createElement("div");
+    ring.style.cssText =
+      "width:48px;height:48px;border-radius:50%;border:2px solid rgba(255,255,255,0.7);background:rgba(255,255,255,0.12);animation:catPulse 1.6s ease-in-out infinite;";
+
+    const label = document.createElement("div");
+    label.style.cssText =
+      "font-size:11px;color:rgba(255,255,255,0.85);font-family:'Noto Sans KR',system-ui,sans-serif;letter-spacing:0.04em;text-shadow:0 1px 4px rgba(0,0,0,0.6);white-space:nowrap;";
+    label.textContent = "클릭하세요";
+
+    el.appendChild(ring);
+    el.appendChild(label);
+    document.body.appendChild(el);
+    catPointerEl = el;
+
+    // CSS animation
+    const style = document.createElement("style");
+    style.textContent = `@keyframes catPulse{0%,100%{transform:scale(1);opacity:0.7}50%{transform:scale(1.25);opacity:1}}`;
+    document.head.appendChild(style);
+
+    const worldPos = new THREE.Vector3();
+    function updatePointer() {
+      if (!catPointerEl) return;
+      catObj.getWorldPosition(worldPos);
+      const projected = worldPos.clone().project(camera);
+      const hw = window.innerWidth / 2;
+      const hh = window.innerHeight / 2;
+      const sx = projected.x * hw + hw;
+      const sy = -projected.y * hh + hh;
+
+      // Hide if behind camera
+      if (projected.z > 1) {
+        el.style.opacity = "0";
+      } else {
+        el.style.opacity = "1";
+        el.style.left = `${sx - 24}px`;
+        el.style.top = `${sy - 24}px`;
+      }
+      requestAnimationFrame(updatePointer);
+    }
+    updatePointer();
+  }
+
+  function removeCatPointer() {
+    if (catPointerEl) {
+      catPointerEl.remove();
+      catPointerEl = null;
+    }
+  }
+
   loader.load(
     glbUrl,
     async (gltf) => {
@@ -642,6 +797,8 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
         onArrive,
       });
 
+      // Wait for all art textures to finish loading before attaching
+      await Promise.all(artTexturePromises);
       await attachArtToPlanes(gltf.scene);
       await attachLogoToWall(gltf.scene);
 
@@ -653,8 +810,29 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       }
       onArrive(ORIGIN_ID);
 
-      console.log("[viewer] glb loaded. colliders:", colliders.length, "artClickable:", clickableArtMeshes.length);
-      console.log("[hint] NAV: ←/→ or buttons, click artwork => go to its waypoint. Q: NAV<->FREE. P: log cam. H/0: origin");
+      // Collect clickable guide objects (reception desk, doent_Cat)
+      for (const gname of GUIDE_OBJECT_NAMES) {
+        const obj = findObjectByName(gltf.scene, gname);
+        if (!obj) continue;
+        obj.traverse((o: THREE.Object3D) => {
+          if ((o as THREE.Mesh).isMesh) guideClickMeshes.push(o as THREE.Mesh);
+        });
+      }
+
+      // Diagnostic: list all ART-related objects in GLB
+      const artNames: string[] = [];
+      gltf.scene.traverse((o: THREE.Object3D) => {
+        if (o.name && (o.name.includes("ART") || o.name.includes("art"))) artNames.push(o.name);
+      });
+      console.log("[viewer] ART objects in GLB:", artNames);
+      console.log("[viewer] glb loaded. colliders:", colliders.length, "artClickable:", clickableArtMeshes.length, "guide:", guideClickMeshes.length);
+
+      // Cat pointer indicator
+      const catObj = findObjectByName(gltf.scene, "doent_Cat");
+      if (catObj) createCatPointer(catObj);
+
+      // Signal that interior is fully ready (fade can clear)
+      opts.onReady?.();
     },
     undefined,
     (err) => console.error("[viewer] GLB load failed:", err)
@@ -664,16 +842,27 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
 
-  function raycastArtwork(clientX: number, clientY: number) {
+  function setNdc(clientX: number, clientY: number) {
     const rect = renderer.domElement.getBoundingClientRect();
-    const x = ((clientX - rect.left) / rect.width) * 2 - 1;
-    const y = -(((clientY - rect.top) / rect.height) * 2 - 1);
-    ndc.set(x, y);
+    ndc.set(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -(((clientY - rect.top) / rect.height) * 2 - 1),
+    );
+  }
 
+  function raycastArtwork(clientX: number, clientY: number) {
+    setNdc(clientX, clientY);
     raycaster.setFromCamera(ndc, camera);
     const hits = raycaster.intersectObjects(clickableArtMeshes, true);
     if (!hits.length) return null;
     return hits[0].object as THREE.Mesh;
+  }
+
+  function raycastGuide(clientX: number, clientY: number): boolean {
+    if (guideClickMeshes.length === 0) return false;
+    setNdc(clientX, clientY);
+    raycaster.setFromCamera(ndc, camera);
+    return raycaster.intersectObjects(guideClickMeshes, true).length > 0;
   }
 
   function onPointerMove(e: PointerEvent) {
@@ -689,7 +878,8 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     }
 
     const hit = raycastArtwork(e.clientX, e.clientY);
-    renderer.domElement.style.cursor = hit ? "pointer" : "";
+    const guideHit = !hit && raycastGuide(e.clientX, e.clientY);
+    renderer.domElement.style.cursor = (hit || guideHit) ? "pointer" : "";
   }
 
   function onPointerDown(e: PointerEvent) {
@@ -699,13 +889,28 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       return;
     }
 
+    // Guide object click (reception desk / doent_Cat)
+    if (raycastGuide(e.clientX, e.clientY)) {
+      showTutorialOverlay();
+      return;
+    }
+
     const hit = raycastArtwork(e.clientX, e.clientY);
     if (!hit) return;
 
     const wpId = hit.userData?.__wpId as number | undefined;
+    const artist = hit.userData?.__artist as string | undefined;
+    const artworkTitle = hit.userData?.__artworkTitle as string | undefined;
 
-    // 작품 클릭 => 해당 waypoint 이동 + 원점 버튼 표시
+    // 작품 클릭 => 모달 표시(가까울 때만) + 해당 waypoint 이동
     if (typeof wpId === "number") {
+      const hitPos = computeWorldPos(hit);
+      const distToArt = camera.position.distanceTo(hitPos);
+
+      if (artist && artworkTitle && distToArt < 50) {
+        showArtModal(artist, artworkTitle);
+      }
+
       setBackBtnVisible(true);
       setBackBtnBusy(false);
 
@@ -713,7 +918,6 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
         try {
           navigator.goTo(wpId);
         } catch {
-          // 그래도 안전하게는 스냅 (작품 이동이 막히면 사용성 박살나서)
           const pose = getWaypointPose(wpId);
           if (pose) {
             camera.position.set(pose.pos[0], pose.pos[1], pose.pos[2]);
@@ -793,6 +997,117 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     if (mode !== "NAV") return;
     nextWaypoint();
   });
+
+  /* ===== Tutorial overlay (reception desk / doent_Cat click) ===== */
+  const TUTORIAL_MESSAGES = [
+    "ARNNECT에 오신것을 환영합니다",
+    "Q버튼을 누르면 WASD로 자유롭게 홀을 돌아볼 수 있어요!",
+    "마음에 드시는 작품을 누르면 작품 상세 페이지로 이동할 수 있어요",
+  ];
+  const TUTORIAL_FINAL = "그럼 즐거운 ARNNECT 하세요!";
+
+  let tutorialEl: HTMLElement | null = null;
+
+  function showTutorialOverlay() {
+    if (tutorialEl) return; // already open
+    removeCatPointer();
+
+    let step = 0;
+
+    const wrap = document.createElement("div");
+    wrap.id = "tutorial-overlay";
+    wrap.style.cssText =
+      "position:fixed;left:0;right:0;bottom:0;z-index:99998;display:flex;justify-content:center;pointer-events:none;padding:0 24px 48px;";
+
+    const box = document.createElement("div");
+    box.style.cssText =
+      "pointer-events:auto;background:rgba(0,0,0,0.72);backdrop-filter:blur(10px);border-radius:16px;padding:28px 36px;max-width:560px;width:100%;text-align:center;font-family:'Noto Sans KR',system-ui,sans-serif;color:rgba(255,255,255,0.95);font-size:17px;line-height:1.7;display:flex;flex-direction:column;align-items:center;gap:18px;";
+
+    const msgEl = document.createElement("div");
+    msgEl.textContent = TUTORIAL_MESSAGES[0];
+
+    const btnRow = document.createElement("div");
+    btnRow.style.cssText = "display:flex;gap:12px;";
+
+    const skipBtn = document.createElement("button");
+    skipBtn.style.cssText =
+      "background:transparent;color:rgba(255,255,255,0.55);border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:8px 22px;font-size:14px;cursor:pointer;font-family:inherit;";
+    skipBtn.textContent = "건너뛰기";
+
+    const nextBtn = document.createElement("button");
+    nextBtn.style.cssText =
+      "background:rgba(255,255,255,0.18);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:8px;padding:8px 22px;font-size:14px;cursor:pointer;font-family:inherit;";
+    nextBtn.textContent = "다음";
+
+    btnRow.appendChild(skipBtn);
+    btnRow.appendChild(nextBtn);
+    box.appendChild(msgEl);
+    box.appendChild(btnRow);
+    wrap.appendChild(box);
+    document.body.appendChild(wrap);
+    tutorialEl = wrap;
+
+    function closeTutorial() {
+      msgEl.textContent = TUTORIAL_FINAL;
+      btnRow.style.display = "none";
+      setTimeout(() => {
+        if (wrap.isConnected) {
+          box.style.transition = "opacity 0.6s ease";
+          box.style.opacity = "0";
+          setTimeout(() => { wrap.remove(); tutorialEl = null; }, 700);
+        }
+      }, 1800);
+    }
+
+    nextBtn.addEventListener("click", () => {
+      step++;
+      if (step < TUTORIAL_MESSAGES.length) {
+        msgEl.textContent = TUTORIAL_MESSAGES[step];
+      } else {
+        closeTutorial();
+      }
+    });
+
+    skipBtn.addEventListener("click", () => {
+      closeTutorial();
+    });
+  }
+
+  /* Clickable guide objects (reception desk, doent_Cat) */
+  const GUIDE_OBJECT_NAMES = ["reception_desk", "doent_Cat"];
+  const guideClickMeshes: THREE.Mesh[] = [];
+
+  /* ===== Art modal ===== */
+  function showArtModal(artist: string, artworkTitle: string) {
+    if (document.getElementById("art-modal")) return;
+
+    const overlay = document.createElement("div");
+    overlay.id = "art-modal";
+    overlay.style.cssText =
+      "position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:99999;";
+
+    const box = document.createElement("div");
+    box.style.cssText =
+      "background:#fff;border-radius:12px;padding:40px 48px;text-align:center;font-family:'Noto Sans KR',system-ui,sans-serif;min-width:280px;";
+
+    const title = document.createElement("h2");
+    title.style.cssText = "margin:0 0 12px;font-size:22px;color:#222;";
+    title.textContent = `${artist}의 "${artworkTitle}" 입니다`;
+
+    const btn = document.createElement("button");
+    btn.style.cssText =
+      "background:#333;color:#fff;border:none;border-radius:8px;padding:10px 32px;font-size:15px;cursor:pointer;margin-top:18px;";
+    btn.textContent = "닫기";
+    btn.addEventListener("click", () => overlay.remove());
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+
+    box.append(title, btn);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  }
 
   /* Loop */
   function loop() {

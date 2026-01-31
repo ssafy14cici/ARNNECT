@@ -26,6 +26,9 @@ export type MountIntroOptions = {
   exposure?: number; // default 0.75
   envIntensity?: number; // default 0.65
   lightIntensity?: number; // default 0.85
+
+  // ✅ 내부에서 돌아올 때 로딩 애니메이션 건너뛰기
+  skipLoading?: boolean;
 };
 
 export type IntroRuntime = {
@@ -37,8 +40,14 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   const holdMs = opts.holdMs ?? 1000;
 
   const ui = createIntroUI();
-  ui.setState("loading");
-  ui.setProgress(0, "Loading…");
+  if (opts.skipLoading) {
+    // 로딩 UI: backdrop만 표시(텍스트 리빌 없이), GLB 로드 후 바로 씬 전환
+    ui.setState("loading");
+    ui.setProgress(0, "");
+  } else {
+    ui.setState("loading");
+    ui.setProgress(0, "Loading…");
+  }
 
   if (opts.prefetchUrl) fetch(opts.prefetchUrl, { cache: "force-cache" }).catch(() => void 0);
 
@@ -161,7 +170,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   console.log("[Intro] enterTarget:", enterTarget, "enterStopDistance:", enterStopDistance);
 
   renderer.render(scene, camera);
-  requestAnimationFrame(() => ui.setState("ready"));
+  requestAnimationFrame(() => ui.setState("ready", opts.skipLoading));
   opts.onReady?.(computedPose);
 
   // 루프(마우스에 따른 "살짝 둘러보기": look + tiny orbit parallax)
@@ -293,7 +302,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
             const carried = ui.carryFadeToBody();
             dispose({ keepCarriedFade: true });
             opts.onEntered();
-            scheduleFadeCleanup(carried, 500);
+            scheduleFadeCleanup(carried, 15000);
           },
         });
 
@@ -619,12 +628,39 @@ function createIntroUI() {
     lineEls.push(el);
   }
 
+  // ✅ 메뉴 햄버거 버튼
+  const menuBtn = document.createElement("button");
+  menuBtn.className = "intro-menu-btn";
+  menuBtn.type = "button";
+  menuBtn.innerHTML = `<span>MENU</span><span class="intro-menu-icon"><span></span><span></span></span>`;
+
+  // ✅ 히어로 오버레이 (건물 위 텍스트)
+  const heroOverlay = document.createElement("div");
+  heroOverlay.className = "intro-hero";
+
+  const heroLine1 = document.createElement("div");
+  heroLine1.className = "intro-hero__line intro-hero__line--main";
+  heroLine1.textContent = "당신의 예술가를 발견하고\n당신의 취향을 완성하세요";
+  heroLine1.style.whiteSpace = "pre-line";
+
+  const heroLine2 = document.createElement("div");
+  heroLine2.className = "intro-hero__line intro-hero__line--sub";
+  heroLine2.textContent = "예술가와 당신이 연결되는 곳";
+
+  const heroLine3 = document.createElement("div");
+  heroLine3.className = "intro-hero__line intro-hero__line--brand";
+  heroLine3.textContent = "ARNNECT";
+
+  heroOverlay.appendChild(heroLine1);
+  heroOverlay.appendChild(heroLine2);
+  heroOverlay.appendChild(heroLine3);
+
   const content = document.createElement("div");
   content.className = "intro-content";
 
   const subtitle = document.createElement("div");
   subtitle.className = "intro-subtitle";
-  subtitle.textContent = "Hold for 1 second to enter";
+  subtitle.textContent = "Hold to enter";
 
   const enterBtn = document.createElement("button");
   enterBtn.className = "intro-enter";
@@ -660,6 +696,8 @@ function createIntroUI() {
   backdrop.appendChild(textReveal);
 
   root.appendChild(backdrop);
+  root.appendChild(menuBtn);
+  root.appendChild(heroOverlay);
   root.appendChild(content);
   root.appendChild(fade);
 
@@ -680,8 +718,16 @@ function createIntroUI() {
       return fade;
     },
 
-    setState: (s: "loading" | "ready" | "entering") => {
-      if (s === "ready") {
+    setState: (s: "loading" | "ready" | "entering", skipLoading?: boolean) => {
+      if (s === "ready" && skipLoading) {
+        // 내부에서 돌아올 때: 로딩/텍스트 애니메이션 전부 건너뛰기
+        loader.style.display = "none";
+        backdrop.style.display = "none";
+        root.dataset.state = "enter-ready";
+
+        heroOverlay.style.opacity = "1";
+        menuBtn.style.opacity = "1";
+      } else if (s === "ready") {
         gsap.to(loader, {
           opacity: 0,
           duration: 0.6,
@@ -701,6 +747,16 @@ function createIntroUI() {
                   onComplete: () => {
                     backdrop.style.display = "none";
                     root.dataset.state = "enter-ready";
+
+                    // 히어로 오버레이 + 메뉴 버튼 페이드인
+                    gsap.fromTo(heroOverlay,
+                      { opacity: 0, y: 30 },
+                      { opacity: 1, y: 0, duration: 1.2, ease: "power2.out" },
+                    );
+                    gsap.fromTo(menuBtn,
+                      { opacity: 0 },
+                      { opacity: 1, duration: 0.8, ease: "power2.out", delay: 0.3 },
+                    );
                   },
                 });
               },
@@ -751,8 +807,15 @@ function createIntroUI() {
       enterText.textContent = "Entering…";
     },
 
+    hideBackdrop: () => {
+      loader.style.display = "none";
+      backdrop.style.display = "none";
+    },
+
     beginEnter: () => {
       gsap.to(content, { opacity: 0, duration: 0.2, ease: "power1.out" });
+      gsap.to(heroOverlay, { opacity: 0, duration: 0.3, ease: "power1.out" });
+      gsap.to(menuBtn, { opacity: 0, duration: 0.3, ease: "power1.out" });
       root.dataset.state = "entering";
     },
   };
