@@ -29,21 +29,6 @@ export type MountIntroOptions = {
 
   // ✅ 내부에서 돌아올 때 로딩 애니메이션 건너뛰기
   skipLoading?: boolean;
-
-  // ✅ 프레이밍 확대 (1.0=기본, 1.5=약 0.5배 키움)
-  framingScale?: number; // default 1.5
-
-  // ✅ safe-area 여유 패딩(px) - 줄이면 건물 더 커짐(텍스트와 더 가까워짐)
-  safeAreaPadPx?: number; // default 16
-
-  // ✅ 하단 여유(비율) - 줄이면 건물 더 아래까지 붙음
-  bottomSafeRatio?: number; // default 0.02
-
-  // ✅ 기본 카메라 거리 배수(작을수록 가까이=크게)
-  distanceFactor?: number; // default 0.33
-
-  // ✅ 프레이밍 bbox outlier 필터 강도(클수록 더 관대)
-  focusBoxOutlierFactor?: number; // default 8
 };
 
 export type IntroRuntime = {
@@ -54,15 +39,9 @@ export type IntroRuntime = {
 export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOptions): Promise<IntroRuntime> {
   const holdMs = opts.holdMs ?? 1000;
 
-  const framingScale = opts.framingScale ?? 1.5;
-  const safeAreaPadPx = opts.safeAreaPadPx ?? 16;
-  const bottomSafeRatioOpt = opts.bottomSafeRatio ?? 0.02;
-  const distanceFactor = opts.distanceFactor ?? 0.33;
-  const outlierFactor = opts.focusBoxOutlierFactor ?? 8;
-
   const ui = createIntroUI();
-
   if (opts.skipLoading) {
+    // 로딩 UI: backdrop만 표시(텍스트 리빌 없이), GLB 로드 후 바로 씬 전환
     ui.setState("loading");
     ui.setProgress(0, "");
   } else {
@@ -82,10 +61,14 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
+  // ✅ 톤매핑(노출로 밝기 조절)
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  const exposure = opts.exposure ?? 0.75;
+
+  // 초기값: “어둡다”가 기본이면 조금 올려서 시작
+  let exposure = opts.exposure ?? 0.75;
   renderer.toneMappingExposure = exposure;
 
+  // HDR 로딩 실패 대비 기본 배경
   renderer.setClearColor(new THREE.Color("#0f1115"), 1);
 
   const scene = new THREE.Scene();
@@ -93,8 +76,8 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
 
   const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.05, 5000);
 
-  // ✅ 라이트
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.3);
+  // ✅ 라이트(너무 낮추면 지금처럼 어두워짐)
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.30);
   scene.add(hemi);
 
   const dir = new THREE.DirectionalLight(0xffffff, opts.lightIntensity ?? 0.85);
@@ -102,8 +85,8 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   scene.add(dir);
 
   // ✅ HDRI (PMREM)
-  let hdriBg: THREE.Texture | null = null;
-  let hdriEnv: THREE.Texture | null = null;
+  let hdriBg: THREE.Texture | null = null; // 배경(원본 HDR)
+  let hdriEnv: THREE.Texture | null = null; // 환경(PMREM)
   if (opts.hdriUrl) {
     try {
       const loaded = await loadHdriWithPmrem(renderer, opts.hdriUrl);
@@ -139,15 +122,10 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   scene.add(gltfScene);
   gltfScene.updateMatrixWorld(true);
 
-  // ✅ bbox: 전체(sceneBox) + 프레이밍용(focusBox)
-  const sceneBox = new THREE.Box3().setFromObject(gltfScene);
-  const focusBox = computeFocusBox(gltfScene, opts.doorName, outlierFactor);
-
-  const sceneSize = sceneBox.getSize(new THREE.Vector3());
-  const sceneMaxDim = Math.max(sceneSize.x, sceneSize.y, sceneSize.z);
-
-  const focusSize = focusBox.getSize(new THREE.Vector3());
-  const focusMaxDim = Math.max(focusSize.x, focusSize.y, focusSize.z);
+  // ✅ bbox + meshCount 진단 로그
+  const box = new THREE.Box3().setFromObject(gltfScene);
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
 
   let meshCount = 0;
   gltfScene.traverse((o) => {
@@ -155,15 +133,14 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   });
 
   console.log("[Intro] doorName:", opts.doorName);
-  console.log("[Intro] scene bbox:", sceneSize, "sceneMaxDim:", sceneMaxDim, "meshCount:", meshCount);
-  console.log("[Intro] focus bbox:", focusSize, "focusMaxDim:", focusMaxDim);
+  console.log("[Intro] bbox size:", size, "maxDim:", maxDim, "meshCount:", meshCount);
 
-  // ✅ near/far는 전체 스케일 기준(클리핑 안전)
-  camera.near = Math.max(0.01, sceneMaxDim / 5000);
-  camera.far = Math.max(5000, sceneMaxDim * 50);
+  // ✅ GLB 스케일 큰 경우 자동 near/far
+  camera.near = Math.max(0.01, maxDim / 5000);
+  camera.far = Math.max(5000, maxDim * 50);
   camera.updateProjectionMatrix();
 
-  // ✅ env intensity
+  // ✅ env intensity (재질이 하얗게/검게 뜨는 걸 여기로 잡음)
   let envIntensity = opts.envIntensity ?? 0.65;
   const applyEnvIntensity = (v: number) => {
     envIntensity = clamp(v, 0.0, 3.0);
@@ -183,80 +160,39 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   };
   applyEnvIntensity(envIntensity);
 
-  // ✅ 포즈 결정(초기 시점) - 프레이밍은 focusBox 기준
-  const focusCenter = focusBox.getCenter(new THREE.Vector3());
-
-  let computedPose =
-    opts.startPose ??
-    computeDoorFacingPose({
-      root: gltfScene,
-      doorName: opts.doorName,
-      center: focusCenter,
-      maxDim: focusMaxDim,
-      distanceFactor,
-    });
-
-  // ✅ 상단 안전영역 확보 + 프레이밍 보정
-  {
-    const { topSafeRatio, bottomSafeRatio } = computeSafeAreaRatios(ui, safeAreaPadPx, bottomSafeRatioOpt);
-    computedPose = refinePoseToSafeArea({
-      pose: computedPose,
-      box: focusBox, // ✅ 여기!
-      camera,
-      topSafeRatio,
-      bottomSafeRatio,
-      scaleUp: framingScale,
-    });
-  }
-
+  // ✅ 포즈 결정(초기 시점)
+  const computedPose = opts.startPose ?? computeDoorFacingPose(gltfScene, opts.doorName, maxDim);
   console.log("[Intro] pose:", computedPose);
   applyPose(camera, computedPose);
 
-  const basePos = new THREE.Vector3(...computedPose.position);
-  const baseTarget = new THREE.Vector3(...computedPose.target);
-
-  const enterTarget = computeEnterTarget(gltfScene, opts.doorName, baseTarget.clone());
-  const enterStopDistance = computeEnterStopDistance(gltfScene, opts.doorName, focusMaxDim);
+  const enterTarget = computeEnterTarget(gltfScene, opts.doorName, new THREE.Vector3(...computedPose.target));
+  const enterStopDistance = computeEnterStopDistance(gltfScene, opts.doorName, maxDim);
   console.log("[Intro] enterTarget:", enterTarget, "enterStopDistance:", enterStopDistance);
 
   renderer.render(scene, camera);
-
-  requestAnimationFrame(() => {
-    ui.setState("ready", opts.skipLoading);
-
-    requestAnimationFrame(() => {
-      const { topSafeRatio, bottomSafeRatio } = computeSafeAreaRatios(ui, safeAreaPadPx, bottomSafeRatioOpt);
-      const refined = refinePoseToSafeArea({
-        pose: { position: [basePos.x, basePos.y, basePos.z], target: [baseTarget.x, baseTarget.y, baseTarget.z], fov: camera.fov },
-        box: focusBox, // ✅ 여기!
-        camera,
-        topSafeRatio,
-        bottomSafeRatio,
-        scaleUp: framingScale,
-      });
-
-      gsap.to(basePos, { x: refined.position[0], y: refined.position[1], z: refined.position[2], duration: 0.9, ease: "power2.inOut" });
-      gsap.to(baseTarget, { x: refined.target[0], y: refined.target[1], z: refined.target[2], duration: 0.9, ease: "power2.inOut" });
-    });
-  });
-
+  requestAnimationFrame(() => ui.setState("ready", opts.skipLoading));
   opts.onReady?.(computedPose);
 
-  // loop
+  // 루프(마우스에 따른 "살짝 둘러보기": look + tiny orbit parallax)
   let alive = true;
   let raf = 0;
   let isEntering = false;
 
+  // pointer: target(즉시 입력) / smooth(감쇠 적용)
   const pointerT = { x: 0, y: 0 };
   const pointerS = { x: 0, y: 0 };
 
   const onMove = (e: PointerEvent) => {
-    const nx = (e.clientX / window.innerWidth) * 2 - 1;
-    const ny = (e.clientY / window.innerHeight) * 2 - 1;
+    const nx = (e.clientX / window.innerWidth) * 2 - 1; // -1..1
+    const ny = (e.clientY / window.innerHeight) * 2 - 1; // top=-1, bottom=+1
     pointerT.x = clamp(nx, -1, 1);
+    // 위로 올리면 +가 되도록 뒤집어줌
     pointerT.y = clamp(-ny, -1, 1);
   };
   window.addEventListener("pointermove", onMove, { passive: true });
+
+  const basePos = new THREE.Vector3(...computedPose.position);
+  const baseTarget = new THREE.Vector3(...computedPose.target);
 
   const tmpForward = new THREE.Vector3();
   const tmpRight = new THREE.Vector3();
@@ -267,17 +203,24 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   const tick = () => {
     if (!alive) return;
 
+    // entering 중엔 흔들림/오비트 꺼서 깔끔하게
     const active = isEntering ? 0 : 1;
 
-    const DAMP = 0.1;
+    // damping (값 올리면 더 즉각적, 내리면 더 부드러움)
+    const DAMP = 0.10;
     pointerS.x = lerp(pointerS.x, pointerT.x, DAMP);
     pointerS.y = lerp(pointerS.y, pointerT.y, DAMP);
 
+    // 거리 기반 스케일링: 모델 크기/카메라 거리 달라도 "항상 살짝"로 유지
     const dist = basePos.distanceTo(baseTarget);
 
-    const ORBIT = clamp(dist * 0.035, 0.03, dist * 0.08) * active;
-    const LOOK = clamp(dist * 0.02, 0.02, dist * 0.06) * active;
+    // ✅ “주변을 살짝 볼 수” 있게 만드는 핵심 파라미터
+    // - ORBIT: 카메라 위치 자체를 미세 이동(패럴럭스)
+    // - LOOK : 시선(target)을 미세 이동(고개 돌리기)
+    const ORBIT = clamp(dist * 0.035, 0.03, dist * 0.08) * active; // 3.5% 정도
+    const LOOK = clamp(dist * 0.020, 0.02, dist * 0.06) * active;  // 2% 정도
 
+    // basis vectors (basePos->baseTarget 기준)
     tmpForward.copy(baseTarget).sub(basePos);
     if (tmpForward.lengthSq() < 1e-8) tmpForward.set(0, 0, -1);
     tmpForward.normalize();
@@ -290,15 +233,15 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     if (tmpUp.lengthSq() < 1e-8) tmpUp.set(0, 1, 0);
     tmpUp.normalize();
 
-    tmpPos
-      .copy(basePos)
+    // camera position: basePos + right/up 오프셋(패럴럭스)
+    tmpPos.copy(basePos)
       .addScaledVector(tmpRight, pointerS.x * ORBIT)
       .addScaledVector(tmpUp, pointerS.y * ORBIT);
 
     camera.position.copy(tmpPos);
 
-    tmpTgt
-      .copy(baseTarget)
+    // look target: baseTarget + right/up 오프셋(고개 돌리기)
+    tmpTgt.copy(baseTarget)
       .addScaledVector(tmpRight, pointerS.x * LOOK)
       .addScaledVector(tmpUp, pointerS.y * LOOK);
 
@@ -314,19 +257,6 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     renderer.setSize(window.innerWidth, window.innerHeight, false);
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-
-    const { topSafeRatio, bottomSafeRatio } = computeSafeAreaRatios(ui, safeAreaPadPx, bottomSafeRatioOpt);
-    const refined = refinePoseToSafeArea({
-      pose: { position: [basePos.x, basePos.y, basePos.z], target: [baseTarget.x, baseTarget.y, baseTarget.z], fov: camera.fov },
-      box: focusBox,
-      camera,
-      topSafeRatio,
-      bottomSafeRatio,
-      scaleUp: framingScale,
-    });
-
-    basePos.set(...refined.position);
-    baseTarget.set(...refined.target);
   };
   window.addEventListener("resize", onResize);
 
@@ -424,6 +354,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
       else disposeMaterial(mat);
     });
 
+    // HDR 리소스 해제
     if (scene.background === hdriBg) scene.background = null;
     if (scene.environment === hdriEnv) scene.environment = null;
     hdriBg?.dispose?.();
@@ -466,219 +397,6 @@ async function loadHdriWithPmrem(renderer: THREE.WebGLRenderer, url: string) {
   return { background: hdr, environment: env };
 }
 
-/* ---------- Focus box (bbox outlier 필터) ---------- */
-
-function computeFocusBox(root: THREE.Object3D, doorName: string, outlierFactor: number) {
-  root.updateMatrixWorld(true);
-
-  const entries: { box: THREE.Box3; maxDim: number; name: string }[] = [];
-
-  root.traverse((obj) => {
-    const mesh = obj as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    if (!mesh.visible) return;
-
-    const geom = mesh.geometry as THREE.BufferGeometry | undefined;
-    if (!geom) return;
-
-    if (!geom.boundingBox) geom.computeBoundingBox();
-    const bb0 = geom.boundingBox;
-    if (!bb0) return;
-
-    const bb = bb0.clone();
-    bb.applyMatrix4(mesh.matrixWorld);
-
-    const s = bb.getSize(new THREE.Vector3());
-    const maxDim = Math.max(s.x, s.y, s.z);
-    if (!(maxDim > 0)) return;
-
-    const n = (mesh.name || "").toLowerCase();
-    if (/(collider|collision|navmesh|trigger|helper)/i.test(n)) return;
-
-    entries.push({ box: bb, maxDim, name: mesh.name || "" });
-  });
-
-  if (entries.length < 3) return new THREE.Box3().setFromObject(root);
-
-  const dims = entries.map((e) => e.maxDim).sort((a, b) => a - b);
-  const median = dims[Math.floor(dims.length * 0.5)];
-  const threshold = Math.max(median * Math.max(2, outlierFactor), median + 1e-6);
-
-  let kept = entries.filter((e) => e.maxDim <= threshold);
-
-  // 너무 많이 잘렸으면(예: 건물이 통짜 메쉬) 그냥 전체로 fallback
-  if (kept.length < Math.max(3, Math.floor(entries.length * 0.25))) {
-    kept = entries;
-  }
-
-  // door는 무조건 포함(혹시라도 필터로 제거된 경우 대비)
-  const door = findByName(root, doorName);
-  if (door) {
-    const doorBox = new THREE.Box3().setFromObject(door);
-    if (!doorBox.isEmpty()) {
-      const s = doorBox.getSize(new THREE.Vector3());
-      kept.push({ box: doorBox, maxDim: Math.max(s.x, s.y, s.z), name: door.name });
-    }
-  }
-
-  const box = new THREE.Box3();
-  for (const e of kept) box.union(e.box);
-
-  if (box.isEmpty()) return new THREE.Box3().setFromObject(root);
-
-  console.log("[Intro] focusBox filter:", { total: entries.length, kept: kept.length, median, threshold });
-  return box;
-}
-
-/* ---------- Safe-area framing ---------- */
-
-function computeSafeAreaRatios(ui: ReturnType<typeof createIntroUI>, padPx: number, bottomSafeRatioInput: number) {
-  const h = Math.max(1, window.innerHeight);
-
-  const heroRect = ui.heroOverlay.getBoundingClientRect();
-  const menuRect = ui.menuBtn.getBoundingClientRect();
-
-  const measuredTopPx = Math.max(heroRect.bottom || 0, menuRect.bottom || 0);
-
-  const PAD_PX = Math.max(0, padPx);
-  const DEFAULT_TOP_SAFE_RATIO = 0.26;
-
-  const topSafePx = measuredTopPx + PAD_PX;
-  let topSafeRatio = topSafePx / h;
-
-  if (topSafeRatio < 0.10) topSafeRatio = DEFAULT_TOP_SAFE_RATIO;
-  topSafeRatio = clamp(topSafeRatio, 0.0, 0.45);
-
-  const bottomSafeRatio = clamp(bottomSafeRatioInput, 0.0, 0.2);
-
-  return { topSafeRatio, bottomSafeRatio };
-}
-
-function refinePoseToSafeArea(args: {
-  pose: CameraPose;
-  box: THREE.Box3;
-  camera: THREE.PerspectiveCamera;
-  topSafeRatio: number;
-  bottomSafeRatio: number;
-  scaleUp?: number;
-}) {
-  const { pose, box, camera, topSafeRatio, bottomSafeRatio } = args;
-  const scaleUp = Math.max(1.0, args.scaleUp ?? 1.0);
-
-  if (!box || box.isEmpty()) return pose;
-
-  const pos = new THREE.Vector3(...pose.position);
-  const target0 = new THREE.Vector3(...pose.target);
-
-  const desiredYMin = -1 + 2 * clamp(bottomSafeRatio, 0, 0.2);
-  const topLimit = 1 - 2 * clamp(topSafeRatio, 0, 0.45);
-  const avail = Math.max(0.25, topLimit - desiredYMin);
-
-  const corners = getBoxCorners(box);
-
-  const setCam = (p: THREE.Vector3, t: THREE.Vector3) => {
-    camera.position.copy(p);
-    camera.fov = pose.fov;
-    camera.updateProjectionMatrix();
-    camera.lookAt(t);
-    camera.updateMatrixWorld(true);
-  };
-
-  const yRange = (p: THREE.Vector3, t: THREE.Vector3) => {
-    setCam(p, t);
-    let yMin = Infinity;
-    let yMax = -Infinity;
-    for (const c of corners) {
-      const v = c.clone().project(camera);
-      yMin = Math.min(yMin, v.y);
-      yMax = Math.max(yMax, v.y);
-    }
-    return { yMin, yMax, span: yMax - yMin };
-  };
-
-  let target = target0.clone();
-  let p = pos.clone();
-
-  // 1) 너무 크면 뒤로 빼기
-  for (let i = 0; i < 6; i++) {
-    const r = yRange(p, target);
-    if (r.span <= avail) break;
-
-    const factor = clamp(r.span / avail, 1.02, 1.35);
-    p = target.clone().add(p.clone().sub(target).multiplyScalar(factor));
-  }
-
-  // 1b) 가능한 범위에서 더 크게(앞으로 당김)
-  if (scaleUp > 1.001) {
-    const r0 = yRange(p, target);
-    const desiredSpan = Math.min(avail * 0.985, r0.span * scaleUp);
-
-    if (desiredSpan > r0.span * 1.01) {
-      for (let i = 0; i < 7; i++) {
-        const r = yRange(p, target);
-        if (r.span >= desiredSpan * 0.995) break;
-
-        const factor = clamp(r.span / desiredSpan, 0.55, 0.98); // ✅ 0.65→0.55로 완화(더 가까이 갈 수 있게)
-        const v = p.clone().sub(target);
-        p = target.clone().add(v.multiplyScalar(factor));
-
-        const rr = yRange(p, target);
-        if (rr.span > avail * 0.995) break;
-      }
-    }
-  }
-
-  // 2) 바닥을 하단에 붙이고 상단은 topSafe 아래로
-  const shiftMax = Math.max(0.5, box.getSize(new THREE.Vector3()).y) * 1.2;
-
-  for (let pass = 0; pass < 4; pass++) {
-    const base = target0.clone();
-    let lo = -shiftMax;
-    let hi = shiftMax;
-
-    for (let it = 0; it < 18; it++) {
-      const mid = (lo + hi) * 0.5;
-      const t = base.clone().add(new THREE.Vector3(0, mid, 0));
-      const r = yRange(p, t);
-
-      if (r.yMin > desiredYMin) lo = mid;
-      else hi = mid;
-    }
-
-    target = base.clone().add(new THREE.Vector3(0, hi, 0));
-    const r2 = yRange(p, target);
-
-    if (r2.yMax <= topLimit + 0.01) break;
-
-    const need = clamp((r2.yMax - topLimit) / Math.max(0.1, avail), 0.08, 0.35);
-    const factor = 1 + need;
-    p = target.clone().add(p.clone().sub(target).multiplyScalar(factor));
-  }
-
-  return {
-    position: [p.x, p.y, p.z],
-    target: [target.x, target.y, target.z],
-    fov: pose.fov,
-  };
-}
-
-function getBoxCorners(box: THREE.Box3) {
-  const min = box.min;
-  const max = box.max;
-  return [
-    new THREE.Vector3(min.x, min.y, min.z),
-    new THREE.Vector3(min.x, min.y, max.z),
-    new THREE.Vector3(min.x, max.y, min.z),
-    new THREE.Vector3(min.x, max.y, max.z),
-    new THREE.Vector3(max.x, min.y, min.z),
-    new THREE.Vector3(max.x, min.y, max.z),
-    new THREE.Vector3(max.x, max.y, min.z),
-    new THREE.Vector3(max.x, max.y, max.z),
-  ];
-}
-
-/* ---------- helpers ---------- */
-
 function clamp(v: number, a: number, b: number) {
   return Math.max(a, Math.min(b, v));
 }
@@ -687,7 +405,7 @@ function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
-/* ---------- pose helpers ---------- */
+/* ---------- helpers ---------- */
 
 function applyPose(camera: THREE.PerspectiveCamera, pose: CameraPose) {
   camera.position.set(...pose.position);
@@ -696,14 +414,9 @@ function applyPose(camera: THREE.PerspectiveCamera, pose: CameraPose) {
   camera.lookAt(...pose.target);
 }
 
-function computeDoorFacingPose(args: {
-  root: THREE.Object3D;
-  doorName: string;
-  center: THREE.Vector3;
-  maxDim: number;
-  distanceFactor: number;
-}): CameraPose {
-  const { root, doorName, center, maxDim, distanceFactor } = args;
+function computeDoorFacingPose(root: THREE.Object3D, doorName: string, maxDim: number): CameraPose {
+  const box = new THREE.Box3().setFromObject(root);
+  const center = box.getCenter(new THREE.Vector3());
 
   const door = findByName(root, doorName);
 
@@ -711,7 +424,7 @@ function computeDoorFacingPose(args: {
     const fov = 50;
     const halfFov = THREE.MathUtils.degToRad(fov * 0.5);
     const radius = Math.max(0.001, maxDim * 0.5);
-    const dist = (radius / Math.tan(halfFov)) * 1.15;
+    const dist = (radius / Math.tan(halfFov)) * 1.35;
 
     const pos = center.clone().add(new THREE.Vector3(0, Math.max(maxDim * 0.12, 1.6), dist));
     return { position: [pos.x, pos.y, pos.z], target: [center.x, center.y, center.z], fov };
@@ -727,9 +440,7 @@ function computeDoorFacingPose(args: {
   const fov = 50;
   const halfFov = THREE.MathUtils.degToRad(fov * 0.5);
   const radius = Math.max(0.001, maxDim * 0.5);
-
-  // ✅ 0.4 고정 대신 옵션(distanceFactor)로 제어
-  const dist = (radius / Math.tan(halfFov)) * clamp(distanceFactor, 0.15, 0.9);
+  const dist = (radius / Math.tan(halfFov)) * 0.4;
 
   const lift = Math.max(maxDim * 0.12, 1.6);
   const camPos = doorPos.clone().addScaledVector(outward, dist).add(new THREE.Vector3(0, lift, 0));
@@ -906,7 +617,7 @@ function createIntroUI() {
   textReveal.className = "intro-text-reveal";
 
   const lines = ["art", "user", "connect", "arnnect"] as const;
-  const lineTexts = { art: "ART", user: "ARTIST and USER", connect: "CONNECT", arnnect: "ARNNECT" };
+  const lineTexts = { art: "ART", user: "USER", connect: "CONNECT", arnnect: "ARNNECT" };
   const lineEls: HTMLElement[] = [];
 
   for (const key of lines) {
@@ -917,11 +628,13 @@ function createIntroUI() {
     lineEls.push(el);
   }
 
+  // ✅ 메뉴 햄버거 버튼
   const menuBtn = document.createElement("button");
   menuBtn.className = "intro-menu-btn";
   menuBtn.type = "button";
   menuBtn.innerHTML = `<span>MENU</span><span class="intro-menu-icon"><span></span><span></span></span>`;
 
+  // ✅ 히어로 오버레이 (건물 위 텍스트)
   const heroOverlay = document.createElement("div");
   heroOverlay.className = "intro-hero";
 
@@ -995,9 +708,6 @@ function createIntroUI() {
     enterBtn,
     fadeEl: fade,
 
-    heroOverlay,
-    menuBtn,
-
     carryFadeToBody: () => {
       fade.id = "intro-fade-carry";
       fade.classList.add("intro-fade--carry");
@@ -1010,6 +720,7 @@ function createIntroUI() {
 
     setState: (s: "loading" | "ready" | "entering", skipLoading?: boolean) => {
       if (s === "ready" && skipLoading) {
+        // 내부에서 돌아올 때: 로딩/텍스트 애니메이션 전부 건너뛰기
         loader.style.display = "none";
         backdrop.style.display = "none";
         root.dataset.state = "enter-ready";
@@ -1037,17 +748,44 @@ function createIntroUI() {
                     backdrop.style.display = "none";
                     root.dataset.state = "enter-ready";
 
-                    gsap.fromTo(heroOverlay, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 1.2, ease: "power2.out" });
-                    gsap.fromTo(menuBtn, { opacity: 0 }, { opacity: 1, duration: 0.8, ease: "power2.out", delay: 0.3 });
+                    // 히어로 오버레이 + 메뉴 버튼 페이드인
+                    gsap.fromTo(heroOverlay,
+                      { opacity: 0, y: 30 },
+                      { opacity: 1, y: 0, duration: 1.2, ease: "power2.out" },
+                    );
+                    gsap.fromTo(menuBtn,
+                      { opacity: 0 },
+                      { opacity: 1, duration: 0.8, ease: "power2.out", delay: 0.3 },
+                    );
                   },
                 });
               },
             });
 
-            tl.fromTo(art, { opacity: 0, scale: 0.92, filter: "blur(16px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 1.6, ease: "power3.out" }, 0);
-            tl.fromTo(user, { opacity: 0, x: 120, filter: "blur(8px)" }, { opacity: 1, x: 0, filter: "blur(0px)", duration: 1.4, ease: "power3.out" }, 0.3);
-            tl.fromTo(connect, { opacity: 0, x: -120, filter: "blur(8px)" }, { opacity: 1, x: 0, filter: "blur(0px)", duration: 1.4, ease: "power3.out" }, 0.6);
-            tl.fromTo(arnnect, { opacity: 0, y: 50, filter: "blur(12px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 1.4, ease: "power2.out" }, 1.0);
+            tl.fromTo(
+              art,
+              { opacity: 0, scale: 0.92, filter: "blur(16px)" },
+              { opacity: 1, scale: 1, filter: "blur(0px)", duration: 1.6, ease: "power3.out" },
+              0,
+            );
+            tl.fromTo(
+              user,
+              { opacity: 0, x: 120, filter: "blur(8px)" },
+              { opacity: 1, x: 0, filter: "blur(0px)", duration: 1.4, ease: "power3.out" },
+              0.3,
+            );
+            tl.fromTo(
+              connect,
+              { opacity: 0, x: -120, filter: "blur(8px)" },
+              { opacity: 1, x: 0, filter: "blur(0px)", duration: 1.4, ease: "power3.out" },
+              0.6,
+            );
+            tl.fromTo(
+              arnnect,
+              { opacity: 0, y: 50, filter: "blur(12px)" },
+              { opacity: 1, y: 0, filter: "blur(0px)", duration: 1.4, ease: "power2.out" },
+              1.0,
+            );
           },
         });
       } else {

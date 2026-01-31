@@ -32,18 +32,6 @@ export type MountIntroOptions = {
 
   // ✅ 프레이밍 확대 (1.0=기본, 1.5=약 0.5배 키움)
   framingScale?: number; // default 1.5
-
-  // ✅ safe-area 여유 패딩(px) - 줄이면 건물 더 커짐(텍스트와 더 가까워짐)
-  safeAreaPadPx?: number; // default 16
-
-  // ✅ 하단 여유(비율) - 줄이면 건물 더 아래까지 붙음
-  bottomSafeRatio?: number; // default 0.02
-
-  // ✅ 기본 카메라 거리 배수(작을수록 가까이=크게)
-  distanceFactor?: number; // default 0.33
-
-  // ✅ 프레이밍 bbox outlier 필터 강도(클수록 더 관대)
-  focusBoxOutlierFactor?: number; // default 8
 };
 
 export type IntroRuntime = {
@@ -53,12 +41,7 @@ export type IntroRuntime = {
 
 export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOptions): Promise<IntroRuntime> {
   const holdMs = opts.holdMs ?? 1000;
-
   const framingScale = opts.framingScale ?? 1.5;
-  const safeAreaPadPx = opts.safeAreaPadPx ?? 16;
-  const bottomSafeRatioOpt = opts.bottomSafeRatio ?? 0.02;
-  const distanceFactor = opts.distanceFactor ?? 0.33;
-  const outlierFactor = opts.focusBoxOutlierFactor ?? 8;
 
   const ui = createIntroUI();
 
@@ -82,10 +65,13 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
+  // ✅ 톤매핑(노출로 밝기 조절)
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
   const exposure = opts.exposure ?? 0.75;
   renderer.toneMappingExposure = exposure;
 
+  // HDR 로딩 실패 대비 기본 배경
   renderer.setClearColor(new THREE.Color("#0f1115"), 1);
 
   const scene = new THREE.Scene();
@@ -102,8 +88,8 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   scene.add(dir);
 
   // ✅ HDRI (PMREM)
-  let hdriBg: THREE.Texture | null = null;
-  let hdriEnv: THREE.Texture | null = null;
+  let hdriBg: THREE.Texture | null = null; // 배경(원본 HDR)
+  let hdriEnv: THREE.Texture | null = null; // 환경(PMREM)
   if (opts.hdriUrl) {
     try {
       const loaded = await loadHdriWithPmrem(renderer, opts.hdriUrl);
@@ -139,15 +125,10 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   scene.add(gltfScene);
   gltfScene.updateMatrixWorld(true);
 
-  // ✅ bbox: 전체(sceneBox) + 프레이밍용(focusBox)
-  const sceneBox = new THREE.Box3().setFromObject(gltfScene);
-  const focusBox = computeFocusBox(gltfScene, opts.doorName, outlierFactor);
-
-  const sceneSize = sceneBox.getSize(new THREE.Vector3());
-  const sceneMaxDim = Math.max(sceneSize.x, sceneSize.y, sceneSize.z);
-
-  const focusSize = focusBox.getSize(new THREE.Vector3());
-  const focusMaxDim = Math.max(focusSize.x, focusSize.y, focusSize.z);
+  // ✅ bbox + meshCount 진단 로그
+  const box = new THREE.Box3().setFromObject(gltfScene);
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
 
   let meshCount = 0;
   gltfScene.traverse((o) => {
@@ -155,12 +136,11 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   });
 
   console.log("[Intro] doorName:", opts.doorName);
-  console.log("[Intro] scene bbox:", sceneSize, "sceneMaxDim:", sceneMaxDim, "meshCount:", meshCount);
-  console.log("[Intro] focus bbox:", focusSize, "focusMaxDim:", focusMaxDim);
+  console.log("[Intro] bbox size:", size, "maxDim:", maxDim, "meshCount:", meshCount);
 
-  // ✅ near/far는 전체 스케일 기준(클리핑 안전)
-  camera.near = Math.max(0.01, sceneMaxDim / 5000);
-  camera.far = Math.max(5000, sceneMaxDim * 50);
+  // ✅ GLB 스케일 큰 경우 자동 near/far
+  camera.near = Math.max(0.01, maxDim / 5000);
+  camera.far = Math.max(5000, maxDim * 50);
   camera.updateProjectionMatrix();
 
   // ✅ env intensity
@@ -183,25 +163,15 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   };
   applyEnvIntensity(envIntensity);
 
-  // ✅ 포즈 결정(초기 시점) - 프레이밍은 focusBox 기준
-  const focusCenter = focusBox.getCenter(new THREE.Vector3());
+  // ✅ 포즈 결정(초기 시점)
+  let computedPose = opts.startPose ?? computeDoorFacingPose(gltfScene, opts.doorName, maxDim);
 
-  let computedPose =
-    opts.startPose ??
-    computeDoorFacingPose({
-      root: gltfScene,
-      doorName: opts.doorName,
-      center: focusCenter,
-      maxDim: focusMaxDim,
-      distanceFactor,
-    });
-
-  // ✅ 상단 안전영역 확보 + 프레이밍 보정
+  // ✅ 상단 안전영역 확보 + 건물 프레이밍 보정(겹침 방지 + 건물 크게)
   {
-    const { topSafeRatio, bottomSafeRatio } = computeSafeAreaRatios(ui, safeAreaPadPx, bottomSafeRatioOpt);
+    const { topSafeRatio, bottomSafeRatio } = computeSafeAreaRatios(ui);
     computedPose = refinePoseToSafeArea({
       pose: computedPose,
-      box: focusBox, // ✅ 여기!
+      box,
       camera,
       topSafeRatio,
       bottomSafeRatio,
@@ -212,23 +182,26 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   console.log("[Intro] pose:", computedPose);
   applyPose(camera, computedPose);
 
+  // base pose (tick에서 이 값들을 기준으로 살짝 패럴럭스/룩 적용)
   const basePos = new THREE.Vector3(...computedPose.position);
   const baseTarget = new THREE.Vector3(...computedPose.target);
 
   const enterTarget = computeEnterTarget(gltfScene, opts.doorName, baseTarget.clone());
-  const enterStopDistance = computeEnterStopDistance(gltfScene, opts.doorName, focusMaxDim);
+  const enterStopDistance = computeEnterStopDistance(gltfScene, opts.doorName, maxDim);
   console.log("[Intro] enterTarget:", enterTarget, "enterStopDistance:", enterStopDistance);
 
   renderer.render(scene, camera);
 
+  // ✅ ready 상태 진입
   requestAnimationFrame(() => {
     ui.setState("ready", opts.skipLoading);
 
+    // ✅ 레이아웃 안정 후 다시 측정해서 부드럽게 재보정(겹침/빈공간 유지 + 건물 크기 유지)
     requestAnimationFrame(() => {
-      const { topSafeRatio, bottomSafeRatio } = computeSafeAreaRatios(ui, safeAreaPadPx, bottomSafeRatioOpt);
+      const { topSafeRatio, bottomSafeRatio } = computeSafeAreaRatios(ui);
       const refined = refinePoseToSafeArea({
         pose: { position: [basePos.x, basePos.y, basePos.z], target: [baseTarget.x, baseTarget.y, baseTarget.z], fov: camera.fov },
-        box: focusBox, // ✅ 여기!
+        box,
         camera,
         topSafeRatio,
         bottomSafeRatio,
@@ -242,7 +215,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
 
   opts.onReady?.(computedPose);
 
-  // loop
+  // 루프(마우스에 따른 "살짝 둘러보기")
   let alive = true;
   let raf = 0;
   let isEntering = false;
@@ -315,10 +288,10 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
 
-    const { topSafeRatio, bottomSafeRatio } = computeSafeAreaRatios(ui, safeAreaPadPx, bottomSafeRatioOpt);
+    const { topSafeRatio, bottomSafeRatio } = computeSafeAreaRatios(ui);
     const refined = refinePoseToSafeArea({
       pose: { position: [basePos.x, basePos.y, basePos.z], target: [baseTarget.x, baseTarget.y, baseTarget.z], fov: camera.fov },
-      box: focusBox,
+      box,
       camera,
       topSafeRatio,
       bottomSafeRatio,
@@ -424,6 +397,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
       else disposeMaterial(mat);
     });
 
+    // HDR 리소스 해제
     if (scene.background === hdriBg) scene.background = null;
     if (scene.environment === hdriEnv) scene.environment = null;
     hdriBg?.dispose?.();
@@ -466,91 +440,28 @@ async function loadHdriWithPmrem(renderer: THREE.WebGLRenderer, url: string) {
   return { background: hdr, environment: env };
 }
 
-/* ---------- Focus box (bbox outlier 필터) ---------- */
+/* ---------- Safe-area framing (핵심) ---------- */
 
-function computeFocusBox(root: THREE.Object3D, doorName: string, outlierFactor: number) {
-  root.updateMatrixWorld(true);
-
-  const entries: { box: THREE.Box3; maxDim: number; name: string }[] = [];
-
-  root.traverse((obj) => {
-    const mesh = obj as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    if (!mesh.visible) return;
-
-    const geom = mesh.geometry as THREE.BufferGeometry | undefined;
-    if (!geom) return;
-
-    if (!geom.boundingBox) geom.computeBoundingBox();
-    const bb0 = geom.boundingBox;
-    if (!bb0) return;
-
-    const bb = bb0.clone();
-    bb.applyMatrix4(mesh.matrixWorld);
-
-    const s = bb.getSize(new THREE.Vector3());
-    const maxDim = Math.max(s.x, s.y, s.z);
-    if (!(maxDim > 0)) return;
-
-    const n = (mesh.name || "").toLowerCase();
-    if (/(collider|collision|navmesh|trigger|helper)/i.test(n)) return;
-
-    entries.push({ box: bb, maxDim, name: mesh.name || "" });
-  });
-
-  if (entries.length < 3) return new THREE.Box3().setFromObject(root);
-
-  const dims = entries.map((e) => e.maxDim).sort((a, b) => a - b);
-  const median = dims[Math.floor(dims.length * 0.5)];
-  const threshold = Math.max(median * Math.max(2, outlierFactor), median + 1e-6);
-
-  let kept = entries.filter((e) => e.maxDim <= threshold);
-
-  // 너무 많이 잘렸으면(예: 건물이 통짜 메쉬) 그냥 전체로 fallback
-  if (kept.length < Math.max(3, Math.floor(entries.length * 0.25))) {
-    kept = entries;
-  }
-
-  // door는 무조건 포함(혹시라도 필터로 제거된 경우 대비)
-  const door = findByName(root, doorName);
-  if (door) {
-    const doorBox = new THREE.Box3().setFromObject(door);
-    if (!doorBox.isEmpty()) {
-      const s = doorBox.getSize(new THREE.Vector3());
-      kept.push({ box: doorBox, maxDim: Math.max(s.x, s.y, s.z), name: door.name });
-    }
-  }
-
-  const box = new THREE.Box3();
-  for (const e of kept) box.union(e.box);
-
-  if (box.isEmpty()) return new THREE.Box3().setFromObject(root);
-
-  console.log("[Intro] focusBox filter:", { total: entries.length, kept: kept.length, median, threshold });
-  return box;
-}
-
-/* ---------- Safe-area framing ---------- */
-
-function computeSafeAreaRatios(ui: ReturnType<typeof createIntroUI>, padPx: number, bottomSafeRatioInput: number) {
+function computeSafeAreaRatios(ui: ReturnType<typeof createIntroUI>) {
   const h = Math.max(1, window.innerHeight);
 
+  // opacity 0이어도 rect는 잡힘. display:none이면 0이라 fallback 필요.
   const heroRect = ui.heroOverlay.getBoundingClientRect();
   const menuRect = ui.menuBtn.getBoundingClientRect();
 
   const measuredTopPx = Math.max(heroRect.bottom || 0, menuRect.bottom || 0);
 
-  const PAD_PX = Math.max(0, padPx);
-  const DEFAULT_TOP_SAFE_RATIO = 0.26;
+  const PAD_PX = 24;
+  const DEFAULT_TOP_SAFE_RATIO = 0.30;
 
   const topSafePx = measuredTopPx + PAD_PX;
   let topSafeRatio = topSafePx / h;
 
-  if (topSafeRatio < 0.10) topSafeRatio = DEFAULT_TOP_SAFE_RATIO;
-  topSafeRatio = clamp(topSafeRatio, 0.0, 0.45);
+  if (topSafeRatio < 0.12) topSafeRatio = DEFAULT_TOP_SAFE_RATIO;
 
-  const bottomSafeRatio = clamp(bottomSafeRatioInput, 0.0, 0.2);
+  topSafeRatio = clamp(topSafeRatio, 0.0, 0.48);
 
+  const bottomSafeRatio = 0.03;
   return { topSafeRatio, bottomSafeRatio };
 }
 
@@ -560,7 +471,7 @@ function refinePoseToSafeArea(args: {
   camera: THREE.PerspectiveCamera;
   topSafeRatio: number;
   bottomSafeRatio: number;
-  scaleUp?: number;
+  scaleUp?: number; // ✅ 1.5면 약 0.5배 키움(가능한 범위에서)
 }) {
   const { pose, box, camera, topSafeRatio, bottomSafeRatio } = args;
   const scaleUp = Math.max(1.0, args.scaleUp ?? 1.0);
@@ -570,8 +481,8 @@ function refinePoseToSafeArea(args: {
   const pos = new THREE.Vector3(...pose.position);
   const target0 = new THREE.Vector3(...pose.target);
 
-  const desiredYMin = -1 + 2 * clamp(bottomSafeRatio, 0, 0.2);
-  const topLimit = 1 - 2 * clamp(topSafeRatio, 0, 0.45);
+  const desiredYMin = -1 + 2 * clamp(bottomSafeRatio, 0, 0.2); // NDC
+  const topLimit = 1 - 2 * clamp(topSafeRatio, 0, 0.48); // NDC
   const avail = Math.max(0.25, topLimit - desiredYMin);
 
   const corners = getBoxCorners(box);
@@ -599,7 +510,7 @@ function refinePoseToSafeArea(args: {
   let target = target0.clone();
   let p = pos.clone();
 
-  // 1) 너무 크면 뒤로 빼기
+  // 1) 너무 크면 뒤로 빼기(안전영역 유지)
   for (let i = 0; i < 6; i++) {
     const r = yRange(p, target);
     if (r.span <= avail) break;
@@ -608,17 +519,18 @@ function refinePoseToSafeArea(args: {
     p = target.clone().add(p.clone().sub(target).multiplyScalar(factor));
   }
 
-  // 1b) 가능한 범위에서 더 크게(앞으로 당김)
+  // 1b) ✅ 가능한 범위에서 더 크게 보이게(카메라를 앞으로 당김)
   if (scaleUp > 1.001) {
     const r0 = yRange(p, target);
     const desiredSpan = Math.min(avail * 0.985, r0.span * scaleUp);
 
     if (desiredSpan > r0.span * 1.01) {
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < 6; i++) {
         const r = yRange(p, target);
         if (r.span >= desiredSpan * 0.995) break;
 
-        const factor = clamp(r.span / desiredSpan, 0.55, 0.98); // ✅ 0.65→0.55로 완화(더 가까이 갈 수 있게)
+        // span ~ 1/distance 가정 근사
+        const factor = clamp(r.span / desiredSpan, 0.65, 0.98);
         const v = p.clone().sub(target);
         p = target.clone().add(v.multiplyScalar(factor));
 
@@ -628,7 +540,7 @@ function refinePoseToSafeArea(args: {
     }
   }
 
-  // 2) 바닥을 하단에 붙이고 상단은 topSafe 아래로
+  // 2) 바닥을 하단에 붙이고, 상단은 topSafe 아래로
   const shiftMax = Math.max(0.5, box.getSize(new THREE.Vector3()).y) * 1.2;
 
   for (let pass = 0; pass < 4; pass++) {
@@ -696,14 +608,9 @@ function applyPose(camera: THREE.PerspectiveCamera, pose: CameraPose) {
   camera.lookAt(...pose.target);
 }
 
-function computeDoorFacingPose(args: {
-  root: THREE.Object3D;
-  doorName: string;
-  center: THREE.Vector3;
-  maxDim: number;
-  distanceFactor: number;
-}): CameraPose {
-  const { root, doorName, center, maxDim, distanceFactor } = args;
+function computeDoorFacingPose(root: THREE.Object3D, doorName: string, maxDim: number): CameraPose {
+  const box = new THREE.Box3().setFromObject(root);
+  const center = box.getCenter(new THREE.Vector3());
 
   const door = findByName(root, doorName);
 
@@ -711,7 +618,7 @@ function computeDoorFacingPose(args: {
     const fov = 50;
     const halfFov = THREE.MathUtils.degToRad(fov * 0.5);
     const radius = Math.max(0.001, maxDim * 0.5);
-    const dist = (radius / Math.tan(halfFov)) * 1.15;
+    const dist = (radius / Math.tan(halfFov)) * 1.35;
 
     const pos = center.clone().add(new THREE.Vector3(0, Math.max(maxDim * 0.12, 1.6), dist));
     return { position: [pos.x, pos.y, pos.z], target: [center.x, center.y, center.z], fov };
@@ -727,9 +634,7 @@ function computeDoorFacingPose(args: {
   const fov = 50;
   const halfFov = THREE.MathUtils.degToRad(fov * 0.5);
   const radius = Math.max(0.001, maxDim * 0.5);
-
-  // ✅ 0.4 고정 대신 옵션(distanceFactor)로 제어
-  const dist = (radius / Math.tan(halfFov)) * clamp(distanceFactor, 0.15, 0.9);
+  const dist = (radius / Math.tan(halfFov)) * 0.4;
 
   const lift = Math.max(maxDim * 0.12, 1.6);
   const camPos = doorPos.clone().addScaledVector(outward, dist).add(new THREE.Vector3(0, lift, 0));
@@ -917,11 +822,13 @@ function createIntroUI() {
     lineEls.push(el);
   }
 
+  // ✅ 메뉴 햄버거 버튼
   const menuBtn = document.createElement("button");
   menuBtn.className = "intro-menu-btn";
   menuBtn.type = "button";
   menuBtn.innerHTML = `<span>MENU</span><span class="intro-menu-icon"><span></span><span></span></span>`;
 
+  // ✅ 히어로 오버레이 (건물 위 텍스트)
   const heroOverlay = document.createElement("div");
   heroOverlay.className = "intro-hero";
 
@@ -995,6 +902,7 @@ function createIntroUI() {
     enterBtn,
     fadeEl: fade,
 
+    // ✅ safe-area 측정용 노출
     heroOverlay,
     menuBtn,
 
