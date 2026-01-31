@@ -60,7 +60,8 @@ function startIntro() {
     doorName: "USA0_USA0_0",
 
     holdMs: 1000,
-    framingScale: 1.5,
+    framingScale: 1.0,
+    topWhitespaceRatio: 0.42,
 
     // ✅ HDRI 배경
     hdriUrl: `${import.meta.env.BASE_URL}textures/rosendal_park_sunset_puresky_2k.hdr`,

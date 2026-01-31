@@ -718,17 +718,23 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     return logo;
   }
 
-  /* ===== Cat pointer indicator ===== */
-  let catPointerEl: HTMLElement | null = null;
+  /* ===== Guide click-point indicators ===== */
+  const guidePointerEls: HTMLElement[] = [];
+  let guidePointersAlive = true;
 
-  function createCatPointer(catObj: THREE.Object3D) {
+  // Inject pulse animation once
+  const pulseStyle = document.createElement("style");
+  pulseStyle.textContent = `@keyframes guidePulse{0%,100%{transform:scale(1);opacity:0.55}50%{transform:scale(1.3);opacity:0.9}}`;
+  document.head.appendChild(pulseStyle);
+
+  function createGuidePointer(obj: THREE.Object3D) {
     const el = document.createElement("div");
     el.style.cssText =
       "position:fixed;z-index:9990;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:4px;transition:opacity 0.3s ease;";
 
     const ring = document.createElement("div");
     ring.style.cssText =
-      "width:48px;height:48px;border-radius:50%;border:2px solid rgba(255,255,255,0.7);background:rgba(255,255,255,0.12);animation:catPulse 1.6s ease-in-out infinite;";
+      "width:48px;height:48px;border-radius:50%;border:2px solid rgba(255,255,255,0.7);background:rgba(255,255,255,0.12);animation:guidePulse 1.6s ease-in-out infinite;";
 
     const label = document.createElement("div");
     label.style.cssText =
@@ -738,24 +744,18 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     el.appendChild(ring);
     el.appendChild(label);
     document.body.appendChild(el);
-    catPointerEl = el;
-
-    // CSS animation
-    const style = document.createElement("style");
-    style.textContent = `@keyframes catPulse{0%,100%{transform:scale(1);opacity:0.7}50%{transform:scale(1.25);opacity:1}}`;
-    document.head.appendChild(style);
+    guidePointerEls.push(el);
 
     const worldPos = new THREE.Vector3();
     function updatePointer() {
-      if (!catPointerEl) return;
-      catObj.getWorldPosition(worldPos);
+      if (!guidePointersAlive || !el.isConnected) return;
+      obj.getWorldPosition(worldPos);
       const projected = worldPos.clone().project(camera);
       const hw = window.innerWidth / 2;
       const hh = window.innerHeight / 2;
       const sx = projected.x * hw + hw;
       const sy = -projected.y * hh + hh;
 
-      // Hide if behind camera
       if (projected.z > 1) {
         el.style.opacity = "0";
       } else {
@@ -768,11 +768,10 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     updatePointer();
   }
 
-  function removeCatPointer() {
-    if (catPointerEl) {
-      catPointerEl.remove();
-      catPointerEl = null;
-    }
+  function removeGuidePointers() {
+    guidePointersAlive = false;
+    for (const el of guidePointerEls) el.remove();
+    guidePointerEls.length = 0;
   }
 
   loader.load(
@@ -831,9 +830,11 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       console.log("[viewer] ART objects in GLB:", artNames);
       console.log("[viewer] glb loaded. colliders:", colliders.length, "artClickable:", clickableArtMeshes.length, "guide:", guideClickMeshes.length);
 
-      // Cat pointer indicator
-      const catObj = findObjectByName(gltf.scene, "doent_Cat");
-      if (catObj) createCatPointer(catObj);
+      // Guide click-point indicators (cat + reception desk)
+      for (const gname of GUIDE_OBJECT_NAMES) {
+        const gobj = findObjectByName(gltf.scene, gname);
+        if (gobj) createGuidePointer(gobj);
+      }
 
       // Signal that interior is fully ready (fade can clear)
       opts.onReady?.();
@@ -1014,7 +1015,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
   function showTutorialOverlay() {
     if (tutorialEl) return; // already open
-    removeCatPointer();
+    removeGuidePointers();
 
     let step = 0;
 

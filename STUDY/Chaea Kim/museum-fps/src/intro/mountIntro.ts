@@ -1,3 +1,4 @@
+// src/intro/mountIntro.ts
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import gsap from "gsap";
@@ -5,7 +6,7 @@ import gsap from "gsap";
 import type { CameraPose, MountIntroOptions, IntroRuntime } from "./types";
 import { clamp, lerp } from "./utils";
 import { loadHdriWithPmrem } from "./hdri";
-import { computeFocusBox, findByName } from "./focusBox";
+import { findByName, computeFocusBox } from "./focusBox";
 import { computeSafeAreaRatios, refinePoseToSafeArea } from "./safeArea";
 import { runEnterSequence, scheduleFadeCleanup } from "./enterSequence";
 import { createIntroUI } from "./ui";
@@ -13,15 +14,15 @@ import { createIntroUI } from "./ui";
 export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOptions): Promise<IntroRuntime> {
   const holdMs = opts.holdMs ?? 1000;
 
-  const framingScale = opts.framingScale ?? 1.0;
+  const framingScale = opts.framingScale ?? 1.0; // 화면에서 건물 크기 (0.95 작게, 1.05 크게)
   const safeAreaPadPx = opts.safeAreaPadPx ?? 16;
   const bottomSafeRatioOpt = opts.bottomSafeRatio ?? 0.02;
-  const topWhitespaceRatio = opts.topWhitespaceRatio;
+  const topWhitespaceRatio = opts.topWhitespaceRatio; // 없으면 safeArea에서 기본 0.30
   const outlierFactor = opts.focusBoxOutlierFactor ?? 8;
   const distanceFactor = opts.distanceFactor ?? 0.4;
 
+  // ✅ UI는 먼저 무조건 만든다 (safeArea 계산에 필요)
   const ui = createIntroUI();
-
   ui.setState("loading");
   ui.setProgress(0, opts.skipLoading ? "" : "Loading…");
 
@@ -39,7 +40,6 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
 
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = opts.exposure ?? 0.75;
-
   renderer.setClearColor(new THREE.Color("#0f1115"), 1);
 
   const scene = new THREE.Scene();
@@ -91,7 +91,10 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   scene.add(gltfScene);
   gltfScene.updateMatrixWorld(true);
 
-  // bbox: 전체(sceneBox) + 프레이밍용(focusBox)
+  // ✅ 간판 오브젝트 (이 이름이 GLB에서 ARNNECT 라고 했지)
+  const signObj = findByName(gltfScene, "ARNNECT");
+
+  // bbox: 전체 + 프레이밍용
   const sceneBox = new THREE.Box3().setFromObject(gltfScene);
   const focusBox = computeFocusBox(gltfScene, opts.doorName, outlierFactor, opts.focusYClip);
 
@@ -100,9 +103,6 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
 
   const focusSize = focusBox.getSize(new THREE.Vector3());
   const focusMaxDim = Math.max(focusSize.x, focusSize.y, focusSize.z);
-
-  console.log("[Intro] scene bbox:", sceneSize, "sceneMaxDim:", sceneMaxDim);
-  console.log("[Intro] focus bbox:", focusSize, "focusMaxDim:", focusMaxDim);
 
   camera.near = Math.max(0.01, sceneMaxDim / 5000);
   camera.far = Math.max(5000, sceneMaxDim * 50);
@@ -125,7 +125,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
       distanceFactor,
     });
 
-  // safe-area refine
+  // ✅ safe-area refine
   {
     const { topSafeRatio, bottomSafeRatio } = computeSafeAreaRatios({
       ui,
@@ -214,6 +214,12 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     pointerS.y = lerp(pointerS.y, pointerT.y, DAMP);
 
     const dist = basePos.distanceTo(baseTarget);
+
+    // ✅ 흔들림이 거슬리면 여기서 y만 0으로 고정하면 됨:
+    // const py = 0;  // <-- 이거로 바꾸면 상하 흔들림 제거
+    const px = pointerS.x;
+    const py = pointerS.y;
+
     const ORBIT = clamp(dist * 0.035, 0.03, dist * 0.08) * active;
     const LOOK = clamp(dist * 0.02, 0.02, dist * 0.06) * active;
 
@@ -229,11 +235,17 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     if (tmpUp.lengthSq() < 1e-8) tmpUp.set(0, 1, 0);
     tmpUp.normalize();
 
-    tmpPos.copy(basePos).addScaledVector(tmpRight, pointerS.x * ORBIT).addScaledVector(tmpUp, pointerS.y * ORBIT);
+    tmpPos.copy(basePos).addScaledVector(tmpRight, px * ORBIT).addScaledVector(tmpUp, py * ORBIT);
     camera.position.copy(tmpPos);
 
-    tmpTgt.copy(baseTarget).addScaledVector(tmpRight, pointerS.x * LOOK).addScaledVector(tmpUp, pointerS.y * LOOK);
+    tmpTgt.copy(baseTarget).addScaledVector(tmpRight, px * LOOK).addScaledVector(tmpUp, py * LOOK);
     camera.lookAt(tmpTgt);
+
+    // ✅ 서브 문구를 간판(ARNNECT) 위에 고정
+    if (signObj) {
+    stickElementToObjectTop(ui.heroSub, signObj, camera, -40);
+  }
+
 
     renderer.render(scene, camera);
     raf = requestAnimationFrame(tick);
@@ -486,3 +498,41 @@ function disposeMaterial(mat: any) {
   for (const k of keys) if (mat[k]?.dispose) mat[k].dispose();
   mat.dispose?.();
 }
+
+// ✅ 3D 오브젝트 위치를 화면 좌표로 변환해서 엘리먼트를 붙임
+function stickElementToObjectTop(
+  el: HTMLElement,
+  obj: THREE.Object3D,
+  camera: THREE.PerspectiveCamera,
+  yOffsetPx = -10,
+) {
+  const box = new THREE.Box3().setFromObject(obj);
+  if (box.isEmpty()) return;
+
+  // ✅ 간판 "윗면 중앙"을 앵커로
+  const p = box.getCenter(new THREE.Vector3());
+  p.y = box.max.y;
+
+  // 화면 밖/뒤면이면 숨김
+  p.project(camera);
+  if (p.z < -1 || p.z > 1) {
+    el.style.opacity = "0";
+    return;
+  }
+  el.style.opacity = "1";
+
+  const x = (p.x * 0.5 + 0.5) * window.innerWidth;
+  const y = (-p.y * 0.5 + 0.5) * window.innerHeight + yOffsetPx;
+
+  el.style.position = "fixed";
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
+
+  // ✅ 중앙 정렬 유지
+  el.style.transform = "translate(-50%, -100%)";
+  el.style.marginTop = "0";
+  el.style.textAlign = "center";
+  el.style.zIndex = "4";
+  el.style.pointerEvents = "none";
+}
+

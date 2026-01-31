@@ -5,6 +5,8 @@ export type CameraPose = {
 };
 
 export type MountIntroOptions = {
+  lockWobbleY?: boolean;   // ✅ true면 위아래 흔들림 막음
+  wobbleYBias?: number;    // ✅ 위아래 고정값(커서 아래 느낌)
   glbUrl: string;
   doorName: string;
   holdMs?: number;
