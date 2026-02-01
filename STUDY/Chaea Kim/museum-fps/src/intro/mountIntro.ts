@@ -177,7 +177,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   // =========================
   let wave: WaveFieldHandle | null = null;
   try {
-    ui.setProgress(1, opts.skipLoading ? "" : "Loading… (water)");
+    ui.setProgress(1, opts.skipLoading ? "" : "Loading…");
 
     // 바다 높이: 건물 바닥 기준
     // - “건물이 물 위에 떠있는 느낌”이면 더 낮추면 됨: sceneBox.min.y - (focusMaxDim * 0.1)
