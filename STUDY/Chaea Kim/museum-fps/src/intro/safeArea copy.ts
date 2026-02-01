@@ -4,41 +4,32 @@ import type { CameraPose } from "./types";
 import type { IntroUI } from "./ui";
 import { clamp } from "./utils";
 
-/**
- * UI가 차지하는 상단 영역을 "안전영역(topSafeRatio)"로 환산
- * - topWhitespaceRatio: 강제로 확보할 최소 상단 여백 비율(예: 0.30)
- * - padPx: 측정된 UI 하단 + 추가 패딩
- */
 export function computeSafeAreaRatios(args: {
   ui: IntroUI;
   padPx?: number;
   bottomSafeRatio?: number;
-  topWhitespaceRatio?: number;
+  topWhitespaceRatio?: number; // 강제 최소 상단 여백 비율
 }) {
   const { ui } = args;
   const h = Math.max(1, window.innerHeight);
 
   const padPx = args.padPx ?? 16;
-  const bottomSafeRatio = clamp(args.bottomSafeRatio ?? 0.02, 0, 0.2);
-  const forcedTopWhitespaceRatio = args.topWhitespaceRatio; // optional
+  const forcedTopWhitespaceRatio = clamp(args.topWhitespaceRatio ?? 0.30, 0.0, 0.48);
+  const bottomSafeRatio = clamp(args.bottomSafeRatio ?? 0.02, 0.0, 0.2);
 
-  // getBoundingClientRect 안전 처리
-  const heroRect = ui.heroOverlay?.getBoundingClientRect?.() ?? ({ bottom: 0 } as DOMRect);
-  const subRect = ui.heroSub?.getBoundingClientRect?.() ?? ({ bottom: 0 } as DOMRect);
-  const menuRect = ui.menuBtn?.getBoundingClientRect?.() ?? ({ bottom: 0 } as DOMRect);
+  // hero/menu가 아직 opacity 0이어도 rect는 나옴 (display:none만 아니면 OK)
+  const heroRect = ui.heroOverlay?.getBoundingClientRect?.();
+  const menuRect = ui.menuBtn?.getBoundingClientRect?.();
 
-  // heroOverlay만으로 부족하면(heroSub가 루트에 있을 때) sub도 같이 본다
-  const measuredTopPx = Math.max(heroRect.bottom || 0, subRect.bottom || 0, menuRect.bottom || 0);
+  const heroBottom = heroRect ? heroRect.bottom : 0;
+  const menuBottom = menuRect ? menuRect.bottom : 0;
 
+  const measuredTopPx = Math.max(heroBottom || 0, menuBottom || 0);
   let topSafeRatio = (measuredTopPx + padPx) / h;
 
-  // ✅ 강제 최소 상단 여백(원하는 “건물 위 여백” 확보용)
-  if (typeof forcedTopWhitespaceRatio === "number") {
-    topSafeRatio = Math.max(topSafeRatio, forcedTopWhitespaceRatio);
-  }
-
-  // 과도 방지
-  topSafeRatio = clamp(topSafeRatio, 0.0, 0.75);
+  // 강제 최소 상단 여백
+  topSafeRatio = Math.max(topSafeRatio, forcedTopWhitespaceRatio);
+  topSafeRatio = clamp(topSafeRatio, 0.0, 0.48);
 
   return { topSafeRatio, bottomSafeRatio };
 }
@@ -49,11 +40,10 @@ export function refinePoseToSafeArea(args: {
   camera: THREE.PerspectiveCamera;
   topSafeRatio: number;
   bottomSafeRatio: number;
-  scale?: number; // <1: 축소(더 멀리), >1: 확대(더 가까이)
+  scale?: number; // <1: 더 작게(뒤로), >1: 더 크게(앞으로)
 }) {
   const { pose, box, camera, topSafeRatio, bottomSafeRatio } = args;
   const scale = clamp(args.scale ?? 1.0, 0.35, 3.0);
-
   if (!box || box.isEmpty()) return pose;
 
   const pos = new THREE.Vector3(...pose.position);
@@ -88,16 +78,15 @@ export function refinePoseToSafeArea(args: {
   let target = target0.clone();
   let p = pos.clone();
 
-  // 1) 너무 크면 뒤로 빼기(기본 안정화)
+  // 1) 기본: 너무 크면 뒤로 빼기
   for (let i = 0; i < 7; i++) {
     const r = yRange(p, target);
     if (r.span <= avail) break;
-
     const factor = clamp(r.span / avail, 1.02, 1.45);
     p = target.clone().add(p.clone().sub(target).multiplyScalar(factor));
   }
 
-  // 1b) scale > 1 => 더 크게(앞으로)
+  // 1b) scale > 1 : 더 크게(앞으로)
   if (scale > 1.001) {
     const r0 = yRange(p, target);
     const desiredSpan = Math.min(avail * 0.985, r0.span * scale);
@@ -115,7 +104,7 @@ export function refinePoseToSafeArea(args: {
     }
   }
 
-  // 1c) scale < 1 => 의도적으로 더 작게(뒤로)
+  // 1c) scale < 1 : 더 작게(뒤로)
   if (scale < 0.999) {
     const r0 = yRange(p, target);
     const desiredSpan = Math.max(0.08, r0.span * scale);
@@ -129,7 +118,7 @@ export function refinePoseToSafeArea(args: {
     }
   }
 
-  // 2) 바닥을 하단에 붙이고, 상단은 topSafe 아래로
+  // 2) 하단을 desiredYMin 근처에 맞추고, 상단은 topSafe 아래로
   const shiftMax = Math.max(0.5, box.getSize(new THREE.Vector3()).y) * 1.2;
 
   for (let pass = 0; pass < 4; pass++) {
@@ -141,14 +130,12 @@ export function refinePoseToSafeArea(args: {
       const mid = (lo + hi) * 0.5;
       const t = base.clone().add(new THREE.Vector3(0, mid, 0));
       const r = yRange(p, t);
-
       if (r.yMin > desiredYMin) lo = mid;
       else hi = mid;
     }
 
     target = base.clone().add(new THREE.Vector3(0, hi, 0));
     const r2 = yRange(p, target);
-
     if (r2.yMax <= topLimit + 0.01) break;
 
     const need = clamp((r2.yMax - topLimit) / Math.max(0.1, avail), 0.08, 0.35);

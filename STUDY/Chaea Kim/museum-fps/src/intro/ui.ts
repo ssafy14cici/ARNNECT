@@ -1,4 +1,6 @@
 // src/intro/ui.ts
+import gsap from "gsap";
+
 export type IntroUIState = "loading" | "ready";
 
 export type IntroUI = {
@@ -36,7 +38,7 @@ export function createIntroUI(): IntroUI {
   root.dataset.state = "loading";
   document.body.appendChild(root);
 
-  // loading
+  /* ---------- loading backdrop ---------- */
   const backdrop = document.createElement("div");
   backdrop.className = "intro-backdrop";
   root.appendChild(backdrop);
@@ -58,7 +60,30 @@ export function createIntroUI(): IntroUI {
   percentText.textContent = "Loading…";
   loader.appendChild(percentText);
 
-  // hero overlay (MAIN만 여기)
+  // ✅ 로딩바 이후 나오는 텍스트 리빌(ART/USER/CONNECT/ARNNECT)
+  const textReveal = document.createElement("div");
+  textReveal.className = "intro-text-reveal";
+  textReveal.style.opacity = "0";
+  backdrop.appendChild(textReveal);
+
+  const lines = ["art", "user", "connect", "arnnect"] as const;
+  const lineTexts = {
+    art: "ART",
+    user: "ARTIST and USER",
+    connect: "CONNECT",
+    arnnect: "ARNNECT",
+  } as const;
+
+  const lineEls: HTMLElement[] = [];
+  for (const key of lines) {
+    const el = document.createElement("div");
+    el.className = `intro-line intro-line--${key}`;
+    el.textContent = lineTexts[key];
+    textReveal.appendChild(el);
+    lineEls.push(el);
+  }
+
+  /* ---------- hero overlay (MAIN only) ---------- */
   const heroOverlay = document.createElement("div");
   heroOverlay.className = "intro-hero";
   root.appendChild(heroOverlay);
@@ -74,7 +99,7 @@ export function createIntroUI(): IntroUI {
   heroSub.textContent = "예술가와 당신이 연결되는 곳";
   root.appendChild(heroSub);
 
-  // menu
+  /* ---------- menu ---------- */
   const menuBtn = document.createElement("button");
   menuBtn.className = "intro-menu-btn";
   menuBtn.type = "button";
@@ -86,7 +111,7 @@ export function createIntroUI(): IntroUI {
   `;
   root.appendChild(menuBtn);
 
-  // enter content
+  /* ---------- enter content ---------- */
   const content = document.createElement("div");
   content.className = "intro-content";
   root.appendChild(content);
@@ -112,52 +137,189 @@ export function createIntroUI(): IntroUI {
   labelEl.textContent = "Enter";
   enterBtn.appendChild(labelEl);
 
-  // fade
+  /* ---------- fade ---------- */
   const fadeEl = document.createElement("div");
   fadeEl.className = "intro-fade";
   root.appendChild(fadeEl);
 
-  // transitions
+  /* ---------- transitions ---------- */
   heroMain.style.transition = "opacity 650ms ease, transform 650ms ease";
   heroSub.style.transition = "opacity 650ms ease, transform 650ms ease";
 
+  // 전체 UI 기본 숨김
   heroOverlay.style.opacity = "0";
   menuBtn.style.opacity = "0";
   content.style.opacity = "0";
 
-  heroMain.style.opacity = "0";
-  heroSub.style.opacity = "0";
-  heroMain.style.transform = "translateY(-6px)";
-  heroSub.style.transform = "translateY(-4px)";
+  // ✅ hero 텍스트는 기본적으로 완전 숨김(특히 sub)
+  const resetHeroText = () => {
+    // main
+    heroMain.style.opacity = "0";
+    heroMain.style.transform = "translateY(-6px)";
+    heroMain.style.display = "none";
 
-  const setState = (state: IntroUIState, skipLoading?: boolean) => {
-    root.dataset.state = state === "ready" ? "enter-ready" : "loading";
+    // sub (중요: ready 재진입 시 먼저 떠있는 버그 방지)
+    heroSub.style.opacity = "0";
+    heroSub.style.transform = "translateY(-4px)";
+    heroSub.style.display = "none";
+  };
+  resetHeroText();
 
-    if (state === "loading") {
-      backdrop.style.display = "flex";
-      heroOverlay.style.opacity = "0";
-      menuBtn.style.opacity = "0";
-      content.style.opacity = "0";
-      heroMain.style.opacity = "0";
-      heroSub.style.opacity = "0";
-      return;
-    }
+  // ready 진입 시 메인→서브 순서 타이머(중복 방지)
+  let mainTimer = 0;
+  let subTimer = 0;
+  const clearHeroTimers = () => {
+    if (mainTimer) window.clearTimeout(mainTimer);
+    if (subTimer) window.clearTimeout(subTimer);
+    mainTimer = 0;
+    subTimer = 0;
+  };
 
-    backdrop.style.display = skipLoading ? "none" : "none";
+  const showEnterUi = () => {
+    root.dataset.state = "enter-ready";
+    backdrop.style.display = "none";
+    backdrop.style.opacity = "1";
+
     heroOverlay.style.opacity = "1";
     menuBtn.style.opacity = "1";
     content.style.opacity = "1";
 
-    // 메인 -> 서브 순서
-    setTimeout(() => {
+    // ✅ 매번 ready 들어올 때 리셋하고 순서 고정
+    clearHeroTimers();
+    resetHeroText();
+
+    // 1) MAIN 먼저
+    heroMain.style.display = "block";
+    mainTimer = window.setTimeout(() => {
       heroMain.style.opacity = "1";
       heroMain.style.transform = "translateY(0)";
     }, 120);
 
-    setTimeout(() => {
+    // 2) SUB는 나중에 (display도 이때 켬)
+    subTimer = window.setTimeout(() => {
+      heroSub.style.display = "block";
       heroSub.style.opacity = "1";
       heroSub.style.transform = "translateY(0)";
-    }, 420);
+    }, 520);
+  };
+
+  const runTextReveal = () => {
+    textReveal.style.opacity = "1";
+    lineEls.forEach((el) => {
+      el.style.opacity = "0";
+      (el.style as any).filter = "blur(12px)";
+      el.style.transform = "none";
+    });
+
+    const [art, user, connect, arnnect] = lineEls;
+    const tl = gsap.timeline();
+
+    tl.fromTo(
+      art,
+      { opacity: 0, scale: 0.92, filter: "blur(16px)" },
+      { opacity: 1, scale: 1, filter: "blur(0px)", duration: 1.6, ease: "power3.out" },
+      0,
+    );
+    tl.fromTo(
+      user,
+      { opacity: 0, x: 120, filter: "blur(8px)" },
+      { opacity: 1, x: 0, filter: "blur(0px)", duration: 1.4, ease: "power3.out" },
+      0.3,
+    );
+    tl.fromTo(
+      connect,
+      { opacity: 0, x: -120, filter: "blur(8px)" },
+      { opacity: 1, x: 0, filter: "blur(0px)", duration: 1.4, ease: "power3.out" },
+      0.6,
+    );
+    tl.fromTo(
+      arnnect,
+      { opacity: 0, y: 50, filter: "blur(12px)" },
+      { opacity: 1, y: 0, filter: "blur(0px)", duration: 1.4, ease: "power2.out" },
+      1.0,
+    );
+
+    tl.to(backdrop, {
+      opacity: 0,
+      duration: 1.4,
+      delay: 0.6,
+      ease: "power2.inOut",
+      onComplete: () => {
+        backdrop.style.display = "none";
+        backdrop.style.opacity = "1";
+        showEnterUi();
+      },
+    });
+
+    return tl;
+  };
+
+  const setState = (state: IntroUIState, skipLoading?: boolean) => {
+    if (state === "loading") {
+      root.dataset.state = "loading";
+
+      clearHeroTimers();
+      resetHeroText();
+
+      backdrop.style.display = "flex";
+      backdrop.style.opacity = "1";
+
+      loader.style.display = "flex";
+      loader.style.opacity = "1";
+
+      textReveal.style.opacity = "0";
+
+      heroOverlay.style.opacity = "0";
+      menuBtn.style.opacity = "0";
+      content.style.opacity = "0";
+
+      gsap.killTweensOf(loader);
+      gsap.killTweensOf(backdrop);
+      gsap.killTweensOf(textReveal);
+      gsap.killTweensOf(lineEls);
+      return;
+    }
+
+    // READY
+    if (skipLoading) {
+      loader.style.display = "none";
+      textReveal.style.opacity = "0";
+      showEnterUi();
+      return;
+    }
+
+    // 로딩바 -> 리빌 -> enter UI
+    root.dataset.state = "loading";
+
+    clearHeroTimers();
+    resetHeroText();
+
+    backdrop.style.display = "flex";
+    backdrop.style.opacity = "1";
+
+    loader.style.display = "flex";
+    loader.style.opacity = "1";
+
+    textReveal.style.opacity = "0";
+
+    heroOverlay.style.opacity = "0";
+    menuBtn.style.opacity = "0";
+    content.style.opacity = "0";
+
+    gsap.killTweensOf(loader);
+    gsap.killTweensOf(backdrop);
+    gsap.killTweensOf(textReveal);
+    gsap.killTweensOf(lineEls);
+
+    gsap.to(loader, {
+      opacity: 0,
+      duration: 0.6,
+      ease: "power2.out",
+      onComplete: () => {
+        loader.style.display = "none";
+        runTextReveal();
+      },
+    });
   };
 
   const setProgress = (p: number, label = "") => {
