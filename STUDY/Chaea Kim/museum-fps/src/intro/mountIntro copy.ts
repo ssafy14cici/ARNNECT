@@ -11,6 +11,8 @@ import { computeSafeAreaRatios, refinePoseToSafeArea } from "./safeArea";
 import { runEnterSequence, scheduleFadeCleanup } from "./enterSequence";
 import { createIntroUI } from "./ui";
 
+import { createWaveField, type WaveFieldHandle } from "./waveField";
+
 export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOptions): Promise<IntroRuntime> {
   const holdMs = opts.holdMs ?? 1000;
 
@@ -20,6 +22,24 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   const topWhitespaceRatio = opts.topWhitespaceRatio; // 없으면 safeArea에서 기본 0.30
   const outlierFactor = opts.focusBoxOutlierFactor ?? 8;
   const distanceFactor = opts.distanceFactor ?? 0.4;
+
+  // =========================
+  // 🌊 WAVE TUNING (여기만 조절)
+  // =========================
+  const WAVE_URL = "/models/museum/wave.glb";
+
+  // 타일 1장의 “월드 크기”: 커질수록 패턴이 커지고, 적은 타일로도 지평선 느낌 가능
+  // (건물 크기에 자동 연동)
+  const WAVE_TILE_BY_FOCUS = 6.0; // focusMaxDim * 6
+  const WAVE_TILE_MIN = 100;
+
+  // half=4 => 9x9=81개 (권장 3~6)
+  const WAVE_HALF_TILES = 4;
+
+  // 바닥과 겹침 방지 / 투명도 / 속도
+  const WAVE_LIFT = 0.02;
+  const WAVE_OPACITY = 0.72;
+  const WAVE_SPEED = 0.45;
 
   // ✅ UI는 먼저 무조건 만든다 (safeArea 계산에 필요)
   const ui = createIntroUI();
@@ -152,6 +172,63 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   const enterTarget = computeEnterTarget(gltfScene, opts.doorName, baseTarget.clone());
   const enterStopDistance = computeEnterStopDistance(gltfScene, opts.doorName, focusMaxDim);
 
+  // =========================
+  // 🌊 Wave field attach (무한 타일 + 애니)
+  // =========================
+  let wave: WaveFieldHandle | null = null;
+  try {
+    ui.setProgress(1, opts.skipLoading ? "" : "Loading… (water)");
+
+    // 바다 높이: 건물 바닥 기준
+    // - “건물이 물 위에 떠있는 느낌”이면 더 낮추면 됨: sceneBox.min.y - (focusMaxDim * 0.1)
+    const waveY = sceneBox.min.y - Math.max(0.35, focusMaxDim * 0.08);
+
+    // 타일 1장 크기 자동 결정(너무 커지면 far에 걸려서 클램프)
+    const autoTile = Math.max(focusMaxDim * WAVE_TILE_BY_FOCUS, WAVE_TILE_MIN);
+    const tileWorld = Math.min(autoTile, camera.far * 0.25);
+
+    wave = await createWaveField({
+      url: WAVE_URL,
+      centerRef: baseTarget,
+      y: waveY,
+      tileWorldSize: tileWorld,
+      halfTiles: WAVE_HALF_TILES,
+      cameraRef: camera,
+
+      // ✅ 끊김(이음새) 줄이기
+      overlapRatio: 0.10,   // 끊김 남으면 0.10까지
+      edgeFade: 0.02,       // 너무 크면 그리드가 더 보임(중요)
+
+      // ✅ “근처 밝고, 멀리 어둡게”
+      nearBoost: 1.45,
+      farBoost: 0.52,
+      gradientGamma: 1.25,
+
+      // ✅ 물 색감
+      opacity: 0.92,
+      tintColor: "#2a67ff",
+      tintStrength: 0.75,
+      emissiveIntensity: 0.20,
+      roughness: 0.32,
+    });
+
+
+    // 물이 건물 뒤로 깔리도록 먼저 추가(렌더 순서는 renderOrder도 넣어둠)
+    scene.add(wave.root);
+
+    // 지평선 숨김용 fog(선택)
+    // HDRI 쓰면 fog가 분위기 바꿀 수 있어서 기본은 “HDRI 없을 때만”
+    if (!opts.hdriUrl) {
+      const bg = scene.background;
+      const fogColor =
+        bg && (bg as any).isColor ? (bg as THREE.Color) : new THREE.Color("#0f1115");
+      scene.fog = new THREE.Fog(fogColor, tileWorld * (WAVE_HALF_TILES * 0.9), tileWorld * (WAVE_HALF_TILES * 2.2));
+    }
+  } catch (e) {
+    console.warn("[Intro] wave load failed:", e);
+    wave = null;
+  }
+
   renderer.render(scene, camera);
 
   requestAnimationFrame(() => {
@@ -204,8 +281,18 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   const tmpPos = new THREE.Vector3();
   const tmpTgt = new THREE.Vector3();
 
+  const clock = new THREE.Clock();
+
+  let lastT = performance.now();
+
   const tick = () => {
     if (!alive) return;
+    const now = performance.now();
+    const dt = Math.min((now - lastT) / 1000, 0.05);
+    lastT = now;
+
+    // ✅ wave anim + infinite tiling update
+    wave?.tick(dt);
 
     const active = isEntering ? 0 : 1;
 
@@ -215,8 +302,6 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
 
     const dist = basePos.distanceTo(baseTarget);
 
-    // ✅ 흔들림이 거슬리면 여기서 y만 0으로 고정하면 됨:
-    // const py = 0;  // <-- 이거로 바꾸면 상하 흔들림 제거
     const px = pointerS.x;
     const py = pointerS.y;
 
@@ -243,9 +328,8 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
 
     // ✅ 서브 문구를 간판(ARNNECT) 위에 고정
     if (signObj) {
-    stickElementToObjectTop(ui.heroSub, signObj, camera, -40);
-  }
-
+      stickElementToObjectTop(ui.heroSub, signObj, camera, -40);
+    }
 
     renderer.render(scene, camera);
     raf = requestAnimationFrame(tick);
@@ -362,6 +446,10 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     gsap.killTweensOf(baseTarget);
     gsap.killTweensOf(camera);
     gsap.killTweensOf(ui.fadeEl);
+
+    // ✅ wave 리소스 정리
+    wave?.dispose();
+    wave = null;
 
     gltfScene.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
@@ -500,12 +588,7 @@ function disposeMaterial(mat: any) {
 }
 
 // ✅ 3D 오브젝트 위치를 화면 좌표로 변환해서 엘리먼트를 붙임
-function stickElementToObjectTop(
-  el: HTMLElement,
-  obj: THREE.Object3D,
-  camera: THREE.PerspectiveCamera,
-  yOffsetPx = -10,
-) {
+function stickElementToObjectTop(el: HTMLElement, obj: THREE.Object3D, camera: THREE.PerspectiveCamera, yOffsetPx = -10) {
   const box = new THREE.Box3().setFromObject(obj);
   if (box.isEmpty()) return;
 
@@ -535,4 +618,3 @@ function stickElementToObjectTop(
   el.style.zIndex = "4";
   el.style.pointerEvents = "none";
 }
-

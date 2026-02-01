@@ -102,7 +102,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   /* ===== "원점(=0번)으로" 버튼 ===== */
   const backBtn = document.createElement("button");
   backBtn.type = "button";
-  backBtn.textContent = "↩ 원점으로 돌아가기";
+  backBtn.textContent = "↩ 처음으로";
   backBtn.style.position = "fixed";
   backBtn.style.left = "50%";
   backBtn.style.bottom = "28px";
@@ -142,13 +142,13 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   function setBackBtnVisible(v: boolean) {
     backBtn.style.display = v ? "inline-flex" : "none";
     backBtn.disabled = false;
-    backBtn.textContent = "↩ 원점으로 돌아가기";
+    backBtn.textContent = "↩ 처음으로";
     backBtn.style.opacity = v ? "0.92" : "0";
   }
 
   function setBackBtnBusy(v: boolean) {
     backBtn.disabled = v;
-    backBtn.textContent = v ? "원점으로 이동 중…" : "↩ 원점으로 돌아가기";
+    backBtn.textContent = v ? "이동 중…" : "↩ 처음으로";
     backBtn.style.opacity = v ? "0.85" : "0.92";
   }
 
@@ -727,22 +727,26 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   pulseStyle.textContent = `@keyframes guidePulse{0%,100%{transform:scale(1);opacity:0.55}50%{transform:scale(1.3);opacity:0.9}}`;
   document.head.appendChild(pulseStyle);
 
-  function createGuidePointer(obj: THREE.Object3D) {
+  function createGuidePointer(obj: THREE.Object3D, opts?: { mini?: boolean }) {
+    const mini = opts?.mini ?? false;
     const el = document.createElement("div");
     el.style.cssText =
       "position:fixed;z-index:9990;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:4px;transition:opacity 0.3s ease;";
 
     const ring = document.createElement("div");
-    ring.style.cssText =
-      "width:48px;height:48px;border-radius:50%;border:2px solid rgba(255,255,255,0.7);background:rgba(255,255,255,0.12);animation:guidePulse 1.6s ease-in-out infinite;";
-
-    const label = document.createElement("div");
-    label.style.cssText =
-      "font-size:11px;color:rgba(255,255,255,0.85);font-family:'MuseumClassic','Noto Sans KR',system-ui,sans-serif;letter-spacing:0.04em;text-shadow:0 1px 4px rgba(0,0,0,0.6);white-space:nowrap;";
-    label.textContent = "클릭하세요";
+    ring.style.cssText = mini
+      ? "width:28px;height:28px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.06);animation:guidePulse 1.6s ease-in-out infinite;"
+      : "width:48px;height:48px;border-radius:50%;border:2px solid rgba(255,255,255,0.7);background:rgba(255,255,255,0.12);animation:guidePulse 1.6s ease-in-out infinite;";
 
     el.appendChild(ring);
-    el.appendChild(label);
+
+    if (!mini) {
+      const label = document.createElement("div");
+      label.style.cssText =
+        "font-size:11px;color:rgba(255,255,255,0.85);font-family:'MuseumClassic','Noto Sans KR',system-ui,sans-serif;letter-spacing:0.04em;text-shadow:0 1px 4px rgba(0,0,0,0.6);white-space:nowrap;";
+      label.textContent = "클릭하세요";
+      el.appendChild(label);
+    }
     document.body.appendChild(el);
     guidePointerEls.push(el);
 
@@ -760,8 +764,9 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
         el.style.opacity = "0";
       } else {
         el.style.opacity = "1";
-        el.style.left = `${sx - 24}px`;
-        el.style.top = `${sy - 24}px`;
+        const half = mini ? 14 : 24;
+        el.style.left = `${sx - half}px`;
+        el.style.top = `${sy - half}px`;
       }
       requestAnimationFrame(updatePointer);
     }
@@ -830,10 +835,13 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       console.log("[viewer] ART objects in GLB:", artNames);
       console.log("[viewer] glb loaded. colliders:", colliders.length, "artClickable:", clickableArtMeshes.length, "guide:", guideClickMeshes.length);
 
-      // Guide click-point indicators (cat + reception desk)
+      // Guide click-point indicators (cat + reception desk + art panels)
       for (const gname of GUIDE_OBJECT_NAMES) {
         const gobj = findObjectByName(gltf.scene, gname);
         if (gobj) createGuidePointer(gobj);
+      }
+      for (const artMesh of clickableArtMeshes) {
+        createGuidePointer(artMesh, { mini: true });
       }
 
       // Signal that interior is fully ready (fade can clear)
@@ -1099,17 +1107,31 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     title.style.cssText = "margin:0 0 12px;font-size:22px;color:#222;";
     title.textContent = `${artist}의 "${artworkTitle}" 입니다`;
 
-    const btn = document.createElement("button");
-    btn.style.cssText =
-      "background:#333;color:#fff;border:none;border-radius:8px;padding:10px 32px;font-size:15px;cursor:pointer;margin-top:18px;";
-    btn.textContent = "닫기";
-    btn.addEventListener("click", () => overlay.remove());
+    const btnRow = document.createElement("div");
+    btnRow.style.cssText = "display:flex;gap:12px;margin-top:18px;justify-content:center;";
+
+    const exhibitBtn = document.createElement("button");
+    exhibitBtn.style.cssText =
+      "background:#333;color:#fff;border:none;border-radius:8px;padding:10px 32px;font-size:15px;cursor:pointer;font-family:inherit;";
+    exhibitBtn.textContent = "전시보러가기";
+    exhibitBtn.addEventListener("click", () => {
+      // TODO: navigate to exhibition room
+      overlay.remove();
+    });
+
+    const closeBtn = document.createElement("button");
+    closeBtn.style.cssText =
+      "background:transparent;color:#666;border:1px solid #ccc;border-radius:8px;padding:10px 32px;font-size:15px;cursor:pointer;font-family:inherit;";
+    closeBtn.textContent = "닫기";
+    closeBtn.addEventListener("click", () => overlay.remove());
+
+    btnRow.append(exhibitBtn, closeBtn);
 
     overlay.addEventListener("click", (e) => {
       if (e.target === overlay) overlay.remove();
     });
 
-    box.append(title, btn);
+    box.append(title, btnRow);
     overlay.appendChild(box);
     document.body.appendChild(overlay);
   }

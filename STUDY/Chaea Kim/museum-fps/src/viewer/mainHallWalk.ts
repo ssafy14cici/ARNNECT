@@ -22,7 +22,7 @@ const WAYPOINTS: Waypoint[] = [
 ];
 
 export function mountMainHallWalk(canvas: HTMLCanvasElement, opts: Options = {}) {
-  const glbUrl = opts.glbUrl ?? `${import.meta.env.BASE_URL}models/mh_add_5.glb`;
+  const glbUrl = opts.glbUrl ?? `${import.meta.env.BASE_URL}models/museum/mh_add_5.glb`;
 
   /* =========================
    * Renderer

@@ -3,74 +3,95 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
 
+import { WAYPOINTS } from "./waypoints";
+
 type Options = {
-  glbUrl?: string; // default: "/models/mh_add_5.glb"
-  moveSpeed?: number; // units/sec
-  lookSpeed?: number; // PointerLockControls는 내부적으로 처리, 여기선 따로 안 씀
+  glbUrl?: string;
+  moveSpeed?: number;
+
+  /** ✅ 시작 웨이포인트 id */
+  startWaypointId?: number;
+
+  /** ✅ 웨이포인트의 y(높이)를 유지할지 */
+  lockYToWaypoint?: boolean;
+
+  /** ✅ 시야각 */
+  fov?: number;
 };
 
+function applyWaypoint(camera: THREE.PerspectiveCamera, wpId: number, fov = 65) {
+  const wp = WAYPOINTS.find((w) => w.id === wpId);
+  if (!wp) {
+    console.warn("[Hall] waypoint not found:", wpId);
+    return { fixedY: null as number | null };
+  }
+
+  const { pos, yaw, pitch } = wp.pose;
+
+  camera.fov = fov;
+  camera.updateProjectionMatrix();
+
+  camera.position.set(pos[0], pos[1], pos[2]);
+
+  // ✅ PointerLockControls와 맞추려면 rotation을 직접 세팅(lookAt보다 안정)
+  camera.rotation.set(pitch, yaw, 0, "YXZ");
+  camera.updateMatrixWorld(true);
+
+  console.log("[Hall] start waypoint =", wpId, "pos =", pos, "yaw/pitch =", yaw, pitch);
+
+  return { fixedY: pos[1] };
+}
+
 export function mountMainHallViewer(canvas: HTMLCanvasElement, opts: Options = {}) {
-  const glbUrl = opts.glbUrl ?? "/models/mh_add_5.glb";
+  // ✅ 여기서 canvas가 진짜인지 강제 체크(이 에러가 다시 나면 여기서 바로 잡힘)
+  if (!(canvas instanceof HTMLCanvasElement)) {
+    console.error("[Hall] canvas is not HTMLCanvasElement:", canvas);
+    throw new Error("mountMainHallViewer(canvas, ...) 첫 인자는 반드시 HTMLCanvasElement 여야 합니다.");
+  }
+
+  const glbUrl = opts.glbUrl ?? "/models/museum/mh_add_5.glb";
   const moveSpeed = opts.moveSpeed ?? 3.5;
 
-  /* ---------------------------
-   * Renderer
-   * --------------------------- */
+  const startWaypointId = opts.startWaypointId ?? 0;
+  const lockYToWaypoint = opts.lockYToWaypoint ?? true;
+  const fov = opts.fov ?? 65;
+
+  /* Renderer */
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
-    alpha: true,
+    alpha: false,
     powerPreference: "high-performance",
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
 
-  // ✅ 색감(칙칙함) 관련 핵심: sRGB + 톤매핑
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
+  renderer.setClearColor(new THREE.Color("#111111"), 1);
 
-  /* ---------------------------
-   * Scene / Camera
-   * --------------------------- */
+  /* Scene / Camera */
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#111111");
 
-  const camera = new THREE.PerspectiveCamera(
-    65,
-    canvas.clientWidth / canvas.clientHeight,
-    0.05,
-    500
-  );
-  camera.position.set(0, 1.65, 4); // 사람 눈높이
+  const camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.innerHeight, 0.05, 5000);
 
-  /* ---------------------------
-   * Controls: PointerLock + WASD
-   * --------------------------- */
+  /* Controls */
   const controls = new PointerLockControls(camera, renderer.domElement);
 
-  // 클릭하면 마우스룩 진입
   const onClick = () => {
     if (!controls.isLocked) controls.lock();
   };
   renderer.domElement.addEventListener("click", onClick);
 
-  // WASD 입력
-  const keys = {
-    w: false,
-    a: false,
-    s: false,
-    d: false,
-    shift: false,
-  };
-
+  const keys = { w: false, a: false, s: false, d: false, shift: false };
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.code === "KeyW") keys.w = true;
     if (e.code === "KeyA") keys.a = true;
     if (e.code === "KeyS") keys.s = true;
     if (e.code === "KeyD") keys.d = true;
     if (e.code === "ShiftLeft" || e.code === "ShiftRight") keys.shift = true;
-    // ESC는 PointerLockControls가 기본적으로 해제됨
   };
   const onKeyUp = (e: KeyboardEvent) => {
     if (e.code === "KeyW") keys.w = false;
@@ -82,110 +103,63 @@ export function mountMainHallViewer(canvas: HTMLCanvasElement, opts: Options = {
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
 
-  /* ---------------------------
-   * Lighting (실내 기본)
-   * --------------------------- */
-  // 전체 기본광 (너무 어둡지 않게)
+  /* Lighting */
   scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-
-  // 천장 방향 디렉셔널
   const dir = new THREE.DirectionalLight(0xffffff, 1.2);
   dir.position.set(5, 10, 5);
   scene.add(dir);
-
-  // 살짝 포인트라이트 (공간감)
   const point = new THREE.PointLight(0xffffff, 0.6, 50);
   point.position.set(0, 4, 0);
   scene.add(point);
 
-  /* ---------------------------
-   * Load GLB
-   * --------------------------- */
+  /* Load GLB */
   const loader = new GLTFLoader();
-
   let hallRoot: THREE.Object3D | null = null;
-  let hallBox = new THREE.Box3();
-  let hallCenter = new THREE.Vector3();
-  let hallSize = new THREE.Vector3();
 
-  const setCommonGLTFFixes = (root: THREE.Object3D) => {
-    root.traverse((obj) => {
-      // Mesh만 처리
-      const mesh = obj as THREE.Mesh;
-      if (!mesh.isMesh) return;
-
-      // 그림자 (원하면 켜도 됨. 일단 성능/아티팩트 때문에 기본 off)
-      mesh.castShadow = false;
-      mesh.receiveShadow = false;
-
-      // 물질 색공간/톤 이슈는 보통 텍스처쪽인데,
-      // GLTFLoader가 sRGB 처리 해주긴 함. 그래도 MeshStandardMaterial 계열이면 OK.
-      const mat = mesh.material as any;
-      if (mat && mat.map) {
-        mat.map.colorSpace = THREE.SRGBColorSpace;
-      }
-    });
-  };
-
-  const placeCameraInside = (root: THREE.Object3D) => {
-    hallBox = new THREE.Box3().setFromObject(root);
-    hallBox.getCenter(hallCenter);
-    hallBox.getSize(hallSize);
-
-    // 공간 크기에 따라 카메라 초기 위치를 "중앙 + 약간 뒤"로
-    // Z 방향이 반대일 수도 있어서, 가장 긴 축을 기준으로 적당히 배치
-    const maxDim = Math.max(hallSize.x, hallSize.y, hallSize.z);
-    const start = hallCenter.clone().add(new THREE.Vector3(0, 1.65, maxDim * 0.2));
-    camera.position.copy(start);
-
-    // 중앙 쪽을 바라보게
-    camera.lookAt(hallCenter.x, 1.65, hallCenter.z);
-  };
+  // ✅ 웨이포인트 y 고정용
+  let fixedY: number | null = null;
 
   loader.load(
     glbUrl,
     (gltf) => {
       hallRoot = gltf.scene;
-      setCommonGLTFFixes(hallRoot);
 
-      // 필요하면 여기서 scale 조정
-      // hallRoot.scale.setScalar(1);
+      // 텍스처 컬러스페이스 보정(선택)
+      hallRoot.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const mat = mesh.material as any;
+        if (mat?.map) mat.map.colorSpace = THREE.SRGBColorSpace;
+      });
 
       scene.add(hallRoot);
 
-      // 카메라를 내부로 배치
-      placeCameraInside(hallRoot);
+      // ✅ 무조건 웨이포인트로 시작 포즈 적용
+      const r = applyWaypoint(camera, startWaypointId, fov);
+      fixedY = lockYToWaypoint ? r.fixedY : null;
     },
-    (ev) => {
-      // console.log("loading", (ev.loaded / (ev.total || 1)) * 100);
-    },
-    (err) => {
-      console.error("Failed to load GLB:", err);
-    }
+    undefined,
+    (err) => console.error("[Hall] Failed to load GLB:", err)
   );
 
-  /* ---------------------------
-   * Resize
-   * --------------------------- */
-  const resize = () => {
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
+  /* Resize */
+  const onResize = () => {
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
+    camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
   };
-  window.addEventListener("resize", resize);
+  window.addEventListener("resize", onResize);
 
-  /* ---------------------------
-   * Animation loop
-   * --------------------------- */
+  /* Loop */
   const clock = new THREE.Clock();
   const v = new THREE.Vector3();
 
+  let alive = true;
   function tick() {
+    if (!alive) return;
+
     const dt = Math.min(clock.getDelta(), 0.033);
 
-    // 이동: PointerLock 상태에서만
     if (controls.isLocked) {
       const speed = moveSpeed * (keys.shift ? 1.8 : 1.0);
 
@@ -201,25 +175,24 @@ export function mountMainHallViewer(canvas: HTMLCanvasElement, opts: Options = {
         controls.moveForward(v.z);
       }
 
-      // "바닥에 박힘" 방지용: Y 고정(간단 버전)
-      camera.position.y = 1.65;
+      // ✅ 여기서 1.65로 고정하면 WAYPOINT y가 깨짐
+      if (fixedY !== null) camera.position.y = fixedY;
     }
 
     renderer.render(scene, camera);
     requestAnimationFrame(tick);
   }
-  tick();
+  requestAnimationFrame(tick);
 
-  /* ---------------------------
-   * Cleanup
-   * --------------------------- */
+  /* Cleanup */
   const destroy = () => {
+    alive = false;
+
     renderer.domElement.removeEventListener("click", onClick);
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
-    window.removeEventListener("resize", resize);
+    window.removeEventListener("resize", onResize);
 
-    // scene dispose (간단 처리)
     if (hallRoot) {
       hallRoot.traverse((o) => {
         const mesh = o as THREE.Mesh;
@@ -230,8 +203,9 @@ export function mountMainHallViewer(canvas: HTMLCanvasElement, opts: Options = {
         else mat?.dispose?.();
       });
     }
+
     renderer.dispose();
   };
 
-  return { destroy, scene, camera, controls };
+  return { destroy };
 }
