@@ -185,7 +185,7 @@ async function startExhibit(payload: ExhibitPayload) {
   toast(`ENTER EXHIBIT: ${payload.artist}`);
 
   exhibitRuntime = await mountExhibitRoom(canvas, {
-    glbUrl: `${import.meta.env.BASE_URL}models/gallery/gallery.glb`,
+    glbUrl: `${import.meta.env.BASE_URL}models/gallery/gallery1.glb`,
     resetRootTransform: true,
     autoFitIfOff: true,
     debug: true, // ✅ 문제 해결되면 false

@@ -297,7 +297,7 @@ export async function mountExhibitRoom(
               camera,
               faceCamera: true,
               epsilon: 0.06,
-              fill: 1.02,
+              fill: 1.0,
               fixFlipY: true,
             });
             if (debug) console.log("[exhibit] panelArt attached:", r.attached.length, "missing:", r.missing);
