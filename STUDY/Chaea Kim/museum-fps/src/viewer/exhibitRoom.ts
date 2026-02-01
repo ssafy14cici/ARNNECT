@@ -4,7 +4,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import gsap from "gsap";
 
-import { attachPanelArt, type PanelArtItem } from "./panelArt";
+import { type PanelArtItem } from "./panelArt";
 import { EXHIBIT_POINTS } from "./exhibitPoints";
 import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
 
@@ -291,16 +291,81 @@ export async function mountExhibitRoom(
           }
 
           if (opts.panelItems?.length) {
-            const r = await attachPanelArt({
-              sceneRoot: glbRoot,
-              items: opts.panelItems,
-              camera,
-              faceCamera: true,
-              epsilon: 0.06,
-              fill: 1.0,
-              fixFlipY: true,
-            });
-            if (debug) console.log("[exhibit] panelArt attached:", r.attached.length, "missing:", r.missing);
+            const texLoader = new THREE.TextureLoader();
+            let attached = 0;
+            const missing: string[] = [];
+
+            for (const item of opts.panelItems) {
+              // GLB 내에서 패널 오브젝트 찾기
+              let panelObj: THREE.Object3D | null = null;
+              glbRoot.traverse((o: THREE.Object3D) => {
+                if (!panelObj && o.name === item.panelName) panelObj = o;
+              });
+              if (!panelObj) {
+                // loose match: 이름에 포함
+                const target = item.panelName.toLowerCase();
+                glbRoot.traverse((o: THREE.Object3D) => {
+                  if (!panelObj && o.name.toLowerCase().includes(target)) panelObj = o;
+                });
+              }
+              if (!panelObj) { missing.push(item.panelName); continue; }
+
+              // 메시 찾기
+              let mesh: THREE.Mesh | null = null;
+              if ((panelObj as any).isMesh) mesh = panelObj as THREE.Mesh;
+              else panelObj.traverse((o: THREE.Object3D) => { if (!mesh && (o as any).isMesh) mesh = o as THREE.Mesh; });
+              if (!mesh) { missing.push(item.panelName); continue; }
+
+              try {
+                const tex = await texLoader.loadAsync(item.imageUrl);
+                tex.colorSpace = THREE.SRGBColorSpace;
+                tex.flipY = false;
+
+                // 패널 geometry 비율 계산
+                const geo = mesh.geometry as THREE.BufferGeometry;
+                geo.computeBoundingBox();
+                const bb = geo.boundingBox!;
+                const sz = new THREE.Vector3();
+                bb.getSize(sz);
+                // 두 큰 축 = 패널 w/h (세 번째는 두께)
+                const axes = [sz.x, sz.y, sz.z].sort((a, b) => b - a);
+                const panelW = axes[0], panelH = axes[1];
+                const panelAspect = panelW / (panelH || 1);
+
+                // 이미지 비율
+                const imgW = tex.image.width || 1;
+                const imgH = tex.image.height || 1;
+                const imgAspect = imgW / imgH;
+
+                // "cover" fit: 패널을 꽉 채우되 이미지 중앙 정렬
+                if (imgAspect > panelAspect) {
+                  // 이미지가 더 넓음 → 세로 맞추고 가로 crop
+                  const scale = panelAspect / imgAspect;
+                  tex.repeat.set(scale, 1);
+                  tex.offset.set((1 - scale) / 2, 0);
+                } else {
+                  // 이미지가 더 높음 → 가로 맞추고 세로 crop
+                  const scale = imgAspect / panelAspect;
+                  tex.repeat.set(1, scale);
+                  tex.offset.set(0, (1 - scale) / 2);
+                }
+                tex.wrapS = THREE.ClampToEdgeWrapping;
+                tex.wrapT = THREE.ClampToEdgeWrapping;
+                tex.needsUpdate = true;
+
+                mesh.material = new THREE.MeshStandardMaterial({
+                  map: tex,
+                  roughness: 0.9,
+                  metalness: 0.0,
+                  side: THREE.DoubleSide,
+                });
+                attached++;
+              } catch (e) {
+                if (debug) console.warn("[exhibit] texture load failed:", item.panelName, e);
+                missing.push(item.panelName);
+              }
+            }
+            if (debug) console.log("[exhibit] panels attached:", attached, "missing:", missing);
           }
 
           loading.remove();

@@ -191,14 +191,12 @@ async function startExhibit(payload: ExhibitPayload) {
     debug: true, // ✅ 문제 해결되면 false
     titleText: `${payload.artist} — ${payload.artworkTitle}`,
 
-    // ✅ 지금은 테스트로 1개만. 나중에 백엔드 응답으로 배열 채우면 됨.
-    panelItems: [
-      // {
-      //   panelName: "ART_1",
-      //   imageUrl: `${import.meta.env.BASE_URL}art/b1.jpg`,
-      //   title: payload.artist,
-      // },
-    ],
+    // ✅ 임시: public/art 이미지 → EX_PANEL 매핑 (나중에 백엔드 응답으로 교체)
+    panelItems: Array.from({ length: 11 }, (_, i) => ({
+      panelName: `EX_PANEL_${i + 1}`,
+      imageUrl: `${import.meta.env.BASE_URL}art/b${i + 1}.jpg`,
+      title: `작품 ${i + 1}`,
+    })),
 
     onExitToHall: () => {
       toast("BACK TO HALL");
