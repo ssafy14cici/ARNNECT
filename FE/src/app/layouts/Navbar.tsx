@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState, Suspense } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
 import { useAuthStore } from "../../features/auth/store";
-import HoverModel from "../../components/HoverModel";
-import LogoutModal from "../../components/common/LogoutModal";
+import HoverModel from "../../shared/ui/three/HoverModel";
+import LogoutModal from "../../shared/ui/modals/LogoutModal";
 import "../../styles/navbar.css";
 
 // ✅ 3D 도형 타입 정의
@@ -67,16 +67,26 @@ export default function Navbar() {
   const items: MenuItem[] = useMemo(
     () => [
       { key: "home", label: "Home", path: "/", shape: "knot" },
-      { key: "yourpreference", label: "너의 취향은", path: "/preference", shape: "octahedron" },
+      {
+        key: "yourpreference",
+        label: "너의 취향은",
+        path: "/preference",
+        shape: "octahedron",
+      },
       { key: "search", label: "Search", path: "/search", shape: "sphere" },
       { key: "close", label: "", type: "close" }, // 닫기 버튼은 3D 없음
 
       { key: "feed", label: "Feed", path: "/feed", shape: "box" },
       { key: "lounge", label: "Lounge", path: "/lounge", shape: "torus" },
-      { key: "profile", label: "Profile", path: "/profile/me/feed", shape: "sphere" },
+      {
+        key: "profile",
+        label: "Profile",
+        path: "/profile/me/feed",
+        shape: "sphere",
+      },
       { key: "auth", label: "Login/Out", path: "", shape: "knot" },
     ],
-    []
+    [],
   );
 
   const handleItemClick = (item: MenuItem) => {
@@ -110,7 +120,11 @@ export default function Navbar() {
       {/* 1. 상단 고정 네비바 */}
       <header className="nav">
         <div className="navInner">
-          <button className="navBrand" type="button" onClick={() => navigate("/")}>
+          <button
+            className="navBrand"
+            type="button"
+            onClick={() => navigate("/")}
+          >
             ARNNECT
           </button>
 
@@ -157,10 +171,7 @@ export default function Navbar() {
                     <div className="ref3DWrapper">
                       <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
                         <Suspense fallback={null}>
-                          <HoverModel 
-                            color="#ffffff" 
-                            shape={it.shape} 
-                          />
+                          <HoverModel color="#ffffff" shape={it.shape} />
                         </Suspense>
                       </Canvas>
                     </div>

@@ -1,4 +1,4 @@
-// FE/src/utils/qrDownload.ts
+// FE/src/features/tickets/qrDownload.ts
 export async function downloadSvgAsPng(svgEl: SVGSVGElement, filename: string) {
   const svgData = new XMLSerializer().serializeToString(svgEl);
 

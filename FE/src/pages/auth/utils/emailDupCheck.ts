@@ -1,28 +1,28 @@
-// src/pages/auth/_utils/emailDupCheck.ts
+// FE/src/pages/auth/utils/emailDupCheck.ts
 import { apiCheckEmailDup } from "../../../features/auth/api";
 
-// UI에서 쓰기 편한 형태로 래핑
-export type EmailDupCheckResult = {
-  ok: boolean;        // true = 사용 가능
-  message: string;    // UI 표시용 메시지
-};
-
-export async function checkEmailDupMock(email: string): Promise<EmailDupCheckResult> {
+/**
+ * 기존 pages 코드 호환을 위해 이름은 그대로 유지(checkEmailDupMock).
+ * 내부는 features/auth/apiCheckEmailDup로 연결되어 mock/real 자동 분기됨.
+ */
+export async function checkEmailDup(email: string): Promise<{
+  ok: boolean;
+  message: string;
+}> {
   const e = email.trim();
+  if (!e) return { ok: false, message: "이메일을 입력해주세요." };
 
-  // 1차 프론트 가드(불필요 호출 방지)
-  if (!e) {
-    return { ok: false, message: "이메일을 입력해주세요." };
+  try {
+    const { available, reason } = await apiCheckEmailDup(e);
+    return {
+      ok: available,
+      message: reason ?? (available ? "사용 가능한 이메일입니다." : "이미 사용 중인 이메일입니다."),
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "이메일 확인에 실패했습니다.";
+    return { ok: false, message: msg };
   }
-  if (!e.includes("@")) {
-    return { ok: false, message: "이메일 형식을 확인해주세요." };
-  }
-
-  // 서버(=mock api) 체크
-  const r = await apiCheckEmailDup(e);
-
-  return {
-    ok: r.available,
-    message: r.reason ?? (r.available ? "사용 가능한 이메일입니다." : "이미 사용 중인 이메일입니다."),
-  };
 }
+
+// ✅ 기존 코드(import { checkEmailDupMock } ...) 그대로 살리기 위한 alias
+export const checkEmailDupMock = checkEmailDup;

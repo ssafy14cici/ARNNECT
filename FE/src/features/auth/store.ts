@@ -1,4 +1,4 @@
-//FE\src\features\auth\store.ts
+// FE/src/features/auth/store.ts
 import { create } from "zustand";
 
 export type AppRole = "general" | "artist";
@@ -6,12 +6,6 @@ export type AppRole = "general" | "artist";
 export type AuthUser = {
   memberUuid: string;
   name: string;
-};
-
-type PersistShape = {
-  token: string | null;
-  role: AppRole | null;
-  user: AuthUser | null;
 };
 
 type AuthState = {
@@ -22,25 +16,28 @@ type AuthState = {
 
   login: (p: { token: string; role: AppRole; remember?: boolean; user: AuthUser }) => void;
   logout: () => void;
-  hydrate: () => void; // ✅ AppLayout에서 호출
+  hydrate: () => void;
 };
 
 const KEY = "comet_mock_auth_v1";
+const USE_MOCK = String(import.meta.env.VITE_USE_MOCK) === "true";
 
-function load(): PersistShape | null {
+function load(): Partial<AuthState> | null {
+  if (!USE_MOCK) return null;
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as PersistShape) : null;
+    return raw ? (JSON.parse(raw) as Partial<AuthState>) : null;
   } catch {
     return null;
   }
 }
 
-function save(p: PersistShape) {
-  localStorage.setItem(KEY, JSON.stringify(p));
+function save(partial: Partial<AuthState>) {
+  if (!USE_MOCK) return;
+  localStorage.setItem(KEY, JSON.stringify(partial));
 }
 
-export const useAuthStore = create<AuthState>((set, get) => {
+export const useAuthStore = create<AuthState>((set) => {
   const saved = load();
 
   return {
@@ -49,29 +46,24 @@ export const useAuthStore = create<AuthState>((set, get) => {
     role: saved?.role ?? null,
     user: saved?.user ?? null,
 
-    login: ({ token, role, remember, user }) => {
+    hydrate: () => {
+      const next = load();
+      set({
+        isLoggedIn: !!next?.token,
+        token: next?.token ?? null,
+        role: (next?.role as AppRole) ?? null,
+        user: (next?.user as AuthUser) ?? null,
+      });
+    },
+
+    login: ({ token, role, user }) => {
       set({ isLoggedIn: true, token, role, user });
-      if (remember) save({ token, role, user });
-      else localStorage.removeItem(KEY); // 세션만 유지하고 싶으면 여기 정책 바꾸면 됨
+      save({ token, role, user });
     },
 
     logout: () => {
       set({ isLoggedIn: false, token: null, role: null, user: null });
-      localStorage.removeItem(KEY);
-    },
-
-    hydrate: () => {
-      const next = load();
-      if (!next?.token) {
-        set({ isLoggedIn: false, token: null, role: null, user: null });
-        return;
-      }
-      set({
-        isLoggedIn: true,
-        token: next.token ?? null,
-        role: next.role ?? null,
-        user: next.user ?? null,
-      });
+      if (USE_MOCK) localStorage.removeItem(KEY);
     },
   };
 });

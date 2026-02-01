@@ -1,32 +1,27 @@
+// FE/src/pages/profile/Profile.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import ProfileHeader from "./components/ProfileHeader";
 import { profileApi } from "../../features/profile/api";
-import type { ArtistProfile, UserProfile, ProfileRole } from "../../features/profile/types";
+import type { ProfileModel } from "../../features/profile/types";
 import { useAuthStore } from "../../features/auth/store";
 import "./profile.css";
-
-type ProfileModel = ArtistProfile | UserProfile;
 
 export type ProfileOutletContext = {
   profile: ProfileModel;
   isOwner: boolean;
 };
 
-function toProfileRole(role: "general" | "artist" | null): ProfileRole {
-  // 로그인 안 했으면 기본 USER 취급(혹은 throw 하고 싶으면 여기서 처리)
-  return role === "artist" ? "ARTIST" : "USER";
-}
-
 export default function Profile() {
-  const { id } = useParams(); // "me" or 실제 id
+  const { id } = useParams(); // "me" | uuid
   const profileId = id ?? "";
 
-  const authRole = useAuthStore((s) => s.role); // "general" | "artist" | null
   const authUser = useAuthStore((s) => s.user); // { memberUuid, name } | null
-
-  const viewerProfileRole = toProfileRole(authRole);
-  const isOwner = useMemo(() => profileId === "me", [profileId]);
+  const isOwner = useMemo(() => {
+    if (profileId === "me") return true;
+    if (!profileId) return false;
+    return authUser?.memberUuid === profileId;
+  }, [profileId, authUser?.memberUuid]);
 
   const [profile, setProfile] = useState<ProfileModel | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -44,25 +39,17 @@ export default function Profile() {
 
     (async () => {
       try {
-        // ✅ 내 프로필: "me"를 API로 넘기지 말고, 진짜 uuid로 조회
+        if (!profileId) throw new Error("프로필 ID가 없습니다.");
+
+        // ✅ 내 프로필은 API에서 직접 가져오기
         if (profileId === "me") {
-          if (!authUser?.memberUuid) {
-            throw new Error("로그인이 필요합니다. (memberUuid 없음)");
-          }
-
-          const myUuid = authUser.memberUuid;
-
-          const p =
-            viewerProfileRole === "ARTIST"
-              ? await profileApi.getArtistProfile(myUuid)
-              : await profileApi.getUserProfile(myUuid);
-
+          const p = await profileApi.getMyProfile();
           if (cancelled || reqSeq.current !== mySeq) return;
           setProfile(p);
           return;
         }
 
-        // ✅ 타인 프로필: artist → 실패 시 user fallback
+        // ✅ 타인 프로필: artist → 실패 시 user fallback (UI 코드 유지)
         try {
           const a = await profileApi.getArtistProfile(profileId);
           if (cancelled || reqSeq.current !== mySeq) return;
@@ -76,15 +63,17 @@ export default function Profile() {
         if (cancelled || reqSeq.current !== mySeq) return;
         setError(e instanceof Error ? e.message : "프로필 로딩 실패");
       } finally {
-        if (cancelled || reqSeq.current !== mySeq) return;
-        setLoading(false);
+        if (cancelled || reqSeq.current !== mySeq) {
+          setLoading(false);
+        }
+        
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [profileId, viewerProfileRole, authUser?.memberUuid]);
+  }, [profileId]);
 
   const navigate = useNavigate();
   const goWrite = () => navigate("/posts/create");
@@ -96,7 +85,6 @@ export default function Profile() {
       </div>
     );
   }
-
   if (error) return <div className="profile-error">{error}</div>;
   if (!profile) return <div className="profile-error">프로필을 찾을 수 없습니다.</div>;
 
@@ -129,7 +117,7 @@ export default function Profile() {
         </div>
 
         <main className="profile-content">
-          <Outlet context={{ profile, isOwner } satisfies ProfileOutletContext} />
+          <Outlet context={{ profile, isOwner } as ProfileOutletContext} />
         </main>
 
         {isOwner && (

@@ -1,36 +1,14 @@
-// FE/src/pages/feed/Feed.tsx
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { FeedCard, type ViewMode } from "../../components/feed/FeedCard";
-import { useAuthStore } from "../../features/auth/store";
-import {
-  createPost,
-  listPosts,
-  seedMyPosts,
-  setMe,
-  type PostRole,
-} from "../../features/feed/mockData";
+import { useNavigate } from "react-router-dom";
+
+import { FeedCard } from "../../features/feed/ui/FeedCard"; // 이동 가정
+import type { FeedFilterKey, FeedItem, ViewMode } from "../../features/feed/types";
+import { getFeedList } from "../../features/feed/api";
+import { subscribePostsUpdated } from "../../features/posts/api/mock"; // mock 모드에서만 동작해도 OK
 import "./feed.css";
 
 const DETAIL_PATH = (id: string) => `/artworks/${id}`;
 const PROFILE_PATH = (authorId: string) => `/profile/${authorId}`;
-
-export type FeedRole = "ARTIST" | "USER";
-
-type FeedItem = {
-  id: string;
-  role: FeedRole;
-  title: string;
-  excerpt?: string;
-  authorName: string;
-  authorId: string;
-  createdAt: string;
-  imageUrl?: string;
-  likes?: number;
-  views?: number;
-};
-
-type FeedFilterKey = "ALL" | "ARTIST" | "USER";
 
 const FILTERS: Array<{ key: FeedFilterKey; label: string }> = [
   { key: "ALL", label: "All" },
@@ -40,129 +18,55 @@ const FILTERS: Array<{ key: FeedFilterKey; label: string }> = [
 
 const PAGE_SIZE = 12;
 
-// ✅ FE/public/art/a1.jpg ... a12.jpg
-const ART_IMAGES = Array.from({ length: 12 }).map((_, i) => `/art/a${i + 1}.jpg`);
-
-function pickExcerpt(content?: string, max = 120) {
-  if (!content) return undefined;
-  const s = content.replace(/\s+/g, " ").trim();
-  if (!s) return undefined;
-  return s.length > max ? `${s.slice(0, max)}…` : s;
-}
-
-// ✅ 최초 1회: 기본 더미(공용) 생성
-const BASE_SEED_KEY = "comet_mock_posts_seeded_v1";
-function ensureBaseSeedOnce() {
-  if (localStorage.getItem(BASE_SEED_KEY) === "1") return;
-
-  const existing = listPosts();
-  if (existing.length > 0) {
-    localStorage.setItem(BASE_SEED_KEY, "1");
-    return;
-  }
-
-  const artistNames = ["A. KIM", "S. LEE", "J. PARK", "H. CHOI"];
-  const userNames = ["U. PARK", "U. CHOI", "U. KANG", "U. HAN"];
-
-  for (let i = 0; i < 24; i++) {
-    const role: PostRole = i % 2 === 0 ? "ARTIST" : "USER";
-    const authorName =
-      role === "ARTIST"
-        ? artistNames[i % artistNames.length]
-        : userNames[i % userNames.length];
-    const authorId =
-      role === "ARTIST" ? `artist-${(i % 6) + 1}` : `user-${(i % 10) + 1}`;
-
-    createPost({
-      authorId,
-      authorName,
-      role,
-      title: role === "ARTIST" ? `Untitled No.${i + 1}` : `Exhibition Review #${i + 1}`,
-      content: role === "ARTIST" ? "작품 업로드 목업 포스트입니다." : "감상평 목업 포스트입니다.",
-      imageUrls: [ART_IMAGES[i % ART_IMAGES.length]],
-      tags: ["mock"],
-      meta: { seeded: true },
-    });
-  }
-
-  localStorage.setItem(BASE_SEED_KEY, "1");
-}
-
-// ✅ 로그인 유저별 1회: 내 글 더미 생성
-const MY_SEED_PREFIX = "comet_mock_my_posts_seeded_v1";
-function ensureMySeedOnce(me: { id: string; name: string; role: PostRole }, count = 6) {
-  const key = `${MY_SEED_PREFIX}.${me.id}`;
-  if (localStorage.getItem(key) === "1") return;
-
-  setMe(me);
-  seedMyPosts(count);
-
-  localStorage.setItem(key, "1");
-}
-
-function mapPostsToFeeds(): FeedItem[] {
-  return listPosts()
-    .map((p: any): FeedItem => ({
-      id: p.id,
-      role: p.role,
-      title: p.title,
-      excerpt: pickExcerpt(p.content),
-      authorName: p.authorName,
-      authorId: p.authorId,
-      createdAt: p.createdAt,
-      imageUrl: (Array.isArray(p.imageUrls) ? p.imageUrls[0] : undefined) ?? p.imageUrl,
-
-      likes: p.likes,
-      views: p.views,
-    }))
-    .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
-}
-
-
 export default function Feed() {
   const navigate = useNavigate();
-  const location = useLocation();
 
-  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
-  const appRole = useAuthStore((s) => s.role); // "general" | "artist" | null
-  const user = useAuthStore((s) => s.user); // { memberUuid, name } | null
-
+  const [items, setItems] = useState<FeedItem[]>([]);
   const [filter, setFilter] = useState<FeedFilterKey>("ALL");
   const [viewMode, setViewMode] = useState<ViewMode>("GRID");
-  const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const observerRef = useRef<IntersectionObserver | null>(null);
 
-  // ✅ seed는 멱등(키로 1회만)이라 렌더 중 호출해도 중복 생성 안 됨
-  ensureBaseSeedOnce();
-
-  const me =
-    isLoggedIn && user
-      ? ({
-          id: user.memberUuid,
-          name: user.name,
-          role: appRole === "artist" ? "ARTIST" : "USER",
-        } as const)
-      : null;
-
-  if (me) ensureMySeedOnce(me, 6);
-
-  // ✅ PostCreate 갔다가 돌아오면 보통 Feed가 리마운트/리렌더 됨.
-  //    혹시 같은 화면 유지되는 케이스 대비로 location.key를 참조해서 리스트 다시 읽음.
-  //    (useMemo 없이 그냥 계산)
-  void location.key;
-  const feeds = mapPostsToFeeds();
-
-  const filteredFeeds =
+  const filtered =
     filter === "ALL"
-      ? feeds
+      ? items
       : filter === "ARTIST"
-        ? feeds.filter((f) => f.role === "ARTIST")
-        : feeds.filter((f) => f.role === "USER");
+        ? items.filter((x) => x.authorRole === "ARTIST")
+        : items.filter((x) => x.authorRole === "USER");
 
-  const visibleFeeds = filteredFeeds.slice(0, visibleCount);
-  const hasMore = visibleCount < filteredFeeds.length;
+  const visible = filtered.slice(0, visibleCount);
+  const hasMore = visibleCount < filtered.length;
+
+  const refetch = async () => {
+    const data = await getFeedList();
+    setItems(data);
+  };
+
+  useEffect(() => {
+    refetch();
+    // mock 모드에서만 의미 있음: 글 작성하면 이벤트로 갱신
+    const unsub = subscribePostsUpdated(() => refetch());
+    return () => unsub?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasMore) {
+          setVisibleCount((v) => v + PAGE_SIZE);
+        }
+      },
+      { threshold: 0.1 },
+    );
+
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore]);
 
   const applyFilter = (next: FeedFilterKey) => {
     setFilter(next);
@@ -170,54 +74,17 @@ export default function Feed() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-
-    observerRef.current?.disconnect();
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && hasMore) {
-          setVisibleCount((prev) => prev + PAGE_SIZE);
-        }
-      },
-      { threshold: 0.1 },
-    );
-
-    observerRef.current.observe(el);
-    return () => observerRef.current?.disconnect();
-  }, [hasMore]);
-
-  const goDetail = (id: string) => navigate(DETAIL_PATH(id));
-  const goProfile = (authorId: string) => navigate(PROFILE_PATH(authorId));
-
   return (
     <div className="feedPage">
+      {/* 헤더/컨트롤 동일 */}
       <header className="feedHeader">
-        <h1 className="feedMainTitle">
-          <span className="italic-serif">(Art)</span> Gallery
-        </h1>
-
-        <p className="feedDesc">
-          We invite you to immerse yourself in the essence of culture.
-          <br />
-          Through artistic expression, master artisans bring to life stories of resilience and beauty.
-        </p>
-
+        {/* ... */}
         <div className="feedControls">
           <div className="togglePill">
-            <button
-              type="button"
-              className={`pillBtn ${viewMode === "LIST" ? "active" : ""}`}
-              onClick={() => setViewMode("LIST")}
-            >
+            <button type="button" className={`pillBtn ${viewMode === "LIST" ? "active" : ""}`} onClick={() => setViewMode("LIST")}>
               List
             </button>
-            <button
-              type="button"
-              className={`pillBtn ${viewMode === "GRID" ? "active" : ""}`}
-              onClick={() => setViewMode("GRID")}
-            >
+            <button type="button" className={`pillBtn ${viewMode === "GRID" ? "active" : ""}`} onClick={() => setViewMode("GRID")}>
               Grid
             </button>
           </div>
@@ -238,22 +105,20 @@ export default function Feed() {
       </header>
 
       <section className={`feedContainer ${viewMode === "LIST" ? "mode-list" : "mode-grid"}`}>
-        {visibleFeeds.map((item) => (
+        {visible.map((it) => (
           <FeedCard
-            key={item.id}
-            feed={item}
+            key={it.id}
+            feed={it}
             viewMode={viewMode}
-            onClick={() => goDetail(item.id)}
+            onClick={() => navigate(DETAIL_PATH(it.id))}
             onAuthorClick={(e) => {
               e?.stopPropagation?.();
-              goProfile(item.authorId);
+              navigate(PROFILE_PATH(it.authorId));
             }}
           />
         ))}
 
-        {visibleFeeds.length === 0 && (
-          <div style={{ padding: 24, opacity: 0.8 }}>아직 표시할 피드가 없습니다.</div>
-        )}
+        {visible.length === 0 && <div style={{ padding: 24, opacity: 0.8 }}>아직 표시할 피드가 없습니다.</div>}
       </section>
 
       <div ref={sentinelRef} className="loadingTrigger" />

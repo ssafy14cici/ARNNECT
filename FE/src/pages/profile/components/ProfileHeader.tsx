@@ -2,14 +2,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../../features/auth/store";
-import { useBadgeStore } from "../../../features/badge/store"; // ✅ 스토어 임포트 추가
+import { profileApi } from "../../../features/profile/api"; // ✅ 추가: API 연결
+import { useBadgeStore } from "../../../features/badge/store";
 import basicProfile from "../../../assets/basicprofile.png";
-import type {
-  ArtistProfile,
-  UserProfile,
-  Badge,
-} from "../../../features/profile/types";
-import BadgePicker from "../../../components/badge/BadgePicker"; // ✅ BadgePicker 사용
+import type { ArtistProfile, UserProfile, Badge } from "../../../features/profile/types";
+import BadgePicker from "../../../features/badge/ui/BadgePicker";
+
 
 type ProfileModel = ArtistProfile | UserProfile;
 
@@ -32,35 +30,32 @@ function clampFeaturedIds(profile: ProfileModel, max = 3) {
   return Array.from(new Set(ids)).slice(0, max);
 }
 
-export default function ProfileHeader({
-  profile,
-  isOwner,
-  onProfileUpdated,
-}: Props) {
+export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Props) {
   const navigate = useNavigate();
+
   const { logout, role: viewerRole } = useAuthStore();
-  const { featured, setFeatured } = useBadgeStore(); // ✅ 뱃지 스토어 사용
+  const { featured, setFeatured } = useBadgeStore();
 
   const [busy, setBusy] = useState(false);
 
-  // ✅ QnA 상태
+  // QnA
   const [qnaOpen, setQnaOpen] = useState(false);
   const [qnaMessage, setQnaMessage] = useState("");
 
-  // ✅ 편집 모달 상태
+  // Edit
   const [editOpen, setEditOpen] = useState(false);
   const [draftName, setDraftName] = useState(profile.name);
   const [draftImageUrl, setDraftImageUrl] = useState(profile.imageUrl ?? "");
   const [draftBio, setDraftBio] = useState(profile.bio ?? "");
   const [draftGenre, setDraftGenre] = useState("");
-  
-  // ✅ 뱃지 선택 모달(BadgePicker) 상태
-  const [pickerOpen, setPickerOpen] = useState(false); 
+
+  // Badge Picker
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [draftFeaturedBadgeIds, setDraftFeaturedBadgeIds] = useState<string[]>(
     () => clampFeaturedIds(profile, 3),
   );
 
-  // ✅ 관리 메뉴 상태
+  // Manage menu
   const [manageOpen, setManageOpen] = useState(false);
   const manageBtnRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -68,26 +63,21 @@ export default function ProfileHeader({
 
   const isArtist = isArtistProfile(profile);
 
-  const earnedBadges = useMemo<Badge[]>(
-    () => profile.badges ?? [],
-    [profile.badges],
-  );
+  const earnedBadges = useMemo<Badge[]>(() => profile.badges ?? [], [profile.badges]);
 
-  // ✅ BadgePicker가 스토어를 업데이트하면, 로컬 draft 상태도 동기화
+  // Badge store -> draft sync (edit 중일 때만)
   useEffect(() => {
-    if (editOpen) {
-      setDraftFeaturedBadgeIds(featured);
-    }
+    if (editOpen) setDraftFeaturedBadgeIds(featured);
   }, [featured, editOpen]);
 
-  // ✅ 헤더용: 실제 프로필의 대표 뱃지 객체 매핑
+  // Header featured badges
   const featuredBadges = useMemo(() => {
     const ids = clampFeaturedIds(profile, 3);
     const map = new Map((profile.badges ?? []).map((b) => [b.id, b]));
     return ids.map((id) => map.get(id)).filter(Boolean) as Badge[];
   }, [profile]);
 
-  // ✅ 편집용: 선택된 뱃지 ID를 객체로 매핑 (미리보기용)
+  // Edit preview
   const draftBadgeObjects = useMemo(() => {
     const map = new Map(earnedBadges.map((b) => [b.id, b]));
     return draftFeaturedBadgeIds.map((id) => map.get(id)).filter(Boolean) as Badge[];
@@ -103,8 +93,7 @@ export default function ProfileHeader({
     return (profile as ArtistProfile).contactEnabled !== false;
   }, [isArtist, profile]);
 
-  const canAskQnA =
-    !isOwner && isArtist && contactEnabled && viewerRole === "general";
+  const canAskQnA = !isOwner && isArtist && contactEnabled && viewerRole === "general";
 
   const avatarSrc = useMemo(() => {
     const url = (profile.imageUrl ?? "").trim();
@@ -112,26 +101,27 @@ export default function ProfileHeader({
     return url;
   }, [profile.imageUrl]);
 
-  // 메뉴 관리 로직 (Focus, Click Outside)
+  // Manage menu focus
   useEffect(() => {
-    if (manageOpen) {
-      firstMenuItemRef.current?.focus?.();
-    } else {
-      manageBtnRef.current?.focus?.();
-    }
+    if (manageOpen) firstMenuItemRef.current?.focus?.();
+    else manageBtnRef.current?.focus?.();
   }, [manageOpen]);
 
+  // click outside / esc
   useEffect(() => {
     if (!manageOpen) return;
+
     const onMouseDown = (e: MouseEvent) => {
       const target = e.target as Node;
       if (menuRef.current?.contains(target)) return;
       if (manageBtnRef.current?.contains(target)) return;
       setManageOpen(false);
     };
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setManageOpen(false);
     };
+
     document.addEventListener("mousedown", onMouseDown);
     document.addEventListener("keydown", onKeyDown);
     return () => {
@@ -142,32 +132,38 @@ export default function ProfileHeader({
 
   const toggleFollow = async () => {
     if (isOwner) return;
+
+    const prev = profile;
+
+    // 낙관적 업데이트
+    const optimistic: ProfileModel = prev.isFollowing
+      ? { ...prev, isFollowing: false, followersCount: Math.max(0, prev.followersCount - 1) }
+      : { ...prev, isFollowing: true, followersCount: prev.followersCount + 1 };
+
     setBusy(true);
+    onProfileUpdated(optimistic);
+
     try {
-      if (profile.isFollowing) {
-        onProfileUpdated({
-          ...profile,
-          isFollowing: false,
-          followersCount: Math.max(0, profile.followersCount - 1),
-        });
-      } else {
-        onProfileUpdated({
-          ...profile,
-          isFollowing: true,
-          followersCount: profile.followersCount + 1,
-        });
-      }
+      if (prev.isFollowing) await profileApi.unfollow(prev.id);
+      else await profileApi.follow(prev.id);
+    } catch (e) {
+      // 실패 롤백
+      onProfileUpdated(prev);
+      alert(e instanceof Error ? e.message : "팔로우 변경 실패");
     } finally {
       setBusy(false);
     }
   };
 
+
   const submitQnA = async () => {
     if (!canAskQnA) return;
     const trimmed = qnaMessage.trim();
     if (!trimmed) return;
+
     setBusy(true);
     try {
+      // 지금은 목업 처리 유지 (나중에 fanLetter/send로 연결해도 됨)
       setQnaMessage("");
       setQnaOpen(false);
       alert("QnA 전송 완료(목업)");
@@ -182,17 +178,16 @@ export default function ProfileHeader({
     setDraftBio(profile.bio ?? "");
     setDraftGenre(isArtist ? ((profile as ArtistProfile).genre ?? "") : "");
 
-    // ✅ 편집 시작 시, 스토어 데이터를 현재 프로필 상태로 초기화
     const currentFeatured = clampFeaturedIds(profile, 3);
     setDraftFeaturedBadgeIds(currentFeatured);
-    setFeatured(currentFeatured); 
+    setFeatured(currentFeatured);
 
     setEditOpen(true);
     setManageOpen(false);
   };
 
-  const saveEdit = () => {
-    // ✅ 저장 시점의 스토어(또는 draft) 상태를 프로필에 반영
+  // ✅ 저장: 로컬 state 반영 + 대표뱃지 저장 API(목업은 localStorage) 호출
+  const saveEdit = async () => {
     const nextFeatured = Array.from(new Set(draftFeaturedBadgeIds)).slice(0, 3);
 
     const next: ProfileModel = isArtist
@@ -212,8 +207,17 @@ export default function ProfileHeader({
           featuredBadgeIds: nextFeatured,
         } satisfies UserProfile);
 
-    onProfileUpdated(next);
-    setEditOpen(false);
+    setBusy(true);
+    try {
+      onProfileUpdated(next);
+      await profileApi.updateFeaturedBadges(next.role, next.id, nextFeatured); // ✅ 추가
+      setPickerOpen(false);
+      setEditOpen(false);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "프로필 저장 실패");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const doLogout = () => {
@@ -238,6 +242,7 @@ export default function ProfileHeader({
         <div className="profileHeaderMain">
           <div className="profileTitleRow">
             <h2 className="profileName">{profile.name}</h2>
+
             <div className="profileBadges">
               {featuredBadges.map((b) => (
                 <span key={b.id} className="profileBadge">
@@ -258,9 +263,7 @@ export default function ProfileHeader({
             {profile.bio ? (
               <span>{profile.bio}</span>
             ) : isOwner ? (
-              <span className="profileBioPlaceholder">
-                소개글을 추가해보세요.
-              </span>
+              <span className="profileBioPlaceholder">소개글을 추가해보세요.</span>
             ) : (
               <span className="profileBioPlaceholder">소개글이 없습니다.</span>
             )}
@@ -272,6 +275,7 @@ export default function ProfileHeader({
                 <button className="profileBtn" onClick={openEdit} type="button">
                   편집
                 </button>
+
                 <button
                   ref={manageBtnRef}
                   className="profileBtn"
@@ -283,15 +287,39 @@ export default function ProfileHeader({
                 >
                   관리
                 </button>
+
                 {manageOpen && (
-                  <div id="profile-manage-menu" ref={menuRef} className="profileMenu" role="menu">
-                    <button ref={firstMenuItemRef} className="profileMenuItem" onClick={openEdit} role="menuitem" type="button">
+                  <div
+                    id="profile-manage-menu"
+                    ref={menuRef}
+                    className="profileMenu"
+                    role="menu"
+                  >
+                    <button
+                      ref={firstMenuItemRef}
+                      className="profileMenuItem"
+                      onClick={openEdit}
+                      role="menuitem"
+                      type="button"
+                    >
                       프로필 편집
                     </button>
-                    <button className="profileMenuItem" onClick={doLogout} role="menuitem" type="button">
+
+                    <button
+                      className="profileMenuItem"
+                      onClick={doLogout}
+                      role="menuitem"
+                      type="button"
+                    >
                       로그아웃
                     </button>
-                    <button className="profileMenuItem" onClick={() => setManageOpen(false)} role="menuitem" type="button">
+
+                    <button
+                      className="profileMenuItem"
+                      onClick={() => setManageOpen(false)}
+                      role="menuitem"
+                      type="button"
+                    >
                       닫기
                     </button>
                   </div>
@@ -299,11 +327,21 @@ export default function ProfileHeader({
               </>
             ) : (
               <>
-                <button className="profileBtn" disabled={busy} onClick={toggleFollow} type="button">
+                <button
+                  className="profileBtn"
+                  disabled={busy}
+                  onClick={toggleFollow}
+                  type="button"
+                >
                   {profile.isFollowing ? "언팔로우" : "팔로우"}
                 </button>
+
                 {canAskQnA && (
-                  <button className="profileBtn" onClick={() => setQnaOpen(true)} type="button">
+                  <button
+                    className="profileBtn"
+                    onClick={() => setQnaOpen(true)}
+                    type="button"
+                  >
                     QnA
                   </button>
                 )}
@@ -318,10 +356,15 @@ export default function ProfileHeader({
         <div className="profileQnaPanel">
           <div className="profileQnaHeader">
             <strong>QnA 남기기</strong>
-            <button className="profileTextBtn" onClick={() => setQnaOpen(false)} type="button">
+            <button
+              className="profileTextBtn"
+              onClick={() => setQnaOpen(false)}
+              type="button"
+            >
               닫기
             </button>
           </div>
+
           <textarea
             className="profileTextarea"
             value={qnaMessage}
@@ -329,11 +372,21 @@ export default function ProfileHeader({
             rows={4}
             placeholder="예: 작품 제작 과정이 궁금해요."
           />
+
           <div className="profileQnaActions">
-            <button className="profileBtn" onClick={() => setQnaOpen(false)} type="button">
+            <button
+              className="profileBtn"
+              onClick={() => setQnaOpen(false)}
+              type="button"
+            >
               취소
             </button>
-            <button className="profileBtn" disabled={busy || !qnaMessage.trim()} onClick={submitQnA} type="button">
+            <button
+              className="profileBtn"
+              disabled={busy || !qnaMessage.trim()}
+              onClick={submitQnA}
+              type="button"
+            >
               보내기
             </button>
           </div>
@@ -346,7 +399,14 @@ export default function ProfileHeader({
           <div className="profileModal">
             <div className="profileModalHeader">
               <strong>프로필 편집</strong>
-              <button className="profileTextBtn" onClick={() => setEditOpen(false)} type="button">
+              <button
+                className="profileTextBtn"
+                onClick={() => {
+                  setPickerOpen(false);
+                  setEditOpen(false);
+                }}
+                type="button"
+              >
                 닫기
               </button>
             </div>
@@ -354,69 +414,101 @@ export default function ProfileHeader({
             <div className="profileForm">
               <label className="profileLabel">
                 이름(활동명/닉네임)
-                <input className="profileInput" value={draftName} onChange={(e) => setDraftName(e.target.value)} />
+                <input
+                  className="profileInput"
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                />
               </label>
 
               <label className="profileLabel">
                 프로필 이미지 URL(목업)
-                <input className="profileInput" value={draftImageUrl} onChange={(e) => setDraftImageUrl(e.target.value)} />
+                <input
+                  className="profileInput"
+                  value={draftImageUrl}
+                  onChange={(e) => setDraftImageUrl(e.target.value)}
+                />
               </label>
 
               {isArtist && (
                 <label className="profileLabel">
                   장르
-                  <input className="profileInput" value={draftGenre} onChange={(e) => setDraftGenre(e.target.value)} />
+                  <input
+                    className="profileInput"
+                    value={draftGenre}
+                    onChange={(e) => setDraftGenre(e.target.value)}
+                  />
                 </label>
               )}
 
               <label className="profileLabel">
                 소개글
-                <textarea className="profileTextarea" value={draftBio} onChange={(e) => setDraftBio(e.target.value)} rows={4} />
+                <textarea
+                  className="profileTextarea"
+                  value={draftBio}
+                  onChange={(e) => setDraftBio(e.target.value)}
+                  rows={4}
+                />
               </label>
 
-              {/* ✅ 뱃지 선택 UI 리뉴얼 */}
+              {/* Badge Picker */}
               <div className="profileLabel">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "8px",
+                  }}
+                >
                   <span>대표 뱃지 (최대 3개)</span>
-                  <button 
-                    type="button" 
-                    className="profileTextBtn" 
+                  <button
+                    type="button"
+                    className="profileTextBtn"
                     onClick={() => setPickerOpen(true)}
-                    style={{ fontSize: '0.85rem', color: '#C8A97E' }}
+                    style={{ fontSize: "0.85rem", color: "#C8A97E" }}
                   >
                     선택하기 &gt;
                   </button>
                 </div>
-                
-                {/* 선택된 뱃지 미리보기 */}
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                   {draftBadgeObjects.length > 0 ? (
                     draftBadgeObjects.map((b) => (
-                      <span 
-                        key={b.id} 
-                        style={{ 
-                          padding: '4px 10px', 
-                          background: 'rgba(255,255,255,0.1)', 
-                          borderRadius: '12px', 
-                          fontSize: '0.8rem',
-                          color: '#eee'
+                      <span
+                        key={b.id}
+                        style={{
+                          padding: "4px 10px",
+                          background: "rgba(255,255,255,0.1)",
+                          borderRadius: "12px",
+                          fontSize: "0.8rem",
+                          color: "#eee",
                         }}
                       >
                         {b.label}
                       </span>
                     ))
                   ) : (
-                    <span style={{ fontSize: '0.8rem', color: '#666' }}>선택된 뱃지가 없습니다.</span>
+                    <span style={{ fontSize: "0.8rem", color: "#666" }}>
+                      선택된 뱃지가 없습니다.
+                    </span>
                   )}
                 </div>
               </div>
             </div>
 
             <div className="profileModalActions">
-              <button className="profileBtn" onClick={() => setEditOpen(false)} type="button">
+              <button
+                className="profileBtn"
+                onClick={() => {
+                  setPickerOpen(false);
+                  setEditOpen(false);
+                }}
+                type="button"
+              >
                 취소
               </button>
-              <button className="profileBtn" onClick={saveEdit} type="button">
+              <button className="profileBtn" disabled={busy} onClick={saveEdit} type="button">
                 저장
               </button>
             </div>
@@ -424,11 +516,11 @@ export default function ProfileHeader({
         </div>
       )}
 
-      {/* ✅ Badge Picker Modal (Portal) */}
-      <BadgePicker 
-        open={pickerOpen} 
-        onClose={() => setPickerOpen(false)} 
-        earnedIds={earnedBadges.map(b => b.id)} 
+      {/* BadgePicker */}
+      <BadgePicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        earnedIds={earnedBadges.map((b) => b.id)}
       />
     </section>
   );

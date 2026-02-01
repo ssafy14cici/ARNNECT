@@ -1,10 +1,9 @@
-//FE\src\pages\posts\PostCreate.tsx
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./postCreate.css";
-
+// 경로 수정: features/feed/posts/api 로 연결
+import { createArtwork, createReview } from "../../features/feed/posts/api";
 import { useAuthStore } from "../../features/auth/store";
-import { createLocalPost } from "../../features/posts/local";
 
 type Mode = "ARTIST" | "USER";
 type Props = { mode: Mode };
@@ -72,35 +71,32 @@ export default function PostCreate({ mode }: Props) {
 
     setLoading(true);
     try {
-      const authorId = authUser!.memberUuid;
-      const authorName = authUser!.name;
+      const author = {
+        id: authUser!.memberUuid,
+        name: authUser!.name,
+        role: appRole === "artist" ? "ARTIST" : "USER",
+      } as const;
 
       if (isArtist) {
-        await createLocalPost({
-          mode: "ARTIST",
-          authorId,
-          authorName,
+        await createArtwork({
           title: title.trim(),
-          content: [
-            description?.trim(),
-            `field: ${field.trim()}`,
-            `genre: ${genre.trim()}`,
-            `year: ${year.trim()}`,
-            size ? `size: ${size.trim()}` : "",
-          ].filter(Boolean).join("\n"),
-          imageFile,
+          description: description.trim(),
+          field: field.trim(),
+          genre: genre.trim(),
+          productionDate: Number(year),
+          size: size.trim(),
           tags: parsedTags,
+          imageFile: imageFile!,
+          author,
         });
       } else {
-        await createLocalPost({
-          mode: "USER",
-          authorId,
-          authorName,
+        await createReview({
           title: reviewTitle.trim(),
           content: reviewText.trim(),
-          imageFile,
-          tags: parsedTags,
           artworkId: Number(artworkId),
+          tags: parsedTags,
+          imageFile: imageFile!,
+          author,
         });
       }
 

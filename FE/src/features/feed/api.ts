@@ -1,6 +1,7 @@
-// FE/src/features/feed/api.ts
 import { http } from "../../shared/api/http";
-import { __mock as postsMock } from "../posts/api";
+// 경로 수정: posts/api -> posts/api (같은 폴더에 있다면 ./posts/api 가 아니라 ./posts/api.ts 위치 확인 필요)
+// 구조상 features/feed/posts/api.ts 이고 현재 파일이 features/feed/api.ts 이므로:
+import { __mock as postsMock } from "./posts/api"; 
 
 type FeedRole = "ARTIST" | "USER";
 
@@ -40,7 +41,8 @@ function fromLocalPosts(): FeedItem[] {
   const reviews = postsMock.loadReviews();
   const artworks = postsMock.loadArtworks();
 
-  const reviewItems: FeedItem[] = reviews.map((r) => ({
+  // 매개변수 r, a에 any 타입 명시하여 에러 해결
+  const reviewItems: FeedItem[] = reviews.map((r: any) => ({
     id: `review-${r.id}`,
     role: r.role,
     title: r.title,
@@ -52,7 +54,7 @@ function fromLocalPosts(): FeedItem[] {
     views: r.views,
   }));
 
-  const artworkItems: FeedItem[] = artworks.map((a) => ({
+  const artworkItems: FeedItem[] = artworks.map((a: any) => ({
     id: `artwork-${a.id}`,
     role: "ARTIST",
     title: a.title,
@@ -67,17 +69,15 @@ function fromLocalPosts(): FeedItem[] {
   return [...reviewItems, ...artworkItems].sort((x, y) => y.createdAt.localeCompare(x.createdAt));
 }
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true" || import.meta.env.DEV;
+const USE_MOCK = (import.meta as any).env.VITE_USE_MOCK === "true" || (import.meta as any).env.DEV;
 
 /** 피드 목록 조회 */
 export const getFeedList = async (): Promise<FeedItem[]> => {
-  // ✅ mock이면: 로컬 작성글/작품을 먼저 보여줌
   if (USE_MOCK) {
     const local = fromLocalPosts();
     return local.length > 0 ? local : buildImageMockFeeds();
   }
 
-  // ✅ real API 시도
   try {
     const res = await http.get("/feeds");
     if (Array.isArray(res?.data)) return res.data as FeedItem[];

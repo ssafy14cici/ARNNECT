@@ -16,7 +16,6 @@ export type LoginResponse = {
   name: string;
 };
 
-
 export type SignupUserRequest = {
   email: string;
   password: string;
@@ -24,7 +23,7 @@ export type SignupUserRequest = {
   name: string;
   phone: string;
   agreements?: {
-    all?: boolean;        // ✅ 추가
+    all?: boolean;
     terms: boolean;
     privacy: boolean;
     marketing?: boolean;

@@ -1,0 +1,196 @@
+/* =========================
+   HOME (Full Page Scroll)
+========================= */
+.snap-container {
+  width: 100vw;
+  height: 100vh;
+  /* 핵심: 세로 방향 스크롤 스냅 */
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  
+  background-color: #050505; /* Navbar와 동일한 딥 다크 배경 */
+  color: white;
+  
+  /* 스크롤바 숨김 처리 */
+  scrollbar-width: none;
+}
+.snap-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* 개별 섹션 (전체 화면) */
+.snap-section {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  /* 핵심: 스크롤이 딱 멈추는 위치 */
+  scroll-snap-align: start;
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  overflow: hidden;
+  cursor: pointer;
+  transition: background-color 0.4s ease;
+}
+
+/* 호버 시 배경 살짝 밝게 (인터랙션 피드백) */
+.snap-section:hover {
+  background-color: #0e0e0e;
+}
+
+/* =========================
+   3D CANVAS WRAPPER
+========================= */
+.canvas-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1; /* 텍스트 뒤에 배치 */
+  pointer-events: none; /* 클릭 방해 금지 */
+  /* 등장 애니메이션 */
+  opacity: 0;
+  animation: fadeInCanvas 1s ease 0.5s forwards;
+}
+
+@keyframes fadeInCanvas {
+  to { opacity: 1; }
+}
+
+/* =========================
+   TEXT OVERLAY (Layout)
+========================= */
+.content-overlay {
+  position: relative;
+  z-index: 2; /* 3D보다 위 */
+  width: 100%;
+  height: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  pointer-events: none;
+}
+
+/* 1. 인덱스 번호 (왼쪽 중앙) */
+.index-number {
+  position: absolute;
+  left: 5vw;
+  top: 50%;
+  transform: translateY(-50%);
+  
+  font-family: 'Pretendard', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 300;
+  letter-spacing: 0.1em;
+  opacity: 0.5;
+}
+/* 인덱스 옆 장식 라인 */
+.index-number::after {
+  content: '';
+  display: block;
+  width: 1px;
+  height: 60px;
+  background: rgba(255, 255, 255, 0.3);
+  margin: 20px auto 0;
+}
+
+/* 2. 타이틀 그룹 (오른쪽 중앙) */
+.title-group {
+  position: absolute;
+  right: 10vw;
+  top: 50%;
+  transform: translateY(-50%);
+  text-align: right;
+  color: #fff;
+}
+
+.main-title {
+  font-family: 'Pretendard', sans-serif;
+  font-size: clamp(3rem, 6vw, 7rem); /* 반응형 큰 글씨 */
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  
+  /* 등장 효과 */
+  opacity: 0;
+  transform: translateY(20px);
+  animation: slideUp 0.8s ease forwards;
+}
+
+.sub-desc {
+  font-size: clamp(1rem, 1.2vw, 1.5rem);
+  font-weight: 300;
+  opacity: 0.6;
+  margin-top: 16px;
+  margin-bottom: 40px;
+  
+  opacity: 0;
+  transform: translateY(20px);
+  animation: slideUp 0.8s ease 0.2s forwards;
+}
+
+/* EXPLORE 버튼 */
+.explore-btn {
+  font-size: 0.9rem;
+  letter-spacing: 0.2em;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  
+  opacity: 0;
+  transform: translateX(-20px);
+  transition: all 0.5s ease;
+  animation: slideUp 0.8s ease 0.4s forwards;
+}
+
+/* 섹션에 마우스 올리면 버튼이 움직임 */
+.snap-section:hover .explore-btn {
+  transform: translateX(0);
+  color: #ccc;
+}
+
+.arrow {
+  display: inline-block;
+  transition: transform 0.3s ease;
+}
+.snap-section:hover .arrow {
+  transform: translateX(5px);
+}
+
+/* =========================
+   ANIMATIONS
+========================= */
+@keyframes slideUp {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 하단 스크롤 안내 */
+.scroll-indicator {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  opacity: 0.4;
+  z-index: 2;
+  animation: blink 2s infinite;
+}
+.scroll-indicator::after {
+  content: '';
+  display: block;
+  width: 1px;
+  height: 40px;
+  background: white;
+  margin: 10px auto 0;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}

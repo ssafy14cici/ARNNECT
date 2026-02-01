@@ -1,26 +1,27 @@
+// FE/src/pages/profile/tabs/CollectionTab.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { loadAll } from "../../../features/collectbook/storage";
 import type { CollectBookItem } from "../../../features/collectbook/types";
-import "./profileTabs.css"; // ✅ CSS Import
+import "./profileTabs.css";
 
 export default function CollectionTab() {
   const { id } = useParams();
-  const profileId = id ?? "me"; 
+  const profileId = id ?? "me";
 
-  const [items, setItems] = useState<CollectBookItem[]>([]);
-  const [onlyPublic, setOnlyPublic] = useState(profileId !== "me");
+  const [items, setItems] = useState<CollectBookItem[]>(() => loadAll());
 
-  const reload = () => {
-    const list = loadAll();
-    setItems(list);
-  };
+  // "me"일 때만 토글 상태를 가짐 (타인 프로필이면 무조건 public만)
+  const [onlyPublicForMe, setOnlyPublicForMe] = useState(false);
+  const onlyPublic = profileId !== "me" ? true : onlyPublicForMe;
+
+  const reload = () => setItems(loadAll());
 
   useEffect(() => {
-    reload();
     const onFocus = () => reload();
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
+    // eslint가 reload deps 물면 reload를 useCallback으로 감싸도 됨(선택)
   }, [profileId]);
 
   const visibleItems = useMemo(() => {
@@ -39,8 +40,8 @@ export default function CollectionTab() {
             <label className="tab-checkbox">
               <input
                 type="checkbox"
-                checked={onlyPublic}
-                onChange={(e) => setOnlyPublic(e.target.checked)}
+                checked={onlyPublicForMe}
+                onChange={(e) => setOnlyPublicForMe(e.target.checked)}
               />
               Public Only
             </label>
