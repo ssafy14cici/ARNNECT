@@ -46,8 +46,6 @@ public class CreateArtistRequest {
     @NotNull(message = "약관 동의는 필수입니다.")
     private Boolean isAgree;
 
-    private String profileImage;
-
     // ===== ARTIST 추가 정보 (아티스트 전용) =====
     @Min(value = 1, message = "분야 ID는 1 이상이어야 합니다.")
     private Integer fieldId;  // art_field.field_id FK

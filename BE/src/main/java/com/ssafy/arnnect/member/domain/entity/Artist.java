@@ -6,6 +6,7 @@ import lombok.*;
 @Entity
 @Table(name = "artist")
 @Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder

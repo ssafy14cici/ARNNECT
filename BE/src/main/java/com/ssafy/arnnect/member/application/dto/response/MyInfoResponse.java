@@ -28,7 +28,7 @@ public class MyInfoResponse {
     private String affiliation;
     private Boolean isVerified;
 
-    private String profileImage;
+    private String originalProfileName;
     private String introduction;
 
 
@@ -39,7 +39,7 @@ public class MyInfoResponse {
                 .nickname(member.getNickname())
                 .birth(member.getBirth())
                 .phone(member.getPhone())
-                .profileImage(member.getProfileImage())
+                .originalProfileName(member.getOriginalProfileName())
                 .build();
     }
 
@@ -51,7 +51,7 @@ public class MyInfoResponse {
                 .nickname(artist.getMember().getNickname())
                 .birth(artist.getMember().getBirth())
                 .phone(artist.getMember().getPhone())
-                .profileImage(artist.getMember().getProfileImage())
+                .originalProfileName(artist.getMember().getOriginalProfileName())
                 .document(artist.getDocument())
                 .fieldId(artist.getFieldId())
                 .debutYear(artist.getDebutYear())

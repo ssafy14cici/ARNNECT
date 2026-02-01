@@ -44,9 +44,6 @@ public class CreateMemberRequest {
     @NotNull(message = "이용약관 동의 여부는 필수 입력 항목입니다.")
     private Boolean isAgree;
 
-    // 선택사항
-    private String profileImage;
-
     public Member toMemberEntity(){
         return Member.builder()
                 .memberUuid(String.valueOf(UUID.randomUUID()))

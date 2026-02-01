@@ -8,6 +8,7 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "member")
 @Getter
+@Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
@@ -40,8 +41,11 @@ public class Member {
     @Column(name = "nickname", nullable = false, length = 50)
     private String nickname;
 
-    @Column(name = "profile_image", length = 255) // 원본 이미지
-    private String profileImage;
+    @Column(name = "original_profile_name", length = 255) // 원본 이미지 이름
+    private String originalProfileName;
+
+    @Column(name = "stored_profile_name", length = 255) // 저장 이미지 이름
+    private String storedProfileImage;
 
     // tinyint(1) -> Boolean 매핑
     @Column(name = "is_agree", nullable = false)

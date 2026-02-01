@@ -14,7 +14,13 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.UNAUTHORIZED, "AUTH_003", "잘못된 이메일 또는 비밀번호 입니다."),
 
     // VALIDATION
-    INVALID_PARAMETER(HttpStatus.BAD_REQUEST, "VALID_001", "요청 값이 올바르지 않습니다.");
+    INVALID_PARAMETER(HttpStatus.BAD_REQUEST, "VALID_001", "요청 값이 올바르지 않습니다."),
+
+    // FILE
+    FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "FILE_001", "파일을 찾을 수 없습니다."),
+    FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "FILE_002", "파일 업로드에 실패했습니다."),
+    FILE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "FILE_003", "파일 삭제에 실패했습니다.");
+
 
     private final HttpStatus httpStatus;
     private final String code;

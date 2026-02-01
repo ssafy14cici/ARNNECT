@@ -2,16 +2,21 @@ package com.ssafy.arnnect.member.application.service;
 
 import com.ssafy.arnnect.member.application.dto.request.CreateArtistRequest;
 import com.ssafy.arnnect.member.application.dto.request.CreateMemberRequest;
+import com.ssafy.arnnect.member.application.dto.request.UpdateArtistRequest;
+import com.ssafy.arnnect.member.application.dto.request.UpdateMemberRequest;
 import com.ssafy.arnnect.member.application.dto.response.MemberInfoResponse;
 import com.ssafy.arnnect.member.application.dto.response.MyInfoResponse;
 import com.ssafy.arnnect.member.domain.entity.UserRole;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 
 public interface MemberService {
-    void createMember(CreateMemberRequest request);
-    void createArtist(CreateArtistRequest request);
-    void updateMember();
-    void updateArtist();
-    void deleteMember(String memberUuid);
+    void createMember(CreateMemberRequest request, MultipartFile file) throws IOException;
+    void createArtist(CreateArtistRequest request, MultipartFile file) throws IOException;
+    void updateMember(UpdateMemberRequest request, MultipartFile file) throws IOException;
+    void updateArtist(UpdateArtistRequest request, MultipartFile file) throws IOException;
+    void deleteMember(String memberUuid) throws IOException;
     MyInfoResponse getMyInfo(String memberUuid, UserRole role);
     MemberInfoResponse getMemberInfo(String myUuid, String memberUuid);
 }
