@@ -2,25 +2,30 @@
 import "./style.css";
 import "./intro/intro.css";
 
-import { mountIntro, type CameraPose } from "./viewer/intro";
+import { mountIntro, type CameraPose } from "./intro/mountIntro";
 import { mountExitOverlay } from "./viewer/exitOverlay";
+import { mountExhibitRoom } from "./viewer/exhibitRoom";
+
+const canvas = document.createElement("canvas");
+canvas.id = "canvas";
+document.body.appendChild(canvas);
 
 const POSE_KEY = "ARNNECT_EXTERIOR_POSE";
 const SKIP_KEY = "ARNNECT_SKIP_LOADING";
 
 let introRuntime: { dispose: () => void } | null = null;
+let hallRuntime: { destroy: () => void } | null = null;
+let exhibitRuntime: { destroy: () => void } | null = null;
 let exitUiDispose: (() => void) | null = null;
-let interiorRuntime: { destroy: () => void } | null = null;
 
-function ensureCanvas(): HTMLCanvasElement {
-  const existing = document.getElementById("canvas");
-  if (existing && existing instanceof HTMLCanvasElement) return existing;
+const DEFAULT_HALL_START_WP = 0;
 
-  const c = document.createElement("canvas");
-  c.id = "canvas";
-  document.body.appendChild(c);
-  return c;
-}
+type ExhibitPayload = {
+  artId?: number;
+  artist: string;
+  artworkTitle: string;
+  fromWaypointId: number;
+};
 
 /** localStorage에서 외부 포즈 복원(있으면 1회 사용 후 삭제) */
 function readSavedPose(): CameraPose | undefined {
@@ -43,34 +48,43 @@ function savePose(pose: CameraPose) {
   }
 }
 
-function cleanupIntro() {
-  if (introRuntime) {
-    introRuntime.dispose();
-    introRuntime = null;
-  }
+function toast(msg: string, ms = 1200) {
+  const el = document.createElement("div");
+  el.style.cssText =
+    "position:fixed;left:50%;top:18px;transform:translateX(-50%);" +
+    "z-index:999999;padding:10px 14px;border-radius:999px;" +
+    "background:rgba(0,0,0,0.55);backdrop-filter:blur(10px);" +
+    "color:rgba(255,255,255,0.92);font-family:ui-sans-serif,system-ui;" +
+    "font-size:13px;letter-spacing:0.02em;pointer-events:none;" +
+    "box-shadow:0 10px 30px rgba(0,0,0,0.35);";
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), ms);
 }
 
-function cleanupInterior() {
-  if (interiorRuntime) {
-    interiorRuntime.destroy();
-    interiorRuntime = null;
+function cleanupInteriorRuntimes() {
+  if (hallRuntime) {
+    hallRuntime.destroy();
+    hallRuntime = null;
+  }
+  if (exhibitRuntime) {
+    exhibitRuntime.destroy();
+    exhibitRuntime = null;
   }
 }
 
 function startIntro() {
-  // 내부 정리
-  cleanupInterior();
+  cleanupInteriorRuntimes();
 
-  // exit ui 정리
   if (exitUiDispose) {
     exitUiDispose();
     exitUiDispose = null;
   }
 
-  // intro 정리
-  cleanupIntro();
-
-  const canvas = ensureCanvas();
+  if (introRuntime) {
+    introRuntime.dispose();
+    introRuntime = null;
+  }
 
   const restoredPose = readSavedPose();
   const skipLoading = !!sessionStorage.getItem(SKIP_KEY);
@@ -85,7 +99,6 @@ function startIntro() {
     framingScale: 1.0,
     topWhitespaceRatio: 0.42,
 
-    // HDRI
     hdriUrl: `${import.meta.env.BASE_URL}textures/rosendal_park_sunset_puresky_2k.hdr`,
     exposure: 0.55,
     envIntensity: 0.35,
@@ -95,37 +108,120 @@ function startIntro() {
     startPose: restoredPose,
 
     onReady: (pose) => savePose(pose),
-
-    onEntered: startInterior,
+    onEntered: () => startMainHall(DEFAULT_HALL_START_WP),
   }).then((rt) => {
     introRuntime = rt;
   });
 }
 
-async function startInterior() {
-  cleanupIntro();
+async function startMainHall(startWaypointId: number) {
+  // intro 정리
+  if (introRuntime) {
+    introRuntime.dispose();
+    introRuntime = null;
+  }
+  // exhibit 정리
+  if (exhibitRuntime) {
+    exhibitRuntime.destroy();
+    exhibitRuntime = null;
+  }
+  // hall 정리(있으면)
+  if (hallRuntime) {
+    hallRuntime.destroy();
+    hallRuntime = null;
+  }
 
-  const canvas = ensureCanvas();
-
-  // ✅ 너가 실제로 쓰는 내부 모듈로 고정
   const { mountMainHallFree } = await import("./viewer/mainHallFree");
 
-  // ✅ mainHallFree에 startWaypointId 옵션 패치하면 여기서 쓰게 됨(아래 C 참고)
-  interiorRuntime = mountMainHallFree(canvas, {
+  hallRuntime = mountMainHallFree(canvas, {
     glbUrl: `${import.meta.env.BASE_URL}models/museum/mh_add_5.glb`,
+    startWaypointId,
     onReady: () => {
       window.dispatchEvent(new Event("intro:clear-fade"));
+      toast("HALL READY");
     },
-    // startWaypointId: 3, // (C 패치 적용 후 사용)
-  }) as any;
+    onOpenExhibit: (payload: ExhibitPayload) => {
+      console.log("[main] onOpenExhibit payload:", payload);
+      toast(`OPEN EXHIBIT: ${payload.artist}`);
+      startExhibit(payload);
+    },
+  });
 
-  exitUiDispose = mountExitOverlay({
-    label: "Back to exterior",
-    onExit: () => {
-      sessionStorage.setItem(SKIP_KEY, "1");
-      window.location.reload();
+  // “외부로” Exit 버튼 유지
+  if (!exitUiDispose) {
+    exitUiDispose = mountExitOverlay({
+      label: "Back to exterior",
+      onExit: () => {
+        sessionStorage.setItem(SKIP_KEY, "1");
+        window.location.reload();
+      },
+    });
+  }
+}
+
+async function startExhibit(payload: ExhibitPayload) {
+  // hall 정리
+  if (hallRuntime) {
+    hallRuntime.destroy();
+    hallRuntime = null;
+  }
+  // intro는 이미 없음(있으면 제거)
+  if (introRuntime) {
+    introRuntime.dispose();
+    introRuntime = null;
+  }
+  // 기존 exhibit 정리
+  if (exhibitRuntime) {
+    exhibitRuntime.destroy();
+    exhibitRuntime = null;
+  }
+  // exit overlay 숨기기 (exhibit에는 자체 back 버튼이 있음)
+  if (exitUiDispose) {
+    exitUiDispose();
+    exitUiDispose = null;
+  }
+
+  console.log("[main] startExhibit()", payload);
+  toast(`ENTER EXHIBIT: ${payload.artist}`);
+
+  exhibitRuntime = await mountExhibitRoom(canvas, {
+    glbUrl: `${import.meta.env.BASE_URL}models/gallery/gallery.glb`,
+    resetRootTransform: true,
+    autoFitIfOff: true,
+    debug: true, // ✅ 문제 해결되면 false
+    titleText: `${payload.artist} — ${payload.artworkTitle}`,
+
+    // ✅ 지금은 테스트로 1개만. 나중에 백엔드 응답으로 배열 채우면 됨.
+    panelItems: [
+      // {
+      //   panelName: "ART_1",
+      //   imageUrl: `${import.meta.env.BASE_URL}art/b1.jpg`,
+      //   title: payload.artist,
+      // },
+    ],
+
+    onExitToHall: () => {
+      toast("BACK TO HALL");
+      startMainHall(payload.fromWaypointId ?? DEFAULT_HALL_START_WP);
     },
   });
 }
+
+/** 디버그: X키로 강제 전시장 진입 (버튼/모달이 안 먹는지 분리 테스트) */
+window.addEventListener(
+  "keydown",
+  (e) => {
+    if (e.code === "KeyX") {
+      e.preventDefault();
+      toast("DEBUG EXHIBIT");
+      startExhibit({
+        artist: "DEBUG",
+        artworkTitle: "DEBUG",
+        fromWaypointId: DEFAULT_HALL_START_WP,
+      });
+    }
+  },
+  { passive: false }
+);
 
 startIntro();

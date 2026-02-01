@@ -1,20 +1,24 @@
-// src/viewer/createViewer.ts
 import * as THREE from "three";
 
-export type TickFn = (dt: number) => void;
-
 export type Viewer = {
+  canvas: HTMLCanvasElement;
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
 
-  addTick: (fn: TickFn) => () => void;
-  start: () => void;
-  stop: () => void;
+  /** 화면 크기/비율 갱신 */
+  resize: () => void;
+
+  /** renderer dispose (페이지 leaving용) */
   dispose: () => void;
 };
 
 export function createViewer(canvas: HTMLCanvasElement): Viewer {
+  // full-screen canvas
+  canvas.style.width = "100%";
+  canvas.style.height = "100%";
+  canvas.style.display = "block";
+
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
@@ -23,65 +27,31 @@ export function createViewer(canvas: HTMLCanvasElement): Viewer {
   });
 
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
+  renderer.setClearColor(new THREE.Color("#000000"), 1);
 
   const scene = new THREE.Scene();
 
-  const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.05, 5000);
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 8000);
   camera.position.set(0, 1.6, 5);
 
-  const ticks = new Set<TickFn>();
-  let raf = 0;
-  let last = performance.now();
-  let running = false;
-
-  const onResize = () => {
-    renderer.setSize(window.innerWidth, window.innerHeight, false);
-    camera.aspect = window.innerWidth / window.innerHeight;
+  const resize = () => {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
     camera.updateProjectionMatrix();
   };
 
-  const loop = () => {
-    if (!running) return;
-    const now = performance.now();
-    const dt = Math.min((now - last) / 1000, 0.05);
-    last = now;
-
-    for (const fn of ticks) fn(dt);
-    renderer.render(scene, camera);
-
-    raf = requestAnimationFrame(loop);
-  };
-
-  const addTick = (fn: TickFn) => {
-    ticks.add(fn);
-    return () => ticks.delete(fn);
-  };
-
-  const start = () => {
-    if (running) return;
-    running = true;
-    last = performance.now();
-    window.addEventListener("resize", onResize);
-    onResize();
-    raf = requestAnimationFrame(loop);
-  };
-
-  const stop = () => {
-    running = false;
-    if (raf) cancelAnimationFrame(raf);
-    raf = 0;
-    window.removeEventListener("resize", onResize);
-  };
+  resize();
+  window.addEventListener("resize", resize);
 
   const dispose = () => {
-    stop();
-    ticks.clear();
+    window.removeEventListener("resize", resize);
     renderer.dispose();
   };
 
-  return { renderer, scene, camera, addTick, start, stop, dispose };
+  return { canvas, renderer, scene, camera, resize, dispose };
 }
