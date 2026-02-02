@@ -1,0 +1,44 @@
+.loading-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background-color: #000; /* 블랙 배경 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #fff;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.text-wrapper {
+  text-align: center;
+}
+
+.brand-name {
+  font-family: 'Playfair Display', serif; /* 세리프 폰트 권장 */
+  font-style: italic;
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+  color: #ccc;
+}
+
+.main-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2.5rem;
+  letter-spacing: 0.1rem;
+  line-height: 1.1;
+  font-weight: 300;
+}
+
+.bottom-clouds {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 200px;
+  background-image: url('/path-to-your-cloud-image.png');
+  background-size: cover;
+  opacity: 0.6;
+}

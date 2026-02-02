@@ -1,66 +1,90 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+// FE/src/pages/auth/Login.tsx
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+
 import { apiLogin } from "../../features/auth/api";
 import type { UserRole } from "../../features/auth/types";
 import { useAuthStore } from "../../features/auth/store";
-import { setMe, type PostRole } from "../../features/feed/mockData";
-import "./login.css";
 
-const MY_SEED_PREFIX = "comet_mock_my_posts_seeded_v1";
+import "./login.css";
+import { USE_MOCK } from "../../shared/config/env";
+
+// ✅ 서버에서 role이 어떤 형태로 오든("USER"/"GENERAL"/"general"/"ARTIST"/"artist") FE 표준("general"|"artist")로 정규화
+function normalizeRole(input: unknown): "general" | "artist" {
+  const v = String(input ?? "").toLowerCase();
+  if (v === "artist") return "artist";
+  // "user", "general", "", undefined 등은 전부 general로 처리
+  return "general";
+}
+
+// ✅ UI 토글은 UserRole을 쓰되, CSS가 기존에 USER/ARTIST 클래스에 의존할 수 있어서 UI용 라벨을 따로 만든다
+function toUiRole(role: UserRole): "USER" | "ARTIST" {
+  return String(role).toLowerCase() === "artist" ? "ARTIST" : "USER";
+}
 
 export default function Login() {
   const nav = useNavigate();
+  const location = useLocation();
   const [sp] = useSearchParams();
-  const returnUrl = sp.get("returnUrl");
+
+  const returnUrl =
+    sp.get("returnUrl") || ((location.state as any)?.from as string | undefined) || null;
 
   const login = useAuthStore((s) => s.login);
 
-  const [role, setRole] = useState<UserRole>("USER");
+  // ✅ UserRole이 "general" | "artist" 라는 전제(지금 FE Guard 타입도 이쪽)
+  const [role, setRole] = useState<UserRole>("general" as UserRole);
+
+  // 편의상 기본 입력값
   const [email, setEmail] = useState("user@test.com");
   const [password, setPassword] = useState("123456789");
+
   const [showPw, setShowPw] = useState(false);
   const [remember, setRemember] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const themeColor = role === "USER" ? "#ffffff" : "#C8A97E";
+  const uiRole = toUiRole(role);
+
+  const themeColor = uiRole === "USER" ? "#ffffff" : "#C8A97E";
   const subTitle =
-    role === "USER" ? "Discover your taste in art." : "Share your inspiration with the world.";
+    uiRole === "USER"
+      ? "Discover your taste in art."
+      : "Share your inspiration with the world.";
 
   useEffect(() => setError(null), [role, email, password]);
 
-  async function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
-      const res = await apiLogin({ email, password, role, remember });
+      // ✅ LoginRequest에 remember가 없으니 제거
+      // (role이 LoginRequest에 없으면 여기서도 타입 에러가 떠야 하는데, 지금은 remember만 에러였음)
+      const res = await apiLogin({ email, password, role });
 
-      // 1) auth store 저장 (memberUuid 필수)
+      // ✅ 응답 role 정규화
+      const appRole = normalizeRole((res as any).role);
+
+      // ✅ auth store 저장
       login({
-        token: res.token,
-        role: res.role === "USER" ? "general" : "artist",
+        token: (res as any).token,
+        role: appRole, // "general" | "artist"
         remember,
-        user: { memberUuid: res.memberUuid, name: res.name },
+        user: {
+          memberUuid: (res as any).memberUuid,
+          name: (res as any).name,
+        },
       });
 
-      // 2) feed mockData의 "현재 유저(me)"도 같이 세팅 (posts 작성자 매칭용)
-      const postRole: PostRole = res.role === "ARTIST" ? "ARTIST" : "USER";
-      setMe({ id: res.memberUuid, name: res.name, role: postRole });
-
-      // 3) 내 글 seed (유저별 1회만)
-      const seedKey = `${MY_SEED_PREFIX}.${res.memberUuid}`;
-      if (localStorage.getItem(seedKey) !== "1") {
-        try {
-          
-        } catch {
-          // seedMyPosts 내부에서 me 없으면 throw 가능 -> 위에서 setMe 했으니 보통 안 남
-        }
-        localStorage.setItem(seedKey, "1");
+      // ✅ 목업 전용 사이드이펙트는 여기서만
+      if (USE_MOCK) {
+        // 필요 시 seed/1회성 처리
       }
 
-      nav(returnUrl || "/");
+      nav(returnUrl || "/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "이메일 또는 비밀번호를 확인해주세요.");
     } finally {
@@ -69,7 +93,7 @@ export default function Login() {
   }
 
   return (
-    <div className={`auth-page ${role === "ARTIST" ? "mode-artist" : "mode-user"}`}>
+    <div className={`auth-page ${uiRole === "ARTIST" ? "mode-artist" : "mode-user"}`}>
       <div className="auth-visual">
         <div className="visual-overlay" />
         <img
@@ -91,22 +115,24 @@ export default function Login() {
           </div>
 
           <div className="role-switch-container">
-            <div className="role-track" style={{ "--active-color": themeColor } as React.CSSProperties}>
+            <div className="role-track" style={{ "--active-color": themeColor } as CSSProperties}>
               <button
                 type="button"
-                className={`role-btn ${role === "USER" ? "active" : ""}`}
-                onClick={() => setRole("USER")}
+                className={`role-btn ${uiRole === "USER" ? "active" : ""}`}
+                onClick={() => setRole("general" as UserRole)}
               >
                 Collector
               </button>
               <button
                 type="button"
-                className={`role-btn ${role === "ARTIST" ? "active" : ""}`}
-                onClick={() => setRole("ARTIST")}
+                className={`role-btn ${uiRole === "ARTIST" ? "active" : ""}`}
+                onClick={() => setRole("artist" as UserRole)}
               >
                 Artist
               </button>
-              <div className={`role-slider ${role}`} />
+
+              {/* CSS가 USER/ARTIST 기준이면 유지 */}
+              <div className={`role-slider ${uiRole}`} />
             </div>
           </div>
 
@@ -151,13 +177,13 @@ export default function Login() {
             {error && <div className="error-message">{error}</div>}
 
             <button type="submit" className="submit-btn" disabled={loading}>
-              {loading ? "Processing..." : role === "USER" ? "LOG IN" : "ARTIST LOG IN"}
+              {loading ? "Processing..." : uiRole === "USER" ? "LOG IN" : "ARTIST LOG IN"}
               <span className="arrow">→</span>
             </button>
           </form>
 
           <div className="auth-footer">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link to="/signup" className="signup-link">
               Sign Up
             </Link>

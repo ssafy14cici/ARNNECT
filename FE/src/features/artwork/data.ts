@@ -2,6 +2,7 @@
 export const artworks = [
   {
     id: "a1",
+    artistMemberUuid: "artist-akim",
     src: "/art/a1.jpg",
     title: "Nocturne Study",
     artistName: "A. Kim",
@@ -14,6 +15,7 @@ export const artworks = [
   },
   {
     id: "a2",
+    artistMemberUuid: "artist-slee",
     src: "/art/a2.jpg",
     title: "Ceramic Form #12",
     artistName: "S. Lee",
@@ -26,6 +28,7 @@ export const artworks = [
   },
   {
     id: "a3",
+    artistMemberUuid: "artist-jpark",
     src: "/art/a3.jpg",
     title: "Portrait Light",
     artistName: "J. Park",
@@ -38,6 +41,7 @@ export const artworks = [
   },
   {
     id: "a4",
+    artistMemberUuid: "artist-hmoon",
     src: "/art/a4.jpg",
     title: "Study of Blue",
     artistName: "H. Moon",
@@ -50,6 +54,7 @@ export const artworks = [
   },
   {
     id: "a5",
+    artistMemberUuid: "artist-akim",
     src: "/art/a5.jpg",
     title: "Ink Texture",
     artistName: "A. Kim",
@@ -62,6 +67,7 @@ export const artworks = [
   },
   {
     id: "a6",
+    artistMemberUuid: "artist-slee",
     src: "/art/a6.jpg",
     title: "Street Snapshot",
     artistName: "S. Lee",
@@ -74,6 +80,7 @@ export const artworks = [
   },
   {
     id: "a7",
+    artistMemberUuid: "artist-0001",
     src: "/art/a7.jpg",
     title: "Warm Craft",
     artistName: "J. Park",
@@ -86,6 +93,7 @@ export const artworks = [
   },
   {
     id: "a8",
+    artistMemberUuid: "artist-0001",
     src: "/art/a8.jpg",
     title: "Minimal Lines",
     artistName: "H. Moon",
@@ -98,6 +106,7 @@ export const artworks = [
   },
   {
     id: "a9",
+    artistMemberUuid: "artist-akim",
     src: "/art/a9.jpg",
     title: "Evening Glow",
     artistName: "A. Kim",
@@ -110,6 +119,7 @@ export const artworks = [
   },
   {
     id: "a10",
+    artistMemberUuid: "artist-slee",
     src: "/art/a10.jpg",
     title: "Form & Shadow",
     artistName: "S. Lee",
@@ -122,6 +132,7 @@ export const artworks = [
   },
   {
     id: "a11",
+    artistMemberUuid: "artist-0001",
     src: "/art/a11.jpg",
     title: "Quiet Scene",
     artistName: "J. Park",
@@ -134,9 +145,10 @@ export const artworks = [
   },
   {
     id: "a12",
+    artistMemberUuid: "artist-0001",
     src: "/art/a12.jpg",
     title: "Color Draft",
-    artistName: "H. Moon",
+    artistName: "HANGYODON",
     artistProfile: "/avatar/default-artist.png",
     thumbnail: "/art/a12.jpg",
     likes: 33,

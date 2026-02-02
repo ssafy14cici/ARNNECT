@@ -1,3 +1,4 @@
+//FE/src/pages/posts/PostCreateRedirect.tsx
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../features/auth/store";

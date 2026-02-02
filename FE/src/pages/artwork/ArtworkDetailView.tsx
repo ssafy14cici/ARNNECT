@@ -1,13 +1,9 @@
 // FE/src/pages/artwork/ArtworkDetailView.tsx
-
-import { CommentForm } from "../../components/artwork/CommentForm";
-import { CommentList } from "../../components/artwork/CommentList";
-import type {
-  Comment,
-  ArtworkBase,
-  ArtworkDetailData,
-} from "../../features/artwork/helpers";
-import "./artworkDetail.css"; // CSS 파일 import (아래에서 작성)
+import { CommentForm } from "../../features/artwork/ui/comments/CommentForm";
+import { CommentList } from "../../features/artwork/ui/comments/CommentList";
+import type { Comment, ArtworkBase, ArtworkDetailData } from "../../features/artwork/helpers";
+import FanLetterSendModal from "../../features/fanLetter/ui/FanLetterSendModal";
+import "./artworkDetail.css";
 
 type Props = {
   artwork: ArtworkDetailData | null;
@@ -31,6 +27,13 @@ type Props = {
   onGoHome: () => void;
   onNavigateArtwork: (artworkId: string) => void;
   profilePath: (authorId: string) => string;
+
+  // ✅ FanLetter
+  fanLetterOpen: boolean;
+  fanLetterSending: boolean;
+  onOpenFanLetter: () => void;
+  onCloseFanLetter: () => void;
+  onSendFanLetter: (content: string) => void;
 };
 
 export function ArtworkDetailView({
@@ -53,8 +56,13 @@ export function ArtworkDetailView({
   onGoHome,
   onNavigateArtwork,
   profilePath,
+
+  fanLetterOpen,
+  fanLetterSending,
+  onOpenFanLetter,
+  onCloseFanLetter,
+  onSendFanLetter,
 }: Props) {
-  // 로딩 상태
   if (isLoading) {
     return (
       <div className="artwork-loading">
@@ -64,7 +72,6 @@ export function ArtworkDetailView({
     );
   }
 
-  // 데이터 없음 / 에러 상태
   if (!artwork) {
     return (
       <div className="artwork-error">
@@ -78,10 +85,8 @@ export function ArtworkDetailView({
 
   return (
     <div className="artwork-detail-page">
-      {/* 1. Hero Section: 작품 감상 영역 (100vh) */}
       <section className="artwork-hero">
         <div className="hero-content">
-          {/* Title & Artist */}
           <div className="hero-header">
             <h1 className="hero-title">{artwork.title}</h1>
             <div className="hero-artist">
@@ -90,7 +95,6 @@ export function ArtworkDetailView({
             </div>
           </div>
 
-          {/* Artwork Image (Frame) */}
           <div className="hero-frame">
             {imageError ? (
               <div className="image-fallback">Image Not Available</div>
@@ -102,36 +106,31 @@ export function ArtworkDetailView({
                 onError={() => setImageError(true)}
               />
             )}
-            {/* 조명 효과 */}
             <div className="frame-shadow" />
           </div>
         </div>
 
-        {/* Scroll Indicator */}
         <div className="scroll-indicator">
           <span>Scroll to Discover</span>
           <div className="scroll-line" />
         </div>
       </section>
 
-      {/* 2. Content Section: 정보 및 소통 (스크롤 내리면 보임) */}
       <div className="artwork-body">
-        {/* Actions Row */}
         <div className="action-bar">
           <div className="action-left">
-            <button
-              className={`follow-btn ${isFollowing ? "active" : ""}`}
-              onClick={onToggleFollow}
-            >
+            <button className={`follow-btn ${isFollowing ? "active" : ""}`} onClick={onToggleFollow}>
               {isFollowing ? "Following" : "+ Follow Artist"}
             </button>
           </div>
 
           <div className="action-right">
-            <button
-              className={`like-btn ${isLiked ? "active" : ""}`}
-              onClick={onLike}
-            >
+            {/* ✅ Fan Letter 버튼 */}
+            <button className="fanletter-btn" onClick={onOpenFanLetter}>
+              Fan Letter
+            </button>
+
+            <button className={`like-btn ${isLiked ? "active" : ""}`} onClick={onLike}>
               <svg
                 width="20"
                 height="20"
@@ -144,11 +143,11 @@ export function ArtworkDetailView({
               </svg>
               <span>{likeCount}</span>
             </button>
+
             <button className="share-btn">Share</button>
           </div>
         </div>
 
-        {/* Description & Tags */}
         <div className="info-section">
           <h3 className="section-label">Description</h3>
           <p className="desc-text">{artwork.description}</p>
@@ -162,15 +161,11 @@ export function ArtworkDetailView({
           </div>
         </div>
 
-        {/* Comments */}
         <div className="comments-section">
           <h3 className="section-label">
             Comments <span className="count">({comments.length})</span>
           </h3>
-          <CommentForm
-            placeholder="Leave a thought on this piece..."
-            onAdd={onAddComment}
-          />
+          <CommentForm placeholder="Leave a thought on this piece..." onAdd={onAddComment} />
           <CommentList
             comments={comments}
             onDelete={onDeleteComment}
@@ -180,20 +175,14 @@ export function ArtworkDetailView({
           />
         </div>
 
-        {/* Discovery (Similar & Recommend) */}
         <div className="discovery-section">
           <h3 className="section-heading">More to Explore</h3>
 
-          {/* Similar */}
           <div className="grid-group">
             <div className="grid-label">Similar Style</div>
             <div className="artwork-grid">
               {similarArtworks.map((item) => (
-                <div
-                  key={item.id}
-                  className="grid-card"
-                  onClick={() => onNavigateArtwork(String(item.id))}
-                >
+                <div key={item.id} className="grid-card" onClick={() => onNavigateArtwork(String(item.id))}>
                   <img src={item.src} alt="artwork" loading="lazy" />
                   <div className="card-overlay">
                     <span>View Artwork</span>
@@ -203,16 +192,11 @@ export function ArtworkDetailView({
             </div>
           </div>
 
-          {/* Recommend */}
           <div className="grid-group">
             <div className="grid-label">Curated for You</div>
             <div className="artwork-grid">
               {recommendArtworks.map((item) => (
-                <div
-                  key={item.id}
-                  className="grid-card"
-                  onClick={() => onNavigateArtwork(String(item.id))}
-                >
+                <div key={item.id} className="grid-card" onClick={() => onNavigateArtwork(String(item.id))}>
                   <img src={item.src} alt="artwork" loading="lazy" />
                   <div className="card-overlay">
                     <span>View Artwork</span>
@@ -223,6 +207,16 @@ export function ArtworkDetailView({
           </div>
         </div>
       </div>
+
+      {/* ✅ FanLetter Modal */}
+      <FanLetterSendModal
+        open={fanLetterOpen}
+        sending={fanLetterSending}
+        artworkTitle={artwork.title}
+        artistName={artwork.artist}
+        onClose={onCloseFanLetter}
+        onSend={onSendFanLetter}
+      />
     </div>
   );
 }

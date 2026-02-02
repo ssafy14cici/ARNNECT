@@ -2,20 +2,29 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
+
 import { router } from "./app/router/routes";
 import "./styles/global.css";
+
 import { useAuthStore } from "./features/auth/store";
-
 import { seedMockDB } from "./mocks";
-import { useMock, setUseMock } from "./mocks/useMock.ts";
 
-console.log("🔥🔥🔥 VERSION 3.0 - NETWORK REMOVED 🔥🔥🔥");
+import { USE_MOCK } from "./shared/config/env";
 
-if (useMock()) seedMockDB();
+if (import.meta.env.DEV && USE_MOCK) {
+  seedMockDB();
+}
+
+
 
 if (import.meta.env.DEV) {
+  // 콘솔에서 __auth.getState() 확인용
   (window as any).__auth = useAuthStore;
-  (window as any).__mock = { useMock, setUseMock }; // 콘솔에서 토글 가능
+}
+
+// ✅ 목업 모드일 때만 seed
+if (USE_MOCK) {
+  seedMockDB();
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

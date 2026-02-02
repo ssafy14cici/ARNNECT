@@ -1,0 +1,117 @@
+/* FE/src/features/fanLetter/ui/fanLetterSendModal.css */
+
+.fl-modal-overlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.62);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.fl-modal-box{
+  width: min(520px, calc(100vw - 32px));
+  background: rgba(18,18,18,0.92);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 14px;
+  padding: 18px;
+  backdrop-filter: blur(12px);
+}
+
+.fl-modal-head{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fl-modal-title{
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.fl-modal-close{
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: transparent;
+  color: rgba(255,255,255,0.82);
+  cursor: pointer;
+}
+
+.fl-modal-meta{
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.fl-meta-row{
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  margin: 6px 0;
+}
+
+.fl-meta-label{
+  width: 70px;
+  opacity: 0.75;
+  font-size: 12px;
+}
+
+.fl-meta-value{
+  font-size: 14px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.fl-modal-textarea{
+  margin-top: 12px;
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(0,0,0,0.18);
+  color: #fff;
+  padding: 12px;
+  resize: none;
+  outline: none;
+}
+
+.fl-modal-actions{
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.fl-btn{
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.16);
+  cursor: pointer;
+}
+
+.fl-btn.ghost{
+  background: transparent;
+  color: rgba(255,255,255,0.86);
+}
+
+.fl-btn.primary{
+  background: rgba(255,255,255,0.92);
+  color: #111;
+  font-weight: 700;
+}
+
+.fl-btn:disabled{
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.fl-modal-hint{
+  margin: 10px 0 0;
+  font-size: 12px;
+  opacity: 0.7;
+}

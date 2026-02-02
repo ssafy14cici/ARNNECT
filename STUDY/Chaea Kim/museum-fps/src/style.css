@@ -6,6 +6,7 @@ html, body, #app {
 
 body {
   overflow: hidden;
+  font-family: "MuseumClassicKR", "Noto Sans KR", ui-sans-serif, system-ui, sans-serif;
 }
 
 #canvas {

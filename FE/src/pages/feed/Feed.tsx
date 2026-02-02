@@ -1,81 +1,134 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { FeedCard, ViewMode, FeedRole, FeedData } from "../../components/feed/FeedCard";
-import { useAuthStore } from "../../features/auth/store";
-import { listPosts, ensureBaseSeedOnce } from "../../features/feed/mockData";
+import { useNavigate } from "react-router-dom";
+
+import { FeedCard } from "../../features/feed/ui/FeedCard";
+import type { FeedFilterKey, FeedItem, ViewMode } from "../../features/feed/types";
+import { getFeedList } from "../../features/feed/api";
+import { subscribePostsUpdated } from "../../features/posts/api/mock";
 import "./feed.css";
 
-ensureBaseSeedOnce();
+const DETAIL_PATH = (it: FeedItem) => {
+  if (it.id.startsWith("review-")) return `/reviews/${it.id.replace("review-", "")}`;
+  if (it.id.startsWith("artwork-")) return `/artworks/${it.id.replace("artwork-", "")}`;
+  return it.authorRole === "USER" ? `/reviews/${it.id}` : `/artworks/${it.id}`;
+};
 
-const ARTWORK_PATH = (id: string) => `/artworks/${id}`;
-const POST_PATH = (id: string) => `/posts/${id}`;
-const PROFILE_PATH = (id: string) => `/profile/${id}`;
+const PROFILE_PATH = (authorId: string) => `/members/${authorId}`;
+
+const FILTERS: Array<{ key: FeedFilterKey; label: string }> = [
+  { key: "ALL", label: "All" },
+  { key: "ARTIST", label: "Artist" },
+  { key: "USER", label: "User" },
+];
 
 const PAGE_SIZE = 12;
 
-function pickExcerpt(content?: string, max = 120) {
-  if (!content) return;
-  const s = content.replace(/\s+/g, " ").trim();
-  return s.length > max ? `${s.slice(0, max)}…` : s;
-}
-
-function mapPosts(): FeedData[] {
-  return listPosts().map((p: any) => ({
-    id: p.id,
-    role: p.role === "ARTIST" ? "ARTIST" : "USER",
-    title: p.title,
-    excerpt: pickExcerpt(p.content),
-    authorName: p.authorName,
-    authorId: p.authorId,
-    createdAt: p.createdAt,
-    imageUrl: p.imageUrls?.[0],
-    likes: p.likes,
-    views: p.views,
-  }));
-}
-
 export default function Feed() {
   const navigate = useNavigate();
-  const location = useLocation();
-  void location.key;
 
+  const [items, setItems] = useState<FeedItem[]>([]);
+  const [filter, setFilter] = useState<FeedFilterKey>("ALL");
   const [viewMode, setViewMode] = useState<ViewMode>("GRID");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  const feeds = mapPosts().slice(0, visibleCount);
-  const hasMore = visibleCount < listPosts().length;
+  const filtered =
+    filter === "ALL"
+      ? items
+      : filter === "ARTIST"
+        ? items.filter((x) => x.authorRole === "ARTIST")
+        : items.filter((x) => x.authorRole === "USER");
+
+  const visible = filtered.slice(0, visibleCount);
+  const hasMore = visibleCount < filtered.length;
+
+  const refetch = async () => {
+    const data = await getFeedList();
+    setItems(data);
+  };
 
   useEffect(() => {
-    if (!sentinelRef.current) return;
-    const io = new IntersectionObserver((e) => {
-      if (e[0].isIntersecting && hasMore) {
-        setVisibleCount((v) => v + PAGE_SIZE);
-      }
-    });
-    io.observe(sentinelRef.current);
+    refetch();
+    const unsub = subscribePostsUpdated(() => refetch());
+    return () => unsub?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasMore) {
+          setVisibleCount((v) => v + PAGE_SIZE);
+        }
+      },
+      { threshold: 0.1 },
+    );
+
+    io.observe(el);
     return () => io.disconnect();
   }, [hasMore]);
 
-  const goDetail = (id: string, role: FeedRole) => {
-    navigate(role === "ARTIST" ? ARTWORK_PATH(id) : POST_PATH(id));
+  const applyFilter = (next: FeedFilterKey) => {
+    setFilter(next);
+    setVisibleCount(PAGE_SIZE);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
-
-  const goProfile = (id: string) => navigate(PROFILE_PATH(id));
 
   return (
     <div className="feedPage">
+      <header className="feedHeader">
+        <div className="feedControls">
+          <div className="togglePill">
+            <button
+              type="button"
+              className={`pillBtn ${viewMode === "LIST" ? "active" : ""}`}
+              onClick={() => setViewMode("LIST")}
+            >
+              List
+            </button>
+            <button
+              type="button"
+              className={`pillBtn ${viewMode === "GRID" ? "active" : ""}`}
+              onClick={() => setViewMode("GRID")}
+            >
+              Grid
+            </button>
+          </div>
+
+          <nav className="filterNav">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                className={`filterBtn ${f.key === filter ? "active" : ""}`}
+                onClick={() => applyFilter(f.key)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </header>
+
       <section className={`feedContainer ${viewMode === "LIST" ? "mode-list" : "mode-grid"}`}>
-        {feeds.map((item) => (
+        {visible.map((it) => (
           <FeedCard
-            key={item.id}
-            feed={item}
+            key={it.id}
+            feed={it}
             viewMode={viewMode}
-            onClick={() => goDetail(item.id, item.role)}
-            onAuthorClick={() => goProfile(item.authorId)}
+            onClick={() => navigate(DETAIL_PATH(it))}
+            onAuthorClick={(e) => {
+              e?.stopPropagation?.();
+              navigate(PROFILE_PATH(it.authorId));
+            }}
           />
         ))}
+
+        {visible.length === 0 && <div style={{ padding: 24, opacity: 0.8 }}>아직 표시할 피드가 없습니다.</div>}
       </section>
 
       <div ref={sentinelRef} />
