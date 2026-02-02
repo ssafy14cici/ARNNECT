@@ -57,4 +57,8 @@ public class FileStorageService {
         if (fileName == null) return "";
         return fileName.substring(fileName.lastIndexOf(".") + 1);
     }
+
+    public String getBaseDir(FileType fileType){
+        return baseDir + "/" + fileType.getFolder() + "/";
+    }
 }

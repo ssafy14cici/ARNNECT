@@ -22,7 +22,10 @@ public enum ErrorCode {
     FILE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "FILE_003", "파일 삭제에 실패했습니다."),
 
     /** ARTWORK **/
-    ARTWORK_NOT_DOUND(HttpStatus.NOT_FOUND, "ARTWORK", "작품이 존재하지않습니다.");
+    ARTWORK_NOT_FOUND(HttpStatus.NOT_FOUND, "ARTWORK_001", "작품이 존재하지않습니다."),
+
+    /** REVIEW **/
+    REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_001", "감상평이 존재하지않습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
