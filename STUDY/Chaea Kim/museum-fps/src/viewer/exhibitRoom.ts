@@ -8,7 +8,7 @@ import { type PanelArtItem } from "./panelArt";
 import { EXHIBIT_POINTS } from "./exhibitPoints";
 import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
 
-type PosePoint = { pos: [number, number, number]; target: [number, number, number] };
+type PosePoint = { pos: [number, number, number]; target: [number, number, number]; pass?: boolean };
 
 type Options = {
   glbUrl: string;
@@ -74,9 +74,11 @@ export async function mountExhibitRoom(
   scene.fog = null;
 
   // ✅ 환경광(이게 없으면 PBR 재질이 “검게 죽는” 케이스가 많음)
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  scene.environment = envTex;
+  // const pmrem = new THREE.PMREMGenerator(renderer);
+  // const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  // scene.environment = envTex;
+
+  scene.environment = null;
 
   /* ===== Camera ===== */
   const camera = new THREE.PerspectiveCamera(55, w0 / h0, 0.05, 5000);
@@ -97,10 +99,14 @@ export async function mountExhibitRoom(
     camera.updateMatrixWorld(true);
   }
 
-  function goTo(i: number, duration = 0.85) {
+  /** 마지막 이동 방향 (pass-through 연쇄용) */
+  let lastDir: 1 | -1 = 1;
+
+  function goTo(i: number, duration = 0.85, dir?: 1 | -1) {
     if (!points.length) return;
     i = ((i % points.length) + points.length) % points.length;
     index = i;
+    if (dir !== undefined) lastDir = dir;
 
     const fromPos = camera.position.clone();
     const fromTarget = lookTarget.clone();
@@ -120,7 +126,13 @@ export async function mountExhibitRoom(
         camera.lookAt(lookTarget);
         camera.updateMatrixWorld(true);
       },
-      onComplete: () => (activeTween = null),
+      onComplete: () => {
+        activeTween = null;
+        // pass-through: 멈추지 않고 같은 방향으로 계속 이동
+        if (points[i].pass) {
+          goTo(i + lastDir, 0.65, lastDir);
+        }
+      },
     });
   }
 
@@ -242,6 +254,96 @@ export async function mountExhibitRoom(
   };
   renderer.domElement.addEventListener("click", onCanvasClick);
 
+  /* ===== Art click ===== */
+  const clickableArtMeshes: THREE.Mesh[] = [];
+  const raycaster = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+
+  function raycastArt(clientX: number, clientY: number): THREE.Mesh | null {
+    if (!clickableArtMeshes.length) return null;
+    const rect = renderer.domElement.getBoundingClientRect();
+    ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(ndc, camera);
+    const hits = raycaster.intersectObjects(clickableArtMeshes, false);
+    return hits.length ? (hits[0].object as THREE.Mesh) : null;
+  }
+
+  function showArtDetailModal(mesh: THREE.Mesh) {
+    if (document.getElementById("exhibit-art-modal")) return;
+
+    const title = mesh.userData.__title ?? "작품";
+    const panelName = mesh.userData.__panelName ?? "";
+    const imageUrl = mesh.userData.__imageUrl ?? "";
+
+    const overlay = document.createElement("div");
+    overlay.id = "exhibit-art-modal";
+    overlay.style.cssText =
+      "position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:99999;";
+
+    const box = document.createElement("div");
+    box.style.cssText =
+      "background:#fff;border-radius:14px;padding:32px 36px;text-align:center;" +
+      "font-family:'MuseumClassic','Noto Sans KR',system-ui,sans-serif;min-width:300px;max-width:480px;";
+
+    if (imageUrl) {
+      const img = document.createElement("img");
+      img.src = imageUrl;
+      img.style.cssText = "width:100%;max-height:320px;object-fit:contain;border-radius:8px;margin-bottom:16px;";
+      box.appendChild(img);
+    }
+
+    const titleEl = document.createElement("h2");
+    titleEl.style.cssText = "margin:0 0 8px;font-size:20px;color:#222;";
+    titleEl.textContent = title;
+    box.appendChild(titleEl);
+
+    const sub = document.createElement("p");
+    sub.style.cssText = "margin:0 0 20px;font-size:13px;color:#888;";
+    sub.textContent = panelName;
+    box.appendChild(sub);
+
+    const btnRow = document.createElement("div");
+    btnRow.style.cssText = "display:flex;gap:12px;justify-content:center;";
+
+    const detailBtn = document.createElement("button");
+    detailBtn.style.cssText =
+      "background:#333;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;cursor:pointer;font-family:inherit;";
+    detailBtn.textContent = "작품 상세보기";
+    detailBtn.addEventListener("click", () => {
+      // TODO: 백엔드 연결 시 상세 페이지로 이동
+      console.log("[exhibit] detail clicked:", { title, panelName, imageUrl });
+      overlay.remove();
+    });
+
+    const closeBtn = document.createElement("button");
+    closeBtn.style.cssText =
+      "background:transparent;color:#666;border:1px solid #ccc;border-radius:8px;padding:10px 28px;font-size:14px;cursor:pointer;font-family:inherit;";
+    closeBtn.textContent = "닫기";
+    closeBtn.addEventListener("click", () => overlay.remove());
+
+    btnRow.append(detailBtn, closeBtn);
+    box.appendChild(btnRow);
+
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  }
+
+  const onCanvasPointerDown = (e: PointerEvent) => {
+    if (fpsEnabled) return;
+    const hit = raycastArt(e.clientX, e.clientY);
+    if (hit) showArtDetailModal(hit);
+  };
+  renderer.domElement.addEventListener("pointerdown", onCanvasPointerDown);
+
+  const onCanvasPointerMove = (e: PointerEvent) => {
+    if (fpsEnabled) { renderer.domElement.style.cursor = ""; return; }
+    const hit = raycastArt(e.clientX, e.clientY);
+    renderer.domElement.style.cursor = hit ? "pointer" : "";
+  };
+  renderer.domElement.addEventListener("pointermove", onCanvasPointerMove);
+
   /* ===== GLB load ===== */
   const loader = new GLTFLoader();
   let glbRoot: THREE.Object3D | null = null;
@@ -290,6 +392,21 @@ export async function mountExhibitRoom(
             }
           }
 
+          // ✅ 바닥 무광 블랙 처리
+          glbRoot.traverse((o: THREE.Object3D) => {
+            const n = (o.name ?? "").toLowerCase();
+            if (!(o as any).isMesh) return;
+            if (n.includes("floor") || n.includes("바닥") || n.includes("ground")) {
+              (o as THREE.Mesh).material = new THREE.MeshStandardMaterial({
+                color: 0x111111,
+                roughness: 1.0,
+                metalness: 0.0,
+                side: THREE.DoubleSide,
+              });
+              if (debug) console.log("[exhibit] floor darkened:", o.name);
+            }
+          });
+
           if (opts.panelItems?.length) {
             const texLoader = new THREE.TextureLoader();
             let attached = 0;
@@ -335,6 +452,13 @@ export async function mountExhibitRoom(
                   metalness: 0.0,
                   side: THREE.DoubleSide,
                 });
+
+                // 클릭용 데이터 저장
+                mesh.userData.__panelName = item.panelName;
+                mesh.userData.__title = item.title;
+                mesh.userData.__imageUrl = item.imageUrl;
+                clickableArtMeshes.push(mesh);
+
                 attached++;
               } catch (e) {
                 if (debug) console.warn("[exhibit] texture load failed:", item.panelName, e);
@@ -468,10 +592,10 @@ export async function mountExhibitRoom(
     if (!points.length) return;
     if (e.code === "ArrowRight") {
       e.preventDefault();
-      goTo(index + 1);
+      goTo(index + 1, 0.85, 1);
     } else if (e.code === "ArrowLeft") {
       e.preventDefault();
-      goTo(index - 1);
+      goTo(index - 1, 0.85, -1);
     }
   };
 
@@ -497,6 +621,8 @@ export async function mountExhibitRoom(
     window.removeEventListener("keyup", onKeyUp as any);
 
     renderer.domElement.removeEventListener("click", onCanvasClick);
+    renderer.domElement.removeEventListener("pointerdown", onCanvasPointerDown);
+    renderer.domElement.removeEventListener("pointermove", onCanvasPointerMove);
     fps.removeEventListener("unlock", onFpsUnlock);
     fps.unlock();
     fpsLabel.remove();
@@ -505,6 +631,7 @@ export async function mountExhibitRoom(
     top.remove();
     viewLabel.remove();
     loading.remove();
+    document.getElementById("exhibit-art-modal")?.remove();
 
     if (glbRoot) {
       glbRoot.traverse((o) => {
