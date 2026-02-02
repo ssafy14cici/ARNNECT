@@ -1,278 +1,448 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import "./artistsignup.css"; // CSS 파일명은 소문자 유지 (또는 파일명 변경 시 수정)
+// FE/src/pages/auth/artist/ArtistSignup.tsx
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import "./artistsignup.css";
 
 import Step1Account from "./ArtistStep1Account";
-import SignupPreviewCard from "./ArtistSignupPreviewCard";
-import StepConsent from "./ArtistStep4Consent";
-import ArtistStep2Profile from "./ArtistStep2Profile";
-import ArtistStep3Optional from "./ArtistStep3Optional";
+import Step2Profile from "./ArtistStep2Profile";
+import Step3Optional from "./ArtistStep3Optional";
+import Step4Consent from "./ArtistStep4Consent";
 
-import {
-  validateAccountStep,
-  validateArtistStep2,
-  validateArtistStep3,
-  validateConsent,
-  maskPw,
-  type AccountStepValue,
-} from "../utils/validation";
-import { checkEmailDupMock } from "../utils/emailDupCheck";
+import type { AccountStepValue } from "../utils/validation";
+import type { ArtistStep2, ArtistStep3 } from "./types";
 
+import { checkEmailDupReal, signupArtistReal } from "../../../features/auth/api/real";
+import type { SignupArtistRequest } from "../../../features/auth/types";
 
-const ART_MAIN = ["미술", "사진", "공예", "디자인"];
-const ART_SUB: Record<string, string[]> = {
-  미술: ["회화", "조각", "일러스트"],
-  사진: ["인물", "풍경", "스트릿"],
-  공예: ["도자", "금속", "목공"],
-  디자인: ["그래픽", "UI/UX", "브랜딩"],
-};
+type StepKey = "ACCOUNT" | "PROFILE" | "PORTFOLIO" | "REVIEW";
+const STEPS: StepKey[] = ["ACCOUNT", "PROFILE", "PORTFOLIO", "REVIEW"];
 
-type ArtistStep2Value = {
-  displayName: string;
-  affiliation: string;
-  artMain: string;
-  artSub: string;
-  verified: "YES" | "NO";
-  verifiedFile: File | null;
-  gender: "M" | "F";
-  birthYear: string;
-  birthYearPublic: boolean;
-};
+// ✅ DB에 fieldId가 1개 뿐 => 고정
+const FIXED_FIELD_ID = 1;
 
-type ArtistStep3Value = {
-  contact: string;
-  intro: string;
-  profileImage: File | null;
-  portfolioFile: File | null;
-};
+const GENRES = [
+  { id: 1, ko: "자유", en: "none" },
+  { id: 2, ko: "추상화", en: "abstract" },
+  { id: 3, ko: "드로잉 / 스케치", en: "drawings" },
+  { id: 4, ko: "인물화", en: "figurative" },
+  { id: 5, ko: "일러스트레이션", en: "illustration" },
+  { id: 6, ko: "풍경화", en: "landscape" },
+  { id: 7, ko: "신화화", en: "mythology" },
+  { id: 8, ko: "꽃·새·동물화", en: "plants-animals" },
+  { id: 9, ko: "포스터", en: "posters" },
+  { id: 10, ko: "종교화", en: "religion" },
+  { id: 11, ko: "정물화", en: "still-life" },
+] as const;
 
-export default function ArtistSignup({ onBack }: { onBack: () => void }) {
+function isValidEmail(v: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
+
+function normalizePhone(v: string) {
+  return v.replace(/\D/g, "");
+}
+
+export default function ArtistSignup() {
   const nav = useNavigate();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState<number>(0);
 
-  // ... (State 정의 기존 코드 유지) ...
+  // Step1
   const [a1, setA1] = useState<AccountStepValue>({
-    email: "", name: "", password: "", phone: "",
-  });
-  const [pw2, setPw2] = useState("");
+    email: "",
+    name: "",
+    password: "",
+    phone: "",
+  } as AccountStepValue);
+
+  const [password2, setPassword2] = useState("");
   const [emailChecked, setEmailChecked] = useState(false);
-  const [checkingEmail, setCheckingEmail] = useState(false);
   const [emailCheckMsg, setEmailCheckMsg] = useState<string | null>(null);
+  const [checkingEmail, setCheckingEmail] = useState(false);
 
-  const [a2, setA2] = useState<ArtistStep2Value>({
-    displayName: "", affiliation: "", artMain: "", artSub: "",
-    verified: "NO", verifiedFile: null, gender: "M", birthYear: "", birthYearPublic: true,
+  // Step2
+  const [a2, setA2] = useState<ArtistStep2>({
+    nickname: "",
+    birth: "",
+    affiliation: "",
+    debutYear: "",
+    genreId: null,
+    sns: "",
   });
 
-  const [a3, setA3] = useState<ArtistStep3Value>({
-    contact: "", intro: "", profileImage: null, portfolioFile: null,
+  // Step3
+  const [a3, setA3] = useState<ArtistStep3>({
+    document: null,
+    artIntroduction: "",
   });
 
-  const [privacyConsent, setPrivacyConsent] = useState(false);
-  const [loading, setLoading] = useState(false);
+  // Step4
+  const [agree, setAgree] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // ... (Effect 및 검증 로직 기존 코드 유지) ...
-  useEffect(() => setError(null), [step]);
-  useEffect(() => {
-    setEmailChecked(false);
-    setEmailCheckMsg(null);
-  }, [a1.email]);
+  const currentKey = STEPS[step];
 
-  const subOptions = useMemo(() => (a2.artMain ? ART_SUB[a2.artMain] ?? [] : []), [a2.artMain]);
-  useEffect(() => {
-    if (a2.artMain && a2.artSub && !subOptions.includes(a2.artSub)) {
-      setA2((p) => ({ ...p, artSub: "" }));
-    }
-  }, [a2.artMain, a2.artSub, subOptions]);
+  const genreLabel = useMemo(() => {
+    if (!a2.genreId) return "";
+    return GENRES.find((g) => g.id === a2.genreId)?.ko ?? "";
+  }, [a2.genreId]);
 
-  const currentYear = new Date().getFullYear();
-  const birthYears = useMemo(
-    () => Array.from({ length: 70 }).map((_, idx) => String(currentYear - idx)),
-    [currentYear]
-  );
+  const progressPct = useMemo(() => {
+    const denom = STEPS.length;
+    return Math.round(((step + 1) / denom) * 100);
+  }, [step]);
 
-  async function onCheckEmail() {
+  const setStepSafe = (n: number) => {
     setError(null);
-    if (!a1.email.trim()) {
+    setStep(Math.min(Math.max(n, 0), STEPS.length - 1));
+  };
+
+  const handleA1Change = (next: AccountStepValue) => {
+    // ✅ 이메일 바뀌면 중복확인 리셋
+    if (next.email !== a1.email) {
       setEmailChecked(false);
-      setEmailCheckMsg("이메일을 입력해주세요.");
+      setEmailCheckMsg(null);
+    }
+    setA1(next);
+  };
+
+  const onCheckEmail = async () => {
+    const email = (a1.email ?? "").trim();
+
+    if (!email) {
+      setEmailChecked(false);
+      setEmailCheckMsg("이메일을 입력해줘");
       return;
     }
+    if (!isValidEmail(email)) {
+      setEmailChecked(false);
+      setEmailCheckMsg("이메일 형식을 확인해줘");
+      return;
+    }
+
     setCheckingEmail(true);
+    setEmailCheckMsg(null);
+
     try {
-      const r = await checkEmailDupMock(a1.email);
-      setEmailChecked(r.ok);
-      setEmailCheckMsg(r.message);
+      // ✅ 서버: boolean만 반환(true=사용가능, false=중복)
+      const res = await checkEmailDupReal(email);
+      setEmailChecked(res.ok);
+      setEmailCheckMsg(res.message);
+    } catch (e: any) {
+      setEmailChecked(false);
+      setEmailCheckMsg(e?.message ?? "중복 확인 실패");
     } finally {
       setCheckingEmail(false);
     }
-  }
+  };
 
-  function goNext() {
-    setError(null);
-    if (step === 1) {
-      const msg = validateAccountStep({ v: a1, password2: pw2, emailChecked });
-      if (msg) return setError(msg);
-      return setStep(2);
-    }
-    if (step === 2) {
-      const msg = validateArtistStep2(a2);
-      if (msg) return setError(msg);
-      return setStep(3);
-    }
-    if (step === 3) {
-      const msg = validateArtistStep3(a3, { portfolioRequired: true });
-      if (msg) return setError(msg);
-      return setStep(4);
-    }
-  }
+  const validateStep1 = (): string | null => {
+    const email = (a1.email ?? "").trim();
+    if (!email) return "이메일을 입력해줘";
+    if (!isValidEmail(email)) return "이메일 형식을 확인해줘";
+    if (!emailChecked) return "이메일 중복 확인을 완료해줘";
 
-  function goPrev() {
-    setError(null);
-    setStep((s) => Math.max(1, s - 1));
-  }
+    const name = (a1.name ?? "").trim();
+    if (!name) return "이름을 입력해줘";
 
-  async function submitFinal() {
+    const pw = a1.password ?? "";
+    if (pw.length < 8) return "비밀번호는 8자 이상이어야 해";
+    if (pw !== password2) return "비밀번호 확인이 일치하지 않아";
+
+    const phone = normalizePhone(a1.phone ?? "");
+    if (!phone) return "전화번호를 입력해줘";
+    if (phone.length < 9) return "전화번호 형식을 확인해줘";
+
+    return null;
+  };
+
+  const validateStep2 = (): string | null => {
+    if (!a2.nickname.trim()) return "닉네임을 입력해줘";
+    if (!a2.birth) return "생년월일을 선택해줘";
+    if (!a2.affiliation.trim()) return "소속을 입력해줘";
+
+    if (!a2.debutYear.trim()) return "데뷔연도를 입력해줘";
+    const debut = Number(a2.debutYear);
+    if (!Number.isFinite(debut) || debut < 1900 || debut > 2100) {
+      return "데뷔연도 형식을 확인해줘";
+    }
+
+    if (!a2.genreId) return "장르를 선택해줘";
+    if (!a2.sns.trim()) return "SNS/개인웹 주소를 입력해줘";
+
+    return null;
+  };
+
+  const validateStep3 = (): string | null => {
+    if (!(a3.document instanceof File)) return "증빙서류(document)를 첨부해줘";
+    if (!a3.artIntroduction.trim()) return "작가 소개(artIntroduction)를 입력해줘";
+    return null;
+  };
+
+  const validateStep4 = (): string | null => {
+    if (!agree) return "약관 동의가 필요해";
+    return null;
+  };
+
+  const onPrev = () => setStepSafe(step - 1);
+
+  const onNext = () => {
     setError(null);
-    const msg = validateConsent(privacyConsent);
-    if (msg) return setError(msg);
+
+    if (currentKey === "ACCOUNT") {
+      const msg = validateStep1();
+      if (msg) return setError(msg);
+      return setStepSafe(step + 1);
+    }
+
+    if (currentKey === "PROFILE") {
+      const msg = validateStep2();
+      if (msg) return setError(msg);
+      return setStepSafe(step + 1);
+    }
+
+    if (currentKey === "PORTFOLIO") {
+      const msg = validateStep3();
+      if (msg) return setError(msg);
+      return setStepSafe(step + 1);
+    }
+  };
+
+  const onSubmit = async () => {
+    setError(null);
+
+    const msg4 = validateStep4();
+    if (msg4) return setError(msg4);
+
+    const msg1 = validateStep1();
+    if (msg1) return setError(msg1);
+
+    const msg2 = validateStep2();
+    if (msg2) return setError(msg2);
+
+    const msg3 = validateStep3();
+    if (msg3) return setError(msg3);
+
+    const payload: SignupArtistRequest = {
+      email: a1.email.trim(),
+      password: a1.password,
+      name: a1.name.trim(),
+      nickname: a2.nickname.trim(),
+      phone: normalizePhone(a1.phone),
+      birth: a2.birth,
+      role: "artist",
+      isAgree: agree,
+
+      document: a3.document as File,
+
+      // ✅ fieldId 고정(1)
+      fieldId: FIXED_FIELD_ID,
+      debutYear: Number(a2.debutYear),
+      genreId: a2.genreId as number,
+
+      sns: a2.sns.trim(),
+      affiliation: a2.affiliation.trim(),
+      artIntroduction: a3.artIntroduction.trim(),
+    };
 
     setLoading(true);
     try {
-      // await apiSignupArtist(payload);
-      nav("/login");
-    } catch (err: any) {
-      setError(err?.message ?? "회원가입에 실패했습니다.");
+      await signupArtistReal(payload);
+      nav("/login", { replace: true });
+    } catch (e: any) {
+      setError(e?.message ?? "회원가입 실패");
     } finally {
       setLoading(false);
     }
-  }
-
-  // ====== Preview Data ======
-  const previewName = a2.displayName || a1.name || "YOUR NAME";
-  const previewEmail = a1.email || "email@example.com";
-  const previewPw = a1.password ? "••••••••" : "—";
-  const previewField = a2.artMain
-    ? `${a2.artMain}${a2.artSub ? ` / ${a2.artSub}` : ""}`
-    : "Art Field";
-
-  // 프리뷰에 표시할 항목 구성 (디자인에 맞게 라벨 영문 병기 추천)
-  const previewRows = [
-    { k: "Account", v: previewEmail },
-    { k: "Phone", v: a1.phone || "—" },
-    ...(step >= 2 ? [
-        { k: "Artist Name", v: a2.displayName || "—" },
-        { k: "Affiliation", v: a2.affiliation || "—" },
-        { k: "Field", v: previewField },
-      ] : []),
-    ...(step >= 3 ? [
-        { k: "Contact", v: a3.contact || "—" },
-        { k: "Portfolio", v: a3.portfolioFile ? "Attached" : "Pending" },
-      ] : []),
-  ];
+  };
 
   return (
-    <div className="artist-signup-page">
-      {/* 1. Left Preview Section (Sticky) */}
-      <div className="artist-preview-section">
+    <main className="artist-signup-page">
+      {/* LEFT PREVIEW */}
+      <aside className="artist-preview-section">
         <div className="preview-header">
-          <button type="button" className="back-link" onClick={onBack}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            <span>Back to Type</span>
+          <button type="button" className="back-link" onClick={() => nav(-1)} disabled={loading}>
+            ← Back
           </button>
         </div>
 
         <div className="preview-card-wrapper">
-          <SignupPreviewCard
-            badge="ARTIST"
-            mainTitle="MEMBERSHIP CARD"
-            stepLabel={`STEP 0${step}`}
-            mainName={previewName}
-            subLine={previewField}
-            rows={previewRows}
-          />
+          {/* ✅ 프리뷰 컴포넌트 없으면 일단 요약 카드만 */}
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 420,
+              border: "1px solid rgba(200,169,126,0.35)",
+              borderRadius: 12,
+              padding: 24,
+              background: "rgba(255,255,255,0.02)",
+            }}
+          >
+            <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 12, letterSpacing: "0.12em" }}>
+              PREVIEW
+            </div>
+            <div style={{ marginTop: 10, fontSize: 20, fontWeight: 700, color: "#C8A97E" }}>
+              {a2.nickname?.trim() ? a2.nickname : "Artist"}
+            </div>
+            <div style={{ marginTop: 10, color: "rgba(255,255,255,0.75)" }}>
+              {a1.email?.trim() ? a1.email : "example@email.com"}
+            </div>
+            <div style={{ marginTop: 8, color: "rgba(255,255,255,0.6)" }}>
+              장르: {genreLabel || "-"}
+            </div>
+            <div style={{ marginTop: 8, color: "rgba(255,255,255,0.45)", fontSize: 13 }}>
+              step: {currentKey} ({step + 1}/{STEPS.length})
+            </div>
+          </div>
         </div>
-        
-        <div className="preview-footer">
-          <p>Join the community of creators.</p>
-        </div>
-      </div>
 
-      {/* 2. Right Form Section */}
-      <div className="artist-form-section">
+        <div className="preview-footer">ARNNECT</div>
+      </aside>
+
+      {/* RIGHT FORM */}
+      <section className="artist-form-section">
         <div className="form-container">
           <div className="form-header">
             <h1 className="form-title">Artist Registration</h1>
             <p className="form-desc">Complete your profile to showcase your work.</p>
           </div>
 
-          {/* Progress Bar */}
+          {/* Progress */}
           <div className="progress-container">
             <div className="progress-track">
-              <div className="progress-fill" style={{ width: `${(step / 4) * 100}%` }} />
+              <div className="progress-fill" style={{ width: `${progressPct}%` }} />
             </div>
+
             <div className="progress-labels">
-              <span className={step >= 1 ? "active" : ""}>Account</span>
-              <span className={step >= 2 ? "active" : ""}>Profile</span>
-              <span className={step >= 3 ? "active" : ""}>Portfolio</span>
-              <span className={step >= 4 ? "active" : ""}>Review</span>
+              {STEPS.map((k, idx) => (
+                <span
+                  key={k}
+                  className={idx === step ? "active" : ""}
+                  style={{ cursor: loading ? "not-allowed" : "pointer" }}
+                  onClick={() => !loading && setStepSafe(idx)}
+                >
+                  {k}
+                </span>
+              ))}
             </div>
           </div>
 
           {/* Steps */}
           <div className="step-content">
-            {step === 1 && (
-              <Step1Account
-                value={a1} onChange={setA1}
-                password2={pw2} onChangePassword2={setPw2}
-                emailChecked={emailChecked} emailCheckMsg={emailCheckMsg}
-                checkingEmail={checkingEmail} onCheckEmail={onCheckEmail}
+            {currentKey === "ACCOUNT" ? (
+              <>
+                <Step1Account
+                  value={a1}
+                  onChange={handleA1Change}
+                  password2={password2}
+                  onChangePassword2={setPassword2}
+                  emailChecked={emailChecked}
+                  emailCheckMsg={emailCheckMsg}
+                  checkingEmail={checkingEmail}
+                  onCheckEmail={onCheckEmail}
+                  error={error}
+                />
+
+                {/* ✅ Step1 전용 Next 버튼 */}
+                <div className="auth-artist-actions" style={{ justifyContent: "flex-end" }}>
+                  <button type="button" className="next-btn" onClick={onNext} disabled={loading}>
+                    Next Step <span className="arrow">→</span>
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            {currentKey === "PROFILE" ? (
+              <Step2Profile
+                value={a2}
+                onChange={setA2}
                 error={error}
+                loading={loading}
+                onPrev={onPrev}
+                onNext={onNext}
               />
-            )}
+            ) : null}
 
-            {step === 2 && (
-              <ArtistStep2Profile
-                value={a2} onChange={setA2}
-                error={error} loading={loading}
-                onPrev={goPrev} onNext={goNext}
-                mainOptions={ART_MAIN} subOptions={subOptions} birthYears={birthYears}
+            {currentKey === "PORTFOLIO" ? (
+              <Step3Optional
+                value={a3}
+                onChange={setA3}
+                error={error}
+                loading={loading}
+                onPrev={onPrev}
+                onNext={onNext}
               />
-            )}
+            ) : null}
 
-            {step === 3 && (
-              <ArtistStep3Optional
-                value={a3} onChange={setA3}
-                error={error} onPrev={goPrev} onNext={goNext}
-                loading={loading} portfolioRequired={true}
-              />
-            )}
+            {currentKey === "REVIEW" ? (
+              <div className="auth-artist-panel">
+                <div className="auth-artist-section">최종 확인</div>
 
-            {step === 4 && (
-              <StepConsent
-                checked={privacyConsent} onChange={setPrivacyConsent}
-                error={error} loading={loading}
-                onPrev={goPrev} onNext={submitFinal}
-                submitLabel="Complete Registration"
-              />
-            )}
+                <div className="auth-review">
+                  <div className="auth-review-row">
+                    <span>이메일</span>
+                    <b>{a1.email}</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>이름</span>
+                    <b>{a1.name}</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>닉네임</span>
+                    <b>{a2.nickname}</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>생년월일</span>
+                    <b>{a2.birth}</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>소속</span>
+                    <b>{a2.affiliation}</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>데뷔연도</span>
+                    <b>{a2.debutYear}</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>장르</span>
+                    <b>{genreLabel} (genreId={a2.genreId ?? "-"})</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>fieldId</span>
+                    <b>{FIXED_FIELD_ID} (고정)</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>SNS</span>
+                    <b>{a2.sns}</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>증빙서류</span>
+                    <b>{a3.document?.name ?? "-"}</b>
+                  </div>
+                </div>
 
-            {/* Step 1 전용 Next 버튼 (Step 1 컴포넌트 내부에 버튼이 없는 경우) */}
-            {step === 1 && (
-              <div className="form-actions right">
-                <button className="next-btn" onClick={goNext}>
-                  Next Step <span className="arrow">→</span>
-                </button>
+                <Step4Consent
+                  checked={agree}
+                  onChange={setAgree}
+                  error={error}
+                  loading={loading}
+                  onPrev={onPrev}
+                  onNext={onSubmit}
+                  submitLabel="회원가입 완료"
+                />
               </div>
-            )}
+            ) : null}
           </div>
 
           <div className="form-footer">
-            Already have an account? <Link to="/login" className="login-link">Log In</Link>
+            Already have an account?
+            <span className="login-link" onClick={() => nav("/login")}>
+              Login
+            </span>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

@@ -93,8 +93,6 @@ export default function CollectBookDetail() {
               <strong>관람일</strong>: {item.visitedAt}
               <br />
               <strong>메모</strong>: {item.memo ?? "-"}
-              <br />
-              <strong>ticket_code</strong>: {item.ticketCode}
             </p>
           </div>
         </div>

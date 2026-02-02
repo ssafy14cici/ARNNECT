@@ -1,8 +1,8 @@
 // FE/src/features/collectbook/storage.ts
-import type { CollectBookItem } from "./types";
-
+import type { CollectBookItem, ExhibitionLite, Visibility } from "./types";
 
 const KEY = "arnnect_collectbook_v1";
+const DEFAULT_OWNER = "mock-user-0001";
 
 function safeParse<T>(raw: string | null, fallback: T): T {
   if (!raw) return fallback;
@@ -18,41 +18,76 @@ function uuid() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
+type StoredCollectBookItem = Partial<CollectBookItem> & { ownerUuid?: string };
+
+function asStr(v: unknown): string | undefined {
+  return typeof v === "string" && v.trim() ? v.trim() : undefined;
+}
+
+function normalizeExhibition(v: unknown): ExhibitionLite {
+  const o = (v && typeof v === "object" ? (v as Record<string, unknown>) : {}) as Record<string, unknown>;
+  return {
+    title: asStr(o.title),
+    place: asStr(o.place),
+    startDate: asStr(o.startDate),
+    endDate: asStr(o.endDate),
+    posterUrl: asStr(o.posterUrl),
+    description: asStr(o.description),
+  };
+}
+
+function normalizeVisibility(v: unknown): Visibility {
+  return v === "public" ? "public" : "private";
+}
+
 export function loadAll(): CollectBookItem[] {
-  return safeParse<CollectBookItem[]>(localStorage.getItem(KEY), []);
+  const list = safeParse<unknown[]>(localStorage.getItem(KEY), []);
+
+  return list
+    .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
+    .map((x) => {
+      const it = x as StoredCollectBookItem;
+
+      return {
+        id: asStr(it.id) ?? uuid(),
+        ownerUuid: asStr(it.ownerUuid) ?? DEFAULT_OWNER,
+        ticketCode: asStr(it.ticketCode) ?? "",
+        exhibition: normalizeExhibition(it.exhibition),
+        memo: asStr(it.memo),
+        visitedAt: asStr(it.visitedAt) ?? new Date().toISOString().slice(0, 10),
+        visibility: normalizeVisibility(it.visibility),
+        scannedAt: asStr(it.scannedAt) ?? new Date().toISOString(),
+      };
+    });
 }
 
 function saveAll(items: CollectBookItem[]) {
   localStorage.setItem(KEY, JSON.stringify(items));
 }
 
-// ✅ 최근 스캔 순 목록
 export function getCollectBookItems(): CollectBookItem[] {
-  const items = loadAll();
-  return items.sort((a, b) => (b.scannedAt || "").localeCompare(a.scannedAt || ""));
+  return loadAll().sort((a, b) => (b.scannedAt || "").localeCompare(a.scannedAt || ""));
 }
 
-
 export function removeCollectBookItem(id: string) {
-  const items = loadAll().filter((it) => it.id !== id);
-  saveAll(items);
+  saveAll(loadAll().filter((it) => it.id !== id));
 }
 
 export function addCollectBookItem(input: Omit<CollectBookItem, "id">) {
   const items = loadAll();
 
-  // ✅ 같은 ticketCode + visitedAt 조합은 1개만
   const idx = items.findIndex(
-    (it) => it.ticketCode === input.ticketCode && it.visitedAt === input.visitedAt
+    (it) =>
+      it.ownerUuid === input.ownerUuid &&
+      it.ticketCode === input.ticketCode &&
+      it.visitedAt === input.visitedAt,
   );
 
   if (idx >= 0) {
-    // 이미 있으면: 기존 항목 갱신(중복 방지)
     const updated: CollectBookItem = {
       ...items[idx],
       ...input,
-      id: items[idx].id, // id 유지
-      // scannedAt은 "최신 스캔 시간으로 갱신"하고 싶으면 아래처럼
+      id: items[idx].id,
       scannedAt: input.scannedAt || items[idx].scannedAt,
     };
     items[idx] = updated;
@@ -60,18 +95,14 @@ export function addCollectBookItem(input: Omit<CollectBookItem, "id">) {
     return updated;
   }
 
-  // 없으면 새로 추가
   const item: CollectBookItem = { id: uuid(), ...input };
   items.push(item);
   saveAll(items);
   return item;
 }
 
-// ✅ 상세 1건 조회
 export function getCollectBookItemById(id: string) {
-  const items = getCollectBookItems();
-  return items.find((it) => it.id === id) ?? null;
+  return getCollectBookItems().find((it) => it.id === id) ?? null;
 }
 
-// ✅ (옵션) 예전 이름을 쓰고 있었다면 alias로도 제공
 export const getCollectBookItem = getCollectBookItemById;

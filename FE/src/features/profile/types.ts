@@ -18,10 +18,7 @@ type ProfileBase = {
   followingsCount: number;
   isFollowing: boolean;
 
-  /** ✅ 획득한 뱃지 목록 */
   badges?: Badge[];
-
-  /** ✅ 대표 뱃지(최대 3개) - id만 저장 */
   featuredBadgeIds?: string[];
 };
 
@@ -36,8 +33,12 @@ export type ArtistProfile = ProfileBase & {
   contactUrl?: string;
 };
 
+export type ProfileModel = UserProfile | ArtistProfile;
+
 export type FeedItem = {
   id: string;
   imageUrl: string;
   createdAt: string;
 };
+
+export type PageResult<T> = { items: T[]; nextCursor?: string | null };

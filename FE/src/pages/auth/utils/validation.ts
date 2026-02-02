@@ -1,7 +1,5 @@
 // src/pages/auth/utils/validation.ts
-import type { ArtistStep2 } from "../../../features/auth/types"; // 경로는 유저 폴더 구조에 맞춰 조정
-// ↑ 현재 파일이 /pages/auth/utils/validation.ts 이므로
-//    /src/types/auth.ts 까지 상대경로: ../../.. /types/auth
+import type { ArtistStep2 } from "../artist/types";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
 export const isValidEmail = (v: string) => EMAIL_REGEX.test(v.trim());
