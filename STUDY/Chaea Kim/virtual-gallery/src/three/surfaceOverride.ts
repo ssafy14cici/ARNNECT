@@ -29,13 +29,16 @@ function lower(s: string) {
 
 function includesAny(name: string, kws: string[]) {
   const n = lower(name);
-  return kws.some((k) => n.includes(k));
+  return kws.some((k) => n.includes(lower(k)));
 }
 
 function isPbrMaterial(mat: THREE.Material) {
   return (mat as any).isMeshStandardMaterial || (mat as any).isMeshPhysicalMaterial;
 }
 
+/**
+ * 기존 기능(텍스처로 표면 교체) 유지용
+ */
 export function applySurfaceTextureOverride(
   root: THREE.Object3D,
   renderer: THREE.WebGLRenderer,
@@ -51,12 +54,10 @@ export function applySurfaceTextureOverride(
     floorRepeat = [4, 4],
     ceilingRepeat = [8, 8],
 
-    // ✅ 너무 매트하면 빛을 먹어서 칙칙해짐
     wallRoughness = 0.72,
     floorRoughness = 0.55,
     ceilingRoughness = 0.85,
 
-    // ✅ 전시장 벽 따뜻한 톤
     wallTint = 0xefe6da,
     floorTint = 0xffffff,
     ceilingTint = 0xffffff,
@@ -111,17 +112,19 @@ export function applySurfaceTextureOverride(
     const rough = isFloor ? floorRoughness : isCeil ? ceilingRoughness : wallRoughness;
     const tint = isFloor ? floorTint : isCeil ? ceilingTint : wallTint;
 
-    const next = new THREE.MeshStandardMaterial({
+    const next: any = new THREE.MeshStandardMaterial({
       map,
       color: tint,
       roughness: rough,
       metalness: 0.0,
     });
 
+    // 다크톤에서 env 영향이 과하면 플라스틱처럼 보일 수 있음
+    if (next.envMapIntensity !== undefined) next.envMapIntensity = 0.15;
+
     mesh.material = next;
     next.needsUpdate = true;
 
-    // ✅ 패턴/그림자 살리려면 receiveShadow
     mesh.castShadow = false;
     mesh.receiveShadow = true;
 

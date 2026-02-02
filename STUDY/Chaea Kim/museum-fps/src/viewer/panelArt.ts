@@ -1,170 +1,270 @@
+// src/viewer/panelArt.ts
 import * as THREE from "three";
 
-export type PanelArtItem = { imageUrl: string; title: string };
-export type WaypointPose = { pos: [number, number, number]; yaw: number; pitch: number };
-export type AttachPanelArtResult = {
-  clickMeshes: THREE.Mesh[];
-  attached: Array<{ idx: number; title: string; targetName: string; size: [number, number] }>;
-  missing: Array<{ idx: number; title: string; reason: string }>;
+export type PanelArtItem = {
+  panelName: string; // ex) "ART_1"
+  imageUrl: string;  // ex) /art/b1.jpg
+  title: string;     // ex) "최수원" (지금은 userData만)
 };
 
-type AttachArgs = {
+export type AttachPanelArtArgs = {
   sceneRoot: THREE.Object3D;
   items: PanelArtItem[];
-  waypoints: WaypointPose[];
+
+  /** 패널 표면에서 띄우기 (깜빡임/관통 방지) */
   epsilon?: number;
-  maxDist?: number;
-  faceProbeScale?: number;
+
+  /** 패널 대비 이미지 채우기 비율(1=꽉, 1.02=조금 크게) */
+  fill?: number;
+
+  /** 카메라에서 패널 중심으로 레이캐스트해서 정면 face 노말로 붙임 */
+  faceCamera?: boolean;
+
+  /** faceCamera=true면 필수 */
+  camera?: THREE.Camera;
+
+  /** 이미지 상하 뒤집힘 보정 (기본 true) */
+  fixFlipY?: boolean;
 };
 
-function computeDirFromYawPitch(yaw: number, pitch: number) {
-  return new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(pitch, yaw, 0, "YXZ")).normalize();
+export type AttachPanelArtResult = {
+  clickMeshes: THREE.Object3D[];
+  attached: Array<{ panel: string; meshName: string }>;
+  missing: string[];
+};
+
+function normalizeName(n: string) {
+  return (n ?? "").trim().toLowerCase();
 }
 
-function isBadTarget(o: THREE.Object3D) {
-  const n = (o.name ?? "").toLowerCase();
-  return n.includes("__art") || n.includes("__image") || n.includes("__name");
+function findByNameLoose(root: THREE.Object3D, want: string): THREE.Object3D | null {
+  const target = normalizeName(want);
+  let exact: THREE.Object3D | null = null;
+  const candidates: THREE.Object3D[] = [];
+
+  root.traverse((o) => {
+    const n = normalizeName(o.name);
+    if (!n) return;
+    if (n === target) exact = o;
+    if (n.includes(target)) candidates.push(o);
+  });
+
+  if (exact) return exact;
+  if (!candidates.length) return null;
+
+  candidates.sort((a, b) => a.name.length - b.name.length);
+  return candidates[0];
 }
 
-async function loadImageTexture(url: string) {
-  const loader = new THREE.TextureLoader();
-  try {
-    const tex = await new Promise<THREE.Texture>((resolve, reject) => {
-      loader.load(url, resolve, undefined, reject);
-    });
-    tex.colorSpace = THREE.SRGBColorSpace;
-    return tex;
-  } catch {
-    return new THREE.DataTexture(new Uint8Array([200, 200, 200, 255]), 1, 1);
-  }
+function getFirstMesh(obj: THREE.Object3D): THREE.Mesh | null {
+  if ((obj as any).isMesh) return obj as THREE.Mesh;
+  let found: THREE.Mesh | null = null;
+  obj.traverse((o) => {
+    if (found) return;
+    if ((o as any).isMesh) found = o as THREE.Mesh;
+  });
+  return found;
 }
 
-function makeNameTexture(text: string) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 512; canvas.height = 128;
-  const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "rgba(0,0,0,0.85)";
-  ctx.roundRect(10, 10, 492, 108, 20); ctx.fill();
-  ctx.fillStyle = "white"; ctx.font = "bold 44px sans-serif";
-  ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText(text, 256, 64);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+/** 월드 노말 n을 plane의 +Z가 바라보도록 quaternion 생성 */
+function quatFromNormal(nWorld: THREE.Vector3): THREE.Quaternion {
+  const n = nWorld.clone().normalize();
+
+  let up = new THREE.Vector3(0, 1, 0);
+  if (Math.abs(n.dot(up)) > 0.95) up = new THREE.Vector3(1, 0, 0);
+
+  const x = new THREE.Vector3().crossVectors(up, n).normalize();
+  const y = new THREE.Vector3().crossVectors(n, x).normalize();
+
+  const m = new THREE.Matrix4();
+  m.makeBasis(x, y, n);
+
+  return new THREE.Quaternion().setFromRotationMatrix(m);
 }
 
-function getWorldNormalFromHit(hit: THREE.Intersection) {
-  if (hit.face) {
-    const normal = hit.face.normal.clone();
-    return normal.transformDirection(hit.object.matrixWorld).normalize();
-  }
-  return new THREE.Vector3(0, 0, 1);
+/** 카메라에서 패널 중심으로 레이캐스트: hit point + world normal(카메라 향하도록 보정) */
+function raycastFacing(panelMesh: THREE.Mesh, camera: THREE.Camera) {
+  panelMesh.updateMatrixWorld(true);
+
+  const box = new THREE.Box3().setFromObject(panelMesh);
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+
+  const origin = new THREE.Vector3();
+  camera.getWorldPosition(origin);
+
+  const dir = center.clone().sub(origin).normalize();
+  const raycaster = new THREE.Raycaster(origin, dir, 0, origin.distanceTo(center) + 1000);
+
+  const hits = raycaster.intersectObject(panelMesh, true);
+  if (!hits.length) return null;
+
+  const hit = hits[0];
+  const hitPoint = hit.point.clone();
+
+  const nLocal = hit.face?.normal?.clone();
+  if (!nLocal) return null;
+
+  const normalMatrix = new THREE.Matrix3().getNormalMatrix(panelMesh.matrixWorld);
+  const nWorld = nLocal.applyMatrix3(normalMatrix).normalize();
+
+  const toCam = origin.clone().sub(hitPoint).normalize();
+  if (nWorld.dot(toCam) < 0) nWorld.multiplyScalar(-1);
+
+  return { hitPoint, nWorld };
 }
 
-/** 패널의 실제 경계를 측정하고 중심 편차를 반환 */
-function refinePanelBounds(params: {
-  target: THREE.Mesh;
-  hitPoint: THREE.Vector3;
-  normal: THREE.Vector3;
-  rayTargets: THREE.Object3D[];
-}) {
-  const { target, hitPoint, normal, rayTargets } = params;
-  const up = new THREE.Vector3(0, 1, 0);
-  const right = new THREE.Vector3().crossVectors(up, normal).normalize();
-  const localUp = new THREE.Vector3().crossVectors(normal, right).normalize();
-  
-  const rc = new THREE.Raycaster();
-  rc.far = 5;
-  const backDir = normal.clone().multiplyScalar(-1);
+/** 패널(ART plane)의 가로/세로 추정: geometry(local) 우선, 없으면 Box3 fallback */
+function estimatePanelWH(mesh: THREE.Mesh) {
+  // 1) geometry 기반 (가장 정확: “프레임보다 작다” 문제를 가장 잘 잡음)
+  const geo = mesh.geometry as THREE.BufferGeometry | undefined;
+  if (geo?.attributes?.position) {
+    geo.computeBoundingBox();
+    const bb = geo.boundingBox;
+    if (bb) {
+      const size = new THREE.Vector3();
+      bb.getSize(size);
 
-  const march = (dir: THREE.Vector3) => {
-    let d = 0;
-    for (let i = 0; i < 40; i++) {
-      const p = hitPoint.clone().add(normal.clone().multiplyScalar(0.1)).addScaledVector(dir, d);
-      rc.set(p, backDir);
-      if (!rc.intersectObjects(rayTargets, true).some(h => h.object.uuid === target.uuid)) break;
-      d += 0.1;
+      // plane이면 두 축만 의미 있음. 보통 z는 두께(거의 0)
+      const axes = [size.x, size.y, size.z].sort((a, b) => b - a);
+      const wLocal = axes[0];
+      const hLocal = axes[1];
+
+      // ✅ 월드 스케일 반영
+      const s = new THREE.Vector3();
+      mesh.getWorldScale(s);
+
+      // local bbox는 mesh local, scale만 곱하면 충분
+      // (rotation은 bbox 축에 영향 없고 planeW/H 만들 때는 스칼라만 필요)
+      const w = wLocal * Math.max(s.x, s.y, s.z);
+      const h = hLocal * Math.max(s.x, s.y, s.z);
+      return { w, h };
     }
-    return d;
-  };
+  }
 
-  const leftD = march(right.clone().multiplyScalar(-1));
-  const rightD = march(right);
-  const upD = march(localUp);
-  const downD = march(localUp.clone().multiplyScalar(-1));
+  // 2) fallback: Box3(fromObject)
+  const box = new THREE.Box3().setFromObject(mesh);
+  const size = new THREE.Vector3();
+  box.getSize(size);
 
-  return {
-    w: leftD + rightD,
-    h: upD + downD,
-    offsetX: (rightD - leftD) / 2, // 가로 치우침 보정
-    offsetY: (upD - downD) / 2  // 세로 치우침 보정 (중앙 정렬 핵심)
-  };
+  const axes = [size.x, size.y, size.z].sort((a, b) => b - a);
+  return { w: axes[0], h: axes[1] };
 }
 
-export async function attachPanelArt(args: AttachArgs): Promise<AttachPanelArtResult> {
-  const epsilon = args.epsilon ?? 0.05; // 벽 안으로 박히지 않게 여유 공간 확보
-  const clickMeshes: THREE.Mesh[] = [];
-  const attached: AttachPanelArtResult["attached"] = [];
-  const missing: AttachPanelArtResult["missing"] = [];
+/** 텍스처 세팅: 지지직/모아레 줄이기 */
+function tuneTexture(tex: THREE.Texture) {
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
 
-  const raycaster = new THREE.Raycaster();
-  const rayTargets: THREE.Object3D[] = [];
-  args.sceneRoot.traverse(o => { if ((o as THREE.Mesh).isMesh && !isBadTarget(o)) rayTargets.push(o); });
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
 
-  for (let i = 0; i < Math.min(args.items.length, args.waypoints.length); i++) {
-    const item = args.items[i];
-    const wp = args.waypoints[i];
-    raycaster.set(new THREE.Vector3(...wp.pos), computeDirFromYawPitch(wp.yaw, wp.pitch));
-    const hits = raycaster.intersectObjects(rayTargets, true);
+  tex.anisotropy = 8;
+  tex.needsUpdate = true;
+}
 
-    if (!hits.length) { missing.push({ idx: i, title: item.title, reason: "no hit" }); continue; }
+export async function attachPanelArt(args: AttachPanelArtArgs): Promise<AttachPanelArtResult> {
+  const epsilon = args.epsilon ?? 0.06; // ✅ 살짝만 띄움 (너무 떠보이면 싫어함)
+  const fill = args.fill ?? 1.02;       // ✅ 프레임보다 살짝 크게 (빈 여백 제거)
+  const faceCamera = args.faceCamera ?? true;
+  const fixFlipY = args.fixFlipY ?? true;
 
-    const hit = hits[0];
-    const normal = getWorldNormalFromHit(hit);
-    const bounds = refinePanelBounds({ target: hit.object as THREE.Mesh, hitPoint: hit.point, normal, rayTargets });
+  const clickMeshes: THREE.Object3D[] = [];
+  const attached: Array<{ panel: string; meshName: string }> = [];
+  const missing: string[] = [];
 
-    const group = new THREE.Group();
-    group.name = `__ART_GROUP_${i}`;
-    
-    // 1. 위치 설정: 클릭 지점 + 패널 중심 편차 보정 + epsilon
-    const upVec = new THREE.Vector3(0, 1, 0);
-    const rightVec = new THREE.Vector3().crossVectors(upVec, normal).normalize();
-    const localUpVec = new THREE.Vector3().crossVectors(normal, rightVec).normalize();
-    
-    const centerPoint = hit.point.clone()
-      .addScaledVector(rightVec, bounds.offsetX)
-      .addScaledVector(localUpVec, bounds.offsetY)
-      .addScaledVector(normal, epsilon);
+  const texLoader = new THREE.TextureLoader();
 
-    group.position.copy(centerPoint);
-    // 2. 각도 설정: 법선 방향을 정확히 바라보게 (기울어짐 방지)
-    group.lookAt(centerPoint.clone().add(normal));
+  const textures = await Promise.all(
+    args.items.map(
+      (it) =>
+        new Promise<THREE.Texture>((resolve, reject) => {
+          texLoader.load(it.imageUrl, (tex) => resolve(tex), undefined, reject);
+        })
+    )
+  );
 
-    args.sceneRoot.add(group);
-    group.updateMatrixWorld();
-    hit.object.attach(group);
+  for (let i = 0; i < args.items.length; i++) {
+    const it = args.items[i];
+    const tex = textures[i];
 
-    // 3. 사진 및 이름표 생성 (크기 최적화)
-    const imgTex = await loadImageTexture(item.imageUrl);
-    const imgMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(bounds.w * 0.85, bounds.h * 0.6),
-      new THREE.MeshStandardMaterial({ 
-        map: imgTex, 
-        polygonOffset: true, polygonOffsetFactor: -10, polygonOffsetUnits: -10 // 벽 뚫고 나오게 강제
-      })
-    );
-    imgMesh.position.set(0, bounds.h * 0.05, 0); // 그룹 중앙에서 살짝 위로
-    imgMesh.userData.__title = item.title;
+    const panelObj = findByNameLoose(args.sceneRoot, it.panelName);
+    if (!panelObj) {
+      console.warn("[panelArt] panel not found:", it.panelName);
+      missing.push(it.panelName);
+      continue;
+    }
 
-    const nameMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(bounds.w * 0.45, bounds.h * 0.12),
-      new THREE.MeshBasicMaterial({ map: makeNameTexture(item.title), transparent: true, polygonOffset: true, polygonOffsetFactor: -11 })
-    );
-    nameMesh.position.set(0, -bounds.h * 0.35, 0.01);
+    const panelMesh = getFirstMesh(panelObj);
+    if (!panelMesh) {
+      console.warn("[panelArt] found but mesh missing:", it.panelName, "=>", panelObj.name);
+      missing.push(it.panelName);
+      continue;
+    }
 
-    group.add(imgMesh, nameMesh);
-    clickMeshes.push(imgMesh);
-    attached.push({ idx: i, title: item.title, targetName: hit.object.name, size: [bounds.w, bounds.h] });
+    // 패널 w/h (정확)
+    const { w: panelW, h: panelH } = estimatePanelWH(panelMesh);
+
+    // 정면 배치용 hit/normal
+    let placePoint: THREE.Vector3 | null = null;
+    let normalWorld: THREE.Vector3 | null = null;
+
+    if (faceCamera && args.camera) {
+      const hit = raycastFacing(panelMesh, args.camera);
+      if (hit) {
+        placePoint = hit.hitPoint;
+        normalWorld = hit.nWorld;
+      }
+    }
+
+    if (!placePoint || !normalWorld) {
+      const box = new THREE.Box3().setFromObject(panelMesh);
+      placePoint = new THREE.Vector3();
+      box.getCenter(placePoint);
+      normalWorld = new THREE.Vector3(0, 0, 1);
+    }
+
+    tuneTexture(tex);
+
+    // ✅ 상하 뒤집힘 보정
+    tex.flipY = fixFlipY ? true : false;
+    tex.needsUpdate = true;
+
+    // ✅ "패널에 꽉" (왜곡 허용, fill로 오버스캔)
+    const planeW = panelW * fill;
+    const planeH = panelH * fill;
+
+    const geo = new THREE.PlaneGeometry(planeW, planeH);
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      depthTest: true,
+      depthWrite: false,
+      toneMapped: false,
+      side: THREE.FrontSide,
+
+      polygonOffset: true,
+      polygonOffsetFactor: -4,
+      polygonOffsetUnits: -4,
+    });
+
+    const art = new THREE.Mesh(geo, mat);
+    art.name = `__ART_IMAGE__${it.panelName}`;
+    art.userData.__title = it.title;
+    art.userData.__panel = it.panelName;
+
+    art.quaternion.copy(quatFromNormal(normalWorld));
+    art.position.copy(placePoint).addScaledVector(normalWorld, epsilon);
+
+    art.renderOrder = 10;
+
+    args.sceneRoot.add(art);
+
+    clickMeshes.push(art);
+    attached.push({ panel: it.panelName, meshName: art.name });
   }
+
   return { clickMeshes, attached, missing };
 }

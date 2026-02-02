@@ -13,7 +13,6 @@ const KEY_USERS = "comet_mock_users_v1";
 type StoredUser = {
   memberUuid: string;
   name: string;
-  displayName?: string;
   email: string;
   password: string;
   role: UserRole;
@@ -46,11 +45,10 @@ function saveUsers(users: StoredUser[]) {
 
 function seedMockUsers() {
   const list = loadUsers();
-
-  const hasUser = list.some((u) => normEmail(u.email) === "user@test.com");
-  const hasArtist = list.some((u) => normEmail(u.email) === "artist@test.com");
-
   const next = [...list];
+
+  const hasUser = next.some((u) => normEmail(u.email) === "user@test.com");
+  const hasArtist = next.some((u) => normEmail(u.email) === "artist@test.com");
 
   if (!hasUser) {
     next.unshift({
@@ -58,7 +56,7 @@ function seedMockUsers() {
       name: "테스트유저",
       email: "user@test.com",
       password: "123456789",
-      role: "USER",
+      role: "general",
       createdAt: new Date().toISOString(),
     });
   }
@@ -67,10 +65,9 @@ function seedMockUsers() {
     next.unshift({
       memberUuid: "mock-artist-0001",
       name: "테스트예술가",
-      displayName: "artist",
       email: "artist@test.com",
       password: "123456789",
-      role: "ARTIST",
+      role: "artist",
       createdAt: new Date().toISOString(),
     });
   }
@@ -100,15 +97,12 @@ export async function checkEmailDupMock(email: string): Promise<{
 
   const e = email.trim();
   if (!e) return { available: false, reason: "이메일을 입력해주세요." };
-  if (!isEmailLike(e))
-    return { available: false, reason: "이메일 형식을 확인해주세요." };
+  if (!isEmailLike(e)) return { available: false, reason: "이메일 형식을 확인해주세요." };
 
   const exists = !!findUserByEmail(e);
   return {
     available: !exists,
-    reason: exists
-      ? "이미 사용 중인 이메일입니다."
-      : "사용 가능한 이메일입니다.",
+    reason: exists ? "이미 사용 중인 이메일입니다." : "사용 가능한 이메일입니다.",
   };
 }
 
@@ -116,69 +110,53 @@ export async function signupUserMock(payload: SignupUserRequest): Promise<void> 
   seedMockUsers();
   await sleep(300);
 
-  const email = payload.email.trim();
-
-  if (!isEmailLike(email)) throw new Error("이메일을 확인해주세요.");
+  if (!isEmailLike(payload.email)) throw new Error("이메일을 확인해주세요.");
+  if (!payload.password || payload.password.length < 8) throw new Error("비밀번호는 8자 이상 입력해주세요.");
   if (!payload.name.trim()) throw new Error("이름을 입력해주세요.");
+  if (!payload.nickname.trim()) throw new Error("닉네임을 입력해주세요.");
   if (!payload.phone.trim()) throw new Error("전화번호를 입력해주세요.");
-  if (payload.password.trim().length < 8)
-    throw new Error("비밀번호는 8자 이상 입력해주세요.");
-  if (payload.password !== payload.passwordConfirm)
-    throw new Error("비밀번호 확인이 일치하지 않습니다.");
-  if (!payload.agreements?.terms || !payload.agreements?.privacy) {
-    throw new Error("필수 약관에 동의해주세요.");
-  }
+  if (!payload.birth.trim()) throw new Error("생년월일을 입력해주세요.");
+  if (!payload.isAgree) throw new Error("약관에 동의해주세요.");
 
-  assertEmailUnique(email);
+  assertEmailUnique(payload.email);
 
   const list = loadUsers();
   list.push({
     memberUuid: uid("user"),
     name: payload.name.trim(),
-    email,
+    email: payload.email.trim(),
     password: payload.password,
-    role: "USER",
+    role: payload.role ?? "general",
     createdAt: new Date().toISOString(),
   });
   saveUsers(list);
 }
 
-export async function signupArtistMock(
-  payload: SignupArtistRequest,
-): Promise<void> {
+export async function signupArtistMock(payload: SignupArtistRequest): Promise<void> {
   seedMockUsers();
   await sleep(350);
 
-  const email = payload.email.trim();
-
-  if (!isEmailLike(email)) throw new Error("이메일을 확인해주세요.");
+  if (!isEmailLike(payload.email)) throw new Error("이메일을 확인해주세요.");
+  if (!payload.password || payload.password.length < 8) throw new Error("비밀번호는 8자 이상 입력해주세요.");
   if (!payload.name.trim()) throw new Error("이름을 입력해주세요.");
+  if (!payload.nickname.trim()) throw new Error("닉네임을 입력해주세요.");
   if (!payload.phone.trim()) throw new Error("전화번호를 입력해주세요.");
-  if (payload.password.trim().length < 8)
-    throw new Error("비밀번호는 8자 이상 입력해주세요.");
+  if (!payload.birth.trim()) throw new Error("생년월일을 입력해주세요.");
+  if (!payload.isAgree) throw new Error("약관에 동의해주세요.");
 
-  if (!payload.displayName?.trim())
-    throw new Error("성명(활동명)을 입력해주세요.");
-  if (!payload.artMain || !payload.artSub)
-    throw new Error("예술활동분야를 선택해주세요.");
-  if (!payload.birthYear) throw new Error("출생연도를 선택해주세요.");
+  if (!payload.fieldId) throw new Error("fieldId를 선택해주세요.");
+  if (!payload.debutYear) throw new Error("debutYear를 입력해주세요.");
+  if (!payload.genreId) throw new Error("genreId를 선택해주세요.");
 
-  if (payload.verified === "YES" && !payload.verifiedFile) {
-    throw new Error("예술활동증명 서류를 업로드해주세요.");
-  }
-  if (!payload.privacyConsent)
-    throw new Error("개인정보 수집·이용에 동의해주세요.");
-
-  assertEmailUnique(email);
+  assertEmailUnique(payload.email);
 
   const list = loadUsers();
   list.push({
     memberUuid: uid("artist"),
     name: payload.name.trim(),
-    displayName: payload.displayName?.trim(),
-    email,
+    email: payload.email.trim(),
     password: payload.password,
-    role: "ARTIST",
+    role: payload.role ?? "artist",
     createdAt: new Date().toISOString(),
   });
   saveUsers(list);
@@ -189,7 +167,6 @@ export async function loginMock(payload: LoginRequest): Promise<LoginResponse> {
   await sleep(250);
 
   const email = payload.email.trim();
-
   if (!isEmailLike(email) || !payload.password) {
     throw new Error("이메일 또는 비밀번호를 확인해주세요.");
   }
@@ -203,10 +180,6 @@ export async function loginMock(payload: LoginRequest): Promise<LoginResponse> {
 
   if (user.password !== payload.password) {
     throw new Error("이메일 또는 비밀번호를 확인해주세요.");
-  }
-
-  if (!user.memberUuid) {
-    throw new Error("로그인 데이터가 올바르지 않습니다.");
   }
 
   return {

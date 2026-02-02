@@ -1,11 +1,11 @@
 // FE/src/features/auth/types.ts
-export type UserRole = "USER" | "ARTIST";
+
+export type UserRole = "general" | "artist"; // FE 표준(라우터 guard와도 맞춤)
 
 export type LoginRequest = {
   email: string;
   password: string;
   role: UserRole;
-  remember?: boolean;
 };
 
 export type LoginResponse = {
@@ -16,33 +16,44 @@ export type LoginResponse = {
   name: string;
 };
 
+// ✅ 유저 회원가입(백엔드 DTO가 다르면 여기만 바꾸면 됨)
 export type SignupUserRequest = {
   email: string;
   password: string;
-  passwordConfirm: string;
   name: string;
+  nickname: string;
   phone: string;
-  agreements?: {
-    all?: boolean;
-    terms: boolean;
-    privacy: boolean;
-    marketing?: boolean;
-  };
+  birth: string; // "YYYY-MM-DD"
+  role: UserRole; // general 권장
+  isAgree: boolean;
 };
 
+// ✅ 예술인 회원가입(POST /member/artist/signup)
 export type SignupArtistRequest = {
   email: string;
   password: string;
   name: string;
+  nickname: string;
   phone: string;
+  birth: string; // "YYYY-MM-DD"
+  role: UserRole; // artist 권장 (Postman은 general로 찍혀있는데, 이건 백엔드랑 한 번 확인 권장)
+  isAgree: boolean;
 
-  displayName?: string;
-  artMain?: string;
-  artSub?: string;
-  birthYear?: number;
+  // ⚠️ document가 실제로 파일 업로드면 multipart로 갈 가능성 높음
+  // - 지금은 Postman에 "file" 문자열로만 찍혀있어, 일단 string | File 둘 다 수용
+  document?: string | File | null;
 
-  verified?: "YES" | "NO";
-  verifiedFile?: File | null;
+  fieldId: number;
+  debutYear: number;
+  genreId: number;
 
-  privacyConsent: boolean;
+  sns?: string;
+  affiliation?: string;
+  artIntroduction?: string;
+};
+
+// ✅ 이메일 중복체크(화면에서 쓰기 좋은 형태)
+export type EmailDupCheckResult = {
+  ok: boolean;
+  message: string;
 };

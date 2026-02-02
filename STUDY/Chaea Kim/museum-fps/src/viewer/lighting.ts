@@ -9,20 +9,20 @@ export function applyGalleryLighting(scene: THREE.Scene, renderer: THREE.WebGLRe
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-  // 전체 조명
-  const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+  // 낮은 앰비언트 — 어둡지만 완전히 검지는 않게
+  const ambient = new THREE.AmbientLight(0xd0e0f8, 0.85);
   scene.add(ambient);
 
-  // 천장에서 내려오는 간접광
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x999999, 0.8);
+  // 천장 간접광 — 위/아래 색 차이로 입체감
+  const hemi = new THREE.HemisphereLight(0xc8ddf0, 0x888888, 1.0);
   hemi.position.set(0, 200, 0);
   scene.add(hemi);
 
-  // 그림자용 디렉셔널 라이트
-  const sun = new THREE.DirectionalLight(0xffffff, 0.7);
-  sun.position.set(50, 300, 50);
-  sun.shadow.bias = -0.005;
-  sun.shadow.normalBias = 0.05;
+  // 메인 디렉셔널 — 강한 그림자로 3D 입체감
+  const sun = new THREE.DirectionalLight(0xe8f0ff, 2.2);
+  sun.position.set(30, 250, 60);
+  sun.shadow.bias = -0.003;
+  sun.shadow.normalBias = 0.04;
   sun.shadow.mapSize.set(4096, 4096);
   sun.shadow.camera.left = -500;
   sun.shadow.camera.right = 500;
@@ -33,7 +33,12 @@ export function applyGalleryLighting(scene: THREE.Scene, renderer: THREE.WebGLRe
   sun.castShadow = true;
   scene.add(sun);
 
-  scene.background = new THREE.Color("#e0e0e0");
+  // 보조광 — 반대편에서 약하게 비춰서 완전 검정 방지
+  const fill = new THREE.DirectionalLight(0xc0d8f0, 0.8);
+  fill.position.set(-40, 150, -30);
+  scene.add(fill);
+
+  scene.background = new THREE.Color("#d8d8d8");
 }
 
 export function controlLight(keyCode: string) {}
@@ -165,7 +170,7 @@ function showPanelModal(label: string) {
 
   const box = document.createElement("div");
   box.style.cssText =
-    "background:#fff;border-radius:12px;padding:40px 48px;text-align:center;font-family:system-ui,sans-serif;min-width:280px;";
+    "background:#fff;border-radius:12px;padding:40px 48px;text-align:center;font-family:MuseumClassic,system-ui,sans-serif;min-width:280px;";
 
   const title = document.createElement("h2");
   title.style.cssText = "margin:0 0 12px;font-size:22px;color:#222;";

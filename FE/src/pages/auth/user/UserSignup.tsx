@@ -9,7 +9,7 @@ import SignupPreviewCard from "./UserSignupPreviewCard";
 import StepConsent from "./UserStep2Consent";
 import { apiSignupUser } from "../../../features/auth/api";
 import { validateAccountStep, validateConsent, type AccountStepValue } from "../utils/validation";
-import { checkEmailDupMock } from "../utils/emailDupCheck";
+import { apiCheckEmailDup } from "../../../features/auth/api";
 
 export default function UserSignup({ onBack }: { onBack: () => void }) {
   const nav = useNavigate();
@@ -47,7 +47,7 @@ export default function UserSignup({ onBack }: { onBack: () => void }) {
     }
     setCheckingEmail(true);
     try {
-      const r = await checkEmailDupMock(email);
+      const r = await apiCheckEmailDup(email);
       setEmailChecked(r.ok);
       setEmailCheckMsg(r.message);
     } catch (e: any) {
@@ -80,13 +80,15 @@ export default function UserSignup({ onBack }: { onBack: () => void }) {
     setLoading(true);
     try {
       await apiSignupUser({
-        email: u1.email.trim(),
-        password: u1.password,
-        passwordConfirm: pw2,
-        name: u1.name.trim(),
-        phone: u1.phone.trim(),
-        agreements: { all: false, terms: true, privacy: true, marketing: false },
-      });
+       email: u1.email.trim(),
+       password: u1.password,
+       name: u1.name.trim(),
+       nickname: u1.name.trim(),      // ✅ 일단 name으로 대체 (닉네임 입력 UI 만들면 교체)
+       phone: u1.phone.trim(),
+       birth: "2000-01-01",           // ✅ TODO: UI에서 받도록 추가 권장
+       role: "general",
+       isAgree: privacyConsent,       // ✅ Step2 동의 여부 → isAgree 매핑
+     });
       nav("/login");
     } catch (err: any) {
       setError(err?.message ?? "회원가입에 실패했습니다.");

@@ -1,6 +1,6 @@
 // FE\src\pages\auth\artist\ArtistStep2Profile.tsx
 import type React from "react";
-import type { ArtistStep2 } from "../../../features/auth/types";
+import type { ArtistStep2 } from "./types";
 
 type Props = {
   value: ArtistStep2;

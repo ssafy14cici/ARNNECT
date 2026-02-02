@@ -1,40 +1,20 @@
 // FE/src/features/auth/api/index.ts
-import type {
-  LoginRequest,
-  LoginResponse,
-  SignupArtistRequest,
-  SignupUserRequest,
-} from "../types";
+import type { EmailDupCheckResult } from "../types";
 
-import {
-  checkEmailDupMock,
-  loginMock,
-  signupArtistMock,
-  signupUserMock,
-} from "./mock";
+import { signupUserMock, signupArtistMock, loginMock, checkEmailDupMock } from "./mock";
+import { signupUserReal, signupArtistReal, loginReal, checkEmailDupReal } from "./real";
 
-import {
-  checkEmailDupReal,
-  loginReal,
-  signupArtistReal,
-  signupUserReal,
-} from "./real";
+const USE_MOCK = String(import.meta.env.VITE_USE_MOCK).toLowerCase() === "true";
 
-// ✅ mock 모드: .env.development에 VITE_USE_MOCK=true 로 고정 추천
-const USE_MOCK = String(import.meta.env.VITE_USE_MOCK) === "true";
+export const apiSignupUser = USE_MOCK ? signupUserMock : signupUserReal;
+export const apiSignupArtist = USE_MOCK ? signupArtistMock : signupArtistReal;
+export const apiLogin = USE_MOCK ? loginMock : loginReal;
 
-export async function apiCheckEmailDup(email: string) {
-  return USE_MOCK ? checkEmailDupMock(email) : checkEmailDupReal(email);
-}
-
-export async function apiSignupUser(payload: SignupUserRequest) {
-  return USE_MOCK ? signupUserMock(payload) : signupUserReal(payload);
-}
-
-export async function apiSignupArtist(payload: SignupArtistRequest) {
-  return USE_MOCK ? signupArtistMock(payload) : signupArtistReal(payload);
-}
-
-export async function apiLogin(payload: LoginRequest): Promise<LoginResponse> {
-  return USE_MOCK ? loginMock(payload) : loginReal(payload);
+/** ✅ UI가 기대하는 { ok, message }로 통일 */
+export async function apiCheckEmailDup(email: string): Promise<EmailDupCheckResult> {
+  const r = USE_MOCK ? await checkEmailDupMock(email) : await checkEmailDupReal(email);
+  return {
+    ok: !!r.available,
+    message: r.reason ?? (r.available ? "사용 가능" : "사용 불가"),
+  };
 }

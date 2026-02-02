@@ -17,7 +17,6 @@ import Login from "../../pages/auth/Login";
 import Signup from "../../pages/auth/Signup";
 
 import Feed from "../../pages/feed/Feed";
-import FeedDetail from "../../pages/feed/FeedDetail";
 
 import Lounge from "../../pages/lounge/Lounge";
 import LoungeIndex from "../../pages/lounge/LoungeIndex";
@@ -35,6 +34,7 @@ import Portfolio from "../../pages/lounge/artist/Portfolio";
 import FanLetter from "../../pages/lounge/artist/FanLetter";
 import FanLetterCompose from "../../pages/fanLetter/FanLetterCompose";
 
+import PostDetail from "../../pages/posts/PostDetail";
 import PostCreate from "../../pages/posts/PostCreate";
 import PostCreateRedirect from "../../pages/posts/PostCreateRedirect";
 
