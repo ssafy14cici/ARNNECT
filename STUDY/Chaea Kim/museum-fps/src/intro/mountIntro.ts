@@ -367,11 +367,21 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     } catch {}
 
+    const HERO_FADE_START = 0.7; // 70% 지점부터 hero 텍스트 사라지기 시작
+
     const step = () => {
       if (!holding || entered) return;
 
       const p = Math.min((performance.now() - holdStart) / holdMs, 1);
       ui.setHoldProgress(p);
+
+      // hero 텍스트 페이드아웃 (0.7 → 1.0 구간에서 1→0)
+      if (p >= HERO_FADE_START) {
+        const fadeP = (p - HERO_FADE_START) / (1 - HERO_FADE_START); // 0→1
+        const op = Math.max(0, 1 - fadeP);
+        ui.heroMain.style.opacity = String(op);
+        ui.heroSub.style.opacity = String(op);
+      }
 
       if (p >= 1) {
         entered = true;
@@ -411,6 +421,10 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     holding = false;
     cancelAnimationFrame(holdRaf);
     ui.setHoldProgress(0);
+
+    // hero 텍스트 복원
+    ui.heroMain.style.opacity = "1";
+    ui.heroSub.style.opacity = "1";
   };
 
   ui.enterBtn.addEventListener("pointerdown", startHold);
