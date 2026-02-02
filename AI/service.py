@@ -1,164 +1,215 @@
+from __future__ import annotations
+
+from typing import Any, Dict
 import bentoml
-import torch
-import torch.nn.functional as F
 import numpy as np
-import os
-from pathlib import Path
-from typing import Dict, Any, List, Optional
-from pydantic import BaseModel
-from PIL import Image
+import json
+from pydantic import ValidationError
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 
-# model_defs.py 에서 정의한 클래스들 임포트
-from model_defs import VectorSASRec, TwoTowerAlign, ACT2IDX, ACTION_SET, load_item_vectors, ArtworkEmbedder
+from app.config import ServiceConfig
+from app.schemas import (
+    HealthResponse,
+    EmbedImageRequest,
+    EmbedArtworkResponse,  # 새로 만든 스키마 임포트
+    ArtistInfoRequest,
+    ArtistInfoResponse,
+    RecommendRequest,
+    RecommendResponse,
+    RecommendItem,
+)
+from app.clip_embedder import ClipImageEmbedder
+from app.chroma_store import ChromaStore
+from app.mapping_store import MappingStore
+from app.item_vector_table import ItemVectorTable
+from app.recommender import Recommender
 
-# 경로 설정
-DATA_PATH = Path("data/artwork_vector.json")
-SAS_CKPT = Path("checkpoints/BEST_SASRec_model.pth")
-TT_CKPT = Path("checkpoints/BEST_BestRecommend_model.pth")
 
-# --- 입력 데이터 정의 (Pydantic) ---
+# -------------------------
+# Auto-wrap Middleware
+# -------------------------
+class AutoWrapMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.method == "POST" and request.headers.get("content-type") == "application/json":
+            body = await request.body()
+            if body:
+                try:
+                    data = json.loads(body)
+                    if isinstance(data, dict) and "inputData" not in data:
+                        wrapped = {"inputData": data}
+                        request._body = json.dumps(wrapped).encode()
+                except:
+                    pass
+        
+        response = await call_next(request)
+        return response
 
-# 1. 추천 API용 입력 정의
-class LogItem(BaseModel):
-    artwork_id: str
-    timestamp: str
-
-class UserInput(BaseModel):
-    member_id: str
-    timestamp: List[LogItem]
-
-# 2. [수정] 임베딩 API용 입력 정의 (이미지 경로를 문자열로 받음)
-class EmbedInput(BaseModel):
-    image_path: str               # 이미지 파일의 절대 경로 또는 상대 경로
-    description: Optional[str] = "" # (선택) 텍스트 설명
-
-# --------------------------------
 
 @bentoml.service(
+    name="reco_service",
     resources={"cpu": "2"},
-    traffic={"timeout": 60}
+    traffic={"timeout": 300},
 )
-class RecommenderService:
-    def __init__(self):
-        # 1. 디바이스 설정
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Service running on: {self.device}")
+class RecoService:
+    def __init__(self) -> None:
+        self.cfg = ServiceConfig()
 
-        # 2. 아이템 벡터 로드
-        self.item_mat, self.a2i, self.i2a = load_item_vectors(DATA_PATH, expected_dim=512)
-        self.item_mat = self.item_mat.to(self.device)
-
-        # 3. 추천 모델 초기화 (num_actions=7)
-        self.sas_model = VectorSASRec(
-            clip_dim=512, hidden_dim=512, num_actions=7, 
-            n_layers=2, n_heads=4, dropout=0.1, maxlen=200
-        ).to(self.device)
-        self.tt_model = TwoTowerAlign(dim=512, dropout=0.1).to(self.device)
-
-        # 4. 체크포인트 로드
-        print("Loading checkpoints...")
-        sas_sd = torch.load(SAS_CKPT, map_location=self.device)
-        if "state_dict" in sas_sd: sas_sd = sas_sd["state_dict"]
-        self.sas_model.load_state_dict(sas_sd, strict=False)
-
-        tt_sd = torch.load(TT_CKPT, map_location=self.device)
-        if "two_tower_state_dict" in tt_sd: tt_sd = tt_sd["two_tower_state_dict"]
-        self.tt_model.load_state_dict(tt_sd, strict=False)
-
-        self.sas_model.eval()
-        self.tt_model.eval()
-
-        # 5. 아이템 임베딩 미리 계산
-        with torch.no_grad():
-            item_base_emb = self.sas_model.item_base(self.item_mat)
-            self.item_final = F.normalize(self.tt_model.item_proj(item_base_emb), dim=-1)
-
-        # 6. Artwork Embedder (OpenCLIP) 초기화
-        self.embedder = ArtworkEmbedder(self.device)
+        self.mapping = MappingStore(
+            piece_to_index_path=self.cfg.piece_to_index_path,
+            index_to_piece_path=self.cfg.index_to_piece_path,
+        )
         
-        print("All models initialized successfully.")
-
-    @bentoml.api
-    def recommend(self, input_data: UserInput) -> Dict[str, Any]:
-        """추천 API"""
-        user_log = input_data.model_dump()
-        maxlen = 200
-        member_id = user_log.get("member_id", "unknown")
-        actions = user_log.get("timestamp", [])
-
-        seq_items = []
-        seq_acts = []
-        valid_cnt = 0
-
-        for act in actions:
-            aid = act.get("artwork_id")
-            atype = act.get("timestamp")
-            
-            if aid not in self.a2i: continue
-            if atype not in ACTION_SET: continue
-                
-            idx = self.a2i[aid]
-            aidx = ACT2IDX[atype]
-            
-            seq_items.append(self.item_mat[idx])
-            seq_acts.append(aidx)
-            valid_cnt += 1
-            if valid_cnt >= maxlen: break
+        # [수정됨] ChromaDB 컬렉션 이름을 'artworkMetaData'로 설정
+        self.chroma = ChromaStore(
+            persist_dir=self.cfg.chroma_dir,
+            collection="artworkMetaData",
+        )
         
-        if valid_cnt == 0:
-            return {"member_id": member_id, "recommendations": []}
+        self.artist_chroma = ChromaStore(
+            persist_dir=self.cfg.chroma_dir,
+            collection="artists",
+        )
 
-        seq_items_tensor = torch.stack(seq_items).unsqueeze(0).to(self.device)
-        seq_acts_tensor = torch.tensor(seq_acts, dtype=torch.long).unsqueeze(0).to(self.device)
-        valid_len_tensor = torch.tensor([valid_cnt], dtype=torch.long).to(self.device)
+        item_table_path = self.cfg.artifacts_dir / "item_vectors.bin"
+        self.item_table = ItemVectorTable(
+            path=item_table_path,
+            num_items=self.cfg.num_items,
+            dim=self.cfg.d_model,
+        )
 
-        with torch.no_grad():
-            user_emb = self.sas_model(seq_items_tensor, seq_acts_tensor, valid_len_tensor)
-            user_final = self.tt_model.user_proj(user_emb)
-            user_final = F.normalize(user_final, dim=-1)
-            scores = (user_final @ self.item_final.t()).squeeze(0)
-            
-            k = 10
-            topk_scores, topk_indices = torch.topk(scores, k=k)
-            topk_indices = topk_indices.cpu().numpy()
-            topk_scores = topk_scores.cpu().numpy()
+        self.clip = ClipImageEmbedder(
+            model_name=self.cfg.clip_model_name,
+            device=self.cfg.device,
+        )
 
-        results = []
-        for rank, idx in enumerate(topk_indices):
-            if idx == 0: continue
-            results.append({
-                "rank": rank + 1,
-                "artwork_id": self.i2a[idx],
-                "score": float(topk_scores[rank])
-            })
+        self.recommender = Recommender(
+            device=self.cfg.device,
+            num_items=self.cfg.num_items,
+            max_len=self.cfg.max_len,
+            d_model=self.cfg.d_model,
+            n_heads=self.cfg.n_heads,
+            n_layers=self.cfg.n_layers,
+            ff_dim=self.cfg.ff_dim,
+            dropout=self.cfg.dropout,
+            num_actions=self.cfg.num_actions,
+            mapping=self.mapping,
+            chroma=self.chroma,
+            item_table=self.item_table,
+            sasrec_ckpt_path=self.cfg.sasrec_ckpt,
+            twotower_ckpt_path=self.cfg.twotower_ckpt,
+        )
 
-        return {"member_id": member_id, "recommendations": results}
+    @bentoml.mount_asgi_app(AutoWrapMiddleware)
+    def add_middleware(self):
+        pass
 
-    @bentoml.api
-    def embed_artwork(self, input_data: EmbedInput) -> Dict[str, Any]:
-        """
-        이미지 파일 경로를 입력받아 벡터를 반환하는 API
-        description은 선택사항.
-        """
-        image_path = input_data.image_path
-        description = input_data.description
-        
-        # 1. 파일 존재 여부 확인
-        if not os.path.exists(image_path):
-            # BentoML 예외 처리 또는 딕셔너리 반환
-            return {"error": f"File not found: {image_path}"}
-        
+    @bentoml.api(route="/health")
+    def health(self) -> HealthResponse:
+        return HealthResponse(
+            ok=True,
+            model_device=self.cfg.device,
+            clip_device=self.cfg.device,
+            num_items=self.cfg.num_items,
+            chroma_collection="artworkMetaData", # 상태 확인용 정보도 업데이트
+        )
+
+    # -------------------------
+    # [수정됨] /embed_artwork
+    # -------------------------
+    @bentoml.api(route="/embed_artwork")
+    def embed_artwork(self, inputData: Dict[str, Any]) -> EmbedArtworkResponse:
+        # 1. 입력 검증
         try:
-            # 2. 이미지 로드 (PIL)
-            image = Image.open(image_path).convert("RGB")
+            req = EmbedImageRequest.model_validate(inputData)
+        except ValidationError as e:
+            raise bentoml.exceptions.InvalidArgument(f"Invalid request format: {e}")
+
+        # 2. 이미지 벡터 생성 (Numpy Array)
+        try:
+            vec = self.clip.embed_image_path(req.imagePath)
         except Exception as e:
-            return {"error": f"Failed to open image: {str(e)}"}
-            
-        # 3. 임베딩 생성
-        vector = self.embedder.encode(image, description)
-        
-        return {
-            "image_path": image_path,
-            "vector": vector,
-            "dim": len(vector)
+            raise bentoml.exceptions.BentoMLException(f"Image load error: {e}")
+
+        # 3. 매핑 업데이트
+        try:
+            idx, is_new = self.mapping.get_or_add(req.artworkId)
+        except Exception as e:
+            raise bentoml.exceptions.BentoMLException(f"Mapping error: {e}")
+
+        # 4. ChromaDB 저장
+        metadata = {
+            "artistId": req.artistId,
+            "category": req.category
         }
+        try:
+            # [수정] 여기서는 vec(Numpy Array)를 그대로 넘겨줍니다. 
+            # ChromaStore 내부에서 알아서 변환하도록 되어 있습니다.
+            self.chroma.upsert(
+                artwork_id=req.artworkId,
+                embedding=vec, 
+                metadata=metadata,
+            )
+        except Exception as e:
+            raise bentoml.exceptions.BentoMLException(f"Chroma upsert error: {e}")
+
+        # 5. ItemVectorTable 업데이트
+        try:
+            # [수정] 여기도 Numpy Array 그대로 사용
+            self.item_table.upsert(idx, vec)
+        except Exception:
+            pass
+
+        # 6. 응답 반환
+        return EmbedArtworkResponse(
+            artworkId=req.artworkId,
+            artistId=req.artistId,
+            # [수정] 응답 내보낼 때만 1차원 리스트로 변환
+            artworkVector=vec.reshape(-1).tolist(),
+            category=req.category
+        )
+    
+    @bentoml.api(route="/isUnknown")
+    def is_unknown(self, inputData: Dict[str, Any]) -> ArtistInfoResponse:
+        try:
+            req = ArtistInfoRequest.model_validate(inputData)
+        except (ValidationError, TypeError) as e:
+            aid = inputData.get("artistId", "UNKNOWN")
+            return ArtistInfoResponse(ok=False, artistId=str(aid), error=f"Bad request: {e}")
+
+        dummy_vec = np.zeros(self.cfg.d_model, dtype=np.float32)
+        metadata = {"isUnknown": req.isUnknown}
+
+        try:
+            self.artist_chroma.upsert(
+                artwork_id=req.artistId,
+                embedding=dummy_vec,
+                metadata=metadata,
+            )
+        except Exception as e:
+            return ArtistInfoResponse(ok=False, artistId=req.artistId, error=f"Error: {e}")
+
+        return ArtistInfoResponse(ok=True, artistId=req.artistId)
+
+    @bentoml.api(route="/recommend")
+    def recommend(self, inputData: Dict[str, Any]) -> RecommendResponse:
+        try:
+            req = RecommendRequest.model_validate(inputData)
+        except (ValidationError, TypeError) as e:
+            mid = inputData.get("memberId", "UNKNOWN")
+            return RecommendResponse(memberId=str(mid), recommends=[])
+
+        logs_list = [{"artworkId": log.artworkId, "action": log.action} for log in req.logs]
+
+        result = self.recommender.recommend(
+            member_id=req.memberId,
+            logs=logs_list,
+            topk=50,
+        )
+
+        out_items = [
+            RecommendItem(rank=r["rank"], artworkId=str(r["artworkId"]))
+            for r in result.recommends
+        ]
+
+        return RecommendResponse(memberId=req.memberId, recommends=out_items)
