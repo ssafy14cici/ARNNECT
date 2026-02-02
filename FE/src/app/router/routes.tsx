@@ -1,4 +1,4 @@
-// src/app/router/routes.tsx
+// FE/src/app/router/routes.tsx
 import type { RouteObject } from "react-router-dom";
 import { Navigate, createBrowserRouter, redirect } from "react-router-dom";
 import { useAuthStore } from "../../features/auth/store";
@@ -32,6 +32,7 @@ import TicketQr from "../../pages/lounge/artist/qr/TicketQr";
 
 import Portfolio from "../../pages/lounge/artist/Portfolio";
 import FanLetter from "../../pages/lounge/artist/FanLetter";
+import FanLetterCompose from "../../pages/fanLetter/FanLetterCompose";
 
 import PostDetail from "../../pages/posts/PostDetail";
 import PostCreate from "../../pages/posts/PostCreate";
@@ -48,9 +49,7 @@ import NotFound from "../../pages/notfound/NotFound";
 import PrivacyPolicy from "../../pages/legal/PrivacyPolicy";
 import TermsOfService from "../../pages/legal/TermsOfService";
 
-
 const KEY_PREF_USED = "arnnect_pref_used_v1";
-
 const USE_MOCK = String(import.meta.env.VITE_USE_MOCK) === "true";
 
 function preferenceOnceLoader() {
@@ -62,16 +61,11 @@ function preferenceOnceLoader() {
   if (USE_MOCK) {
     const used = localStorage.getItem(KEY_PREF_USED) === "true";
     if (used) {
-      // 이미 사용했는데 로그인 안함 -> 로그인으로
       throw redirect("/login");
     }
   }
-
-  // real 모드에서는(백엔드 붙기 전) 일단 막지 않거나,
-  // 추후 백엔드에서 "이미 취향분석 완료" 판단해서 막는 식으로 확장
   return null;
 }
-
 
 export const routes: RouteObject[] = [
   {
@@ -88,12 +82,11 @@ export const routes: RouteObject[] = [
       { path: "login", element: <Login /> },
       { path: "signup", element: <Signup /> },
 
-      // ✅ Feed는 Public로 빼기
+      // ✅ Feed는 Public
       { path: "feed", element: <Feed /> },
 
       // ✅ Preference는 Public + loader로 1회 제한
       { path: "preference", element: <YourPreference />, loader: preferenceOnceLoader },
-
 
       // legal (canonical)
       { path: "legal/privacy", element: <PrivacyPolicy /> },
@@ -107,7 +100,6 @@ export const routes: RouteObject[] = [
       {
         element: <Guard requireAuth />,
         children: [
-
           /* Create entry (role에 따라 분기) */
           { path: "create", element: <PostCreateRedirect /> },
 
@@ -120,6 +112,7 @@ export const routes: RouteObject[] = [
                 element: <Guard requireRole="artist" />,
                 children: [{ index: true, element: <PostCreate mode="ARTIST" /> }],
               },
+              // ✅ 여기 param 이름이 routes에서는 artworkId
               { path: ":artworkId", element: <ArtworkDetail /> },
             ],
           },
@@ -155,37 +148,34 @@ export const routes: RouteObject[] = [
             ],
           },
 
-          /* Preference / Taste / Remind / Analysis */
+          /* Preference / Taste / Remind / Analysis (canonical) */
           { path: "taste", element: <Taste /> },
           { path: "remind", element: <Quiz /> },
           { path: "analysis", element: <Taste /> },
           { path: "analysis/total", element: <Taste /> }, // placeholder
 
-          /* Tickets */
+          /* Tickets (canonical) */
           {
             path: "tickets",
             children: [
-              // ✅ tickets/ : artist only -> QrEntry
+              // /tickets
               {
                 element: <Guard requireRole="artist" />,
                 children: [{ index: true, element: <QrEntry /> }],
               },
-
-              // ✅ tickets/issue : artist only -> TicketQr
+              // /tickets/issue
               {
                 path: "issue",
                 element: <Guard requireRole="artist" />,
                 children: [{ index: true, element: <TicketQr /> }],
               },
-
-              // ✅ tickets/scan: general only
+              // /tickets/scan
               {
                 path: "scan",
                 element: <Guard requireRole="general" />,
                 children: [{ index: true, element: <CollectBookScan /> }],
               },
-
-              // ✅ tickets/portfolio: artist only
+              // /tickets/portfolio
               {
                 path: "portfolio",
                 element: <Guard requireRole="artist" />,
@@ -194,8 +184,7 @@ export const routes: RouteObject[] = [
             ],
           },
 
-
-          /* CollectBook */
+          /* CollectBook (canonical) */
           {
             path: "collectbook",
             element: <Guard requireRole="general" />,
@@ -205,7 +194,7 @@ export const routes: RouteObject[] = [
             ],
           },
 
-          /* Fanletters */
+          /* Fanletters (canonical) */
           {
             path: "fanletters",
             element: <Guard requireRole="artist" />,
@@ -213,12 +202,10 @@ export const routes: RouteObject[] = [
           },
 
           /* -------------- Legacy routes (점진 이관) -------------- */
-          // ✅ 컴포넌트 대신 loader redirect로 처리 (Fast Refresh 룰 해결)
           {
             path: "profile/:id",
             loader: ({ params }) => redirect(`/members/${params.id ?? "me"}`),
           },
-
           {
             path: "posts",
             children: [
@@ -229,25 +216,68 @@ export const routes: RouteObject[] = [
             ],
           },
 
-          /* Lounge: UX 허브는 유지하되 canonical로 redirect */
+          /* ---------------- Lounge (B안: 내부 렌더링) ---------------- */
           {
             path: "lounge",
-            element: <Lounge />,
+            element: <Lounge />, // ✅ Lounge.tsx에 Outlet 필요
             children: [
               { index: true, element: <LoungeIndex /> },
 
-              { path: "collectbook", element: <Navigate to="/collectbook" replace /> },
-              { path: "collectbook/scan", element: <Navigate to="/tickets/scan" replace /> },
+              // ✅ general
+              {
+                path: "collectbook",
+                element: <Guard requireRole="general" />,
+                children: [{ index: true, element: <CollectBook /> }],
+              },
+              {
+                path: "collectbook/scan",
+                element: <Guard requireRole="general" />,
+                children: [{ index: true, element: <CollectBookScan /> }],
+              },
+              {
+                path: "collectbook/:id",
+                element: <Guard requireRole="general" />,
+                children: [{ index: true, element: <CollectBookDetail /> }],
+              },
+              {
+                path: "taste",
+                element: <Guard requireRole="general" />,
+                children: [{ index: true, element: <Taste /> }],
+              },
+              {
+                path: "quiz",
+                element: <Guard requireRole="general" />,
+                children: [{ index: true, element: <Quiz /> }],
+              },
 
-              { path: "taste", element: <Navigate to="/taste" replace /> },
-              { path: "quiz", element: <Navigate to="/remind" replace /> },
+              // ✅ artist
+              {
+                path: "ticket",
+                element: <Guard requireRole="artist" />,
+                children: [{ index: true, element: <QrEntry /> }],
+              },
+              {
+                path: "qr/issue",
+                element: <Guard requireRole="artist" />,
+                children: [{ index: true, element: <TicketQr /> }],
+              },
+              {
+                path: "portfolio",
+                element: <Guard requireRole="artist" />,
+                children: [{ index: true, element: <Portfolio /> }],
+              },
+              {
+                path: "fan-letter",
+                element: <Guard requireRole="artist" />,
+                children: [{ index: true, element: <FanLetter /> }],
+              },
 
-              { path: "ticket", element: <Navigate to="/tickets" replace /> },
-              { path: "portfolio", element: <Navigate to="/tickets/portfolio" replace /> },
-              { path: "fan-letter", element: <Navigate to="/fanletters" replace /> },
-              { path: "qr", element: <Navigate to="/tickets" replace /> },
-              { path: "qr/issue", element: <Navigate to="/tickets/issue" replace /> },
-
+              // ✅ fanletter compose (원하면 general로 제한)
+              {
+                path: "fanletters/compose/:id",
+                element: <Guard requireRole="general" />,
+                children: [{ index: true, element: <FanLetterCompose /> }],
+              },
             ],
           },
         ],

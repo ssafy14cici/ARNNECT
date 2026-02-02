@@ -1,10 +1,11 @@
 // FE/src/pages/fanLetter/FanLetterCompose.tsx
-
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuthStore } from "../../features/auth/store";
+
 import { artworks } from "../../features/artwork/data";
-import { findArtworkById, type ArtworkBase } from "../../features/artwork/helpers";
+import { findArtworkById, toArtworkNumericId, type ArtworkBase } from "../../features/artwork/helpers";
+
 import { sendFanLetter } from "../../features/fanLetter/api";
 
 import "./fanLetterCompose.css";
@@ -12,11 +13,19 @@ import "./fanLetterCompose.css";
 type LocationState = {
   artworkTitle?: string;
   artistName?: string;
+
+  // ✅ 정식 키
+  artistMemberUuid?: string;
+
+  // 레거시 fallback
   artistId?: string;
 };
 
 export default function FanLetterCompose() {
-  const { id } = useParams<{ id: string }>();
+  // ✅ 라우트 param 명이 id/artworkId 어느 쪽이든 커버
+  const params = useParams() as Record<string, string | undefined>;
+  const rawParamId = params.id ?? params.artworkId ?? "";
+
   const nav = useNavigate();
   const loc = useLocation();
   const state = (loc.state ?? {}) as LocationState;
@@ -25,7 +34,7 @@ export default function FanLetterCompose() {
   const role = useAuthStore((s) => s.role); // "general" | "artist" | null
 
   const ARTWORKS = artworks as unknown as readonly ArtworkBase[];
-  const baseArtwork = useMemo(() => findArtworkById(ARTWORKS, id), [ARTWORKS, id]);
+  const baseArtwork = useMemo(() => findArtworkById(ARTWORKS, rawParamId), [ARTWORKS, rawParamId]);
 
   const artworkTitle =
     state.artworkTitle ||
@@ -37,32 +46,58 @@ export default function FanLetterCompose() {
     (baseArtwork && ((baseArtwork.artist as string | undefined) || (baseArtwork.artistName as string | undefined))) ||
     "";
 
-  const artistId =
+  // ✅ FanLetterSendInput 필수: artistMemberUuid
+  const artistMemberUuid =
+    state.artistMemberUuid ||
+    (baseArtwork && ((baseArtwork.artistMemberUuid as string | undefined) || (baseArtwork.artistId as string | undefined))) ||
     state.artistId ||
-    (baseArtwork && (((baseArtwork as any).artistId as string | undefined) || ((baseArtwork as any).authorId as string | undefined))) ||
     "";
+
+  // ✅ FanLetterSendInput.artworkId는 number
+  const artworkIdNum = useMemo(() => {
+    return toArtworkNumericId(baseArtwork?.id ?? rawParamId);
+  }, [baseArtwork?.id, rawParamId]);
 
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
 
-  const canSend = Boolean(user?.memberUuid) && role === "general" && content.trim().length > 0;
+  const canSend =
+    Boolean(user?.memberUuid) &&
+    role === "general" &&
+    Boolean(artistMemberUuid) &&
+    Boolean(artworkIdNum) &&
+    content.trim().length > 0;
 
   const onSend = async () => {
-    if (!canSend) {
+    if (!user?.memberUuid || role !== "general") {
+      alert("일반 유저만 발송할 수 있습니다.");
+      return;
+    }
+    if (!artistMemberUuid) {
+      alert("작가 정보를 찾지 못했습니다.");
+      return;
+    }
+    if (!artworkIdNum) {
+      alert("작품 ID를 확인할 수 없습니다.");
+      return;
+    }
+    if (!content.trim()) {
       alert("내용을 입력해주세요.");
       return;
     }
+
     setSending(true);
     try {
       await sendFanLetter({
-        artworkId: String(baseArtwork?.id ?? id ?? ""),
-        artworkTitle,
-        artistId,
-        artistName,
-        senderId: user!.memberUuid,
-        senderName: user!.name,
-        content: content.trim(),
+        artistMemberUuid,           // ✅ 필수
+        artworkId: artworkIdNum,    // ✅ number
+        artworkTitle,              // 레거시 호환
+        artistName,                // 옵션 메타
+        senderId: user.memberUuid, // 옵션 메타
+        senderName: user.name,     // 레거시 호환
+        content: content.trim(),   // ✅ 필수
       });
+
       alert("팬레터가 발송되었습니다.");
       nav(-1);
     } catch (e) {
@@ -91,7 +126,7 @@ export default function FanLetterCompose() {
 
           <div className="fl-row">
             <label className="fl-label">To (Artist)</label>
-            <input className="fl-input" value={artistName} readOnly placeholder="(작가 정보 없음)" />
+            <input className="fl-input" value={artistName || artistMemberUuid} readOnly placeholder="(작가 정보 없음)" />
           </div>
 
           <div className="fl-row">

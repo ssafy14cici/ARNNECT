@@ -1,36 +1,34 @@
 // FE/src/pages/lounge/Lounge.tsx
 import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 import "./lounge.css";
 import { useAuthStore } from "../../features/auth/store";
 
 type Role = "general" | "artist";
 type TabKey = "collectbook" | "taste" | "quiz" | "ticket" | "portfolio" | "fan-letter";
+type Tab = { key: TabKey; title: string; desc: string; to: string };
 
 function normalizeRole(role: unknown): Role {
   if (role === "artist" || role === "ARTIST") return "artist";
   return "general";
 }
 
-type Tab = { key: TabKey; title: string; desc: string; to: string };
-
 export default function Lounge() {
   const rawRole = useAuthStore((s) => s.role);
   const role = normalizeRole(rawRole);
-  const nav = useNavigate();
 
-  // ✅ canonical 라우트로 바로 이동 (routes.tsx랑 일치)
+  // ✅ B안: 라운지 내부 라우트로만 이동(상대경로)
   const tabs: Tab[] = useMemo(() => {
     return role === "artist"
       ? [
-          { key: "ticket", title: "QR 티켓", desc: "티켓 발급/관리", to: "/tickets" },
-          { key: "portfolio", title: "포트폴리오", desc: "작가 정보/작품", to: "/tickets/portfolio" },
-          { key: "fan-letter", title: "팬레터", desc: "질문/답변", to: "/fanletters" },
+          { key: "ticket", title: "QR 티켓", desc: "티켓 발급/관리", to: "ticket" },
+          { key: "portfolio", title: "포트폴리오", desc: "작가 정보/작품", to: "portfolio" },
+          { key: "fan-letter", title: "팬레터", desc: "질문/답변", to: "fan-letter" },
         ]
       : [
-          { key: "collectbook", title: "컬렉트북", desc: "스캔한 티켓/작품 기록", to: "/collectbook" },
-          { key: "taste", title: "취향분석", desc: "선호/활동 기반 요약", to: "/taste" },
-          { key: "quiz", title: "퀴즈", desc: "작품/작가 기반 퀴즈", to: "/remind" },
+          { key: "collectbook", title: "컬렉트북", desc: "스캔한 티켓/작품 기록", to: "collectbook" },
+          { key: "taste", title: "취향분석", desc: "선호/활동 기반 요약", to: "taste" },
+          { key: "quiz", title: "퀴즈", desc: "작품/작가 기반 퀴즈", to: "quiz" },
         ];
   }, [role]);
 
@@ -47,17 +45,20 @@ export default function Lounge() {
 
         <div className="loungeTabs">
           {tabs.map((t) => (
-            <button
+            <NavLink
               key={t.key}
-              type="button"
-              className="loungeTabBtn"
-              onClick={() => nav(t.to)}
+              to={t.to}
+              end
+              className={({ isActive }) => `loungeTabBtn ${isActive ? "active" : ""}`}
             >
               <div className="loungeTabTitle">{t.title}</div>
               <div className="loungeTabDesc">{t.desc}</div>
-            </button>
+            </NavLink>
           ))}
         </div>
+
+        {/* ✅ B안 핵심: 라운지 내부에서 컨텐츠가 아래에 렌더링 */}
+        <Outlet />
       </section>
     </main>
   );

@@ -1,14 +1,20 @@
+// FE/src/pages/feed/Feed.tsx
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { FeedCard } from "../../features/feed/ui/FeedCard"; // 이동 가정
+import { FeedCard } from "../../features/feed/ui/FeedCard";
 import type { FeedFilterKey, FeedItem, ViewMode } from "../../features/feed/types";
 import { getFeedList } from "../../features/feed/api";
-import { subscribePostsUpdated } from "../../features/posts/api/mock"; // mock 모드에서만 동작해도 OK
+import { subscribePostsUpdated } from "../../features/posts/api/mock";
 import "./feed.css";
 
-const DETAIL_PATH = (id: string) => `/artworks/${id}`;
-const PROFILE_PATH = (authorId: string) => `/profile/${authorId}`;
+const DETAIL_PATH = (it: FeedItem) => {
+  if (it.id.startsWith("review-")) return `/reviews/${it.id.replace("review-", "")}`;
+  if (it.id.startsWith("artwork-")) return `/artworks/${it.id.replace("artwork-", "")}`;
+  return it.authorRole === "USER" ? `/reviews/${it.id}` : `/artworks/${it.id}`;
+};
+
+const PROFILE_PATH = (authorId: string) => `/members/${authorId}`;
 
 const FILTERS: Array<{ key: FeedFilterKey; label: string }> = [
   { key: "ALL", label: "All" },
@@ -45,7 +51,6 @@ export default function Feed() {
 
   useEffect(() => {
     refetch();
-    // mock 모드에서만 의미 있음: 글 작성하면 이벤트로 갱신
     const unsub = subscribePostsUpdated(() => refetch());
     return () => unsub?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -76,15 +81,21 @@ export default function Feed() {
 
   return (
     <div className="feedPage">
-      {/* 헤더/컨트롤 동일 */}
       <header className="feedHeader">
-        {/* ... */}
         <div className="feedControls">
           <div className="togglePill">
-            <button type="button" className={`pillBtn ${viewMode === "LIST" ? "active" : ""}`} onClick={() => setViewMode("LIST")}>
+            <button
+              type="button"
+              className={`pillBtn ${viewMode === "LIST" ? "active" : ""}`}
+              onClick={() => setViewMode("LIST")}
+            >
               List
             </button>
-            <button type="button" className={`pillBtn ${viewMode === "GRID" ? "active" : ""}`} onClick={() => setViewMode("GRID")}>
+            <button
+              type="button"
+              className={`pillBtn ${viewMode === "GRID" ? "active" : ""}`}
+              onClick={() => setViewMode("GRID")}
+            >
               Grid
             </button>
           </div>
@@ -110,7 +121,7 @@ export default function Feed() {
             key={it.id}
             feed={it}
             viewMode={viewMode}
-            onClick={() => navigate(DETAIL_PATH(it.id))}
+            onClick={() => navigate(DETAIL_PATH(it))}
             onAuthorClick={(e) => {
               e?.stopPropagation?.();
               navigate(PROFILE_PATH(it.authorId));

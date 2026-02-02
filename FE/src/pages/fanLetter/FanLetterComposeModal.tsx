@@ -3,7 +3,8 @@ import { useMemo, useState } from "react";
 import "./fanLetterComposeModal.css";
 
 import { useAuthStore } from "../../features/auth/store";
-import { sendFanLetter, type FanLetterCreateReq } from "../../features/fanLetter/api";
+import { sendFanLetter } from "../../features/fanLetter/api";
+import type { FanLetterSendInput } from "../../features/fanLetter/types";
 
 type Props = {
   open: boolean;
@@ -33,9 +34,10 @@ export default function FanLetterComposeModal({
     if (!open) return true;
     if (!isLoggedIn) return true;
     if (!artworkId) return true;
+    if (!artistMemberUuid) return true; // ✅ FanLetterSendInput 필수
     if (!content.trim()) return true;
     return false;
-  }, [open, isLoggedIn, artworkId, content]);
+  }, [open, isLoggedIn, artworkId, artistMemberUuid, content]);
 
   if (!open) return null;
 
@@ -46,25 +48,20 @@ export default function FanLetterComposeModal({
   };
 
   const onSend = async () => {
-    if (!isLoggedIn) {
-      alert("로그인 후 이용해주세요.");
-      return;
-    }
-    if (!artworkId) {
-      alert("작품 정보를 찾지 못했습니다.");
-      return;
-    }
+    if (!isLoggedIn) return alert("로그인 후 이용해주세요.");
+    if (!artworkId) return alert("작품 정보를 찾지 못했습니다.");
+    if (!artistMemberUuid) return alert("작가 정보를 찾지 못했습니다.");
 
     const senderId = user?.memberUuid ?? "";
     const senderName = user?.name ?? "익명";
 
-    const payload: FanLetterCreateReq = {
-      artworkId,
-      artworkTitle,
+    const payload: FanLetterSendInput = {
       artistMemberUuid,
-      artistName,
-      senderId,
-      senderName,
+      artworkId,
+      artworkTitle,            // 레거시 호환(→ artworkName)
+      artistName,              // mock 저장 메타(옵션)
+      senderId,                // mock 저장 메타(옵션)
+      senderName,              // 레거시 호환(→ fromNickname)
       content: content.trim(),
     };
 
@@ -101,7 +98,7 @@ export default function FanLetterComposeModal({
             <label className="flm-label">To</label>
             <input
               className="flm-input"
-              value={artistName ? artistName : artistMemberUuid ? `artist: ${artistMemberUuid}` : "Artist"}
+              value={artistName ? artistName : `artist: ${artistMemberUuid}`}
               readOnly
             />
           </div>

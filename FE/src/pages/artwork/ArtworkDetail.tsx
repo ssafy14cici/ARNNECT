@@ -15,11 +15,19 @@ import {
 } from "../../features/artwork/helpers";
 import { sendFanLetter } from "../../features/fanLetter/api";
 
-export const PROFILE_PATH = (authorId: string) => `/profile/${authorId}`;
+// ✅ canonical로 통일
+export const PROFILE_PATH = (authorId: string) => `/members/${authorId}`;
 
 export default function ArtworkDetail() {
-  const { id } = useParams<{ id: string }>();
+  // ✅ routes.tsx: /artworks/:artworkId 이므로 artworkId로 받아야 함
+  const { artworkId = "" } = useParams<{ artworkId: string }>();
   const navigate = useNavigate();
+
+  // ✅ 혹시 legacy로 /artworks/artwork-a1 같이 들어오면 정리
+  const normalizedArtworkId = useMemo(
+    () => artworkId.replace(/^artwork-/, ""),
+    [artworkId],
+  );
 
   const user = useAuthStore((s) => s.user);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
@@ -31,40 +39,48 @@ export default function ArtworkDetail() {
   const [isLoading, setIsLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
 
-  // ✅ FanLetter 모달 상태 (중복 선언 절대 금지)
+  // ✅ FanLetter 모달 상태
   const [fanLetterOpen, setFanLetterOpen] = useState(false);
   const [fanLetterSending, setFanLetterSending] = useState(false);
 
   const ARTWORKS = artworks as unknown as readonly ArtworkBase[];
 
-  const baseArtwork = useMemo(() => findArtworkById(ARTWORKS, id), [ARTWORKS, id]);
+  // ✅ id로 작품 찾기 (normalizedArtworkId 사용)
+  const baseArtwork = useMemo(
+    () => findArtworkById(ARTWORKS, normalizedArtworkId),
+    [ARTWORKS, normalizedArtworkId],
+  );
 
-  const artwork = useMemo(() => (baseArtwork ? getMockArtworkData(baseArtwork) : null), [baseArtwork]);
+  const artwork = useMemo(
+    () => (baseArtwork ? getMockArtworkData(baseArtwork) : null),
+    [baseArtwork],
+  );
 
   const similarArtworks = useMemo(() => {
-    if (!artwork) return [];
-    return ARTWORKS.filter((item) => item.id !== artwork.id).slice(0, 4);
-  }, [ARTWORKS, artwork]);
+    if (!baseArtwork) return [];
+    return ARTWORKS.filter((item) => String(item.id) !== String(baseArtwork.id)).slice(0, 4);
+  }, [ARTWORKS, baseArtwork]);
 
   const recommendArtworks = useMemo(() => ARTWORKS.slice(0, 4), [ARTWORKS]);
 
-  // ✅ numeric artwork id (FanLetter payload용) : null이면 undefined로 바꿔서 안전하게
+  // ✅ numeric artwork id (FanLetter payload용)
   const numericArtworkId = useMemo(() => {
-    const n = toArtworkNumericId(baseArtwork?.id ?? id);
+    const n = toArtworkNumericId(baseArtwork?.id ?? normalizedArtworkId);
     return n ?? undefined;
-  }, [baseArtwork?.id, id]);
+  }, [baseArtwork?.id, normalizedArtworkId]);
 
   useEffect(() => {
     setIsLoading(true);
     setImageError(false);
     const timer = setTimeout(() => setIsLoading(false), 300);
     return () => clearTimeout(timer);
-  }, [id]);
+  }, [normalizedArtworkId]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [id]);
+  }, [normalizedArtworkId]);
 
+  // ✅ 작품 없으면 홈으로 (지금 UI에서 Not Found를 보여주고 있으니 이건 취향)
   useEffect(() => {
     if (!isLoading && !artwork) {
       const timer = setTimeout(() => navigate("/", { replace: true }), 2000);
@@ -141,9 +157,9 @@ export default function ArtworkDetail() {
       alert("로그인 후 이용해주세요.");
       return;
     }
-    if (!artwork) return;
+    if (!artwork || !baseArtwork) return;
 
-    // ✅ artworkId: number로 보장 (null/undefined면 artwork.id로 fallback)
+    // ✅ artworkId: number로 보장
     const safeArtworkId =
       numericArtworkId ?? (typeof artwork.id === "number" ? artwork.id : Number(artwork.id));
 
@@ -152,9 +168,20 @@ export default function ArtworkDetail() {
       return;
     }
 
+    // ✅ FanLetterSendInput 필수 필드: artistMemberUuid
+    // data.ts에 추가했지만, ArtworkBase 타입에 없을 수 있어서 any로 안전 접근
+    const artistMemberUuid =
+      (baseArtwork as any)?.artistMemberUuid ?? (baseArtwork as any)?.artistId ?? "";
+
+    if (!artistMemberUuid) {
+      alert("작가 정보를 확인할 수 없습니다.");
+      return;
+    }
+
     setFanLetterSending(true);
     try {
       await sendFanLetter({
+        artistMemberUuid,            // ✅ 추가 (타입 에러 해결)
         artworkId: safeArtworkId,
         artworkTitle: artwork.title,
         artistName: artwork.artist,
@@ -174,7 +201,7 @@ export default function ArtworkDetail() {
   };
 
   const goHome = () => navigate("/");
-  const goArtwork = (artworkId: string) => navigate(`/artworks/${artworkId}`);
+  const goArtwork = (nextArtworkId: string) => navigate(`/artworks/${nextArtworkId}`);
 
   return (
     <ArtworkDetailView

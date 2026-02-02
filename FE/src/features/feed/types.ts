@@ -1,19 +1,21 @@
-// src/features/feed/types.ts (중복 타입 제거)
-
 export type FeedAuthorRole = "ARTIST" | "USER";
+export type FeedFilterKey = "ALL" | "ARTIST" | "USER";
+export type ViewMode = "GRID" | "LIST";
 
 export type FeedItem = {
-  id: string;
+  id: string;               // "artwork-12" | "review-5" | "img-1" 등
   authorRole: FeedAuthorRole;
+
   title: string;
   excerpt?: string;
+
   authorName: string;
   authorId: string;
-  createdAt: string;     // ISO
+
+  createdAt: string;        // ISO
   imageUrl?: string;
+
+  category?: string;
   likes: number;
   views: number;
 };
-
-export type FeedFilterKey = "ALL" | "ARTIST" | "USER";
-export type ViewMode = "GRID" | "LIST";
