@@ -52,18 +52,23 @@ type LogoAttachOptions = {
 export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {}) {
   const uiMount = opts.uiMount ?? document.body;
 
-  // ✅ 3D UI를 한 군데로 모으고, DevTools에서 쉽게 찾기 위한 헬퍼
+  // ✅ UI 스코프 표식 (exhibitRoom.ts와 동일 컨벤션)
+  const UI_SCOPE = "mainHallFree";
+  function markUi(el: HTMLElement) {
+    el.dataset.museumUi = "1";
+    el.dataset.museumUiScope = UI_SCOPE;
+  }
   function mountEl<T extends HTMLElement>(el: T, clickable = false): T {
-    el.dataset.museumUi = "1"; // 표식 (DevTools에서 검색)
+    markUi(el);
     if (clickable) el.style.pointerEvents = "auto";
     uiMount.appendChild(el);
     return el;
   }
-  const mountedStyleEls: HTMLStyleElement[] = [];
 
-  // ✅ style 태그도 표식 찍어서 붙임 (head 대신 uiMount로)
+  // ✅ head에 붙이는 style도 스코프 표식 + 추적
+  const mountedStyleEls: HTMLStyleElement[] = [];
   function mountStyle(styleEl: HTMLStyleElement): HTMLStyleElement {
-    styleEl.dataset.museumUi = "1";
+    markUi(styleEl);
     document.head.appendChild(styleEl);
     mountedStyleEls.push(styleEl);
     return styleEl;
@@ -162,20 +167,23 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   backBtn.style.transition = "transform 120ms ease, background 120ms ease, opacity 120ms ease";
   backBtn.style.opacity = "0.92";
 
-  backBtn.addEventListener("mouseenter", () => {
+  const onBackEnter = () => {
     backBtn.style.background = "rgba(0,0,0,0.48)";
     backBtn.style.transform = "translateX(-50%) scale(1.04)";
-  });
-  backBtn.addEventListener("mouseleave", () => {
+  };
+  const onBackLeave = () => {
     backBtn.style.background = "rgba(0,0,0,0.35)";
     backBtn.style.transform = "translateX(-50%) scale(1)";
-  });
+  };
+  backBtn.addEventListener("mouseenter", onBackEnter);
+  backBtn.addEventListener("mouseleave", onBackLeave);
 
   // pointer lock 방해 방지
-  backBtn.addEventListener("pointerdown", (e) => {
+  const onBackPointerDown = (e: PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-  });
+  };
+  backBtn.addEventListener("pointerdown", onBackPointerDown);
 
   mountEl(backBtn, true);
 
@@ -223,25 +231,34 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
     btn.textContent = side === "left" ? "‹" : "›";
 
-    btn.addEventListener("mouseenter", () => {
+    const onEnter = () => {
       btn.style.opacity = "0.98";
       btn.style.background = "rgba(0,0,0,0.42)";
       btn.style.border = "1px solid rgba(255,255,255,0.45)";
       btn.style.transform = "translateY(-50%) scale(1.06)";
-    });
-    btn.addEventListener("mouseleave", () => {
+    };
+    const onLeave = () => {
       btn.style.opacity = "0.72";
       btn.style.background = "rgba(0,0,0,0.28)";
       btn.style.border = "1px solid rgba(255,255,255,0.28)";
       btn.style.transform = "translateY(-50%) scale(1)";
-    });
+    };
+    btn.addEventListener("mouseenter", onEnter);
+    btn.addEventListener("mouseleave", onLeave);
 
-    btn.addEventListener("pointerdown", (e) => {
+    const onPtr = (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
-    });
+    };
+    btn.addEventListener("pointerdown", onPtr);
 
     mountEl(btn, true);
+
+    // destroy에서 제거할 수 있게 핸들러를 붙여둠
+    (btn as any).__onEnter = onEnter;
+    (btn as any).__onLeave = onLeave;
+    (btn as any).__onPtr = onPtr;
+
     return btn;
   }
 
@@ -331,13 +348,6 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     collisionRay.set(from, dir);
     collisionRay.far = dist + COLLISION_MARGIN;
     const hits = collisionRay.intersectObjects(colliders, true);
-    const hit = hits[0];
-    console.log("[HALL] hit", !!hit, hit?.object?.name, hit?.object?.userData);
-
-    // 디버그 필요하면 아래를 켜기
-    // const first = hits[0];
-    // console.log("[HALL] collision?", !!first, first?.object?.name, first?.distance);
-
     return hits.length === 0 || hits[0].distance > dist + COLLISION_MARGIN;
   }
 
@@ -372,12 +382,8 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     flashOverlay(mode === "NAV" ? `NAV ${currentId}` : "FREE");
 
     if (mode === "NAV" && controls.isLocked) controls.unlock();
-
     if (currentId === ORIGIN_ID) setBackBtnVisible(false);
-
-    if (mode !== "NAV") {
-      pointerT.set(0, 0);
-    }
+    if (mode !== "NAV") pointerT.set(0, 0);
   }
 
   function isColliderMesh(o: THREE.Object3D) {
@@ -472,6 +478,70 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     navigator.goTo(prev);
   }
 
+  // =========================
+  // Asset tracking (dispose)
+  // =========================
+  let alive = true;
+
+  const createdTextures = new Set<THREE.Texture>();
+  const createdMaterials = new Set<THREE.Material>();
+  const createdGeometries = new Set<THREE.BufferGeometry>();
+
+  function trackMaterial(m: THREE.Material) {
+    createdMaterials.add(m);
+  }
+  function trackGeometry(g: THREE.BufferGeometry) {
+    createdGeometries.add(g);
+  }
+  function trackTexture(t: THREE.Texture) {
+    createdTextures.add(t);
+  }
+
+  function collectMaterialTextures(mat: THREE.Material) {
+    const anyMat = mat as any;
+    const keys = [
+      "map",
+      "alphaMap",
+      "aoMap",
+      "bumpMap",
+      "displacementMap",
+      "emissiveMap",
+      "envMap",
+      "lightMap",
+      "metalnessMap",
+      "normalMap",
+      "roughnessMap",
+    ] as const;
+
+    for (const k of keys) {
+      const v = anyMat[k];
+      if (v && (v as THREE.Texture).isTexture) trackTexture(v as THREE.Texture);
+    }
+  }
+
+  function collectFromObject3D(root: THREE.Object3D) {
+    root.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+
+      if (m.geometry) trackGeometry(m.geometry);
+
+      const mat = m.material as THREE.Material | THREE.Material[] | undefined;
+      if (!mat) return;
+
+      if (Array.isArray(mat)) {
+        for (const mm of mat) {
+          if (!mm) continue;
+          trackMaterial(mm);
+          collectMaterialTextures(mm);
+        }
+      } else {
+        trackMaterial(mat);
+        collectMaterialTextures(mat);
+      }
+    });
+  }
+
   // Preload all art textures immediately
   const preloadedTextures = new Map<string, THREE.Texture>();
   const artTexturePromises: Promise<void>[] = [];
@@ -485,9 +555,33 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     { id: 6, anchorName: "ART_6", nameAnchor: "ART_6_NAME", artist: "김혜령", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a6.jpg` },
   ];
 
+  const texLoader = new THREE.TextureLoader();
+  async function loadTexture(url: string, flipV = true) {
+    const tex = await texLoader.loadAsync(url);
+    if (!alive) {
+      tex.dispose();
+      return tex;
+    }
+
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.flipY = false;
+
+    if (flipV) {
+      tex.wrapS = THREE.ClampToEdgeWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(1, -1);
+      tex.offset.set(0, 1);
+    }
+
+    tex.needsUpdate = true;
+    trackTexture(tex);
+    return tex;
+  }
+
   for (const item of ART_ITEMS) {
     const p = loadTexture(item.imageUrl, true)
       .then((tex) => {
+        if (!alive) return;
         preloadedTextures.set(item.imageUrl, tex);
       })
       .catch(() => {});
@@ -509,23 +603,6 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       if (o.name === targetName) found = o;
     });
     return found;
-  }
-
-  async function loadTexture(url: string, flipV = true) {
-    const tex = await new THREE.TextureLoader().loadAsync(url);
-    tex.colorSpace = THREE.SRGBColorSpace;
-
-    tex.flipY = false;
-
-    if (flipV) {
-      tex.wrapS = THREE.ClampToEdgeWrapping;
-      tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(1, -1);
-      tex.offset.set(0, 1);
-    }
-
-    tex.needsUpdate = true;
-    return tex;
   }
 
   function computeWorldPos(obj: THREE.Object3D) {
@@ -561,6 +638,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     return bestId;
   }
 
+  const spotlights: THREE.SpotLight[] = [];
   function addArtSpotlight(mesh: THREE.Mesh) {
     const pos = new THREE.Vector3();
     mesh.getWorldPosition(pos);
@@ -575,12 +653,18 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     spot.target.position.copy(pos);
     scene.add(spot);
     scene.add(spot.target);
+
+    spotlights.push(spot);
   }
 
   async function applyNameToPanel(mesh: THREE.Mesh, text: string) {
+    if (!alive) return;
+
     try {
       await document.fonts.load('500 36px "MuseumClassic"');
     } catch {}
+
+    if (!alive) return;
 
     const canvas2 = document.createElement("canvas");
     canvas2.width = 512;
@@ -603,24 +687,34 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     const tex = new THREE.CanvasTexture(canvas2);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.flipY = false;
+    trackTexture(tex);
 
-    mesh.material = new THREE.MeshStandardMaterial({
+    const mat = new THREE.MeshStandardMaterial({
       map: tex,
       roughness: 0.9,
       metalness: 0.0,
       side: THREE.DoubleSide,
     });
+    trackMaterial(mat);
+
+    mesh.material = mat;
   }
 
   async function attachToMeshPlane(planeMesh: THREE.Mesh, item: ArtworkItem) {
-    const tex = preloadedTextures.get(item.imageUrl) ?? (await loadTexture(item.imageUrl, true));
+    if (!alive) return;
 
-    planeMesh.material = new THREE.MeshStandardMaterial({
+    const tex = preloadedTextures.get(item.imageUrl) ?? (await loadTexture(item.imageUrl, true));
+    if (!alive) return;
+
+    const mat = new THREE.MeshStandardMaterial({
       map: tex,
       roughness: 0.9,
       metalness: 0.0,
       side: THREE.DoubleSide,
     });
+    trackMaterial(mat);
+
+    planeMesh.material = mat;
 
     const artPos = computeWorldPos(planeMesh);
 
@@ -641,6 +735,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     roughness: 1.0,
     metalness: 0.0,
   });
+  trackMaterial(SIDE_MAT);
 
   function paintArtSideFaces(parentObj: THREE.Object3D, artMesh: THREE.Mesh) {
     parentObj.traverse((o: THREE.Object3D) => {
@@ -649,8 +744,8 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       (o as THREE.Mesh).material = SIDE_MAT;
     });
 
-    const geo = artMesh.geometry;
-    if (geo.groups && geo.groups.length > 1) {
+    const geo = artMesh.geometry as any;
+    if (geo?.groups && geo.groups.length > 1) {
       const artMat = artMesh.material as THREE.Material;
       artMesh.material = [artMat, ...Array(geo.groups.length - 1).fill(SIDE_MAT)];
     }
@@ -660,6 +755,8 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     const missing: string[] = [];
 
     for (const item of ART_ITEMS) {
+      if (!alive) return;
+
       const obj = findObjectByName(root, item.anchorName);
       if (!obj) {
         missing.push(item.anchorName);
@@ -688,22 +785,20 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
         if (nameObj) {
           let nameMesh: THREE.Mesh | null = null;
           if ((nameObj as any).isMesh) nameMesh = nameObj as THREE.Mesh;
-          else
+          else {
             nameObj.traverse((o: THREE.Object3D) => {
               if (!nameMesh && (o as THREE.Mesh).isMesh) nameMesh = o as THREE.Mesh;
             });
-          if (nameMesh) {
-            await applyNameToPanel(nameMesh, `${item.artist} — ${item.artworkTitle}`);
-            console.log(`[art] name panel found: ${item.nameAnchor}`);
           }
-        } else {
-          console.warn(`[art] name panel not found: ${item.nameAnchor}`);
+          if (nameMesh) await applyNameToPanel(nameMesh, `${item.artist} — ${item.artworkTitle}`);
         }
       }
     }
 
     if (missing.length) console.warn("[art] missing planes:", missing);
   }
+
+  let logoMesh: THREE.Mesh | null = null;
 
   async function attachLogoToWall(root: THREE.Object3D) {
     const wall = findObjectByName(root, LOGO.wallName);
@@ -714,8 +809,11 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     const wallMesh = wall as THREE.Mesh;
 
     const tex = await loadTexture(LOGO.imageUrl, true);
+    if (!alive) return null;
 
     const logoGeo = new THREE.PlaneGeometry(LOGO.widthM, LOGO.heightM);
+    trackGeometry(logoGeo);
+
     const logoMat = new THREE.MeshStandardMaterial({
       map: tex,
       transparent: true,
@@ -723,6 +821,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       metalness: 0.0,
       side: THREE.DoubleSide,
     });
+    trackMaterial(logoMat);
 
     logoMat.polygonOffset = true;
     logoMat.polygonOffsetFactor = -3;
@@ -744,6 +843,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     logo.position.copy(wallPos).addScaledVector(nn, LOGO.offsetM);
 
     scene.add(logo);
+    logoMesh = logo;
     return logo;
   }
 
@@ -751,7 +851,6 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   const guidePointerEls: HTMLElement[] = [];
   let guidePointersAlive = true;
 
-  // ✅ pulse style (destroy에서 제거)
   const pulseStyle = document.createElement("style");
   pulseStyle.textContent = `@keyframes guidePulse{0%,100%{transform:scale(1);opacity:0.55}50%{transform:scale(1.3);opacity:0.9}}`;
   mountStyle(pulseStyle);
@@ -783,6 +882,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     const worldPos = new THREE.Vector3();
     function updatePointer() {
       if (!guidePointersAlive || !el.isConnected) return;
+
       obj.getWorldPosition(worldPos);
       const projected = worldPos.clone().project(camera);
       const hw = window.innerWidth / 2;
@@ -811,6 +911,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
   /* ===== GLB load + colliders + ART + LOGO ===== */
   const loader = new GLTFLoader();
+  let glbRoot: THREE.Object3D | null = null;
 
   const GUIDE_OBJECT_NAMES = ["reception_desk", "doent_Cat"];
   const guideClickMeshes: THREE.Mesh[] = [];
@@ -818,6 +919,13 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   loader.load(
     glbUrl,
     async (gltf) => {
+      if (!alive) {
+        // 로드가 늦게 끝난 경우: 바로 dispose하고 무시
+        collectFromObject3D(gltf.scene);
+        return;
+      }
+
+      glbRoot = gltf.scene;
       scene.add(gltf.scene);
 
       const tmp: THREE.Object3D[] = [];
@@ -842,8 +950,13 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       });
 
       await Promise.all(artTexturePromises);
+      if (!alive) return;
+
       await attachArtToPlanes(gltf.scene);
+      if (!alive) return;
+
       await attachLogoToWall(gltf.scene);
+      if (!alive) return;
 
       // ✅ 시작 waypoint로 이동
       try {
@@ -862,8 +975,6 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
         });
       }
 
-      console.log("[viewer] glb loaded. colliders:", colliders.length, "artClickable:", clickableArtMeshes.length, "guide:", guideClickMeshes.length);
-
       // guide pointers
       for (const gname of GUIDE_OBJECT_NAMES) {
         const gobj = findObjectByName(gltf.scene, gname);
@@ -872,6 +983,9 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       for (const artMesh of clickableArtMeshes) {
         createGuidePointer(artMesh, { mini: true });
       }
+
+      // GLB 내부 리소스 추적(한 번만)
+      collectFromObject3D(gltf.scene);
 
       opts.onReady?.();
     },
@@ -1017,18 +1131,20 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   window.addEventListener("keydown", onKeyDown, { passive: false } as any);
   window.addEventListener("keyup", onKeyUp);
 
-  navLeft.addEventListener("click", (e) => {
+  const onNavLeftClick = (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (mode !== "NAV") return;
     prevWaypoint();
-  });
-  navRight.addEventListener("click", (e) => {
+  };
+  const onNavRightClick = (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (mode !== "NAV") return;
     nextWaypoint();
-  });
+  };
+  navLeft.addEventListener("click", onNavLeftClick);
+  navRight.addEventListener("click", onNavRightClick);
 
   /* ===== Tutorial overlay ===== */
   const TUTORIAL_MESSAGES = [
@@ -1113,9 +1229,10 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
   /* ===== Art modal ===== */
   function showArtModal(payload: { artist: string; artworkTitle: string; artId?: number }) {
-    if (document.getElementById("art-modal")) return;
+    // ✅ uiMount 기준으로 중복 방지
+    if (uiMount.querySelector("#art-modal")) return;
 
-    // ✅ 혹시라도 pointer lock이 남아있으면 버튼 클릭이 씹힐 수 있어서 강제 해제
+    // ✅ pointer lock이 남아있으면 버튼 클릭이 씹힐 수 있어서 강제 해제
     if (controls.isLocked) controls.unlock();
     (document as any).exitPointerLock?.();
 
@@ -1141,15 +1258,12 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
     const exhibitBtn = document.createElement("button");
     exhibitBtn.type = "button";
-    exhibitBtn.style.cssText =
-      "background:#333;color:#fff;border:none;border-radius:8px;padding:10px 32px;font-size:15px;cursor:pointer;font-family:inherit;";
+    exhibitBtn.style.cssText = "background:#333;color:#fff;border:none;border-radius:8px;padding:10px 32px;font-size:15px;cursor:pointer;font-family:inherit;";
     exhibitBtn.textContent = "전시보러가기";
 
     const openExhibit = (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
-
-      console.log("[hall] exhibit button clicked", payload, "fromWaypoint:", currentId);
 
       overlay2.remove();
 
@@ -1167,8 +1281,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
-    closeBtn.style.cssText =
-      "background:transparent;color:#666;border:1px solid #ccc;border-radius:8px;padding:10px 32px;font-size:15px;cursor:pointer;font-family:inherit;";
+    closeBtn.style.cssText = "background:transparent;color:#666;border:1px solid #ccc;border-radius:8px;padding:10px 32px;font-size:15px;cursor:pointer;font-family:inherit;";
     closeBtn.textContent = "닫기";
     closeBtn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -1198,7 +1311,6 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     lastT = now;
 
     if (mode === "FREE") tickFree(dt);
-
     updateNavWobble(dt);
 
     if (returnPending) {
@@ -1227,6 +1339,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
   return {
     destroy() {
+      alive = false;
       loopAlive = false;
 
       if (controls.isLocked) controls.unlock();
@@ -1239,26 +1352,70 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       renderer.domElement.removeEventListener("pointerdown", onPointerDown);
 
       backBtn.removeEventListener("click", onBackClick);
+      backBtn.removeEventListener("mouseenter", onBackEnter);
+      backBtn.removeEventListener("mouseleave", onBackLeave);
+      backBtn.removeEventListener("pointerdown", onBackPointerDown);
+
+      navLeft.removeEventListener("click", onNavLeftClick);
+      navRight.removeEventListener("click", onNavRightClick);
+
+      // nav hover/pointerdown handlers
+      const nl: any = navLeft as any;
+      const nr: any = navRight as any;
+      if (nl.__onEnter) navLeft.removeEventListener("mouseenter", nl.__onEnter);
+      if (nl.__onLeave) navLeft.removeEventListener("mouseleave", nl.__onLeave);
+      if (nl.__onPtr) navLeft.removeEventListener("pointerdown", nl.__onPtr);
+      if (nr.__onEnter) navRight.removeEventListener("mouseenter", nr.__onEnter);
+      if (nr.__onLeave) navRight.removeEventListener("mouseleave", nr.__onLeave);
+      if (nr.__onPtr) navRight.removeEventListener("pointerdown", nr.__onPtr);
 
       if (overlayTimer) window.clearTimeout(overlayTimer);
 
-      // UI 제거
-      overlay.remove();
-      navLeft.remove();
-      navRight.remove();
-      backBtn.remove();
-
-      // tutorial/modal 남아있으면 제거
+      // tutorial/modal 남아있으면 제거 (uiMount 기준)
       uiMount.querySelector("#art-modal")?.remove();
       uiMount.querySelector("#tutorial-overlay")?.remove();
 
-      // pointer styles 제거
+      // guide pointer stop
       guidePointersAlive = false;
       for (const el of guidePointerEls) el.remove();
-      pulseStyle.remove();
 
-      // 혹시 남는 UI가 있으면 싹 정리(표식 기반)
-      uiMount.querySelectorAll('[data-museum-ui="mainHallFree"]').forEach((n) => n.remove());
+      // logo 제거
+      if (logoMesh) {
+        scene.remove(logoMesh);
+        logoMesh = null;
+      }
+
+      // spotlights 제거
+      for (const s of spotlights) {
+        scene.remove(s);
+        if (s.target) scene.remove(s.target);
+      }
+
+      // GLB root 제거
+      if (glbRoot) {
+        scene.remove(glbRoot);
+      }
+
+      // head style 제거
+      for (const s of mountedStyleEls) s.remove();
+      mountedStyleEls.length = 0;
+
+      // 스코프 표식 기반 UI 싹 정리 (uiMount + head)
+      uiMount.querySelectorAll(`[data-museum-ui="1"][data-museum-ui-scope="${UI_SCOPE}"]`).forEach((n) => n.remove());
+      document.head.querySelectorAll(`[data-museum-ui="1"][data-museum-ui-scope="${UI_SCOPE}"]`).forEach((n) => n.remove());
+
+      // 리소스 dispose (중복 방지 Set 기반)
+      for (const tex of createdTextures) tex.dispose();
+      createdTextures.clear();
+
+      for (const mat of createdMaterials) mat.dispose();
+      createdMaterials.clear();
+
+      for (const geo of createdGeometries) geo.dispose();
+      createdGeometries.clear();
+
+      preloadedTextures.clear();
+      glbRoot = null;
 
       renderer.dispose();
     },

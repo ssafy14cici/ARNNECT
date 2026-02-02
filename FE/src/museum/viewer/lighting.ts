@@ -4,6 +4,23 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass";
 
+/** uiMount를 실수로 안 넘겨도 museum uiLayer로 최대한 자동 귀속 */
+function resolveUiMount(uiMount?: HTMLElement): HTMLElement {
+  if (uiMount && uiMount !== document.body) return uiMount;
+
+  const layer =
+    document.querySelector<HTMLElement>("#museum-ui-layer") ||
+    document.querySelector<HTMLElement>('[data-museum-ui-layer="1"]');
+
+  return layer ?? (uiMount ?? document.body);
+}
+
+function markUi(el: HTMLElement, scope: string) {
+  el.dataset.museumUi = "1";
+  el.dataset.museumUiScope = scope;
+  return el;
+}
+
 export function applyGalleryLighting(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.6;
@@ -87,7 +104,6 @@ export function applyPanelArt(model: THREE.Group, arts: PanelArt[]) {
     const panel = model.getObjectByName(panelName) as THREE.Mesh | undefined;
     if (!panel) return;
 
-    // 캔버스에 사진 + 하단 이름 텍스트를 그림
     const canvas = document.createElement("canvas");
     const size = 1024;
     canvas.width = size;
@@ -99,17 +115,16 @@ export function applyPanelArt(model: THREE.Group, arts: PanelArt[]) {
     img.src = imageUrl;
 
     img.onload = () => {
-      // 배경 - 패널 색상
+      // 배경
       ctx.fillStyle = "#f0f0f0";
       ctx.fillRect(0, 0, size, size);
 
-      // 사진 영역 (상단 중앙 약 60%)
+      // 사진 영역
       const margin = 100;
       const imgAreaTop = margin;
       const imgAreaW = size - margin * 2;
       const imgAreaH = size * 0.6;
 
-      // 비율 유지하며 중앙 배치
       const scale = Math.min(imgAreaW / img.width, imgAreaH / img.height);
       const w = img.width * scale;
       const h = img.height * scale;
@@ -117,7 +132,7 @@ export function applyPanelArt(model: THREE.Group, arts: PanelArt[]) {
       const y = imgAreaTop + (imgAreaH - h) / 2;
       ctx.drawImage(img, x, y, w, h);
 
-      // 하단 이름 텍스트
+      // 하단 텍스트
       const textY = imgAreaTop + imgAreaH + 60;
       ctx.fillStyle = "#333333";
       ctx.font = "36px sans-serif";
@@ -134,20 +149,43 @@ export function applyPanelArt(model: THREE.Group, arts: PanelArt[]) {
         metalness: 0.0,
       });
     };
+
+    img.onerror = () => {
+      // 이미지 실패해도 패널이 깨지진 않게
+      ctx.fillStyle = "#f0f0f0";
+      ctx.fillRect(0, 0, size, size);
+      ctx.fillStyle = "#333";
+      ctx.font = "28px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, size / 2, size / 2);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+
+      panel.material = new THREE.MeshStandardMaterial({
+        map: tex,
+        roughness: 0.7,
+        metalness: 0.0,
+      });
+    };
   });
 }
 
 /**
  * 패널 클릭 시 모달 띄우기
- * - uiMount를 반드시 받아서 uiLayer로 붙이기
+ * - uiMount는 반드시 uiLayer로 (resolveUiMount로 방어)
+ * - 반환값(dispose)을 destroy에서 호출해야 이벤트 누수 없음
  */
 export function setupPanelClick(
   renderer: THREE.WebGLRenderer,
   camera: THREE.PerspectiveCamera,
   model: THREE.Group,
   arts: PanelArt[],
-  uiMount: HTMLElement = document.body,
+  uiMount?: HTMLElement,
 ) {
+  const mount = resolveUiMount(uiMount);
+
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
 
@@ -160,7 +198,7 @@ export function setupPanelClick(
   });
 
   const onClick = (e: MouseEvent) => {
-    // 모달 위에서 클릭한 건 여기로 내려오지 않게 (안전)
+    // 모달 위 클릭은 무시(안전)
     if ((e.target as HTMLElement | null)?.closest?.("#panel-modal")) return;
 
     const rect = renderer.domElement.getBoundingClientRect();
@@ -173,43 +211,43 @@ export function setupPanelClick(
     raycaster.setFromCamera(pointer, camera);
 
     const hits = raycaster.intersectObjects(panelMeshes, false);
-    if (hits.length === 0) return;
+    if (!hits.length) return;
 
     const hit = hits[0].object;
     const art = arts.find((a) => a.panelName === hit.name);
     if (!art) return;
 
-    showPanelModal(art.label, uiMount);
+    showPanelModal(art.label, mount);
   };
 
   renderer.domElement.addEventListener("click", onClick);
 
-  // destroy가 필요하면 호출부에서 removeEventListener 하도록 반환해도 됨
-  return () => renderer.domElement.removeEventListener("click", onClick);
+  // ✅ destroy에서 이 반환 함수를 호출해야 함
+  return () => {
+    renderer.domElement.removeEventListener("click", onClick);
+    // 모달이 열려있으면 닫아주기(선택)
+    mount.querySelector("#panel-modal")?.remove();
+  };
 }
 
-function showPanelModal(label: string, uiMount: HTMLElement = document.body) {
-  // uiMount 기준으로 중복 방지
+function showPanelModal(label: string, uiMount: HTMLElement) {
+  // uiMount 기준 중복 방지
   if (uiMount.querySelector("#panel-modal")) return;
 
-  const overlay = document.createElement("div");
+  const overlay = markUi(document.createElement("div"), "lighting");
   overlay.id = "panel-modal";
-  overlay.dataset.museumUi = "1";
-  overlay.dataset.museumUiScope = "lighting";
   overlay.style.cssText =
     "position:fixed;inset:0;background:rgba(0,0,0,0.6);" +
     "display:flex;align-items:center;justify-content:center;z-index:99999;" +
-    "pointer-events:auto;"; // ✅ uiLayer(pointer-events:none) 위에서도 클릭 가능
+    "pointer-events:auto;";
 
-  const box = document.createElement("div");
-  box.dataset.museumUi = "1";
-  box.dataset.museumUiScope = "lighting";
+  const box = markUi(document.createElement("div"), "lighting");
   box.style.cssText =
     "background:#fff;border-radius:12px;padding:40px 48px;text-align:center;" +
     "font-family:MuseumClassic,system-ui,sans-serif;min-width:280px;" +
     "pointer-events:auto;";
 
-  // ✅ 캔버스 쪽으로 이벤트 새는 거 방지
+  // 캔버스 쪽으로 이벤트 새는 거 방지
   overlay.addEventListener("pointerdown", (e) => e.stopPropagation());
   box.addEventListener("pointerdown", (e) => e.stopPropagation());
 
@@ -239,6 +277,7 @@ function showPanelModal(label: string, uiMount: HTMLElement = document.body) {
   box.append(title, desc, btn);
   overlay.appendChild(box);
 
+  // ✅ body 금지. uiMount로만.
   uiMount.appendChild(overlay);
 }
 
@@ -246,7 +285,8 @@ export function createComposer(scene: THREE.Scene, camera: THREE.PerspectiveCame
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
 
-  const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.05, 0.2, 0.98);
+  const rect = renderer.domElement.getBoundingClientRect();
+  const bloomPass = new UnrealBloomPass(new THREE.Vector2(rect.width, rect.height), 0.05, 0.2, 0.98);
   composer.addPass(bloomPass);
 
   return composer;

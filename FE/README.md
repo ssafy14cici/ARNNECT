@@ -567,4 +567,82 @@ git commit -m "FEAT: 프론트 초기 뼈대 구조 추가
 
 ```
 
+# Museum App 통합 규칙 (UI Layer / Scene Lifecycle)
+
+## 목적
+이 프로젝트는 씬 전환(인트로 → 홀 → 전시장 → 홀 → 외부)을 반복해도
+UI/이벤트/style 누수 없이 안정적으로 동작하도록 통합되어야 한다.
+
+특히 "3D 캔버스 + DOM UI"가 서로 다른 곳(document.body/head)에 흩어져 붙으면,
+씬 전환 후에도 이전 UI가 남거나 pointer lock / click 이벤트가 꼬이는 문제가 발생한다.
+
+---
+
+## 핵심 구조
+- 앱 레벨에서 `#museum-ui-layer`(uiLayer)를 만든다.
+- 이후 모든 씬(인트로/홀/전시장/exit overlay)의 DOM UI는 **반드시 uiMount(uiLayer)에만** 붙인다.
+- 씬이 종료될 때(runtime destroy/dispose) 해당 씬이 만든 UI는 스코프 표식을 기반으로 전부 제거한다.
+
+> 단, `<style>` 태그는 예외로 `document.head`에 붙인다.
+> 대신 반드시 스코프 표식 + destroy 시 제거를 보장한다.
+
+---
+
+## 공통 규칙 1: UI는 uiMount에만 append
+### ✅ OK
+- uiMount.appendChild(el)
+- mountEl(el) 래퍼 사용 (추천)
+
+### ❌ 금지
+- document.body.appendChild(...)
+- document.querySelector(...).appendChild(...) (uiMount가 아닌 곳)
+- body/head에 직접 UI 노드 붙이기
+
+---
+
+## 공통 규칙 2: 표식(dataset) 필수
+모든 씬 UI는 아래 dataset을 반드시 갖는다.
+
+- data-museum-ui="1"
+- data-museum-ui-scope="<scopeName>"
+
+예시:
+- intro: scope="intro"
+- mainHallFree: scope="mainHallFree"
+- exhibitRoom: scope="exhibitRoom"
+
+---
+
+## 공통 규칙 3: <style>은 head 허용 (단, 추적/정리 필수)
+CSS를 런타임으로 삽입해야 할 경우 `<style>` 태그는 head에 붙이는 것이 정상이다.
+
+### ✅ 허용 패턴
+- styleEl에 dataset 표식 추가
+- mountedStyleEls 배열로 추적
+- destroy에서 mountedStyleEls 전부 제거
+- (추가 안전장치) head에서 scope selector로 제거
+
+### ❌ 금지 패턴
+- head에 style append하고 추적/제거 안 함 (재진입 시 CSS 누수/중복)
+
+---
+
+## 추천 구현 패턴(템플릿)
+
+### UI 붙이기 (uiMount)
+```ts
+const UI_SCOPE = "exhibitRoom";
+
+function markUi<T extends HTMLElement>(el: T): T {
+  el.dataset.museumUi = "1";
+  el.dataset.museumUiScope = UI_SCOPE;
+  return el;
+}
+
+function mountEl<T extends HTMLElement>(el: T, uiMount: HTMLElement, clickable = false): T {
+  markUi(el);
+  if (clickable) el.style.pointerEvents = "auto";
+  uiMount.appendChild(el);
+  return el;
+}
 

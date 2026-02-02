@@ -219,9 +219,14 @@ export function mountMuseumApp(args: {
         exitUiDispose = mountExitOverlay({
           label: "Back to exterior",
           onExit: () => {
+            console.log("[APP] Exit overlay clicked -> startIntro() (no reload)");
             sessionStorage.setItem(SKIP_KEY, "1");
-            if (args.onExitToExterior) args.onExitToExterior();
-            else window.location.reload();
+            startIntro();
+            // if (args.onExitToExterior) {
+            //   args.onExitToExterior();   // 바깥 앱이 따로 exterior 라우팅/마운트 관리하면 이걸로
+            // } else {
+            //   startIntro();              // 기본은 intro로 돌아가기
+            // }
           },
           uiMount,
         });
