@@ -1,13 +1,16 @@
 package com.ssafy.arnnect.member.domain.entity;
+import com.ssafy.arnnect.member.application.dto.request.UpdateMemberRequest;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.util.Map;
 
 @Entity
 @Table(name = "member")
 @Getter
+@Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
@@ -40,8 +43,11 @@ public class Member {
     @Column(name = "nickname", nullable = false, length = 50)
     private String nickname;
 
-    @Column(name = "profile_image", length = 255) // 원본 이미지
-    private String profileImage;
+    @Column(name = "origin_profile_image_name", length = 255) // 원본 이미지 이름
+    private String originProfileImageName;
+
+    @Column(name = "saved_profile_image_name", length = 255) // 저장 이미지 이름
+    private String savedProfileImageName;
 
     // tinyint(1) -> Boolean 매핑
     @Column(name = "is_agree", nullable = false)
@@ -69,5 +75,20 @@ public class Member {
 
     public void encodePassword(String encoded){
         this.password = encoded;
+    }
+
+    public void updateNickname(String nickname){
+        if (nickname != null && !nickname.trim().isEmpty()) {
+            this.nickname = nickname;
+        }
+    }
+
+    public void updateProfileImage(Map<String, String> profileImageName){
+        this.savedProfileImageName = profileImageName.get("saved");
+        this.originProfileImageName = profileImageName.get("origin");
+    }
+
+    public void deleteMember(){
+        this.isDeleted = true;
     }
 }

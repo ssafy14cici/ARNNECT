@@ -5,8 +5,10 @@ import com.ssafy.arnnect.member.domain.entity.Member;
 import com.ssafy.arnnect.member.domain.entity.UserRole;
 import jakarta.validation.constraints.*;
 import lombok.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.UUID;
 
 @Getter
@@ -46,8 +48,6 @@ public class CreateArtistRequest {
     @NotNull(message = "약관 동의는 필수입니다.")
     private Boolean isAgree;
 
-    private String profileImage;
-
     // ===== ARTIST 추가 정보 (아티스트 전용) =====
     @Min(value = 1, message = "분야 ID는 1 이상이어야 합니다.")
     private Integer fieldId;  // art_field.field_id FK
@@ -61,8 +61,7 @@ public class CreateArtistRequest {
     @Size(max = 500)
     private String snsPage;
 
-    @Size(max = 255)
-    private String document;
+    private MultipartFile document;
 
     @Size(max = 50)
     private String affiliation;
@@ -72,7 +71,9 @@ public class CreateArtistRequest {
     @Size(max = 1000, message = "소개글은 1000자 이하로 작성해주세요.")
     private String introduction;
 
-    public Member toMemberEntity(){
+    MultipartFile image;
+
+    public Member toMemberEntity(Map<String, String> profileImageName){
         return Member.builder()
                 .memberUuid(String.valueOf(UUID.randomUUID()))
                 .role(UserRole.ARTIST)
@@ -83,16 +84,18 @@ public class CreateArtistRequest {
                 .birth(this.birth)
                 .nickname(this.nickname)
                 .isAgree(this.isAgree)
+                .originProfileImageName(profileImageName != null ? profileImageName.get("origin") : null)
+                .savedProfileImageName(profileImageName != null ? profileImageName.get("saved") : null)
                 .build();
     }
-    public Artist toArtistEntity(Member member){
+    public Artist toArtistEntity(Member member, String documentName){
         return Artist.builder()
                 .member(member)
                 .fieldId(this.fieldId)
                 .genreId(this.genreId)
                 .debutYear(this.debutYear)
                 .snsPage(this.snsPage)
-                .document(this.document)
+                .document(documentName)
                 .affiliation(this.affiliation)
                 .isNew(this.isNew)
                 .introduction(this.introduction)

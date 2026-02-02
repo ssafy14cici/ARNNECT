@@ -4,7 +4,9 @@ import com.ssafy.arnnect.member.domain.entity.Member;
 import com.ssafy.arnnect.member.domain.entity.UserRole;
 import jakarta.validation.constraints.*;
 import lombok.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Map;
 import java.util.UUID;
 
 @Getter
@@ -44,10 +46,9 @@ public class CreateMemberRequest {
     @NotNull(message = "이용약관 동의 여부는 필수 입력 항목입니다.")
     private Boolean isAgree;
 
-    // 선택사항
-    private String profileImage;
+    MultipartFile image;
 
-    public Member toMemberEntity(){
+    public Member toMemberEntity(Map<String, String> profileImageName){
         return Member.builder()
                 .memberUuid(String.valueOf(UUID.randomUUID()))
                 .role(UserRole.GENERAL)
@@ -58,6 +59,8 @@ public class CreateMemberRequest {
                 .birth(this.birth)
                 .nickname(this.nickname)
                 .isAgree(this.isAgree)
+                .originProfileImageName(profileImageName != null ? profileImageName.get("origin") : null)
+                .savedProfileImageName(profileImageName != null ? profileImageName.get("saved") : null)
                 .build();
     }
 

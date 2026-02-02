@@ -1,11 +1,13 @@
 package com.ssafy.arnnect.member.domain.entity;
 
+import com.ssafy.arnnect.member.application.dto.request.UpdateArtistRequest;
 import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
 @Table(name = "artist")
 @Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -48,5 +50,25 @@ public class Artist {
     @Column(name = "is_new")
     private Boolean isNew;
 
+    public void updateArtist(UpdateArtistRequest request){
+        if (request.getFieldId() != null) {
+            this.fieldId = request.getFieldId();
+        }
+        if (request.getGenreId() != null) {
+            this.genreId = request.getGenreId();
+        }
+        if (request.getDebutYear() != null) {
+            this.debutYear = request.getDebutYear();
+        }
+        if (request.getAffiliation() != null && !request.getAffiliation().trim().isEmpty()) {
+            this.affiliation = request.getAffiliation();
+        }
+        if (request.getSnsPage() != null && !request.getSnsPage().trim().isEmpty()) {
+            this.snsPage = request.getSnsPage();
+        }
+        if (request.getIntroduction() != null && !request.getIntroduction().trim().isEmpty()) {
+            this.introduction = request.getIntroduction();
+        }
+    }
 }
 
