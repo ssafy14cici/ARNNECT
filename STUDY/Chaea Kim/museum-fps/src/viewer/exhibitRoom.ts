@@ -330,10 +330,39 @@ export async function mountExhibitRoom(
     document.body.appendChild(overlay);
   }
 
+  /** EX_PANEL_N → 대응하는 viewpoint index 매핑 (pass-through 코너 건너뜀) */
+  const panelToViewpoint: Record<string, number> = {
+    EX_PANEL_1: 1, EX_PANEL_2: 2, EX_PANEL_3: 3,
+    EX_PANEL_4: 5, EX_PANEL_5: 6, EX_PANEL_6: 6,
+    EX_PANEL_7: 7, EX_PANEL_8: 7, EX_PANEL_9: 8,
+    EX_PANEL_10: 10, EX_PANEL_11: 11,
+  };
+
+  /** 카메라가 해당 viewpoint 근처에 있는지 판정하는 거리 임계값 */
+  const CLOSE_THRESHOLD = 1.5;
+
   const onCanvasPointerDown = (e: PointerEvent) => {
     if (fpsEnabled) return;
     const hit = raycastArt(e.clientX, e.clientY);
-    if (hit) showArtDetailModal(hit);
+    if (!hit) return;
+
+    const panel = hit.userData.__panelName ?? "";
+    const vpIdx = panelToViewpoint[panel];
+
+    if (vpIdx !== undefined) {
+      const vp = points[vpIdx];
+      const vpPos = new THREE.Vector3(vp.pos[0], vp.pos[1], vp.pos[2]);
+      const dist = camera.position.distanceTo(vpPos);
+
+      if (dist < CLOSE_THRESHOLD) {
+        // 이미 가까이 있으면 모달 표시
+        showArtDetailModal(hit);
+      } else {
+        // 멀면 viewpoint로 이동만
+        goTo(vpIdx, 0.85);
+        viewLabel.textContent = `VIEWPOINT ${vpIdx}`;
+      }
+    }
   };
   renderer.domElement.addEventListener("pointerdown", onCanvasPointerDown);
 
