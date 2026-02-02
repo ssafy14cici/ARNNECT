@@ -13,21 +13,14 @@ type Viewer = {
 type ViewerOpts = {
   exposure?: number;
   backgroundColor?: number;
-
-  /**
-   * ✅ 무광 블랙 전시장(레퍼런스 톤) 원하면 false가 정답
-   * RoomEnvironment는 검은 바닥/벽을 회색으로 띄우는 원흉임
-   */
+  /** HDR 없이도 PBR이 죽지 않게 (권장 true) */
   useProceduralEnvironment?: boolean;
 };
 
 export function createViewer(canvas: HTMLCanvasElement, opts: ViewerOpts = {}): Viewer {
-  // ✅ 레퍼런스 같은 다크 톤 기본값
-  const exposure = opts.exposure ?? 0.9;
-  const backgroundColor = opts.backgroundColor ?? 0x0b0b0b;
-
-  // ✅ 기본 false: 환경광(바운스) 제거 -> 블랙이 회색으로 뜨는 것 방지
-  const useProceduralEnvironment = opts.useProceduralEnvironment ?? false;
+  const exposure = opts.exposure ?? 1.0; // ✅ 기본을 밝게
+  const backgroundColor = opts.backgroundColor ?? 0xf2f2f2;
+  const useProceduralEnvironment = opts.useProceduralEnvironment ?? true;
 
   const renderer = new THREE.WebGLRenderer({
     canvas,
@@ -51,7 +44,7 @@ export function createViewer(canvas: HTMLCanvasElement, opts: ViewerOpts = {}): 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(backgroundColor);
 
-  // ✅ 환경광은 기본 OFF (무광 블랙 목표)
+  // ✅ HDR 없이도 재질(표준/피지컬) “회색 플라스틱” 방지
   if (useProceduralEnvironment) {
     const pmrem = new THREE.PMREMGenerator(renderer);
     const envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
@@ -72,16 +65,15 @@ export function createViewer(canvas: HTMLCanvasElement, opts: ViewerOpts = {}): 
   controls.maxDistance = 80;
 
   /* =========================
-   * Lights (Dark gallery)
+   * Lights (HDR 없이도 따뜻하게)
    * ========================= */
 
-  // ✅ 바닥/벽이 회색으로 뜨는 원인은 “바운스성 조명”이 많아서임
-  // Ambient/Hemisphere를 극도로 약하게
-  scene.add(new THREE.AmbientLight(0xffffff, 0.01));
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x000000, 0.05));
+  // 베이스는 약하게(과하면 평면 됨)
+  scene.add(new THREE.AmbientLight(0xffffff, 0.08));
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xd9d9d9, 0.35));
 
-  // ✅ Key light(스포트/키) 느낌: 강도 낮게
-  const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+  // ✅ 태양광: 따뜻한 색 + 그림자 ON
+  const sun = new THREE.DirectionalLight(0xfff2dc, 3.2);
   sun.position.set(12, 18, 6);
   sun.castShadow = true;
 
@@ -98,8 +90,8 @@ export function createViewer(canvas: HTMLCanvasElement, opts: ViewerOpts = {}): 
 
   scene.add(sun);
 
-  // ✅ Fill: 대비만 조금 풀기
-  const fill = new THREE.DirectionalLight(0xffffff, 0.15);
+  // 보조광(대비 완화)
+  const fill = new THREE.DirectionalLight(0xffffff, 0.45);
   fill.position.set(-10, 8, -6);
   fill.castShadow = false;
   scene.add(fill);
