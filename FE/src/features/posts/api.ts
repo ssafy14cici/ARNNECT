@@ -1,6 +1,6 @@
 // FE/src/features/posts/api.ts
 import { http } from "../../shared/api/http";
-import { createPost, setMe, type PostRole } from "./api/mockData";
+import { createPost, setMe, type PostRole } from "./api/mock";
 
 const USE_MOCK = String(import.meta.env.VITE_USE_MOCK) === "true";
 

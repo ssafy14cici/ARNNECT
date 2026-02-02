@@ -1,4 +1,3 @@
-// FE/src/pages/profile/tabs/FeedTab.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 
@@ -15,7 +14,6 @@ type GridItem = {
   createdAt: string;
 };
 
-// listPostsByAuthor가 반환하는 “최소 형태”만 안전하게 정의
 type PostLike = {
   id: string | number;
   imageUrl?: string | null;
@@ -24,7 +22,6 @@ type PostLike = {
 
 function toPostLikes(value: unknown): PostLike[] {
   if (!Array.isArray(value)) return [];
-  // unknown[] -> PostLike[] 로 “안전”하게 변환
   return value
     .map((v) => (typeof v === "object" && v !== null ? (v as Partial<PostLike>) : null))
     .filter((v): v is Partial<PostLike> => Boolean(v))
@@ -38,11 +35,11 @@ function toPostLikes(value: unknown): PostLike[] {
 
 export default function FeedTab() {
   const nav = useNavigate();
-  const { id } = useParams();
+  const { memberUuid } = useParams(); // ✅ routes.tsx: ":memberUuid"
   const { profile } = useOutletContext<ProfileOutletContext>();
 
   const authUser = useAuthStore((s) => s.user);
-  const rawProfileId = id ?? "";
+  const rawProfileId = memberUuid ?? "";
 
   const effectiveProfileId = useMemo(() => {
     if (!rawProfileId) return "";
@@ -56,8 +53,6 @@ export default function FeedTab() {
   );
 
   const [items, setItems] = useState<GridItem[]>([]);
-
-  // 최신 로드 함수를 ref에 넣어두고, subscribe 콜백에서 호출
   const loadRef = useRef<() => void>(() => {});
 
   useEffect(() => {
@@ -82,15 +77,11 @@ export default function FeedTab() {
       setItems(next);
     };
 
-    // 프로필/모드 바뀌면 즉시 1회 로드
     loadRef.current();
   }, [effectiveProfileId, mode]);
 
   useEffect(() => {
-    const unsub = subscribePostsUpdated(() => {
-      loadRef.current();
-    });
-
+    const unsub = subscribePostsUpdated(() => loadRef.current());
     return () => {
       if (typeof unsub === "function") unsub();
     };
@@ -105,12 +96,7 @@ export default function FeedTab() {
     <div className="tab-container">
       <div className="tab-grid-3">
         {items.map((it) => (
-          <button
-            key={it.id}
-            type="button"
-            className="feed-item-btn"
-            onClick={() => goDetail(it.id)}
-          >
+          <button key={it.id} type="button" className="feed-item-btn" onClick={() => goDetail(it.id)}>
             <img
               src={it.imageUrl}
               alt=""

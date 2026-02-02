@@ -1,4 +1,3 @@
-// FE/src/pages/profile/Profile.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import ProfileHeader from "./components/ProfileHeader";
@@ -13,10 +12,11 @@ export type ProfileOutletContext = {
 };
 
 export default function Profile() {
-  const { id } = useParams(); // "me" | uuid
-  const profileId = id ?? "";
+  const { memberUuid } = useParams(); // ✅ routes.tsx: ":memberUuid"
+  const profileId = memberUuid ?? "";
 
   const authUser = useAuthStore((s) => s.user); // { memberUuid, name } | null
+
   const isOwner = useMemo(() => {
     if (profileId === "me") return true;
     if (!profileId) return false;
@@ -41,7 +41,7 @@ export default function Profile() {
       try {
         if (!profileId) throw new Error("프로필 ID가 없습니다.");
 
-        // ✅ 내 프로필은 API에서 직접 가져오기
+        // ✅ 내 프로필
         if (profileId === "me") {
           const p = await profileApi.getMyProfile();
           if (cancelled || reqSeq.current !== mySeq) return;
@@ -49,7 +49,7 @@ export default function Profile() {
           return;
         }
 
-        // ✅ 타인 프로필: artist → 실패 시 user fallback (UI 코드 유지)
+        // ✅ 타인 프로필: artist → 실패 시 user fallback
         try {
           const a = await profileApi.getArtistProfile(profileId);
           if (cancelled || reqSeq.current !== mySeq) return;
@@ -63,10 +63,10 @@ export default function Profile() {
         if (cancelled || reqSeq.current !== mySeq) return;
         setError(e instanceof Error ? e.message : "프로필 로딩 실패");
       } finally {
-        if (cancelled || reqSeq.current !== mySeq) {
+        // ✅ 핵심: 정상 케이스에서 loading을 반드시 false로
+        if (!cancelled && reqSeq.current === mySeq) {
           setLoading(false);
         }
-        
       }
     })();
 

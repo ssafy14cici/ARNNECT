@@ -1,4 +1,4 @@
-// FE/src/pages/lounge/user/CollectBookScan.tsx
+// FE/src/pages/lounge/user/collectbook/CollectBookScan.tsx
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
@@ -7,12 +7,7 @@ import { NotFoundException } from "@zxing/library";
 import "../../lounge.css";
 import { addCollectBookItem } from "../../../../features/collectbook/storage";
 import { getExhibitionByCode, redeemTicket } from "../../../../features/tickets/api";
-
-// TODO(BE 연동):
-// - redeemTicket은 의미상 collectbook 도메인이라 api/collectbook.ts로 옮기는 게 깔끔함.
-// - 백엔드가 붙으면 "서버에 등록 성공" 후 서버가 준 collect_book_id로 상세 이동하는 흐름이 정석.
-//   (지금처럼 localStorage에 addCollectBookItem 하는 건 mock/오프라인 캐시 용도로만 유지)
-
+import { useAuthStore } from "../../../../features/auth/store"; // ✅ 추가
 
 type Step = "scan" | "preview";
 type Visibility = "private" | "public";
@@ -39,12 +34,10 @@ function todayYYYYMMDD() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-// ✅ JSON / URL / key 변형까지 대응
 function extractTicketCode(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
 
-  // 1) JSON: {"ticket_code": "..."} or {"ticketCode": "..."} or {"code": "..."}
   try {
     const parsed = JSON.parse(trimmed) as unknown;
     if (parsed && typeof parsed === "object") {
@@ -55,11 +48,8 @@ function extractTicketCode(raw: string): string | null {
         (typeof obj.code === "string" && obj.code);
       if (v) return v.trim();
     }
-  } catch {
-    // ignore
-  }
+  } catch {}
 
-  // 2) URL: ...?ticket_code=xxx / ticketCode=xxx / code=xxx
   try {
     const url = new URL(trimmed);
     const v =
@@ -67,17 +57,13 @@ function extractTicketCode(raw: string): string | null {
       url.searchParams.get("ticketCode") ||
       url.searchParams.get("code");
     if (v) return v.trim();
-  } catch {
-    // ignore
-  }
+  } catch {}
 
-  // 3) pattern: ticket_code: xxx / ticketCode=xxx / code=xxx
   const m =
     trimmed.match(/ticket[_-]?code\s*[:=]\s*([A-Za-z0-9_-]+)/i) ||
     trimmed.match(/code\s*[:=]\s*([A-Za-z0-9_-]+)/i);
   if (m?.[1]) return m[1].trim();
 
-  // 4) fallback: 그냥 문자열
   return trimmed;
 }
 
@@ -88,12 +74,6 @@ function getErrorMessage(e: unknown, fallback: string) {
 }
 
 function normalizeExhibition(data: unknown): Exhibition | null {
-  // TODO(BE 연동 - 이미지):
-  // 등록 시 이미지를 "파일 업로드"로 보내더라도,
-  // 조회 시에는 FE가 <img src="...">로 그릴 수 있는 값이 필요함.
-  // - (권장) BE 응답에 posterUrl/imageUrl(접근 가능한 URL) 제공
-  // - 또는 imageId를 주고, GET /files/:id 같은 다운로드 엔드포인트를 제공 → FE에서 URL로 변환 필요
-
   if (!data || typeof data !== "object") return null;
 
   const obj = data as Record<string, unknown>;
@@ -112,9 +92,10 @@ export default function CollectBookScan() {
   const nav = useNavigate();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
-
-  // ✅ 스캔 중 중복 트리거 방지(같은 화면에서 계속 QR 잡힐 때)
   const lockedRef = useRef(false);
+
+  // ✅ 로그인 유저 UUID (ownerUuid로 저장)
+  const ownerUuid = useAuthStore((s) => s.user?.memberUuid ?? "");
 
   const [step, setStep] = useState<Step>("scan");
   const [error, setError] = useState("");
@@ -133,8 +114,8 @@ export default function CollectBookScan() {
   const [scannerReady, setScannerReady] = useState(false);
   const [loadingExhibition, setLoadingExhibition] = useState(false);
 
-  // ✅ 전시 조회 실패해도 등록은 가능하도록(티켓코드만 있으면 됨)
-  const canRegister = useMemo(() => !!ticketCode && !busy, [ticketCode, busy]);
+  // ✅ ownerUuid까지 있어야 로컬 저장 가능
+  const canRegister = useMemo(() => !!ticketCode && !!ownerUuid && !busy, [ticketCode, ownerUuid, busy]);
 
   useEffect(() => {
     if (step !== "scan") return;
@@ -147,9 +128,7 @@ export default function CollectBookScan() {
     const stopCameraFully = () => {
       try {
         controlsRef.current?.stop();
-      } catch {
-        // ignore
-      } finally {
+      } catch {} finally {
         controlsRef.current = null;
       }
 
@@ -164,37 +143,27 @@ export default function CollectBookScan() {
 
     const onDecode = async (result: Result | undefined, err: unknown, controls: IScannerControls) => {
       if (!isActive) return;
-
-      // NotFound는 스캔 중 흔한 케이스라 무시
-      if (err && !(err instanceof NotFoundException)) {
-        // console.error(err);
-      }
+      if (err && !(err instanceof NotFoundException)) {}
 
       if (!result || lockedRef.current) return;
 
       const raw = result.getText();
-      console.log("[QR raw]", raw);
-
       const code = extractTicketCode(raw);
-      console.log("[parsed code]", code);
 
       if (!code) {
         setError("QR에서 ticket_code를 읽지 못했습니다.");
         return;
       }
 
-      // ✅ 여기서 잠그고 스캔 중지
       lockedRef.current = true;
       controlsRef.current = controls;
       controls.stop();
 
-      // ✅ 무조건 다음 화면(프리뷰)로 넘어가게
       setError("");
       setTicketCode(code);
       setScannedAt(new Date().toISOString());
       setStep("preview");
 
-      // 전시 조회는 프리뷰에서 로딩 표시로 처리(실패해도 멈춤)
       setLoadingExhibition(true);
       try {
         const data = (await getExhibitionByCode(code)) as unknown;
@@ -220,7 +189,6 @@ export default function CollectBookScan() {
         const controls = await codeReader.decodeFromVideoDevice(undefined, videoEl, onDecode);
         controlsRef.current = controls;
 
-        console.log("[scanner started]");
         setScannerReady(true);
       } catch (e: unknown) {
         if (!isActive) return;
@@ -248,6 +216,10 @@ export default function CollectBookScan() {
   };
 
   const register = async () => {
+    if (!ownerUuid) {
+      setError("로그인이 필요합니다.");
+      return;
+    }
     if (!canRegister) return;
 
     setBusy(true);
@@ -260,21 +232,10 @@ export default function CollectBookScan() {
         visitedAt: form.visitedAt,
         visibility: form.visibility,
       });
-      // TODO(BE 연동):
-      // redeemTicket(POST /api/v1/collectbook)은 서버에 "티켓북 등록"을 생성하고,
-      // 응답으로 collect_book_id를 반환할 가능성이 큼.
-      //
-      // ✅ 백엔드 연동 후 정석 흐름:
-      // const { collect_book_id } = await redeemTicket(...)
-      // nav(`/lounge/collectbook/${collect_book_id}`, { replace: true });
-      //
-      // ✅ 그리고 localStorage 저장(addCollectBookItem)은 선택 사항:
-      // - (옵션1) 완전히 제거: 서버 데이터만 사용 (권장)
-      // - (옵션2) 낙관적 캐시: 화면 빠르게 보이게 하고, 목록/상세는 서버에서 재조회
 
-
-      // ✅ 로컬 저장(전시 조회 실패해도 저장은 됨)
+      // ✅ 로컬 저장 (ownerUuid 필수 포함)
       const saved = addCollectBookItem({
+        ownerUuid, // ✅ 추가 (TS 에러 해결)
         ticketCode,
         exhibition: exhibition ?? {},
         memo: form.memo.trim() || undefined,
@@ -283,7 +244,6 @@ export default function CollectBookScan() {
         scannedAt: scannedAt || new Date().toISOString(),
       });
 
-      // ✅ 디테일로 이동
       nav(`/lounge/collectbook/${saved.id}`, { replace: true });
     } catch (e: unknown) {
       setError(getErrorMessage(e, "등록 실패"));
@@ -391,20 +351,26 @@ export default function CollectBookScan() {
                 />
               </label>
 
-              <label>
+              {/* ✅ 공개/비공개 선택: 토글 UI로 확실히 보이게 */}
+              <div>
                 <div className="loungeSubHint">공개 설정</div>
-                <select
-                  value={form.visibility}
-                  onChange={(e) => {
-                    const v = e.target.value as Visibility;
-                    setForm((p) => ({ ...p, visibility: v }));
-                  }}
-                  style={inputStyle}
-                >
-                  <option value="private">비공개</option>
-                  <option value="public">공개</option>
-                </select>
-              </label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 6 }}>
+                  <button
+                    type="button"
+                    onClick={() => setForm((p) => ({ ...p, visibility: "private" }))}
+                    style={segBtnStyle(form.visibility === "private")}
+                  >
+                    비공개
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm((p) => ({ ...p, visibility: "public" }))}
+                    style={segBtnStyle(form.visibility === "public")}
+                  >
+                    공개
+                  </button>
+                </div>
+              </div>
             </div>
 
             {error && <div className="loungeNotice">{error}</div>}
@@ -437,3 +403,13 @@ const textareaStyle: CSSProperties = {
   ...inputStyle,
   resize: "vertical",
 };
+
+const segBtnStyle = (active: boolean): CSSProperties => ({
+  width: "100%",
+  borderRadius: 12,
+  padding: "10px 12px",
+  border: active ? "1px solid rgba(255,255,255,0.35)" : "1px solid rgba(255,255,255,0.14)",
+  background: active ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.05)",
+  color: "inherit",
+  fontWeight: 700,
+});

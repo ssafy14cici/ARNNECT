@@ -1,4 +1,3 @@
-// FE/src/pages/home/HomeMobile.tsx
 import { Suspense, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
@@ -12,50 +11,99 @@ export default function HomeMobile() {
 
   const sections = useMemo(
     () => [
-      { key: "preference", label: "너의 취향은", path: "/preference", desc: "Discover Your Preference", shape: "octahedron" as ShapeType },
-      { key: "search", label: "Search", path: "/search", desc: "Find Inspiration", shape: "sphere" as ShapeType },
-      { key: "feed", label: "Feed", path: "/feed", desc: "Share Your World", shape: "box" as ShapeType },
-      { key: "lounge", label: "Lounge", path: "/lounge", desc: "Connect with Artists", shape: "torus" as ShapeType },
-      { key: "profile", label: "Profile", path: "/profile/me/feed", desc: "Your Archive", shape: "sphere" as ShapeType },
+      { key: "intro", index: "00", label: "ANNECT", sub: "HERITAGE", path: null, shape: "knot" as ShapeType },
+      { key: "preference", index: "01", label: "Your Taste", sub: "Discover", path: "/preference", shape: "octahedron" as ShapeType },
+      { key: "search", index: "02", label: "Search", sub: "Inspiration", path: "/search", shape: "sphere" as ShapeType },
+      { key: "feed", index: "03", label: "Feed", sub: "Share World", path: "/feed", shape: "box" as ShapeType },
+      { key: "lounge", index: "04", label: "Lounge", sub: "Connect", path: "/lounge", shape: "torus" as ShapeType },
+      { key: "profile", index: "05", label: "Archive", sub: "Profile", path: "/profile/me/feed", shape: "sphere" as ShapeType },
     ],
     []
   );
 
+  // [핵심] 기존 Navbar의 햄버거 버튼(id="menu4")을 강제로 클릭하게 만듭니다.
+  const handleMenuTrigger = () => {
+    const navbarMenuBtn = document.getElementById("menu4");
+    if (navbarMenuBtn) {
+      navbarMenuBtn.click();
+    } else {
+      console.warn("Navbar menu button (#menu4) not found.");
+    }
+  };
+
   return (
-    <div className="mobile-snap-container">
-      {sections.map((item, index) => (
-        <section
-          key={item.key}
-          className="mobile-section"
-          onClick={() => navigate(item.path)}
+    <div className="mobile-wrapper">
+      {/* [1. 배경 라인 레이어 (Fixed)] */}
+      <div className="fixed-lines">
+        <div className="line-vertical-center"></div>
+        <div className="line-horizontal-top"></div>
+        <div className="line-horizontal-bottom"></div>
+      </div>
+
+      {/* [2. 고정 헤더 (Top 25% 영역)] */}
+      <header className="fixed-header">
+        {/* 로고 (왼쪽) - 클릭 시 /feed 이동 */}
+        <div 
+          className="header-left" 
+          onClick={() => navigate('/feed')} 
+          style={{ cursor: 'pointer' }}
         >
-          {/* 1. 3D 배경 (상단 배치) */}
-          <div className="mobile-canvas-wrapper">
-            <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
-              <ambientLight intensity={0.7} />
-              <pointLight position={[10, 10, 10]} intensity={1.5} />
-              <Suspense fallback={null}>
-                <group scale={1.7} rotation={[index * 0.7, 0, 0]}>
-                  <HoverModel
-                    color={index % 2 === 0 ? "#ffffff" : "#cccccc"}
-                    shape={item.shape}
-                  />
-                </group>
-              </Suspense>
-            </Canvas>
+          <div className="logo-box">
+            <span>THE<br/>ANNECT</span>
           </div>
+        </div>
 
-          {/* 2. 텍스트 정보 (하단 고정) */}
-          <div className="mobile-info-overlay">
-            <div className="m-index">{(index + 1).toString().padStart(2, "0")}</div>
-            <h2 className="m-title">{item.label}</h2>
-            <p className="m-desc">{item.desc}</p>
-            <div className="m-explore-tag">EXPLORE →</div>
-          </div>
+        {/* 메뉴 (오른쪽) - 클릭 시 기존 Navbar의 메뉴 열기 */}
+        <div 
+          className="header-right" 
+          onClick={handleMenuTrigger} // 여기서 Navbar와 연결
+          style={{ cursor: 'pointer' }}
+        >
+          <div className="hamburger"></div>
+        </div>
+      </header>
 
-          {index === 0 && <div className="m-scroll-indicator">SCROLL</div>}
-        </section>
-      ))}
+      {/* [3. 스크롤 컨텐츠] */}
+      <div className="snap-container">
+        {sections.map((item, i) => (
+          <section 
+            key={item.key} 
+            className="snap-section"
+            onClick={() => item.path && navigate(item.path)}
+          >
+            <div className="model-area">
+              <Canvas camera={{ position: [0, 0, 14], fov: 35 }} dpr={[1, 2]}>
+                <ambientLight intensity={0.8} />
+                <pointLight position={[10, 10, 10]} intensity={1.5} />
+                <pointLight position={[-10, -10, -10]} intensity={0.5} />
+                <Suspense fallback={null}>
+                  <group rotation={[0.5, 0.5, 0]} scale={0.55}>
+                    <HoverModel 
+                      color={i === 0 ? "#ffffff" : "#d0d0d0"} 
+                      shape={item.shape} 
+                    />
+                  </group>
+                </Suspense>
+              </Canvas>
+            </div>
+
+            <div className="info-area">
+               <div className="info-left">
+                  <div className="scroll-content">
+                    <span className="scroll-text">SCROLL</span>
+                    <div className="scroll-line"></div>
+                  </div>
+               </div>
+
+               <div className="info-right">
+                  <span className="index-text">{item.index}</span>
+                  <h2 className="main-title">{item.label}</h2>
+                  <div className="arrow-down">↓</div>
+               </div>
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
