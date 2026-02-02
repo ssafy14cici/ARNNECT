@@ -1,7 +1,7 @@
 //FE\src\pages\lounge\user\Taste.tsx
 import { Link } from "react-router-dom";
 import "../lounge.css";
-import Radar6, { type RadarItem } from "../../../components/charts/Radar6";
+import Radar6, { type RadarItem } from "../../../shared/ui/charts/Radar6";
 
 type RankItem = { name: string; score: number; hint?: string };
 

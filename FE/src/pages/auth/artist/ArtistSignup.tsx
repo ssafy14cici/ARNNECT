@@ -1,3 +1,5 @@
+//FE/src/pages/auth/artist/ArtistSignup.tsx
+
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./artistsignup.css"; // CSS 파일명은 소문자 유지 (또는 파일명 변경 시 수정)
@@ -13,7 +15,6 @@ import {
   validateArtistStep2,
   validateArtistStep3,
   validateConsent,
-  maskPw,
   type AccountStepValue,
 } from "../utils/validation";
 import { checkEmailDupMock } from "../utils/emailDupCheck";

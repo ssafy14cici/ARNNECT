@@ -1,3 +1,4 @@
+//FE/src/shared/types/models.ts
 /** 작품 모델 */
 export type Artwork = {
   id: string;
