@@ -1,71 +1,37 @@
 // FE/src/pages/profile/components/ArtistInfo.tsx
 import type { ArtistProfile } from "../../../features/profile/types";
+import "./profileInfo.css";
 
 export default function ArtistInfo({ profile }: { profile: ArtistProfile }) {
+  const intro = profile.artIntroduction ?? profile.bio ?? "";
+  const link = profile.sns ?? profile.contactUrl ?? "";
+
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 16,
-      }}
-    >
-      {profile.genre && (
-        <span
-          style={{
-            display: "inline-block",
-            padding: "6px 14px",
-            borderRadius: 20,
-            background: "rgba(120, 165, 255, 0.15)",
-            border: "1px solid rgba(120, 165, 255, 0.3)",
-            color: "#78a5ff",
-            fontSize: 13,
-            fontWeight: 600,
-            letterSpacing: "0.5px",
-          }}
-        >
-          {profile.genre}
-        </span>
+    <div className="profileInfo">
+      <div className="profileInfo-badges">
+        {profile.isVerified !== undefined && (
+          <span className={`profileInfo-chip ${profile.isVerified ? "ok" : "muted"}`}>
+            {profile.isVerified ? "인증 완료" : "미인증"}
+          </span>
+        )}
+
+        {profile.field && <span className="profileInfo-chip">{profile.field}</span>}
+        {profile.genre && <span className="profileInfo-chip">{profile.genre}</span>}
+        {typeof profile.debutYear === "number" && (
+          <span className="profileInfo-chip">{profile.debutYear} 데뷔</span>
+        )}
+        {profile.affiliation && <span className="profileInfo-chip">{profile.affiliation}</span>}
+      </div>
+
+      {intro ? (
+        <p className="profileInfo-intro">{intro}</p>
+      ) : (
+        <p className="profileInfo-intro muted">소개글이 없습니다.</p>
       )}
 
-      {profile.bio && (
-        <p
-          style={{
-            maxWidth: 460,
-            textAlign: "center",
-            opacity: 0.85,
-            fontSize: 15,
-            lineHeight: 1.6,
-            margin: 0,
-            whiteSpace: "pre-wrap",
-          }}
-        >
-          {profile.bio}
-        </p>
-      )}
-
-      {profile.contactUrl && (
-        <a
-          href={profile.contactUrl}
-          target="_blank"
-          rel="noreferrer"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            marginTop: 8,
-            textDecoration: "none",
-            padding: "10px 24px",
-            borderRadius: 12,
-            background: "#fff",
-            color: "#1a1a1a",
-            fontSize: 14,
-            fontWeight: 700,
-          }}
-        >
-          <span>💌</span>
-          <span>작가에게 문의하기</span>
+      {link && (
+        <a className="profileInfo-linkBtn" href={link} target="_blank" rel="noreferrer">
+          SNS / 개인웹 열기
         </a>
       )}
     </div>

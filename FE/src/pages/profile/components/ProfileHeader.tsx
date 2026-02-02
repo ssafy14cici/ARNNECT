@@ -1,13 +1,13 @@
-// FE/src/pages/profile/components/ProfileHeader.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import type { UpdateMyProfilePatch } from "../../../features/profile/api";
 import { useAuthStore } from "../../../features/auth/store";
-import { profileApi } from "../../../features/profile/api"; // ✅ 추가: API 연결
+import { profileApi } from "../../../features/profile/api";
 import { useBadgeStore } from "../../../features/badge/store";
+
 import basicProfile from "../../../assets/basicprofile.png";
 import type { ArtistProfile, UserProfile, Badge } from "../../../features/profile/types";
 import BadgePicker from "../../../features/badge/ui/BadgePicker";
-
 
 type ProfileModel = ArtistProfile | UserProfile;
 
@@ -96,9 +96,9 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
   const canAskQnA = !isOwner && isArtist && contactEnabled && viewerRole === "general";
 
   const avatarSrc = useMemo(() => {
-    const url = (profile.imageUrl ?? "").trim();
-    if (!url || url === "null" || url === "undefined") return basicProfile;
-    return url;
+    const u = String(profile.imageUrl ?? "").trim();
+    if (!u || u === "null" || u === "undefined") return basicProfile;
+    return u;
   }, [profile.imageUrl]);
 
   // Manage menu focus
@@ -132,6 +132,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
   const toggleFollow = async () => {
     if (isOwner) return;
+    if (!profile.id) return;
 
     const prev = profile;
 
@@ -147,14 +148,12 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
       if (prev.isFollowing) await profileApi.unfollow(prev.id);
       else await profileApi.follow(prev.id);
     } catch (e) {
-      // 실패 롤백
       onProfileUpdated(prev);
       alert(e instanceof Error ? e.message : "팔로우 변경 실패");
     } finally {
       setBusy(false);
     }
   };
-
 
   const submitQnA = async () => {
     if (!canAskQnA) return;
@@ -163,10 +162,13 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
     setBusy(true);
     try {
-      // 지금은 목업 처리 유지 (나중에 fanLetter/send로 연결해도 됨)
+      // ✅ 실API 연결: POST /api/v1/fanletters
+      await profileApi.sendFanLetter(profile.id, trimmed);
       setQnaMessage("");
       setQnaOpen(false);
-      alert("QnA 전송 완료(목업)");
+      alert("QnA 전송 완료");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "QnA 전송 실패");
     } finally {
       setBusy(false);
     }
@@ -186,31 +188,28 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
     setManageOpen(false);
   };
 
-  // ✅ 저장: 로컬 state 반영 + 대표뱃지 저장 API(목업은 localStorage) 호출
   const saveEdit = async () => {
+    if (!isOwner) return;
+
     const nextFeatured = Array.from(new Set(draftFeaturedBadgeIds)).slice(0, 3);
 
-    const next: ProfileModel = isArtist
-      ? ({
-          ...(profile as ArtistProfile),
-          name: draftName.trim() || profile.name,
-          imageUrl: draftImageUrl.trim() || null,
-          bio: draftBio,
-          genre: draftGenre,
-          featuredBadgeIds: nextFeatured,
-        } satisfies ArtistProfile)
-      : ({
-          ...(profile as UserProfile),
-          name: draftName.trim() || profile.name,
-          imageUrl: draftImageUrl.trim() || null,
-          bio: draftBio,
-          featuredBadgeIds: nextFeatured,
-        } satisfies UserProfile);
+    const patch = {
+      nickname: draftName.trim() || profile.name,
+      profileImage: draftImageUrl.trim() || null,
+      artIntroduction: draftBio ?? "",
+      ...(isArtist ? { genre: draftGenre ?? "" } : {}),
+    } satisfies UpdateMyProfilePatch;
+
 
     setBusy(true);
     try {
-      onProfileUpdated(next);
-      await profileApi.updateFeaturedBadges(next.role, next.id, nextFeatured); // ✅ 추가
+      // ✅ 실API 수정 + 서버 리프레시
+      const updated = await profileApi.updateMyProfile(profile.role, patch);
+      onProfileUpdated(updated as ProfileModel);
+
+      // 대표뱃지 엔드포인트 확정 전까지는 no-op(실API 준비만)
+      await profileApi.updateFeaturedBadges(profile.role, updated.id, nextFeatured);
+
       setPickerOpen(false);
       setEditOpen(false);
     } catch (e) {
@@ -289,12 +288,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
                 </button>
 
                 {manageOpen && (
-                  <div
-                    id="profile-manage-menu"
-                    ref={menuRef}
-                    className="profileMenu"
-                    role="menu"
-                  >
+                  <div id="profile-manage-menu" ref={menuRef} className="profileMenu" role="menu">
                     <button
                       ref={firstMenuItemRef}
                       className="profileMenuItem"
@@ -305,12 +299,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
                       프로필 편집
                     </button>
 
-                    <button
-                      className="profileMenuItem"
-                      onClick={doLogout}
-                      role="menuitem"
-                      type="button"
-                    >
+                    <button className="profileMenuItem" onClick={doLogout} role="menuitem" type="button">
                       로그아웃
                     </button>
 
@@ -327,21 +316,12 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
               </>
             ) : (
               <>
-                <button
-                  className="profileBtn"
-                  disabled={busy}
-                  onClick={toggleFollow}
-                  type="button"
-                >
+                <button className="profileBtn" disabled={busy} onClick={toggleFollow} type="button">
                   {profile.isFollowing ? "언팔로우" : "팔로우"}
                 </button>
 
                 {canAskQnA && (
-                  <button
-                    className="profileBtn"
-                    onClick={() => setQnaOpen(true)}
-                    type="button"
-                  >
+                  <button className="profileBtn" onClick={() => setQnaOpen(true)} type="button">
                     QnA
                   </button>
                 )}
@@ -356,11 +336,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
         <div className="profileQnaPanel">
           <div className="profileQnaHeader">
             <strong>QnA 남기기</strong>
-            <button
-              className="profileTextBtn"
-              onClick={() => setQnaOpen(false)}
-              type="button"
-            >
+            <button className="profileTextBtn" onClick={() => setQnaOpen(false)} type="button">
               닫기
             </button>
           </div>
@@ -374,11 +350,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
           />
 
           <div className="profileQnaActions">
-            <button
-              className="profileBtn"
-              onClick={() => setQnaOpen(false)}
-              type="button"
-            >
+            <button className="profileBtn" onClick={() => setQnaOpen(false)} type="button">
               취소
             </button>
             <button
@@ -414,15 +386,11 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
             <div className="profileForm">
               <label className="profileLabel">
                 이름(활동명/닉네임)
-                <input
-                  className="profileInput"
-                  value={draftName}
-                  onChange={(e) => setDraftName(e.target.value)}
-                />
+                <input className="profileInput" value={draftName} onChange={(e) => setDraftName(e.target.value)} />
               </label>
 
               <label className="profileLabel">
-                프로필 이미지 URL(목업)
+                프로필 이미지 URL
                 <input
                   className="profileInput"
                   value={draftImageUrl}
@@ -433,65 +401,33 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
               {isArtist && (
                 <label className="profileLabel">
                   장르
-                  <input
-                    className="profileInput"
-                    value={draftGenre}
-                    onChange={(e) => setDraftGenre(e.target.value)}
-                  />
+                  <input className="profileInput" value={draftGenre} onChange={(e) => setDraftGenre(e.target.value)} />
                 </label>
               )}
 
               <label className="profileLabel">
                 소개글
-                <textarea
-                  className="profileTextarea"
-                  value={draftBio}
-                  onChange={(e) => setDraftBio(e.target.value)}
-                  rows={4}
-                />
+                <textarea className="profileTextarea" value={draftBio} onChange={(e) => setDraftBio(e.target.value)} rows={4} />
               </label>
 
-              {/* Badge Picker */}
+              {/* Badge Picker (엔드포인트 확정 전까지 UI만 유지) */}
               <div className="profileLabel">
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "8px",
-                  }}
-                >
+                <div className="profileRowBetween">
                   <span>대표 뱃지 (최대 3개)</span>
-                  <button
-                    type="button"
-                    className="profileTextBtn"
-                    onClick={() => setPickerOpen(true)}
-                    style={{ fontSize: "0.85rem", color: "#C8A97E" }}
-                  >
+                  <button type="button" className="profileTextBtn" onClick={() => setPickerOpen(true)}>
                     선택하기 &gt;
                   </button>
                 </div>
 
-                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <div className="profileBadgePreview">
                   {draftBadgeObjects.length > 0 ? (
                     draftBadgeObjects.map((b) => (
-                      <span
-                        key={b.id}
-                        style={{
-                          padding: "4px 10px",
-                          background: "rgba(255,255,255,0.1)",
-                          borderRadius: "12px",
-                          fontSize: "0.8rem",
-                          color: "#eee",
-                        }}
-                      >
+                      <span key={b.id} className="profileBadgePill">
                         {b.label}
                       </span>
                     ))
                   ) : (
-                    <span style={{ fontSize: "0.8rem", color: "#666" }}>
-                      선택된 뱃지가 없습니다.
-                    </span>
+                    <span className="profileHintMuted">선택된 뱃지가 없습니다.</span>
                   )}
                 </div>
               </div>
@@ -516,7 +452,6 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
         </div>
       )}
 
-      {/* BadgePicker */}
       <BadgePicker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}

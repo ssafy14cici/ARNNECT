@@ -1,6 +1,7 @@
 // FE/src/pages/profile/Profile.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
+
 import ProfileHeader from "./components/ProfileHeader";
 import "./profile.css";
 
@@ -17,7 +18,7 @@ export default function Profile() {
   const { memberUuid } = useParams(); // routes.tsx: ":memberUuid"
   const profileId = memberUuid ?? "";
 
-  const authUser = useAuthStore((s) => s.user); // { memberUuid, name } | null
+  const authUser = useAuthStore((s) => s.user); // { memberUuid, ... } | null
 
   const isOwner = useMemo(() => {
     if (profileId === "me") return true;
@@ -26,17 +27,16 @@ export default function Profile() {
   }, [profileId, authUser?.memberUuid]);
 
   const [profile, setProfile] = useState<ProfileModel | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 요청 순서 관리(빠르게 라우트 이동할 때 오래된 응답 무시)
+  // 빠른 라우팅 이동 시 오래된 응답 무시
   const reqSeq = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
     const mySeq = ++reqSeq.current;
 
-    // 요청 시작 상태 초기화
     setLoading(true);
     setError(null);
     setProfile(null);
@@ -45,7 +45,6 @@ export default function Profile() {
       try {
         if (!profileId) throw new Error("프로필 ID가 없습니다.");
 
-        // 내 프로필
         if (profileId === "me") {
           const p = await profileApi.getMyProfile();
           if (cancelled || reqSeq.current !== mySeq) return;
@@ -53,7 +52,7 @@ export default function Profile() {
           return;
         }
 
-        // 타인 프로필: artist → 실패 시 user fallback
+        // 타인 프로필: 같은 엔드포인트지만 타입 분기 필요해서 artist → user fallback 유지
         try {
           const a = await profileApi.getArtistProfile(profileId);
           if (cancelled || reqSeq.current !== mySeq) return;
@@ -67,9 +66,7 @@ export default function Profile() {
         if (cancelled || reqSeq.current !== mySeq) return;
         setError(e instanceof Error ? e.message : "프로필 로딩 실패");
       } finally {
-        if (!cancelled && reqSeq.current === mySeq) {
-          setLoading(false);
-        }
+        if (!cancelled && reqSeq.current === mySeq) setLoading(false);
       }
     })();
 
@@ -92,8 +89,8 @@ export default function Profile() {
   if (error) return <div className="profile-error">{error}</div>;
   if (!profile) return <div className="profile-error">프로필을 찾을 수 없습니다.</div>;
 
-  // role 값이 "ARTIST" 또는 "artist" 등으로 올 수 있어서 방어적으로 처리
-  const viewedIsArtist = String((profile as any).role ?? "").toLowerCase() === "artist";
+  // ✅ 이제 role은 "USER" | "ARTIST"로 고정
+  const viewedIsArtist = profile.role === "ARTIST";
   const themeClass = viewedIsArtist ? "theme-artist" : "theme-user";
 
   return (

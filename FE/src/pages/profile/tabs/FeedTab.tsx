@@ -1,94 +1,79 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 
-import { listPostsByAuthor, subscribePostsUpdated } from "../../../features/feed/posts/api";
+import { profileApi } from "../../../features/profile/api";
 import { useAuthStore } from "../../../features/auth/store";
 import type { ProfileOutletContext } from "../Profile";
+import type { FeedItem } from "../../../features/profile/types";
 import "./profileTabs.css";
-
-type LocalMode = "ARTIST" | "USER";
-
-type GridItem = {
-  id: string;
-  imageUrl: string;
-  createdAt: string;
-};
-
-type PostLike = {
-  id: string | number;
-  imageUrl?: string | null;
-  createdAt?: string | null;
-};
-
-function toPostLikes(value: unknown): PostLike[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((v) => (typeof v === "object" && v !== null ? (v as Partial<PostLike>) : null))
-    .filter((v): v is Partial<PostLike> => Boolean(v))
-    .map((v) => ({
-      id: v.id ?? "",
-      imageUrl: v.imageUrl ?? null,
-      createdAt: v.createdAt ?? null,
-    }))
-    .filter((v) => v.id !== "");
-}
 
 export default function FeedTab() {
   const nav = useNavigate();
-  const { memberUuid } = useParams(); // ✅ routes.tsx: ":memberUuid"
+  const { memberUuid } = useParams();
   const { profile } = useOutletContext<ProfileOutletContext>();
 
   const authUser = useAuthStore((s) => s.user);
-  const rawProfileId = memberUuid ?? "";
 
+  const effectiveProfileId = useMemo(() => {
+    const raw = memberUuid ?? "";
+    if (raw === "me") return authUser?.memberUuid ?? "";
+    return raw;
+  }, [memberUuid, authUser?.memberUuid]);
 
-
-  // ✅ mode 변수명 및 타입을 role로 통일 (local.ts와 맞춤)
-  const role: LocalRole = useMemo(
-    () => (profile.role === "ARTIST" ? "ARTIST" : "USER"),
-    [profile.role],
-  );
-
-  const [items, setItems] = useState<GridItem[]>([]);
-  const loadRef = useRef<() => void>(() => {});
+  const [items, setItems] = useState<FeedItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadRef.current = () => {
-      if (!effectiveProfileId) {
-        setItems([]);
-        return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    (async () => {
+      try {
+        if (!effectiveProfileId) {
+          setItems([]);
+          return;
+        }
+
+        const page =
+          profile.role === "ARTIST"
+            ? await profileApi.getArtistFeed(effectiveProfileId)
+            : await profileApi.getUserFeed(effectiveProfileId);
+
+        if (!cancelled) setItems(page.items ?? []);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "피드 로딩 실패");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
+    })();
 
-      const raw = listPostsByAuthor(effectiveProfileId, mode) as unknown;
-      const posts = toPostLikes(raw);
-
-      const next: GridItem[] = posts
-        .filter((p) => typeof p.imageUrl === "string" && p.imageUrl.trim().length > 0)
-        .map((p) => ({
-          id: String(p.id),
-          imageUrl: p.imageUrl!.trim(),
-          createdAt: typeof p.createdAt === "string" ? p.createdAt : "",
-        }))
-        .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
-
-      setItems(next);
-    };
-
-    loadRef.current();
-  }, [effectiveProfileId, mode]);
-
-  useEffect(() => {
-    const unsub = subscribePostsUpdated(() => loadRef.current());
     return () => {
-      if (typeof unsub === "function") unsub();
+      cancelled = true;
     };
-  }, []);
+  }, [effectiveProfileId, profile.role]);
 
   const goDetail = (contentId: string) => {
-    // ✅ Role에 따라 상세 페이지 분기
-    if (role === "ARTIST") nav(`/artworks/${contentId}`);
+    if (profile.role === "ARTIST") nav(`/artworks/${contentId}`);
     else nav(`/posts/${contentId}`);
   };
+
+  if (loading) {
+    return (
+      <div className="tab-container">
+        <div className="tab-empty">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="tab-container">
+        <div className="tab-empty">{error}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="tab-container">

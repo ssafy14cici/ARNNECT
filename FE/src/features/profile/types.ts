@@ -10,6 +10,8 @@ export type Badge = {
 type ProfileBase = {
   id: string;
   role: ProfileRole;
+
+  // 화면 표시용(공통)
   name: string;
   imageUrl?: string | null;
   bio?: string | null;
@@ -24,11 +26,31 @@ type ProfileBase = {
 
 export type UserProfile = ProfileBase & {
   role: "USER";
+
+  email?: string;
+  nickname?: string;
+  birth?: string; // yyyy-MM-dd
+  phone?: string;
+  isAgree?: boolean;
 };
 
 export type ArtistProfile = ProfileBase & {
   role: "ARTIST";
+
+  email?: string;
+  birth?: string; // yyyy-MM-dd
+  phone?: string;
+  isAgree?: boolean;
+
+  document?: string;
+  field?: string;
+  debutYear?: number;
   genre?: string;
+  sns?: string;
+  affiliation?: string;
+  isVerified?: boolean;
+  artIntroduction?: string;
+
   contactEnabled?: boolean;
   contactUrl?: string;
 };
@@ -41,4 +63,7 @@ export type FeedItem = {
   createdAt: string;
 };
 
-export type PageResult<T> = { items: T[]; nextCursor?: string | null };
+export type PageResult<T> = {
+  items: T[];
+  nextCursor?: string | null;
+};
