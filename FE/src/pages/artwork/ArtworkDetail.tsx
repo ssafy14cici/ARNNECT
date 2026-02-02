@@ -1,8 +1,7 @@
-//FE/src/pages/artwork/ArtworkDetail.tsx
+// FE/src/pages/artwork/ArtworkDetail.tsx
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { artworks } from "../../features/artwork/data";
-
 import "./artworkDetail.css";
 
 import { useAuthStore } from "../../features/auth/store";
@@ -12,7 +11,9 @@ import {
   getMockArtworkData,
   type Comment,
   type ArtworkBase,
+  toArtworkNumericId,
 } from "../../features/artwork/helpers";
+import { sendFanLetter } from "../../features/fanLetter/api";
 
 export const PROFILE_PATH = (authorId: string) => `/profile/${authorId}`;
 
@@ -20,7 +21,6 @@ export default function ArtworkDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  // ✅ 로그인 유저 정보(진짜 이름/uuid)
   const user = useAuthStore((s) => s.user);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
 
@@ -31,17 +31,15 @@ export default function ArtworkDetail() {
   const [isLoading, setIsLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
 
+  // ✅ FanLetter 모달 상태 (중복 선언 절대 금지)
+  const [fanLetterOpen, setFanLetterOpen] = useState(false);
+  const [fanLetterSending, setFanLetterSending] = useState(false);
+
   const ARTWORKS = artworks as unknown as readonly ArtworkBase[];
 
-  const baseArtwork = useMemo(
-    () => findArtworkById(ARTWORKS, id),
-    [ARTWORKS, id],
-  );
+  const baseArtwork = useMemo(() => findArtworkById(ARTWORKS, id), [ARTWORKS, id]);
 
-  const artwork = useMemo(
-    () => (baseArtwork ? getMockArtworkData(baseArtwork) : null),
-    [baseArtwork],
-  );
+  const artwork = useMemo(() => (baseArtwork ? getMockArtworkData(baseArtwork) : null), [baseArtwork]);
 
   const similarArtworks = useMemo(() => {
     if (!artwork) return [];
@@ -49,6 +47,12 @@ export default function ArtworkDetail() {
   }, [ARTWORKS, artwork]);
 
   const recommendArtworks = useMemo(() => ARTWORKS.slice(0, 4), [ARTWORKS]);
+
+  // ✅ numeric artwork id (FanLetter payload용) : null이면 undefined로 바꿔서 안전하게
+  const numericArtworkId = useMemo(() => {
+    const n = toArtworkNumericId(baseArtwork?.id ?? id);
+    return n ?? undefined;
+  }, [baseArtwork?.id, id]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -81,8 +85,8 @@ export default function ArtworkDetail() {
       return;
     }
 
-    const authorId = user?.memberUuid ?? "me"; // ✅ user 없으면 /profile/me 로
-    const authorName = user?.name ?? "나"; // ✅ user 없으면 임시 표시
+    const authorId = user?.memberUuid ?? "me";
+    const authorName = user?.name ?? "나";
 
     setComments((prev) => [
       ...prev,
@@ -121,18 +125,52 @@ export default function ArtworkDetail() {
 
   const deleteComment = (commentId: string) => {
     if (window.confirm("삭제하시겠습니까?")) {
-      setComments((prev) =>
-        prev.filter((c) => c.id !== commentId && c.parentId !== commentId),
-      );
+      setComments((prev) => prev.filter((c) => c.id !== commentId && c.parentId !== commentId));
     }
   };
 
   const updateComment = (commentId: string, newContent: string) => {
     const value = newContent.trim();
-    if (!value) return; // 빈 값 저장 방지
-    setComments((prev) =>
-      prev.map((c) => (c.id === commentId ? { ...c, content: value } : c)),
-    );
+    if (!value) return;
+    setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, content: value } : c)));
+  };
+
+  // ✅ FanLetter 발송
+  const onSendFanLetter = async (content: string) => {
+    if (!isLoggedIn || !user?.memberUuid) {
+      alert("로그인 후 이용해주세요.");
+      return;
+    }
+    if (!artwork) return;
+
+    // ✅ artworkId: number로 보장 (null/undefined면 artwork.id로 fallback)
+    const safeArtworkId =
+      numericArtworkId ?? (typeof artwork.id === "number" ? artwork.id : Number(artwork.id));
+
+    if (!Number.isFinite(safeArtworkId)) {
+      alert("작품 ID를 확인할 수 없습니다.");
+      return;
+    }
+
+    setFanLetterSending(true);
+    try {
+      await sendFanLetter({
+        artworkId: safeArtworkId,
+        artworkTitle: artwork.title,
+        artistName: artwork.artist,
+        senderId: user.memberUuid,
+        senderName: user.name,
+        content,
+      });
+
+      alert("팬레터가 발송되었습니다.");
+      setFanLetterOpen(false);
+    } catch (e) {
+      console.error(e);
+      alert("팬레터 발송에 실패했습니다.");
+    } finally {
+      setFanLetterSending(false);
+    }
   };
 
   const goHome = () => navigate("/");
@@ -159,6 +197,18 @@ export default function ArtworkDetail() {
       onGoHome={goHome}
       onNavigateArtwork={goArtwork}
       profilePath={PROFILE_PATH}
+      // ✅ FanLetter
+      fanLetterOpen={fanLetterOpen}
+      fanLetterSending={fanLetterSending}
+      onOpenFanLetter={() => {
+        if (!isLoggedIn) {
+          alert("로그인이 필요합니다.");
+          return;
+        }
+        setFanLetterOpen(true);
+      }}
+      onCloseFanLetter={() => setFanLetterOpen(false)}
+      onSendFanLetter={onSendFanLetter}
     />
   );
 }

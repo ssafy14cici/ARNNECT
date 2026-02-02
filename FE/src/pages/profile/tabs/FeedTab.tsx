@@ -1,15 +1,12 @@
-// FE/src/pages/profile/tabs/FeedTab.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
-import {
-  listPostsByAuthor,
-  subscribePostsUpdated,
-  type LocalMode,
-} from "../../../features/posts/local";
 
+import { listPostsByAuthor, subscribePostsUpdated } from "../../../features/feed/posts/api";
 import { useAuthStore } from "../../../features/auth/store";
 import type { ProfileOutletContext } from "../Profile";
 import "./profileTabs.css";
+
+type LocalMode = "ARTIST" | "USER";
 
 type GridItem = {
   id: string;
@@ -17,14 +14,32 @@ type GridItem = {
   createdAt: string;
 };
 
+type PostLike = {
+  id: string | number;
+  imageUrl?: string | null;
+  createdAt?: string | null;
+};
+
+function toPostLikes(value: unknown): PostLike[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((v) => (typeof v === "object" && v !== null ? (v as Partial<PostLike>) : null))
+    .filter((v): v is Partial<PostLike> => Boolean(v))
+    .map((v) => ({
+      id: v.id ?? "",
+      imageUrl: v.imageUrl ?? null,
+      createdAt: v.createdAt ?? null,
+    }))
+    .filter((v) => v.id !== "");
+}
+
 export default function FeedTab() {
   const nav = useNavigate();
-  const { id } = useParams();
+  const { memberUuid } = useParams(); // ✅ routes.tsx: ":memberUuid"
   const { profile } = useOutletContext<ProfileOutletContext>();
 
-  const authUser = useAuthStore((s) => s.user); // { memberUuid, name } | null
-  const rawProfileId = id ?? "";
-  const [tick, setTick] = useState(0);
+  const authUser = useAuthStore((s) => s.user);
+  const rawProfileId = memberUuid ?? "";
 
   const effectiveProfileId = useMemo(() => {
     if (!rawProfileId) return "";
@@ -37,27 +52,40 @@ export default function FeedTab() {
     [profile.role],
   );
 
+  const [items, setItems] = useState<GridItem[]>([]);
+  const loadRef = useRef<() => void>(() => {});
+
   useEffect(() => {
-    const unsub = subscribePostsUpdated(() => setTick((t) => t + 1));
-    return () => unsub();
+    loadRef.current = () => {
+      if (!effectiveProfileId) {
+        setItems([]);
+        return;
+      }
+
+      const raw = listPostsByAuthor(effectiveProfileId, mode) as unknown;
+      const posts = toPostLikes(raw);
+
+      const next: GridItem[] = posts
+        .filter((p) => typeof p.imageUrl === "string" && p.imageUrl.trim().length > 0)
+        .map((p) => ({
+          id: String(p.id),
+          imageUrl: p.imageUrl!.trim(),
+          createdAt: typeof p.createdAt === "string" ? p.createdAt : "",
+        }))
+        .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+
+      setItems(next);
+    };
+
+    loadRef.current();
+  }, [effectiveProfileId, mode]);
+
+  useEffect(() => {
+    const unsub = subscribePostsUpdated(() => loadRef.current());
+    return () => {
+      if (typeof unsub === "function") unsub();
+    };
   }, []);
-
-  const items: GridItem[] = useMemo(() => {
-    if (!effectiveProfileId) return [];
-
-    const posts = listPostsByAuthor(effectiveProfileId, mode);
-
-    return posts
-      .filter(
-        (p) => typeof p.imageUrl === "string" && p.imageUrl.trim().length > 0,
-      )
-      .map((p) => ({
-        id: p.id,
-        imageUrl: p.imageUrl!,
-        createdAt: p.createdAt ?? "",
-      }))
-      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
-  }, [effectiveProfileId, mode, tick]);
 
   const goDetail = (contentId: string) => {
     if (mode === "ARTIST") nav(`/artworks/${contentId}`);
@@ -68,12 +96,7 @@ export default function FeedTab() {
     <div className="tab-container">
       <div className="tab-grid-3">
         {items.map((it) => (
-          <button
-            key={it.id}
-            type="button"
-            className="feed-item-btn"
-            onClick={() => goDetail(it.id)}
-          >
+          <button key={it.id} type="button" className="feed-item-btn" onClick={() => goDetail(it.id)}>
             <img
               src={it.imageUrl}
               alt=""

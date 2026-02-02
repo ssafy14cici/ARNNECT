@@ -1,17 +1,25 @@
+// FE/src/pages/auth/Login.tsx
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+
 import { apiLogin } from "../../features/auth/api";
 import type { UserRole } from "../../features/auth/types";
 import { useAuthStore } from "../../features/auth/store";
-import { setMe, seedMyPosts, type PostRole } from "../../features/feed/mockData";
+
 import "./login.css";
 
-const MY_SEED_PREFIX = "comet_mock_my_posts_seeded_v1";
+const USE_MOCK = String(import.meta.env.VITE_USE_MOCK) === "true";
 
 export default function Login() {
   const nav = useNavigate();
+  const location = useLocation();
   const [sp] = useSearchParams();
-  const returnUrl = sp.get("returnUrl");
+
+  // 1) 쿼리 returnUrl 우선, 없으면 Guard state.from 사용
+  const returnUrl =
+    sp.get("returnUrl") ||
+    ((location.state as any)?.from as string | undefined) ||
+    null;
 
   const login = useAuthStore((s) => s.login);
 
@@ -20,6 +28,7 @@ export default function Login() {
   const [password, setPassword] = useState("123456789");
   const [showPw, setShowPw] = useState(false);
   const [remember, setRemember] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,7 +46,7 @@ export default function Login() {
     try {
       const res = await apiLogin({ email, password, role, remember });
 
-      // 1) auth store 저장 (memberUuid 필수)
+      // ✅ auth store 저장 (항상)
       login({
         token: res.token,
         role: res.role === "USER" ? "general" : "artist",
@@ -45,22 +54,13 @@ export default function Login() {
         user: { memberUuid: res.memberUuid, name: res.name },
       });
 
-      // 2) feed mockData의 "현재 유저(me)"도 같이 세팅 (posts 작성자 매칭용)
-      const postRole: PostRole = res.role === "ARTIST" ? "ARTIST" : "USER";
-      setMe({ id: res.memberUuid, name: res.name, role: postRole });
-
-      // 3) 내 글 seed (유저별 1회만)
-      const seedKey = `${MY_SEED_PREFIX}.${res.memberUuid}`;
-      if (localStorage.getItem(seedKey) !== "1") {
-        try {
-          seedMyPosts(8);
-        } catch {
-          // seedMyPosts 내부에서 me 없으면 throw 가능 -> 위에서 setMe 했으니 보통 안 남
-        }
-        localStorage.setItem(seedKey, "1");
+      // ✅ 목업 전용 사이드이펙트는 여기서만(필요한 것만 남겨)
+      if (USE_MOCK) {
+        // 예: 유저별 1회 seed 같은 걸 하고 싶으면 이 블록 안에서만
+        // (지금은 중앙 seedMockDB(main.tsx)로 충분하면 비워둬도 됨)
       }
 
-      nav(returnUrl || "/");
+      nav(returnUrl || "/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "이메일 또는 비밀번호를 확인해주세요.");
     } finally {
@@ -91,7 +91,10 @@ export default function Login() {
           </div>
 
           <div className="role-switch-container">
-            <div className="role-track" style={{ "--active-color": themeColor } as React.CSSProperties}>
+            <div
+              className="role-track"
+              style={{ "--active-color": themeColor } as React.CSSProperties}
+            >
               <button
                 type="button"
                 className={`role-btn ${role === "USER" ? "active" : ""}`}
@@ -157,7 +160,7 @@ export default function Login() {
           </form>
 
           <div className="auth-footer">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link to="/signup" className="signup-link">
               Sign Up
             </Link>

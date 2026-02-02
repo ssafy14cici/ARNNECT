@@ -1,4 +1,5 @@
-// FE/src/utils/qrDownload.ts
+// FE/src/features/tickets/qrDownload.ts
+
 export async function downloadSvgAsPng(svgEl: SVGSVGElement, filename: string) {
   const svgData = new XMLSerializer().serializeToString(svgEl);
 
@@ -39,4 +40,19 @@ export async function downloadSvgAsPng(svgEl: SVGSVGElement, filename: string) {
   document.body.appendChild(a);
   a.click();
   a.remove();
+}
+
+// ✅ [추가] SVG를 data:image/svg+xml;base64,... 형태로 변환 (서버에 base64만 저장할 때 사용)
+function base64EncodeUnicode(str: string) {
+  return btoa(
+    encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+      String.fromCharCode(parseInt(p1, 16))
+    )
+  );
+}
+
+export function svgToDataUrl(svgEl: SVGSVGElement) {
+  const xml = new XMLSerializer().serializeToString(svgEl);
+  const svg64 = base64EncodeUnicode(xml);
+  return `data:image/svg+xml;base64,${svg64}`;
 }
