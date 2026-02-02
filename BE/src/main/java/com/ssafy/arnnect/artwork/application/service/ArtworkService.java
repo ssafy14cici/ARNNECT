@@ -4,6 +4,8 @@ import com.ssafy.arnnect.artwork.application.dto.request.CreateArtworkRequest;
 import com.ssafy.arnnect.artwork.application.dto.request.UpdateArtworkRequest;
 import com.ssafy.arnnect.artwork.application.dto.response.ArtworkResponse;
 import com.ssafy.arnnect.artwork.application.dto.response.DetailArtworkResponse;
+import com.ssafy.arnnect.artwork.application.dto.response.FieldResponse;
+import com.ssafy.arnnect.artwork.application.dto.response.GenreResponse;
 
 import java.util.List;
 
@@ -15,5 +17,8 @@ public interface ArtworkService {
     DetailArtworkResponse getDetailArtwork(Long artworkId);
     List<ArtworkResponse> getArtworkList();
     List<ArtworkResponse> getArtworkListOfArtist(String memberUuid);
+
+    List<FieldResponse> getFeildList();
+    List<GenreResponse> getGenreList(Integer fieldId);
 
 }

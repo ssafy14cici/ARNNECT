@@ -4,7 +4,11 @@ import com.ssafy.arnnect.artwork.application.dto.request.CreateArtworkRequest;
 import com.ssafy.arnnect.artwork.application.dto.request.UpdateArtworkRequest;
 import com.ssafy.arnnect.artwork.application.dto.response.ArtworkResponse;
 import com.ssafy.arnnect.artwork.application.dto.response.DetailArtworkResponse;
+import com.ssafy.arnnect.artwork.application.dto.response.FieldResponse;
+import com.ssafy.arnnect.artwork.application.dto.response.GenreResponse;
 import com.ssafy.arnnect.artwork.application.service.ArtworkService;
+import com.ssafy.arnnect.common.exception.BusinessException;
+import com.ssafy.arnnect.common.exception.ErrorCode;
 import com.ssafy.arnnect.security.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -53,5 +57,15 @@ public class ArtworkController {
     @GetMapping()
     public ResponseEntity<List<ArtworkResponse>> getArtworkListOfArtist(@RequestParam String artist){
         return ResponseEntity.ok(service.getArtworkListOfArtist(artist));
+    }
+
+    @GetMapping("/field")
+    public ResponseEntity<List<FieldResponse>> getFieldList(){
+        return ResponseEntity.ok(service.getFeildList());
+    }
+
+    @GetMapping("/genre")
+    public ResponseEntity<List<GenreResponse>> getGenreList(@RequestParam Integer fieldId){
+        return ResponseEntity.ok(service.getGenreList(fieldId));
     }
 }

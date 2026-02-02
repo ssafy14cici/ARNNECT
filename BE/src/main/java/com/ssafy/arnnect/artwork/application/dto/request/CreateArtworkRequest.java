@@ -36,6 +36,7 @@ public class CreateArtworkRequest {
                 .size(this.size)
                 .originImageName(imageName.get("origin"))
                 .savedImageName(imageName.get("saved"))
+                .isDeleted(false)
                 .build();
     }
 }
