@@ -1,20 +1,15 @@
 // FE/src/pages/auth/artist/types.ts
 
 export type ArtistStep2 = {
-  displayName: string;
+  nickname: string;
+  birth: string;        // yyyy-MM-dd
   affiliation: string;
-  artMain: string;
-  artSub: string;
-  verified: "YES" | "NO";
-  verifiedFile: File | null;
-  gender: "M" | "F";
-  birthYear: string;
-  birthYearPublic: boolean;
+  debutYear: string;    // 입력은 string → submit에서 number 변환
+  genreId: number | null;
+  sns: string;
 };
 
 export type ArtistStep3 = {
-  contact: string;
-  intro: string;
-  profileImage: File | null;
-  portfolioFile: File | null;
+  document: File | null;       // backend: document (file)
+  artIntroduction: string;      // optional이지만 우선 입력 받는다고 가정
 };
