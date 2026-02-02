@@ -19,7 +19,7 @@ public enum ErrorCode {
     /** FILE **/
     FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "FILE_001", "파일을 찾을 수 없습니다."),
     FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "FILE_002", "파일 업로드에 실패했습니다."),
-    FILE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "FILE_003", "파일 삭제에 실패했습니다.");
+    FILE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "FILE_003", "파일 삭제에 실패했습니다."),
 
     /** ARTWORK **/
     ARTWORK_NOT_DOUND(HttpStatus.NOT_FOUND, "ARTWORK", "작품이 존재하지않습니다.");
