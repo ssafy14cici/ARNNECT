@@ -27,37 +27,31 @@ public class MemberController {
 
     //사용자 등록
     @PostMapping("/users/signup")
-    public ResponseEntity<Void> createMember(
-            @RequestPart("data") CreateMemberRequest request,
-            @RequestPart(value = "file", required = false) MultipartFile file) throws IOException {
-        service.createMember(request, file);
+    public ResponseEntity<Void> createMember(@ModelAttribute CreateMemberRequest request) throws IOException {
+        service.createMember(request);
         return ResponseEntity.ok().build();
     }
 
     //사용자 수정
     @PutMapping("/users/my")
-    public ResponseEntity<Void> putMember(
-            @RequestPart("data") UpdateMemberRequest request,
-            @RequestPart(value = "file", required = false) MultipartFile file) throws IOException {
-        service.updateMember(request, file);
+    public ResponseEntity<Void> putMember(@ModelAttribute UpdateMemberRequest request) throws IOException {
+        String memberUuid = SecurityUtil.getCurrentMemberUuid();
+        service.updateMember(request, memberUuid);
         return ResponseEntity.ok().build();
     }
 
     //예술인 회원가입
     @PostMapping("/artist/signup")
-    public ResponseEntity<Void> createArtist(
-            @RequestPart("data") CreateArtistRequest request,
-            @RequestPart(value = "file", required = false) MultipartFile file) throws IOException {
-        service.createArtist(request, file);
+    public ResponseEntity<Void> createArtist(@ModelAttribute CreateArtistRequest request) throws IOException {
+        service.createArtist(request);
         return ResponseEntity.ok().build();
     }
 
     //예술인 수정
     @PutMapping("/artist/my")
-    public ResponseEntity<Void> putArtist(
-            @RequestPart("data") UpdateArtistRequest request,
-            @RequestPart(value = "file", required = false) MultipartFile file) throws IOException {
-        service.updateArtist(request, file);
+    public ResponseEntity<Void> putArtist(@ModelAttribute UpdateArtistRequest request) throws IOException {
+        String memberUuid = SecurityUtil.getCurrentMemberUuid();
+        service.updateArtist(request, memberUuid);
         return ResponseEntity.ok().build();
     }
 

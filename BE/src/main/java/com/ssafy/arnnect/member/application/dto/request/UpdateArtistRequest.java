@@ -2,6 +2,7 @@ package com.ssafy.arnnect.member.application.dto.request;
 
 import jakarta.validation.constraints.*;
 import lombok.*;
+import org.springframework.web.multipart.MultipartFile;
 
 
 @Getter
@@ -35,4 +36,5 @@ public class UpdateArtistRequest {
     @Size(max = 1000, message = "소개글은 1000자 이하로 작성해주세요.")
     private String introduction;
 
+    MultipartFile image;
 }

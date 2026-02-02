@@ -3,7 +3,8 @@ package com.ssafy.arnnect.common.file;
 public enum FileType {
     PROFILE("profile"),
     ARTWORK("artwork"),
-    REVIEW("review");
+    REVIEW("review"),
+    DOCUMENT("document");
 
     private final String folder;
 

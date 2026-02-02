@@ -12,10 +12,10 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 
 public interface MemberService {
-    void createMember(CreateMemberRequest request, MultipartFile file) throws IOException;
-    void createArtist(CreateArtistRequest request, MultipartFile file) throws IOException;
-    void updateMember(UpdateMemberRequest request, MultipartFile file) throws IOException;
-    void updateArtist(UpdateArtistRequest request, MultipartFile file) throws IOException;
+    void createMember(CreateMemberRequest request) throws IOException;
+    void createArtist(CreateArtistRequest request) throws IOException;
+    void updateMember(UpdateMemberRequest request, String memberUuid) throws IOException;
+    void updateArtist(UpdateArtistRequest request, String memberUuid) throws IOException;
     void deleteMember(String memberUuid) throws IOException;
     MyInfoResponse getMyInfo(String memberUuid, UserRole role);
     MemberInfoResponse getMemberInfo(String myUuid, String memberUuid);

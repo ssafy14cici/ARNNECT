@@ -19,7 +19,8 @@ public class MemberInfoResponse {
     String genreName;
     Integer debutYear;
     String snsPage;
-    String profileImage;
+    String origin_profile_name;
+    String saved_profile_name;
     String introduction;
     String affiliation;
 

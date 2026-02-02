@@ -39,7 +39,7 @@ public class MyInfoResponse {
                 .nickname(member.getNickname())
                 .birth(member.getBirth())
                 .phone(member.getPhone())
-                .originalProfileName(member.getOriginalProfileName())
+                .originalProfileName(member.getOriginProfileImageName())
                 .build();
     }
 
@@ -51,7 +51,7 @@ public class MyInfoResponse {
                 .nickname(artist.getMember().getNickname())
                 .birth(artist.getMember().getBirth())
                 .phone(artist.getMember().getPhone())
-                .originalProfileName(artist.getMember().getOriginalProfileName())
+                .originalProfileName(artist.getMember().getOriginProfileImageName())
                 .document(artist.getDocument())
                 .fieldId(artist.getFieldId())
                 .debutYear(artist.getDebutYear())

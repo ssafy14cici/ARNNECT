@@ -26,6 +26,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -39,96 +41,112 @@ public class MemberServiceImpl implements MemberService{
 
     @Override
     @Transactional
-    public void createMember(CreateMemberRequest request, MultipartFile file) throws IOException {
-        Member member = request.toMemberEntity();
-        member.encodePassword(passwordEncoder.encode(member.getPassword()));
-        if(file != null) {
-            saveProfileImage(member, file);
+    public void createMember(CreateMemberRequest request) throws IOException {
+        Map<String, String> profileImageName = null;
+        try {
+            if(request.getImage() != null && !request.getImage().isEmpty()){
+                profileImageName = fileStorageService.saveFile(request.getImage(), FileType.PROFILE);
+            }
+            Member member = request.toMemberEntity(profileImageName);
+            member.encodePassword(passwordEncoder.encode(member.getPassword()));
+            memberRepo.save(member);
+            log.info("사용자 회원가입 : member => {}",member.toString());
+        } catch (Exception e) {
+            if(request.getImage() != null && !request.getImage().isEmpty()) {
+                fileStorageService.deleteFile(profileImageName.get("saved"), FileType.PROFILE);
+            }
         }
-        log.info("사용자 회원가입 : member => {}",member.toString());
-        memberRepo.save(member);
     }
 
     @Override
     @Transactional
-    public void createArtist(CreateArtistRequest request, MultipartFile file) throws IOException {
-        Member member = request.toMemberEntity();
-        member.encodePassword(passwordEncoder.encode(member.getPassword()));
-        if(file != null) {
-            saveProfileImage(member, file);
+    public void createArtist(CreateArtistRequest request) throws IOException {
+        Map<String, String> profileImageName = null;
+        String documentFileName = fileStorageService.saveFile(request.getDocument(), FileType.DOCUMENT).get("saved");
+        try {
+            if(request.getImage() != null && !request.getImage().isEmpty()){
+                profileImageName = fileStorageService.saveFile(request.getImage(), FileType.PROFILE);
+            }
+            Member member = request.toMemberEntity(profileImageName);
+            member.encodePassword(passwordEncoder.encode(member.getPassword()));
+            Artist artist = request.toArtistEntity(member, documentFileName);
+            artistRepo.save(artist);
+            log.info("예술가 회원가입 : artist => {}",artist.toString());
+        } catch (Exception e) {
+            if(profileImageName != null && !request.getImage().isEmpty()) {
+                fileStorageService.deleteFile(profileImageName.get("saved"), FileType.PROFILE);
+            }
+            fileStorageService.deleteFile(documentFileName, FileType.DOCUMENT);
         }
-        log.info("예술가 회원가입 : member => {}",member.toString());
-
-        Artist artist = request.toArtistEntity(memberRepo.save(member));
-        artistRepo.save(artist);
     }
 
     @Override
     @Transactional
-    public void updateMember(UpdateMemberRequest request, MultipartFile file) throws IOException{
-        String memberUuid = SecurityUtil.getCurrentMemberUuid();
-        Member member = memberRepo.findByMemberUuid(memberUuid)
+    public void updateMember(UpdateMemberRequest request, String memberUuid) throws IOException{
+       Member member = memberRepo.findByMemberUuid(memberUuid)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        String oldSavedProfileImageName = member.getSavedProfileImageName();
+        Map<String, String> profileImageName = null;
 
-        if (request.getPassword() != null) {
-            member.encodePassword(passwordEncoder.encode(request.getPassword()));
+        try{
+            if(request.getImage() != null && !request.getImage().isEmpty()){
+                profileImageName = fileStorageService.saveFile(request.getImage(), FileType.PROFILE);
+            }
+            if(request.getPassword() != null && !request.getPassword().isEmpty()){
+                member.encodePassword(passwordEncoder.encode(member.getPassword()));
+            }
+            member.updateNickname(request.getNickname());
+            if(profileImageName != null){
+                member.updateProfileImage(profileImageName);
+            }
+            memberRepo.save(member);
+            if(profileImageName != null && oldSavedProfileImageName != null){
+                fileStorageService.deleteFile(oldSavedProfileImageName, FileType.PROFILE);
+            }
+        } catch (Exception e) {
+            if(profileImageName != null){
+                fileStorageService.deleteFile(profileImageName.get("saved"), FileType.PROFILE);
+            }
+            throw e;
         }
-        if (request.getNickname() != null) {
-            member.setNickname(request.getNickname());
-        }
-
-        if (file != null) {
-            updateProfileImage(member, file);
-        }
-
-        memberRepo.save(member);
     }
 
     @Override
     @Transactional
-    public void updateArtist(UpdateArtistRequest request, MultipartFile file) throws IOException{
-        String memberUuid = SecurityUtil.getCurrentMemberUuid();
-
-        // Artist 조회 (Member 포함)
+    public void updateArtist(UpdateArtistRequest request, String memberUuid) throws IOException{
         Artist artist = artistRepo.findByMember_MemberUuid(memberUuid)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         Member member = artist.getMember();
+        String oldSavedProfileImageName = member.getSavedProfileImageName();
+        Map<String, String> profileImageName = null;
 
-        // Member 정보 수정
-        if (request.getPassword() != null) {
-            member.encodePassword(passwordEncoder.encode(request.getPassword()));
-        }
-        if (request.getNickname() != null) {
-            member.setNickname(request.getNickname());
-        }
+        try{
+            if(request.getImage() != null && !request.getImage().isEmpty()){
+                profileImageName = fileStorageService.saveFile(request.getImage(), FileType.PROFILE);
+            }
+            if(request.getPassword() != null && !request.getPassword().trim().isEmpty()){
+                String encoded = passwordEncoder.encode(request.getPassword());
+                member.encodePassword(encoded);
+            }
+            if(request.getNickname() != null && !request.getNickname().trim().isEmpty()){
+                member.updateNickname(request.getNickname());
+            }
+            artist.updateArtist(request);
+            if(profileImageName != null){
+                member.updateProfileImage(profileImageName);
+            }
+            memberRepo.save(member);
+            artistRepo.save(artist);
+            if(profileImageName != null && oldSavedProfileImageName != null){
+                fileStorageService.deleteFile(oldSavedProfileImageName, FileType.PROFILE);
+            }
 
-        // Artist 정보 수정
-        if (request.getFieldId() != null) {
-            artist.setFieldId(request.getFieldId());
+        } catch (Exception e) {
+            if(profileImageName != null){
+                fileStorageService.deleteFile(profileImageName.get("saved"), FileType.PROFILE);
+            }
+            throw e;
         }
-        if (request.getGenreId() != null) {
-            artist.setGenreId(request.getGenreId());
-        }
-        if (request.getDebutYear() != null) {
-            artist.setDebutYear(request.getDebutYear());
-        }
-        if (request.getSnsPage() != null) {
-            artist.setSnsPage(request.getSnsPage());
-        }
-        if (request.getAffiliation() != null) {
-            artist.setAffiliation(request.getAffiliation());
-        }
-        if (request.getIntroduction() != null) {
-            artist.setIntroduction(request.getIntroduction());
-        }
-
-        // 파일 처리
-        if (file != null) {
-            updateProfileImage(member, file);
-        }
-
-        memberRepo.save(member);
-        artistRepo.save(artist);
     }
 
     @Override
@@ -136,17 +154,7 @@ public class MemberServiceImpl implements MemberService{
     public void deleteMember(String memberUuid) throws IOException {
         Member member = memberRepo.findByMemberUuid(memberUuid)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-
-        // Soft Delete
-        member.setIsDeleted(true);
-        member.setDeletedAt(LocalDateTime.now());
-
-        // 프로필 이미지 삭제 (선택)
-        if (member.getStoredProfileImage() != null) {
-            fileStorageService.deleteFile(member.getStoredProfileImage(), FileType.PROFILE);
-        }
-
-        memberRepo.save(member);
+        member.deleteMember();
     }
 
     @Override
@@ -171,28 +179,5 @@ public class MemberServiceImpl implements MemberService{
     public Long getMemberId(String memberUuid){
         return memberRepo.findByMemberUuid(memberUuid).orElseThrow(
                 ()-> new BusinessException(ErrorCode.USER_NOT_FOUND)).getMemberId();
-    }
-
-    // 프로필 이미지 저장
-    private void saveProfileImage(Member member, MultipartFile file) throws IOException {
-        FileNameGenerator generator = new FileNameGenerator();
-        String originalFilename = file.getOriginalFilename();
-        String storedName = generator.generateFileName(originalFilename, member.getMemberUuid());
-
-        member.setOriginalProfileName(originalFilename);
-        member.setStoredProfileImage(storedName);
-        fileStorageService.saveFile(file, storedName, FileType.PROFILE);
-    }
-
-    // 프로필 이미지 업데이트
-    private void updateProfileImage(Member member, MultipartFile file) throws IOException {
-        // 기존 파일 삭제
-        String oldStoredName = member.getStoredProfileImage();
-        if (oldStoredName != null) {
-            fileStorageService.deleteFile(oldStoredName, FileType.PROFILE);
-        }
-
-        // 새 파일 저장
-        saveProfileImage(member, file);
     }
 }
