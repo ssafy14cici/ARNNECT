@@ -11,11 +11,7 @@ import Step4Consent from "./ArtistStep4Consent";
 import type { AccountStepValue } from "../utils/validation";
 import type { ArtistStep2, ArtistStep3 } from "./types";
 
-import {
-  checkEmailDupReal,
-  signupArtistReal,
-} from "../../../features/auth/api/real";
-
+import { checkEmailDupReal, signupArtistReal } from "../../../features/auth/api/real";
 import type { SignupArtistRequest } from "../../../features/auth/types";
 
 type StepKey = "ACCOUNT" | "PROFILE" | "PORTFOLIO" | "REVIEW";
@@ -50,7 +46,7 @@ export default function ArtistSignup() {
   const nav = useNavigate();
   const [step, setStep] = useState<number>(0);
 
-  // Step1: account
+  // Step1
   const [a1, setA1] = useState<AccountStepValue>({
     email: "",
     name: "",
@@ -92,13 +88,18 @@ export default function ArtistSignup() {
     return GENRES.find((g) => g.id === a2.genreId)?.ko ?? "";
   }, [a2.genreId]);
 
+  const progressPct = useMemo(() => {
+    const denom = STEPS.length;
+    return Math.round(((step + 1) / denom) * 100);
+  }, [step]);
+
   const setStepSafe = (n: number) => {
     setError(null);
     setStep(Math.min(Math.max(n, 0), STEPS.length - 1));
   };
 
   const handleA1Change = (next: AccountStepValue) => {
-    // ✅ 이메일 변경 시 중복확인 결과 초기화
+    // ✅ 이메일 바뀌면 중복확인 리셋
     if (next.email !== a1.email) {
       setEmailChecked(false);
       setEmailCheckMsg(null);
@@ -124,6 +125,7 @@ export default function ArtistSignup() {
     setEmailCheckMsg(null);
 
     try {
+      // ✅ 서버: boolean만 반환(true=사용가능, false=중복)
       const res = await checkEmailDupReal(email);
       setEmailChecked(res.ok);
       setEmailCheckMsg(res.message);
@@ -234,6 +236,7 @@ export default function ArtistSignup() {
 
       document: a3.document as File,
 
+      // ✅ fieldId 고정(1)
       fieldId: FIXED_FIELD_ID,
       debutYear: Number(a2.debutYear),
       genreId: a2.genreId as number,
@@ -255,123 +258,190 @@ export default function ArtistSignup() {
   };
 
   return (
-    <main className="auth-artist-page">
-      <header className="auth-artist-hero">
-        <h1 className="auth-artist-title">Artist Registration</h1>
-        <p className="auth-artist-sub">Complete your profile to showcase your work.</p>
-      </header>
-
-      <nav className="auth-artist-stepbar">
-        {STEPS.map((k, idx) => (
-          <button
-            key={k}
-            type="button"
-            className={`auth-artist-step ${idx === step ? "active" : ""}`}
-            onClick={() => setStepSafe(idx)}
-            disabled={loading}
-          >
-            {k}
+    <main className="artist-signup-page">
+      {/* LEFT PREVIEW */}
+      <aside className="artist-preview-section">
+        <div className="preview-header">
+          <button type="button" className="back-link" onClick={() => nav(-1)} disabled={loading}>
+            ← Back
           </button>
-        ))}
-      </nav>
+        </div>
 
-      <section className="auth-artist-body">
-        {currentKey === "ACCOUNT" ? (
-          <Step1Account
-            value={a1}
-            onChange={handleA1Change}
-            password2={password2}
-            onChangePassword2={setPassword2}
-            emailChecked={emailChecked}
-            emailCheckMsg={emailCheckMsg}
-            checkingEmail={checkingEmail}
-            onCheckEmail={onCheckEmail}
-            error={error}
-          />
-        ) : null}
+        <div className="preview-card-wrapper">
+          {/* ✅ 프리뷰 컴포넌트 없으면 일단 요약 카드만 */}
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 420,
+              border: "1px solid rgba(200,169,126,0.35)",
+              borderRadius: 12,
+              padding: 24,
+              background: "rgba(255,255,255,0.02)",
+            }}
+          >
+            <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 12, letterSpacing: "0.12em" }}>
+              PREVIEW
+            </div>
+            <div style={{ marginTop: 10, fontSize: 20, fontWeight: 700, color: "#C8A97E" }}>
+              {a2.nickname?.trim() ? a2.nickname : "Artist"}
+            </div>
+            <div style={{ marginTop: 10, color: "rgba(255,255,255,0.75)" }}>
+              {a1.email?.trim() ? a1.email : "example@email.com"}
+            </div>
+            <div style={{ marginTop: 8, color: "rgba(255,255,255,0.6)" }}>
+              장르: {genreLabel || "-"}
+            </div>
+            <div style={{ marginTop: 8, color: "rgba(255,255,255,0.45)", fontSize: 13 }}>
+              step: {currentKey} ({step + 1}/{STEPS.length})
+            </div>
+          </div>
+        </div>
 
-        {currentKey === "PROFILE" ? (
-          <Step2Profile
-            value={a2}
-            onChange={setA2}
-            error={error}
-            loading={loading}
-            onPrev={onPrev}
-            onNext={onNext}
-          />
-        ) : null}
+        <div className="preview-footer">ARNNECT</div>
+      </aside>
 
-        {currentKey === "PORTFOLIO" ? (
-          <Step3Optional
-            value={a3}
-            onChange={setA3}
-            error={error}
-            loading={loading}
-            onPrev={onPrev}
-            onNext={onNext}
-          />
-        ) : null}
+      {/* RIGHT FORM */}
+      <section className="artist-form-section">
+        <div className="form-container">
+          <div className="form-header">
+            <h1 className="form-title">Artist Registration</h1>
+            <p className="form-desc">Complete your profile to showcase your work.</p>
+          </div>
 
-        {currentKey === "REVIEW" ? (
-          <div className="auth-artist-panel">
-            <div className="auth-artist-section">최종 확인</div>
-
-            <div className="auth-review">
-              <div className="auth-review-row">
-                <span>이메일</span>
-                <b>{a1.email}</b>
-              </div>
-              <div className="auth-review-row">
-                <span>이름</span>
-                <b>{a1.name}</b>
-              </div>
-              <div className="auth-review-row">
-                <span>닉네임</span>
-                <b>{a2.nickname}</b>
-              </div>
-              <div className="auth-review-row">
-                <span>생년월일</span>
-                <b>{a2.birth}</b>
-              </div>
-              <div className="auth-review-row">
-                <span>소속</span>
-                <b>{a2.affiliation}</b>
-              </div>
-              <div className="auth-review-row">
-                <span>데뷔연도</span>
-                <b>{a2.debutYear}</b>
-              </div>
-              <div className="auth-review-row">
-                <span>장르</span>
-                <b>
-                  {genreLabel} (genreId={a2.genreId ?? "-"})
-                </b>
-              </div>
-              <div className="auth-review-row">
-                <span>fieldId</span>
-                <b>{FIXED_FIELD_ID} (고정)</b>
-              </div>
-              <div className="auth-review-row">
-                <span>SNS</span>
-                <b>{a2.sns}</b>
-              </div>
-              <div className="auth-review-row">
-                <span>증빙서류</span>
-                <b>{a3.document?.name ?? "-"}</b>
-              </div>
+          {/* Progress */}
+          <div className="progress-container">
+            <div className="progress-track">
+              <div className="progress-fill" style={{ width: `${progressPct}%` }} />
             </div>
 
-            <Step4Consent
-              checked={agree}
-              onChange={setAgree}
-              error={error}
-              loading={loading}
-              onPrev={onPrev}
-              onNext={onSubmit}
-              submitLabel="회원가입 완료"
-            />
+            <div className="progress-labels">
+              {STEPS.map((k, idx) => (
+                <span
+                  key={k}
+                  className={idx === step ? "active" : ""}
+                  style={{ cursor: loading ? "not-allowed" : "pointer" }}
+                  onClick={() => !loading && setStepSafe(idx)}
+                >
+                  {k}
+                </span>
+              ))}
+            </div>
           </div>
-        ) : null}
+
+          {/* Steps */}
+          <div className="step-content">
+            {currentKey === "ACCOUNT" ? (
+              <>
+                <Step1Account
+                  value={a1}
+                  onChange={handleA1Change}
+                  password2={password2}
+                  onChangePassword2={setPassword2}
+                  emailChecked={emailChecked}
+                  emailCheckMsg={emailCheckMsg}
+                  checkingEmail={checkingEmail}
+                  onCheckEmail={onCheckEmail}
+                  error={error}
+                />
+
+                {/* ✅ Step1 전용 Next 버튼 */}
+                <div className="auth-artist-actions" style={{ justifyContent: "flex-end" }}>
+                  <button type="button" className="next-btn" onClick={onNext} disabled={loading}>
+                    Next Step <span className="arrow">→</span>
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            {currentKey === "PROFILE" ? (
+              <Step2Profile
+                value={a2}
+                onChange={setA2}
+                error={error}
+                loading={loading}
+                onPrev={onPrev}
+                onNext={onNext}
+              />
+            ) : null}
+
+            {currentKey === "PORTFOLIO" ? (
+              <Step3Optional
+                value={a3}
+                onChange={setA3}
+                error={error}
+                loading={loading}
+                onPrev={onPrev}
+                onNext={onNext}
+              />
+            ) : null}
+
+            {currentKey === "REVIEW" ? (
+              <div className="auth-artist-panel">
+                <div className="auth-artist-section">최종 확인</div>
+
+                <div className="auth-review">
+                  <div className="auth-review-row">
+                    <span>이메일</span>
+                    <b>{a1.email}</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>이름</span>
+                    <b>{a1.name}</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>닉네임</span>
+                    <b>{a2.nickname}</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>생년월일</span>
+                    <b>{a2.birth}</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>소속</span>
+                    <b>{a2.affiliation}</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>데뷔연도</span>
+                    <b>{a2.debutYear}</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>장르</span>
+                    <b>{genreLabel} (genreId={a2.genreId ?? "-"})</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>fieldId</span>
+                    <b>{FIXED_FIELD_ID} (고정)</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>SNS</span>
+                    <b>{a2.sns}</b>
+                  </div>
+                  <div className="auth-review-row">
+                    <span>증빙서류</span>
+                    <b>{a3.document?.name ?? "-"}</b>
+                  </div>
+                </div>
+
+                <Step4Consent
+                  checked={agree}
+                  onChange={setAgree}
+                  error={error}
+                  loading={loading}
+                  onPrev={onPrev}
+                  onNext={onSubmit}
+                  submitLabel="회원가입 완료"
+                />
+              </div>
+            ) : null}
+          </div>
+
+          <div className="form-footer">
+            Already have an account?
+            <span className="login-link" onClick={() => nav("/login")}>
+              Login
+            </span>
+          </div>
+        </div>
       </section>
     </main>
   );

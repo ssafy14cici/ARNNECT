@@ -374,3 +374,12 @@ select option {
     margin-top: 30px; /* 모바일에서 간격 조금 좁힘 */
   }
 }
+
+.next-btn:hover:not(:disabled) {
+  background: #e0c295;
+  transform: translateY(-2px);
+}
+.next-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
