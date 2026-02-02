@@ -5,7 +5,7 @@
 ========================= */
 :root {
   --bg: #0c0c0c;
-  --line: rgba(255, 255, 255, 0.15); /* 선 색상 */
+  --line: rgba(255, 255, 255, 0.15);
   --text: #ffffff;
   --font-main: "Pretendard", sans-serif;
 }
@@ -19,9 +19,9 @@
   overflow: hidden;
 }
 
-/* =========================================
-   1. FIXED LINES (고정 배경 선)
-   ========================================= */
+/* =========================
+   1) FIXED LINES
+========================= */
 .fixed-lines {
   position: fixed;
   inset: 0;
@@ -29,135 +29,265 @@
   z-index: 0;
 }
 
-/* ★ 세로선: 단 하나 (중앙) */
 .line-vertical-center {
   position: absolute;
-  top: 0; bottom: 0; left: 50%;
+  top: 0;
+  bottom: 0;
+  left: 50%;
   width: 1px;
   background-color: var(--line);
   transform: translateX(-50%);
 }
 
-/* ★ 가로선 1: 상단 25% 지점 */
 .line-horizontal-top {
   position: absolute;
-  top: 25%; left: 0; right: 0;
+  top: 25%;
+  left: 0;
+  right: 0;
   height: 1px;
   background-color: var(--line);
 }
 
-/* ★ 가로선 2 (50%): 없음 (생략) */
-
-/* ★ 가로선 3: 하단 75% 지점 */
 .line-horizontal-bottom {
   position: absolute;
-  top: 75%; left: 0; right: 0;
+  top: 75%;
+  left: 0;
+  right: 0;
   height: 1px;
   background-color: var(--line);
 }
 
-
-/* =========================================
-   2. FIXED HEADER (0% ~ 25% 영역)
-   ========================================= */
+/* =========================
+   2) FIXED HEADER (Top 25%)
+========================= */
 .fixed-header {
   position: fixed;
-  top: 0; left: 0; width: 100%;
-  height: 25%; /* 첫 번째 가로선까지 */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 25%;
   z-index: 50;
-  pointer-events: none;
   display: flex;
+  pointer-events: none;
 }
 
-.header-left, .header-right {
-  width: 50%; height: 100%;
-  display: flex; align-items: center; justify-content: center;
+.header-left,
+.header-right {
+  width: 50%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   pointer-events: auto;
 }
 
-/* 로고 박스 */
 .logo-box {
   border: 1px solid white;
   padding: 10px 8px;
   text-align: center;
 }
+
 .logo-box span {
   font-family: var(--font-main);
-  font-size: 10px; font-weight: 800; line-height: 1.1; letter-spacing: 1px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: 1px;
 }
 
-/* 햄버거 메뉴 */
 .hamburger {
-  width: 24px; height: 1px; background: white;
-  position: relative; cursor: pointer;
+  width: 24px;
+  height: 1px;
+  background: white;
+  position: relative;
+  cursor: pointer;
 }
-.hamburger::before, .hamburger::after {
-  content: ''; position: absolute; left: 0; width: 100%; height: 1px; background: white;
+
+.hamburger::before,
+.hamburger::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: white;
 }
-.hamburger::before { top: -6px; }
-.hamburger::after { top: 6px; }
 
+.hamburger::before {
+  top: -6px;
+}
+.hamburger::after {
+  top: 6px;
+}
 
-/* =========================================
-   3. SNAP SECTIONS
-   ========================================= */
+/* =========================
+   3) MAIN SNAP SCROLL
+========================= */
 .snap-container {
-  width: 100%; height: 100%;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  z-index: 5;
+}
+.snap-container::-webkit-scrollbar {
+  display: none;
+}
+
+.snap-section {
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+  scroll-snap-align: start;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+}
+
+/* middle: 25% ~ 75% */
+.model-area {
+  position: absolute;
+  top: 25%;
+  height: 50%;
+  width: 100%;
+  z-index: 10;
+}
+
+/* =========================
+   4) FIXED FOOTER (Bottom 25%)
+   - Left: fixed indicator
+   - Right: internal scroller (synced)
+========================= */
+.fixed-footer {
+  position: fixed;
+  top: 75%;
+  left: 0;
+  width: 100%;
+  height: 25%;
+  z-index: 60;
+  display: flex;
+  pointer-events: none;
+}
+
+.footer-left,
+.footer-right {
+  width: 50%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 왼쪽은 표시만: 이벤트 받을 필요 없으면 그대로 */
+.footer-left {
+  pointer-events: none;
+}
+
+.scroll-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.6;
+}
+
+.scroll-text {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+}
+
+.scroll-line {
+  width: 1px;
+  height: 30px;
+  background: white;
+}
+
+/* 오른쪽은 스크롤/클릭 허용 */
+.footer-right {
+  pointer-events: auto;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 0;
+}
+
+/* 오른쪽 하단 메뉴 자체 스크롤 */
+.menu-scroller {
+  width: 100%;
+  height: 100%;
   overflow-y: scroll;
   scroll-snap-type: y mandatory;
   scrollbar-width: none;
 }
-.snap-container::-webkit-scrollbar { display: none; }
+.menu-scroller::-webkit-scrollbar {
+  display: none;
+}
 
-.snap-section {
-  position: relative;
-  width: 100vw; height: 100dvh;
+/* 메뉴 각 아이템은 footer 높이(25%)와 동일 -> snap */
+.menu-item {
+  height: 100%;
+  width: 100%;
   scroll-snap-align: start;
-  overflow: hidden;
-  /* 섹션 바닥 구분선 (100% 지점) */
-  border-bottom: 1px solid var(--line);
-}
-
-/* 3D Model Area (25% ~ 75% 영역) */
-.model-area {
-  position: absolute;
-  top: 25%; 
-  height: 50%; /* 높이 50% 차지 */
-  width: 100%;
-  z-index: 5;
-}
-
-/* Text Info Area (75% ~ 100% 영역) */
-.info-area {
-  position: absolute;
-  top: 75%;
-  height: 25%; /* 높이 25% 차지 */
-  width: 100%;
-  z-index: 10;
-  pointer-events: none;
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  cursor: pointer;
+  opacity: 0.65;
+  transition: opacity 0.15s ease;
 }
 
-.info-left, .info-right {
-  width: 50%; height: 100%;
-  position: relative;
-  display: flex; align-items: center; justify-content: center;
+.menu-item.active {
+  opacity: 1;
 }
 
-/* SCROLL (왼쪽 하단) */
-.scroll-content {
-  display: flex; flex-direction: column; align-items: center; gap: 8px; opacity: 0.6;
+.index-text {
+  font-family: monospace;
+  font-size: 10px;
+  margin-bottom: 6px;
+  opacity: 0.75;
 }
-.scroll-text { font-size: 9px; letter-spacing: 0.2em; }
-.scroll-line { width: 1px; height: 30px; background: white; }
 
-/* TITLE (오른쪽 하단) */
-.info-right {
-  flex-direction: column; text-align: center;
+.main-title {
+  font-family: var(--font-main);
+  font-size: 1.8rem;
+  font-weight: 500;
+  margin: 0;
+  line-height: 1;
+  text-transform: uppercase;
 }
-.index-text { font-family: monospace; font-size: 10px; margin-bottom: 6px; opacity: 0.7; }
-.main-title { 
-  font-family: var(--font-main); 
-  font-size: 1.8rem; font-weight: 500; margin: 0; line-height: 1; text-transform: uppercase;
+
+.arrow-down {
+  margin-top: 10px;
+  font-size: 14px;
+  opacity: 0.5;
 }
-.arrow-down { margin-top: 10px; font-size: 14px; opacity: 0.5; }
+
+/* 선택: 현재 섹션 path로 바로 이동 버튼 */
+.menu-enter {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  pointer-events: auto;
+  background: transparent;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  padding: 6px 10px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.menu-enter:hover {
+  opacity: 1;
+}
+
+/* 접근성: 모션 민감 사용자 */
+@media (prefers-reduced-motion: reduce) {
+  .menu-item {
+    transition: none;
+  }
+}

@@ -1,12 +1,12 @@
 // FE/src/features/fanLetter/ui/FanLetterSendModal.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./fanLetterSendModal.css";
 
 type Props = {
   open: boolean;
-  artworkTitle: string;
-  artistName?: string;
   sending?: boolean;
+  artworkTitle: string;
+  artistName: string;
 
   onClose: () => void;
   onSend: (content: string) => void;
@@ -14,76 +14,78 @@ type Props = {
 
 export default function FanLetterSendModal({
   open,
+  sending = false,
   artworkTitle,
   artistName,
-  sending = false,
   onClose,
   onSend,
 }: Props) {
   const [content, setContent] = useState("");
 
   useEffect(() => {
-    if (!open) return;
-    setContent("");
+    if (!open) setContent("");
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  const disabled = useMemo(() => {
+    if (!open) return true;
+    if (sending) return true;
+    if (!content.trim()) return true;
+    return false;
+  }, [open, sending, content]);
 
   if (!open) return null;
 
+  const close = () => {
+    if (sending) return;
+    onClose();
+  };
+
   const submit = () => {
-    const v = content.trim();
-    if (!v) return;
-    onSend(v);
+    if (disabled) return;
+    onSend(content.trim());
   };
 
   return (
-    <div className="fl-modal-overlay" onMouseDown={onClose}>
-      <div className="fl-modal-box" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="fl-modal-head">
-          <h2 className="fl-modal-title">Fan Letter</h2>
-          <button className="fl-modal-close" onClick={onClose} type="button" aria-label="close">
-            ×
+    <div className="fl-backdrop" onMouseDown={close}>
+      <div className="fl-modal" onMouseDown={(e) => e.stopPropagation()}>
+        <header className="fl-header">
+          <div className="fl-title">Fan Letter</div>
+          <button type="button" className="fl-x" onClick={close} disabled={sending}>
+            ✕
           </button>
+        </header>
+
+        <div className="fl-body">
+          <div className="fl-row">
+            <label className="fl-label">Artwork</label>
+            <input className="fl-input" value={artworkTitle} readOnly />
+          </div>
+
+          <div className="fl-row">
+            <label className="fl-label">To</label>
+            <input className="fl-input" value={artistName} readOnly />
+          </div>
+
+          <div className="fl-row">
+            <label className="fl-label">Message</label>
+            <textarea
+              className="fl-textarea"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              rows={8}
+              placeholder="작가에게 전할 메시지를 작성하세요."
+            />
+          </div>
         </div>
 
-        <div className="fl-modal-meta">
-          <div className="fl-meta-row">
-            <span className="fl-meta-label">To</span>
-            <span className="fl-meta-value">{artistName ?? "Artist"}</span>
-          </div>
-          <div className="fl-meta-row">
-            <span className="fl-meta-label">Artwork</span>
-            <span className="fl-meta-value">{artworkTitle}</span>
-          </div>
-        </div>
-
-        <textarea
-          className="fl-modal-textarea"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="작가에게 보낼 메시지를 작성하세요..."
-          rows={8}
-          disabled={sending}
-        />
-
-        <div className="fl-modal-actions">
-          <button className="fl-btn ghost" onClick={onClose} type="button" disabled={sending}>
+        <footer className="fl-footer">
+          <button type="button" className="fl-btn ghost" onClick={close} disabled={sending}>
             Cancel
           </button>
-          <button className="fl-btn primary" onClick={submit} type="button" disabled={sending || !content.trim()}>
+          <button type="button" className="fl-btn primary" onClick={submit} disabled={disabled}>
             {sending ? "Sending..." : "Send"}
           </button>
-        </div>
-
-        <p className="fl-modal-hint">* 팬레터는 발송 후 수정/삭제 정책이 API에 맞춰질 예정입니다.</p>
+        </footer>
       </div>
     </div>
   );

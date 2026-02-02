@@ -2,28 +2,11 @@
 
 import React from 'react';
 import './FeedCard.css';
-
-// ✅ 1. 별도 파일 없이 여기에 타입을 직접 정의합니다.
-export type ViewMode = 'GRID' | 'LIST';
-export type FeedRole = 'ARTIST' | 'USER';
-
-export interface FeedData {
-  id: string;
-  role: FeedRole;     // 'ARTIST' 또는 'USER'
-  title: string;
-  excerpt?: string;   // 요약글 (있을 수도 없을 수도 있음)
-  authorName: string;
-  authorId: string;
-  createdAt: string;
-  imageUrl?: string;  // 이미지 URL (없으면 텍스트 모드)
-  category?: string;
-  likes?: number;
-  views?: number;
-}
+import type { FeedItem, ViewMode } from "../types"; 
 
 interface FeedCardProps {
-  feed: FeedData;     // 위에서 정의한 타입 사용
-  viewMode: ViewMode; 
+  feed: FeedItem;
+  viewMode: ViewMode;
   onClick?: () => void;
   onAuthorClick?: (e: React.MouseEvent) => void;
 }
@@ -72,10 +55,9 @@ export const FeedCard: React.FC<FeedCardProps> = ({
       {/* 1. 이미지 영역 */}
       <div className="card-img-box">
         {/* 뱃지 */}
-        <div className={`card-badge ${feed.role === 'ARTIST' ? 'artist' : 'user'}`}>
-          <BadgeIcon role={feed.role} />
+        <div className={`card-badge ${feed.authorRole === "ARTIST" ? "artist" : "user"}`}>
+          <BadgeIcon role={feed.authorRole} />
         </div>
-
         {hasImage ? (
           <img className="card-img" src={feed.imageUrl} alt={feed.title} loading="lazy" />
         ) : (

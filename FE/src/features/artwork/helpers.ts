@@ -41,11 +41,23 @@ export type ArtworkDetailData = ArtworkBase & {
   tags: string[]; // UI에서 map 돌리기 편하게 최종은 mutable array
 };
 
-/** "a12" / "12" / 12 → 12 로 통일 */
+/** ✅ URL/피드에서 넘어오는 id를 작품 id 규칙으로 정규화 */
+function normalizeArtworkId(raw: unknown): string {
+  const s = String(raw ?? "").trim();
+  if (!s) return "";
+
+  // /artworks/artwork-a1 같이 들어오는 케이스 방어
+  // (review-는 여기서 들어오면 원래 잘못된 거지만, 그래도 제거해두면 안전)
+  return s.replace(/^artwork-/, "").replace(/^review-/, "");
+}
+
+/** ✅ "a12" / "12" / 12 / "artwork-a12" → 12 로 통일 */
 export function toArtworkNumericId(id: unknown): number | null {
+  const normalizedRaw = normalizeArtworkId(id);
+
   if (typeof id === "number" && Number.isFinite(id)) return id;
 
-  const s = String(id ?? "").trim();
+  const s = normalizedRaw;
   if (!s) return null;
 
   // "a12" → "12"
@@ -60,7 +72,9 @@ export function toArtworkNumericId(id: unknown): number | null {
 }
 
 export const getMockArtworkData = (baseArtwork: ArtworkBase): ArtworkDetailData => {
-  const artworkNumber = String(baseArtwork.id).replace("a", "");
+  // ✅ id가 "artwork-a1" 같이 들어와도 정상화
+  const rawId = normalizeArtworkId(baseArtwork.id);
+  const artworkNumber = String(rawId).replace(/^a/, "");
 
   const title = baseArtwork.title || `Garsington Opera Pavilion #${artworkNumber}`;
 
@@ -85,24 +99,27 @@ export const getMockArtworkData = (baseArtwork: ArtworkBase): ArtworkDetailData 
 };
 
 export const findArtworkById = (list: readonly ArtworkBase[], id?: string) => {
-  if (!id) return null;
+  const normalized = normalizeArtworkId(id);
+  if (!normalized) return null;
 
-  const urlId = String(id);
+  const urlId = String(normalized);
 
   return (
     list.find((item) => {
-      const itemId = String(item.id);
+      const itemId = String(normalizeArtworkId(item.id));
 
+      // 1) 문자열 직접 매칭: "a1" vs "a1", "1" vs "a1" 등 허용
       if (
         itemId === urlId ||
         itemId === `a${urlId}` ||
-        itemId.replace("a", "") === urlId.replace("a", "")
+        itemId.replace(/^a/, "") === urlId.replace(/^a/, "")
       ) {
         return true;
       }
 
-      const numericUrlId = parseInt(urlId.replace("a", ""), 10);
-      const numericItemId = parseInt(itemId.replace("a", ""), 10);
+      // 2) 숫자 규칙 매칭: 1000 이상 보정 규칙 포함
+      const numericUrlId = parseInt(urlId.replace(/^a/, ""), 10);
+      const numericItemId = parseInt(itemId.replace(/^a/, ""), 10);
 
       if (Number.isNaN(numericUrlId) || Number.isNaN(numericItemId)) return false;
 

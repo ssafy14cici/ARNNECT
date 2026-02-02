@@ -58,7 +58,7 @@ export type ApiEnvelope<T> = {
 };
 
 /**
- * 팬레터 발송 입력(ArtworkDetail에서 사용)
+ * 팬레터 발송 입력(ArtworkDetail/Compose에서 사용)
  *
  * ✅ 표준 필드: artistMemberUuid, fromNickname, content, artworkId/artworkName
  * ✅ 레거시 호환: senderName, artworkTitle도 허용(기존 코드 깨지지 않게)
@@ -77,14 +77,14 @@ export type FanLetterSendInput = {
 
   content: string;
 
-  // 목업에서만 추가로 저장하고 싶으면 옵션으로 들고 있어도 됨(백엔드에는 안 보냄)
+  // mock에서만 추가로 저장하고 싶으면 옵션으로 들고 있어도 됨(백엔드에는 안 보냄)
   senderId?: string;
   artistName?: string;
 };
 
 /**
  * 내부에서 쓰는 "정규화된" 발송 payload
- * (api/index.ts에서 normalize해서 mock/real로 전달)
+ * (api.ts에서 normalize해서 mock/real로 전달)
  */
 export type FanLetterSendPayload = {
   artistMemberUuid: string;
