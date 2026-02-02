@@ -9,9 +9,13 @@ import "./styles/global.css";
 import { useAuthStore } from "./features/auth/store";
 import { seedMockDB } from "./mocks";
 
-// ✅ 기본값: 목업 ON
-// - VITE_USE_MOCK="false"로만 끌 수 있게 해두면, dev에서 실API 붙일 때만 OFF 하면 됨
-const USE_MOCK = import.meta.env.VITE_USE_MOCK !== "false";
+import { USE_MOCK } from "./shared/config/env";
+
+if (import.meta.env.DEV && USE_MOCK) {
+  seedMockDB();
+}
+
+
 
 if (import.meta.env.DEV) {
   // 콘솔에서 __auth.getState() 확인용
