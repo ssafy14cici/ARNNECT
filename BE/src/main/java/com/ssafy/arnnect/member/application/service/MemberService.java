@@ -14,4 +14,5 @@ public interface MemberService {
     void deleteMember(String memberUuid);
     MyInfoResponse getMyInfo(String memberUuid, UserRole role);
     MemberInfoResponse getMemberInfo(String myUuid, String memberUuid);
+    Long getMemberId(String memberUuid);
 }
