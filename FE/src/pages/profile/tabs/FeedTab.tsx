@@ -1,16 +1,12 @@
-// FE/src/pages/profile/tabs/FeedTab.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
-// ✅ LocalMode -> LocalRole로 변경된 타입 반영
-import {
-  listPostsByAuthor,
-  subscribePostsUpdated,
-  type LocalRole,
-} from "../../../features/posts/local";
 
+import { listPostsByAuthor, subscribePostsUpdated } from "../../../features/feed/posts/api";
 import { useAuthStore } from "../../../features/auth/store";
 import type { ProfileOutletContext } from "../Profile";
 import "./profileTabs.css";
+
+type LocalMode = "ARTIST" | "USER";
 
 type GridItem = {
   id: string;
@@ -18,16 +14,32 @@ type GridItem = {
   createdAt: string;
 };
 
+type PostLike = {
+  id: string | number;
+  imageUrl?: string | null;
+  createdAt?: string | null;
+};
+
+function toPostLikes(value: unknown): PostLike[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((v) => (typeof v === "object" && v !== null ? (v as Partial<PostLike>) : null))
+    .filter((v): v is Partial<PostLike> => Boolean(v))
+    .map((v) => ({
+      id: v.id ?? "",
+      imageUrl: v.imageUrl ?? null,
+      createdAt: v.createdAt ?? null,
+    }))
+    .filter((v) => v.id !== "");
+}
+
 export default function FeedTab() {
   const nav = useNavigate();
-  const { id } = useParams();
+  const { memberUuid } = useParams(); // ✅ routes.tsx: ":memberUuid"
   const { profile } = useOutletContext<ProfileOutletContext>();
 
   const authUser = useAuthStore((s) => s.user);
-  const effectiveProfileId = authUser?.memberUuid ?? "";
-
-  const rawProfileId = id ?? "";
-  const [tick, setTick] = useState(0);
+  const rawProfileId = memberUuid ?? "";
 
 
 
@@ -37,32 +49,40 @@ export default function FeedTab() {
     [profile.role],
   );
 
+  const [items, setItems] = useState<GridItem[]>([]);
+  const loadRef = useRef<() => void>(() => {});
+
   useEffect(() => {
-    const unsub = subscribePostsUpdated(() => setTick((t) => t + 1));
-    return () => unsub();
+    loadRef.current = () => {
+      if (!effectiveProfileId) {
+        setItems([]);
+        return;
+      }
+
+      const raw = listPostsByAuthor(effectiveProfileId, mode) as unknown;
+      const posts = toPostLikes(raw);
+
+      const next: GridItem[] = posts
+        .filter((p) => typeof p.imageUrl === "string" && p.imageUrl.trim().length > 0)
+        .map((p) => ({
+          id: String(p.id),
+          imageUrl: p.imageUrl!.trim(),
+          createdAt: typeof p.createdAt === "string" ? p.createdAt : "",
+        }))
+        .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+
+      setItems(next);
+    };
+
+    loadRef.current();
+  }, [effectiveProfileId, mode]);
+
+  useEffect(() => {
+    const unsub = subscribePostsUpdated(() => loadRef.current());
+    return () => {
+      if (typeof unsub === "function") unsub();
+    };
   }, []);
-
-  const items: GridItem[] = useMemo(() => {
-    if (!effectiveProfileId) return [];
-
-    // ✅ listPostsByAuthor 호출 시 role 전달
-    const posts = listPostsByAuthor(effectiveProfileId, role);
-
-    return posts
-      .map((p) => {
-        // ✅ [핵심 수정] 이미지가 배열(imageUrls)에 있든 문자열(imageUrl)에 있든 다 찾아냄
-        const img = (Array.isArray(p.imageUrls) ? p.imageUrls[0] : undefined) ?? p.imageUrl;
-        
-        return {
-          id: p.id,
-          imageUrl: img ?? "",
-          createdAt: p.createdAt ?? "",
-        };
-      })
-      // ✅ 이미지가 존재하는 것만 필터링 (빈 문자열 제외)
-      .filter((p) => p.imageUrl.trim().length > 0)
-      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
-  }, [effectiveProfileId, role, tick]);
 
   const goDetail = (contentId: string) => {
     // ✅ Role에 따라 상세 페이지 분기
@@ -74,12 +94,7 @@ export default function FeedTab() {
     <div className="tab-container">
       <div className="tab-grid-3">
         {items.map((it) => (
-          <button
-            key={it.id}
-            type="button"
-            className="feed-item-btn"
-            onClick={() => goDetail(it.id)}
-          >
+          <button key={it.id} type="button" className="feed-item-btn" onClick={() => goDetail(it.id)}>
             <img
               src={it.imageUrl}
               alt=""

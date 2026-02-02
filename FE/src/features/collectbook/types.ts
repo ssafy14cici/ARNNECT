@@ -1,4 +1,4 @@
-// FE/src/types/collectbook.ts
+// FE/src/features/collectbook/types.ts
 export type Visibility = "private" | "public";
 
 export type ExhibitionLite = {
@@ -11,11 +11,13 @@ export type ExhibitionLite = {
 };
 
 export type CollectBookItem = {
-  id: string;          // local id (BE 붙으면 collect_book_id로 대체될 수 있음)
-  ticketCode: string;  // QR에서 읽은 ticket_code
+  id: string;
+  ownerUuid: string;   // ✅ 추가: 이 콜렉션의 주인
+  ticketCode: string;
   exhibition: ExhibitionLite;
   memo?: string;
-  visitedAt: string;   // YYYY-MM-DD
+  visitedAt: string;
   visibility: Visibility;
-  scannedAt: string;   // ISO string
+  scannedAt: string;
 };
+

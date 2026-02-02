@@ -1,3 +1,5 @@
+//FE/src/pages/auth/user/UserSignup.tsx
+
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./usersignup.css"; // CSS 파일명 확인

@@ -1,3 +1,4 @@
+// FE/src/app/layouts/Footer.tsx
 import { Link } from "react-router-dom";
 import "../../styles/footer.css";
 

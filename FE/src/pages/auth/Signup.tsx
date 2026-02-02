@@ -1,3 +1,5 @@
+//FE/src/pages/auth/Signup.tsx
+
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import "./signup.css"; 

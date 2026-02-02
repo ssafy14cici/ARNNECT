@@ -5,41 +5,83 @@ import ProfileHeader from "./components/ProfileHeader";
 import "./profile.css";
 
 import { profileApi } from "../../features/profile/api";
-import type { ArtistProfile, UserProfile, ProfileRole } from "../../features/profile/types";
-
-type ProfileModel = ArtistProfile | UserProfile;
+import type { ProfileModel } from "../../features/profile/types";
+import { useAuthStore } from "../../features/auth/store";
+import "./profile.css";
 
 export type ProfileOutletContext = {
   profile: ProfileModel;
   isOwner: boolean;
 };
 
-type ProfileProps = {
-  role: ProfileRole; // "USER" | "ARTIST"  (routes.tsx에서 주입)
-};
+export default function Profile() {
+  const { memberUuid } = useParams(); // ✅ routes.tsx: ":memberUuid"
+  const profileId = memberUuid ?? "";
 
-export default function Profile({ role }: ProfileProps) {
-  const navigate = useNavigate();
+  const authUser = useAuthStore((s) => s.user); // { memberUuid, name } | null
 
-  // ✅ 단순 로직: 이 페이지는 "내 프로필" 전용
-  const isOwner = true;
+  const isOwner = useMemo(() => {
+    if (profileId === "me") return true;
+    if (!profileId) return false;
+    return authUser?.memberUuid === profileId;
+  }, [profileId, authUser?.memberUuid]);
 
   const [profile, setProfile] = useState<ProfileModel | null>(null);
 
   // ✅ 네트워크 X: profileApi가 하드코딩 반환(Promise)
   useEffect(() => {
     (async () => {
-      if (role === "ARTIST") {
-        const p = await profileApi.getArtistProfile("artist");
-        setProfile(p);
-      } else {
-        const p = await profileApi.getUserProfile("user");
-        setProfile(p);
+      try {
+        if (!profileId) throw new Error("프로필 ID가 없습니다.");
+
+        // ✅ 내 프로필
+        if (profileId === "me") {
+          const p = await profileApi.getMyProfile();
+          if (cancelled || reqSeq.current !== mySeq) return;
+          setProfile(p);
+          return;
+        }
+
+        // ✅ 타인 프로필: artist → 실패 시 user fallback
+        try {
+          const a = await profileApi.getArtistProfile(profileId);
+          if (cancelled || reqSeq.current !== mySeq) return;
+          setProfile(a);
+        } catch {
+          const u = await profileApi.getUserProfile(profileId);
+          if (cancelled || reqSeq.current !== mySeq) return;
+          setProfile(u);
+        }
+      } catch (e) {
+        if (cancelled || reqSeq.current !== mySeq) return;
+        setError(e instanceof Error ? e.message : "프로필 로딩 실패");
+      } finally {
+        // ✅ 핵심: 정상 케이스에서 loading을 반드시 false로
+        if (!cancelled && reqSeq.current === mySeq) {
+          setLoading(false);
+        }
       }
     })();
-  }, [role]);
 
-  const viewedIsArtist = useMemo(() => role === "ARTIST", [role]);
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId]);
+
+  const navigate = useNavigate();
+  const goWrite = () => navigate("/posts/create");
+
+  if (loading) {
+    return (
+      <div className="profile-loading">
+        <div className="spinner" />
+      </div>
+    );
+  }
+  if (error) return <div className="profile-error">{error}</div>;
+  if (!profile) return <div className="profile-error">프로필을 찾을 수 없습니다.</div>;
+
+  const viewedIsArtist = profile.role === "ARTIST";
   const themeClass = viewedIsArtist ? "theme-artist" : "theme-user";
 
   const goWrite = () => navigate("/posts/create");
@@ -72,7 +114,7 @@ export default function Profile({ role }: ProfileProps) {
         </div>
 
         <main className="profile-content">
-          <Outlet context={{ profile, isOwner } satisfies ProfileOutletContext} />
+          <Outlet context={{ profile, isOwner } as ProfileOutletContext} />
         </main>
 
         {isOwner && (

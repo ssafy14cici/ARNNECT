@@ -1,49 +1,81 @@
+// FE/src/features/fanLetter/api.ts
+import { http } from "../../shared/api/http";
 import type {
   ApiEnvelope,
   FanLetter,
   FanLetterAnswerRequest,
   FanLetterId,
   FanLetterRaw,
+  FanLetterSendInput,
+  FanLetterSendPayload,
 } from "./types";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ""; // 예: "https://i14e107.p.ssafy.io:8000"
-const PREFIX = "/api/v1/fanletters";
+// ✅ 레거시 호환: 기존 코드가 FanLetterCreateReq를 import해도 깨지지 않게 alias 제공
+export type FanLetterCreateReq = FanLetterSendInput;
 
-/**
- * Cookie 기반 인증(명세: HttpOnly Cookie) 대응을 위해 기본적으로 credentials 포함
- * 토큰 헤더가 필요하면 init.headers에 추가하면 됨.
- */
-async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.headers ?? {}),
-    },
-  });
+const USE_MOCK =
+  String((import.meta as any).env?.VITE_USE_MOCK) === "true" || Boolean((import.meta as any).env?.DEV);
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `HTTP ${res.status} ${res.statusText}${text ? ` - ${text}` : ""}`,
-    );
+const KEY = "arnnect_mock_fanletters_v1";
+
+// ---------- utils ----------
+function safeParse<T>(raw: string | null, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
   }
-
-  // 204/빈 바디 방어
-  const text = await res.text().catch(() => "");
-  if (!text) return undefined as T;
-
-  const json = JSON.parse(text) as unknown;
-
-  // 대부분 { ..., data } 래핑. 래핑 없을 가능성도 고려.
-  if (json && typeof json === "object" && "data" in (json as any)) {
-    return (json as ApiEnvelope<T>).data as T;
-  }
-  return json as T;
 }
 
-function mapRawToFanLetter(raw: FanLetterRaw): FanLetter {
+function nowISO() {
+  return new Date().toISOString();
+}
+
+function toYMD(iso = nowISO()) {
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// ---------- pubsub (mock 갱신용) ----------
+const listeners = new Set<() => void>();
+
+export function subscribeFanLettersUpdated(cb: () => void) {
+  listeners.add(cb);
+  return () => listeners.delete(cb);
+}
+
+function emit() {
+  listeners.forEach((fn) => fn());
+}
+
+// ---------- normalize ----------
+function normalizeSendInput(input: FanLetterSendInput): FanLetterSendPayload {
+  const artistMemberUuid = (input.artistMemberUuid ?? "").trim();
+  if (!artistMemberUuid) throw new Error("artistMemberUuid is required");
+
+  const fromNickname = (input.fromNickname ?? input.senderName ?? "").trim() || "익명";
+  const artworkName = (input.artworkName ?? input.artworkTitle ?? "").trim();
+
+  const content = (input.content ?? "").trim();
+  if (!content) throw new Error("content is required");
+
+  return {
+    artistMemberUuid,
+    artworkId: input.artworkId,
+    artworkName: artworkName || undefined,
+    fromNickname,
+    content,
+    senderId: input.senderId,
+    artistName: input.artistName,
+  };
+}
+
+// ---------- raw -> view ----------
+function toFanLetter(raw: FanLetterRaw): FanLetter {
   return {
     id: raw.fanLetterId,
     fromNickname: raw.nickname,
@@ -51,51 +83,92 @@ function mapRawToFanLetter(raw: FanLetterRaw): FanLetter {
     createdAt: raw.date,
     artworkId: raw.artworkId,
     artworkName: raw.artworkName,
-    isAnswered: Boolean(raw.answered),
+    isAnswered: raw.answered,
     answer: raw.answer,
   };
 }
 
-/** 작가가 받은 팬레터 전체 조회 */
-export async function fetchArtistFanLetters(
-  artistMemberUuid: string,
-): Promise<FanLetter[]> {
-  const data = await apiFetch<FanLetterRaw[]>(
-    `${PREFIX}/all?artist=${encodeURIComponent(artistMemberUuid)}`,
-  );
-  return (data ?? []).map(mapRawToFanLetter);
+// ---------- mock store ----------
+function loadAll(): FanLetterRaw[] {
+  return safeParse<FanLetterRaw[]>(localStorage.getItem(KEY), []);
+}
+function saveAll(items: FanLetterRaw[]) {
+  localStorage.setItem(KEY, JSON.stringify(items));
+}
+function nextId(items: FanLetterRaw[]): number {
+  const max = items.reduce((acc, cur) => Math.max(acc, cur.fanLetterId), 0);
+  return max + 1;
 }
 
-/** 답장 등록(미답변 → 답변완료) */
-export async function createFanLetterAnswer(
-  fanLetterId: FanLetterId,
-  answer: string,
-): Promise<void> {
-  const body: FanLetterAnswerRequest = { answer };
-  // 응답에 data 없음(명세) → void 처리
-  await apiFetch<void>(`${PREFIX}/${fanLetterId}/answer`, {
-    method: "POST",
-    body: JSON.stringify(body),
+// ---------- APIs ----------
+/** (artist) 특정 작가의 팬레터 목록 */
+export async function listFanLettersForArtist(artistMemberUuid: string): Promise<FanLetter[]> {
+  if (USE_MOCK) {
+    const all = loadAll();
+    return all
+      .filter((x) => x.artistMemberUuid === artistMemberUuid)
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+      .map(toFanLetter);
+  }
+
+  const res = await http.get<ApiEnvelope<FanLetterRaw[]>>(`/fanletters/all`, {
+    params: { artist: artistMemberUuid },
   });
+
+  const raws = res?.data?.data ?? [];
+  return (raws ?? []).map(toFanLetter);
 }
 
-/** 답장 수정(답변완료 상태) */
-export async function updateFanLetterAnswer(
-  fanLetterId: FanLetterId,
-  answer: string,
-): Promise<void> {
-  const body: FanLetterAnswerRequest = { answer };
-  await apiFetch<void>(`${PREFIX}/${fanLetterId}/answer`, {
-    method: "PUT",
-    body: JSON.stringify(body),
+/** (user) 팬레터 발송 */
+export async function sendFanLetter(input: FanLetterSendInput): Promise<FanLetterId | void> {
+  const payload = normalizeSendInput(input);
+
+  if (USE_MOCK) {
+    const all = loadAll();
+    const id = nextId(all);
+
+    const raw: FanLetterRaw = {
+      fanLetterId: id,
+      artworkId: payload.artworkId,
+      artworkName: payload.artworkName,
+      nickname: payload.fromNickname,
+      content: payload.content,
+      date: toYMD(nowISO()),
+      answered: false,
+      answer: undefined,
+      artistMemberUuid: payload.artistMemberUuid,
+    };
+
+    saveAll([raw, ...all]);
+    emit();
+    return id;
+  }
+
+  await http.post(`/fanletters`, {
+    artistMemberUuid: payload.artistMemberUuid,
+    artworkId: payload.artworkId,
+    artworkName: payload.artworkName,
+    nickname: payload.fromNickname,
+    content: payload.content,
   });
+
+  return;
 }
 
-/** 답장 삭제(답변완료 → 미답변) */
-export async function deleteFanLetterAnswer(
-  fanLetterId: FanLetterId,
-): Promise<void> {
-  await apiFetch<void>(`${PREFIX}/${fanLetterId}/answer`, {
-    method: "DELETE",
-  });
+/** (artist) 팬레터 답변 */
+export async function answerFanLetter(fanLetterId: number, req: FanLetterAnswerRequest): Promise<void> {
+  const answer = (req.answer ?? "").trim();
+  if (!answer) throw new Error("answer is required");
+
+  if (USE_MOCK) {
+    const all = loadAll();
+    const next = all.map((x) =>
+      x.fanLetterId === fanLetterId ? { ...x, answered: true, answer } : x,
+    );
+    saveAll(next);
+    emit();
+    return;
+  }
+
+  await http.post(`/fanletters/${fanLetterId}/answer`, { answer });
 }
