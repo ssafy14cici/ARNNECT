@@ -319,38 +319,14 @@ export async function mountExhibitRoom(
               try {
                 const tex = await texLoader.loadAsync(item.imageUrl);
                 tex.colorSpace = THREE.SRGBColorSpace;
+                // GLB UV를 그대로 사용 (flipY=false는 GLB 표준)
                 tex.flipY = false;
-
-                // 패널 geometry 비율 계산
-                const geo = mesh.geometry as THREE.BufferGeometry;
-                geo.computeBoundingBox();
-                const bb = geo.boundingBox!;
-                const sz = new THREE.Vector3();
-                bb.getSize(sz);
-                // 두 큰 축 = 패널 w/h (세 번째는 두께)
-                const axes = [sz.x, sz.y, sz.z].sort((a, b) => b - a);
-                const panelW = axes[0], panelH = axes[1];
-                const panelAspect = panelW / (panelH || 1);
-
-                // 이미지 비율
-                const imgW = tex.image.width || 1;
-                const imgH = tex.image.height || 1;
-                const imgAspect = imgW / imgH;
-
-                // "cover" fit: 패널을 꽉 채우되 이미지 중앙 정렬
-                if (imgAspect > panelAspect) {
-                  // 이미지가 더 넓음 → 세로 맞추고 가로 crop
-                  const scale = panelAspect / imgAspect;
-                  tex.repeat.set(scale, 1);
-                  tex.offset.set((1 - scale) / 2, 0);
-                } else {
-                  // 이미지가 더 높음 → 가로 맞추고 세로 crop
-                  const scale = imgAspect / panelAspect;
-                  tex.repeat.set(1, scale);
-                  tex.offset.set(0, (1 - scale) / 2);
-                }
+                tex.center.set(0.5, 0.5);
+                tex.rotation = Math.PI / 2; // 90° 회전 보정
                 tex.wrapS = THREE.ClampToEdgeWrapping;
-                tex.wrapT = THREE.ClampToEdgeWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(1, -1);
+                tex.offset.set(0, 1);
                 tex.needsUpdate = true;
 
                 mesh.material = new THREE.MeshStandardMaterial({

@@ -489,6 +489,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       tex.wrapT = THREE.RepeatWrapping;
       tex.repeat.set(1, -1);
       tex.offset.set(0, 1);
+      
     }
 
     tex.needsUpdate = true;

@@ -177,7 +177,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   // =========================
   let wave: WaveFieldHandle | null = null;
   try {
-    ui.setProgress(1, opts.skipLoading ? "" : "Loading… (water)");
+    ui.setProgress(1, opts.skipLoading ? "" : "Complete");
 
     const waveY = sceneBox.min.y - Math.max(0.35, focusMaxDim * 0.08);
     const autoTile = Math.max(focusMaxDim * WAVE_TILE_BY_FOCUS, WAVE_TILE_MIN);
