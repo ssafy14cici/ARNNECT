@@ -10,7 +10,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Map;
+import java.util.*;
 
 @Entity
 @Table(name = "artwork")
@@ -70,6 +70,10 @@ public class Artwork {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @OneToMany(mappedBy = "artwork", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ArtworkTag> artworkTags = new ArrayList<>();
+
+
 
     public void updateArtwork(UpdateArtworkRequest request){
         this.title = request.getTitle();
@@ -87,5 +91,16 @@ public class Artwork {
 
     public void deleteArtwork(){
         this.isDeleted = true;
+    }
+
+
+    public void addTag(Tag tag) {
+        ArtworkTag newMapping = ArtworkTag.builder()
+                .artwork(this).tag(tag).build();
+        artworkTags.add(newMapping);
+    }
+
+    public void removeTag(Tag tag) {
+        artworkTags.removeIf(mapping -> mapping.getTag().equals(tag));
     }
 }

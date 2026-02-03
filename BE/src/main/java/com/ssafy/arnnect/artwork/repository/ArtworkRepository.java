@@ -1,12 +1,11 @@
 package com.ssafy.arnnect.artwork.repository;
 
 import com.ssafy.arnnect.artwork.application.dto.response.ArtworkResponse;
-import com.ssafy.arnnect.artwork.application.dto.response.DetailArtworkResponse;
+import com.ssafy.arnnect.artwork.domain.entity.ArtworkDetail;
 import com.ssafy.arnnect.artwork.domain.entity.Artwork;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.security.core.parameters.P;
 
 import java.util.List;
 import java.util.Optional;
@@ -34,9 +33,9 @@ public interface ArtworkRepository extends JpaRepository<Artwork, Long> {
     LEFT JOIN member m ON m.member_id = a.member_id
     LEFT JOIN art_field af ON af.field_id = a.field_id
     LEFT JOIN art_genre ag ON ag.genre_id = a.genre_id
-    WHERE a.artwork_id = :artworkId
+    WHERE a.artwork_id = :artworkId AND a.is_deleted = false
     """, nativeQuery = true)
-    DetailArtworkResponse findByDetailArtwork(@Param("artworkId")Long artwork);
+    Optional<ArtworkDetail> findByDetailArtwork(@Param("artworkId")Long artwork);
 
     @Query(value = """
     select\s
