@@ -1,6 +1,6 @@
 package com.ssafy.arnnect.review.repository;
 
-import com.ssafy.arnnect.review.application.dto.response.ReviewDetailResponse;
+import com.ssafy.arnnect.review.domain.entity.ReviewDetail;
 import com.ssafy.arnnect.review.domain.entity.Review;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -33,5 +33,5 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
         LEFT JOIN member ar_member ON ar_member.member_id = ar.member_id \s
         where r.review_id = :reviewId and r.is_deleted = false
     """, nativeQuery = true)
-    Optional<ReviewDetailResponse> getReviewDetail(Long reviewId);
+    Optional<ReviewDetail> getReviewDetail(Long reviewId);
 }
