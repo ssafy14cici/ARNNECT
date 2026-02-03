@@ -4,30 +4,26 @@ import com.ssafy.arnnect.common.exception.BusinessException;
 import com.ssafy.arnnect.common.exception.ErrorCode;
 import com.ssafy.arnnect.common.file.FileStorageService;
 import com.ssafy.arnnect.common.file.FileType;
-import com.ssafy.arnnect.common.util.FileNameGenerator;
 import com.ssafy.arnnect.member.application.dto.request.CreateArtistRequest;
 import com.ssafy.arnnect.member.application.dto.request.CreateMemberRequest;
 import com.ssafy.arnnect.member.application.dto.request.UpdateArtistRequest;
 import com.ssafy.arnnect.member.application.dto.request.UpdateMemberRequest;
 import com.ssafy.arnnect.member.application.dto.response.MemberInfoResponse;
+import com.ssafy.arnnect.member.domain.entity.MemberInfo;
 import com.ssafy.arnnect.member.application.dto.response.MyInfoResponse;
 import com.ssafy.arnnect.member.domain.entity.Artist;
 import com.ssafy.arnnect.member.domain.entity.Member;
 import com.ssafy.arnnect.member.domain.entity.UserRole;
 import com.ssafy.arnnect.member.repository.ArtistRepository;
 import com.ssafy.arnnect.member.repository.MemberRepository;
-import com.ssafy.arnnect.security.SecurityUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.Optional;
 
 @Slf4j
 @Service
@@ -162,18 +158,19 @@ public class MemberServiceImpl implements MemberService{
         if(UserRole.GENERAL.equals(role)){
             return MyInfoResponse.fromMember(memberRepo.findByMemberUuid(memberUuid).orElseThrow(
                     ()-> new BusinessException(ErrorCode.USER_NOT_FOUND)
-            ));
+            ), fileStorageService.getBaseDir(FileType.PROFILE));
         }else{
             return MyInfoResponse.fromArtist(artistRepo.findByMember_MemberUuid(memberUuid).orElseThrow(
                     ()->new BusinessException(ErrorCode.USER_NOT_FOUND)
-            ));
+            ), fileStorageService.getBaseDir(FileType.PROFILE));
         }
     }
 
     @Override
-    public MemberInfoResponse getMemberInfo(String myUuid,String memberUuid) {
-        return memberRepo.findMemberInfo(memberUuid,memberRepo.findByMemberUuid(memberUuid).orElseThrow(
-                ()-> new BusinessException(ErrorCode.USER_NOT_FOUND)).getMemberId());
+    public MemberInfoResponse getMemberInfo(String myUuid, String memberUuid) {
+
+        return MemberInfoResponse.from(memberRepo.findMemberInfo(memberUuid,memberRepo.findByMemberUuid(memberUuid).orElseThrow(
+                ()-> new BusinessException(ErrorCode.USER_NOT_FOUND)).getMemberId()), fileStorageService.getBaseDir(FileType.PROFILE));
     }
 
     @Override

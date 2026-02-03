@@ -28,22 +28,22 @@ public class MyInfoResponse {
     private String affiliation;
     private Boolean isVerified;
 
-    private String originalProfileName;
+    private String imgUrl;
     private String introduction;
 
 
-    public static MyInfoResponse fromMember(Member member){
+    public static MyInfoResponse fromMember(Member member, String imgUrl){
         return MyInfoResponse.builder()
                 .email(member.getEmail())
                 .name(member.getName())
                 .nickname(member.getNickname())
                 .birth(member.getBirth())
                 .phone(member.getPhone())
-                .originalProfileName(member.getOriginProfileImageName())
+                .imgUrl(member.getSavedProfileImageName() != null? imgUrl + member.getSavedProfileImageName() : null)
                 .build();
     }
 
-    public static MyInfoResponse fromArtist(Artist artist){
+    public static MyInfoResponse fromArtist(Artist artist, String imgUrl){
         // 아티스트 추가 정보
         return MyInfoResponse.builder()
                 .email(artist.getMember().getEmail())
@@ -51,7 +51,7 @@ public class MyInfoResponse {
                 .nickname(artist.getMember().getNickname())
                 .birth(artist.getMember().getBirth())
                 .phone(artist.getMember().getPhone())
-                .originalProfileName(artist.getMember().getOriginProfileImageName())
+                .imgUrl(artist.getMember().getOriginProfileImageName() != null? imgUrl + artist.getMember().getOriginProfileImageName() : null)
                 .document(artist.getDocument())
                 .fieldId(artist.getFieldId())
                 .debutYear(artist.getDebutYear())

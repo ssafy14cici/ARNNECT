@@ -59,6 +59,6 @@ public class FileStorageService {
     }
 
     public String getBaseDir(FileType fileType){
-        return baseDir + "/" + fileType.getFolder() + "/";
+        return "/" + fileType.getFolder() + "/";
     }
 }
