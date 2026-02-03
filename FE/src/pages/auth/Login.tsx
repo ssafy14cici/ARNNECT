@@ -9,14 +9,15 @@ import { useAuthStore } from "../../features/auth/store";
 import "./login.css";
 import { USE_MOCK } from "../../shared/config/env";
 
-// ---------- type guards ----------
+// ✅ REAL 모드에서만 사용: /api/v1/member/my 로 role 확정
+// (경로는 유저 프로젝트에 맞게 조정: 현재는 real.ts에 getMyReal을 추가한다고 가정)
+import { getMyReal } from "../../features/auth/api/real";
+
+// ---------- helpers ----------
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
-function hasKey<K extends string>(
-  obj: Record<string, unknown>,
-  key: K
-): obj is Record<K, unknown> {
+function hasKey<K extends string>(obj: Record<string, unknown>, key: K): obj is Record<K, unknown> {
   return key in obj;
 }
 function pickStr(obj: Record<string, unknown>, key: string): string | undefined {
@@ -25,31 +26,21 @@ function pickStr(obj: Record<string, unknown>, key: string): string | undefined 
   return typeof v === "string" ? v : undefined;
 }
 
-// ✅ 서버에서 role이 어떤 형태로 오든("USER"/"GENERAL"/"general"/"ARTIST"/"artist") FE 표준("general"|"artist")로 정규화
+/**
+ * ✅ 서버 role이 어떤 형태로 오든 FE 표준("general"|"artist")로 정규화
+ * - ARTIST / artist / ROLE_ARTIST / ... => artist
+ * - USER / GENERAL / general / ROLE_USER / ... => general
+ */
 function normalizeRole(input: unknown): "general" | "artist" {
   const v = String(input ?? "").toLowerCase();
-  if (v === "artist") return "artist";
+  if (v.includes("artist")) return "artist";
+  if (v.includes("user") || v.includes("general")) return "general";
   return "general";
 }
 
-// ✅ UI 토글은 UserRole을 쓰되, CSS가 기존에 USER/ARTIST 클래스에 의존할 수 있어서 UI용 라벨을 따로 만든다
+/** ✅ UI 토글은 UserRole을 쓰되, CSS가 USER/ARTIST 클래스에 의존할 수 있어 UI용 라벨로 변환 */
 function toUiRole(role: UserRole): "USER" | "ARTIST" {
-  return String(role).toLowerCase() === "artist" ? "ARTIST" : "USER";
-}
-
-/** BE envelope/평문 응답 모두 처리 (data/result 있으면 unwrap) */
-function unwrapEnvelope<T>(json: unknown): T {
-  if (!isRecord(json)) return json as T;
-
-  const obj: Record<string, unknown> = json;
-
-  if (Object.prototype.hasOwnProperty.call(obj, "data")) {
-    return obj["data"] as T;
-  }
-  if (Object.prototype.hasOwnProperty.call(obj, "result")) {
-    return obj["result"] as T;
-  }
-  return json as T;
+  return String(role).toLowerCase().includes("artist") ? "ARTIST" : "USER";
 }
 
 /** location.state에서 from 경로 안전하게 뽑기 */
@@ -59,76 +50,6 @@ function pickReturnUrlFromState(state: unknown): string | null {
   return typeof from === "string" && from.trim() ? from : null;
 }
 
-/** /api/v1/member/my 호출 (스키마 미확정이라 관대하게 파싱) */
-async function fetchMy(accessToken: string): Promise<{
-  memberUuid: string;
-  name: string;
-  role: "general" | "artist";
-}> {
-  const API_BASE_RAW = import.meta.env.VITE_API_BASE_URL ?? "";
-  const API_BASE = API_BASE_RAW.replace(/\/$/, "");
-  const url = `${API_BASE}/api/v1/member/my`;
-
-  const res = await fetch(url, {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  const text = await res.text().catch(() => "");
-  let json: unknown = null;
-  try {
-    json = text ? (JSON.parse(text) as unknown) : null;
-  } catch {
-    json = text; // JSON 아니면 text
-  }
-
-  if (!res.ok) {
-    const msg =
-      isRecord(json) && hasKey(json, "message") ? String(json.message ?? "") : String(text ?? "");
-    throw new Error(`HTTP ${res.status} - ${msg || `${res.status} ${res.statusText}`}`);
-  }
-
-  const unwrapped = unwrapEnvelope<unknown>(json);
-  const data = isRecord(unwrapped) ? unwrapped : {};
-
-  // role 후보 키들
-  const rawRole =
-    pickStr(data, "role") ??
-    pickStr(data, "userRole") ??
-    pickStr(data, "memberRole") ??
-    pickStr(data, "type") ??
-    pickStr(data, "accountType") ??
-    "";
-
-  // uuid 후보 키들
-  const rawUuid =
-    pickStr(data, "memberUuid") ??
-    pickStr(data, "memberUUID") ??
-    pickStr(data, "uuid") ??
-    pickStr(data, "memberId") ??
-    pickStr(data, "id") ??
-    "";
-
-  // name 후보 키들
-  const rawName =
-    pickStr(data, "name") ??
-    pickStr(data, "nickname") ??
-    pickStr(data, "displayName") ??
-    pickStr(data, "userName") ??
-    pickStr(data, "username") ??
-    "";
-
-  return {
-    memberUuid: String(rawUuid ?? ""),
-    name: String(rawName ?? ""),
-    role: normalizeRole(rawRole),
-  };
-}
-
 /** apiLogin 응답에서 token 안전하게 뽑기 */
 function pickToken(res: unknown): string | null {
   if (!isRecord(res)) return null;
@@ -136,28 +57,16 @@ function pickToken(res: unknown): string | null {
   return token && token.trim() ? token : null;
 }
 
-/** apiLogin 응답에서 memberUuid/name 안전하게 뽑기 (mock일 때만 의미 있음) */
-function pickLoginUser(res: unknown): { memberUuid?: string; name?: string; role?: unknown } {
-  if (!isRecord(res)) return {};
-  return {
-    memberUuid: pickStr(res, "memberUuid"),
-    name: pickStr(res, "name"),
-    role: res["role"],
-  };
-}
-
 export default function Login() {
   const nav = useNavigate();
   const location = useLocation();
   const [sp] = useSearchParams();
 
-  const returnUrl =
-    sp.get("returnUrl") ||
-    pickReturnUrlFromState(location.state as unknown) ||
-    null;
+  const returnUrl = sp.get("returnUrl") || pickReturnUrlFromState(location.state as unknown) || null;
 
   const login = useAuthStore((s) => s.login);
 
+  // ✅ UI 토글 (프로젝트 UserRole이 "general" | "artist" 인 전제)
   const [role, setRole] = useState<UserRole>("general" as UserRole);
 
   // 편의상 기본 입력값
@@ -173,10 +82,7 @@ export default function Login() {
   const uiRole = toUiRole(role);
 
   const themeColor = uiRole === "USER" ? "#ffffff" : "#C8A97E";
-  const subTitle =
-    uiRole === "USER"
-      ? "Discover your taste in art."
-      : "Share your inspiration with the world.";
+  const subTitle = uiRole === "USER" ? "Discover your taste in art." : "Share your inspiration with the world.";
 
   useEffect(() => setError(null), [role, email, password]);
 
@@ -192,37 +98,52 @@ export default function Login() {
       const token = pickToken(res);
       if (!token) throw new Error("로그인 응답에 accessToken(token)이 없습니다.");
 
-      // 기본값: UI 선택 role
-      let appRole: "general" | "artist" = normalizeRole(role);
-      let memberUuid = "";
-      let name = "";
+      // ✅ 선택한 탭(role)
+      const selectedRole = normalizeRole(role);
 
-      // mock이면 응답에 memberUuid/name/role이 들어있을 수 있음
-      const fromRes = pickLoginUser(res);
-      if (fromRes.role != null) appRole = normalizeRole(fromRes.role);
-      if (fromRes.memberUuid) memberUuid = fromRes.memberUuid;
-      if (fromRes.name) name = fromRes.name;
-
-      // real이면 /member/my로 실제 사용자 정보 채우기 권장
+      // ✅ REAL: 무조건 /member/my로 실제 role 확정
+      // - /member/my가 실패하면 role을 신뢰할 수 없으니 로그인 실패 처리 (원하는 UX 기준)
       if (!USE_MOCK) {
-        try {
-          const my = await fetchMy(token);
-          appRole = my.role || appRole;
-          memberUuid = my.memberUuid || memberUuid;
-          name = my.name || name;
-        } catch (e2) {
-          // /member/my 실패해도 로그인 자체는 유지
-          console.warn(e2);
+        const my = await getMyReal(token);
+
+        // 서버가 role을 안 주는 경우: 프론트만으로 계정 타입 판별 불가
+        if (my.role == null) {
+          throw new Error("서버(/member/my) 응답에 role이 없어 계정 유형을 판별할 수 없습니다.");
         }
+
+        const actualRole = normalizeRole(my.role);
+
+        // ✅ 탭(선택 role)과 실제 role이 다르면 로그인 거절
+        if (actualRole !== selectedRole) {
+          throw new Error(
+            actualRole === "artist"
+              ? "아티스트 계정입니다. Artist 탭으로 로그인하세요."
+              : "유저 계정입니다. Collector 탭으로 로그인하세요.",
+          );
+        }
+
+        login({
+          token,
+          role: actualRole,
+          remember,
+          user: {
+            memberUuid: my.memberUuid || "me",
+            name: my.name || "user",
+          },
+        });
+
+        nav(returnUrl || "/", { replace: true });
+        return;
       }
 
+      // ✅ MOCK: 실제 role 확정 루트가 없으니 선택 role로 저장
       login({
         token,
-        role: appRole,
-        remember, // store 내부에서 무시해도 시그니처 때문에 전달
+        role: selectedRole,
+        remember,
         user: {
-          memberUuid: memberUuid || "me",
-          name: name || "user",
+          memberUuid: "me",
+          name: "user",
         },
       });
 
@@ -306,11 +227,7 @@ export default function Login() {
 
             <div className="form-options">
               <label className="custom-check">
-                <input
-                  type="checkbox"
-                  checked={remember}
-                  onChange={(e) => setRemember(e.target.checked)}
-                />
+                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
                 <span className="check-text">Keep me logged in</span>
               </label>
             </div>

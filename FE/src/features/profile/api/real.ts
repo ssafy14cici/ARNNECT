@@ -11,6 +11,7 @@ import type {
 
 import { useAuthStore } from "../../auth/store";
 
+
 const BASE = String(import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
 function url(path: string) {
@@ -413,19 +414,14 @@ export async function updateMyProfile(
 ): Promise<ProfileModel> {
   const path = role === "ARTIST" ? "/api/v1/member/artists/my" : "/api/v1/member/users/my";
 
-  try {
-    await req<unknown>(path, { method: "PATCH", body: JSON.stringify(patch) });
-  } catch (e) {
-    // PATCH 미지원(405) 같은 경우 대비
-    if (e instanceof HttpError && (e.status === 404 || e.status === 405)) {
-      await req<unknown>(path, { method: "PUT", body: JSON.stringify(patch) });
-    } else {
-      throw e;
-    }
-  }
+  await req<unknown>(path, {
+    method: "PUT",
+    body: JSON.stringify(patch),
+  });
 
   return getMyProfile();
 }
+
 
 /**
  * 대표뱃지 엔드포인트 확정 전: no-op

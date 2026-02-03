@@ -6,6 +6,28 @@ import type {
   SignupUserRequest,
 } from "../types";
 
+
+export type MyInfoReal = {
+  memberUuid: string;
+  name: string;
+  role?: unknown; // 서버가 role 안 주면 undefined 가능
+};
+
+export async function getMyReal(accessToken: string): Promise<MyInfoReal> {
+  const raw = await apiFetch<unknown>(`${PREFIX_MEMBER}/my`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!isRecord(raw)) return { memberUuid: "", name: "", role: undefined };
+
+  return {
+    memberUuid: typeof raw.memberUuid === "string" ? raw.memberUuid : "",
+    name: typeof raw.name === "string" ? raw.name : "",
+    role: (raw as Record<string, unknown>)["role"], // 키가 다르면 여기서 확장
+  };
+}
+
 const API_BASE_RAW = import.meta.env.VITE_API_BASE_URL ?? "";
 const API_BASE = API_BASE_RAW.replace(/\/$/, "");
 
