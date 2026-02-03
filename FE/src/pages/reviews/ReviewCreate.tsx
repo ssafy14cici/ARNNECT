@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "./postCreate.css";
+import "./reviewcreate.css";
 
 import { useAuthStore } from "../../features/auth/store";
 import { createReview } from "../../features/reviews/api";

@@ -3,10 +3,21 @@ import { http } from "../../../shared/api/http";
 import type { FeedItem, FeedAuthorRole } from "../model/types";
 
 /**
- * NOTE
+ * ✅ NOTE
  * - http의 baseURL이 이미 "/api/v1" 포함이면, 아래 PATH에서 "/api/v1" 제거
  */
-const FEED_PATH = "/api/v1/artworks/feed";
+const ARTWORK_FEED_PATH = "/api/v1/artworks/feed";
+
+/**
+ * ✅ REVIEW LIST API 후보들
+ * - 프로젝트/BE 구현에 맞는 실제 경로로 정리해서 하나만 남기는 걸 권장
+ * - 전부 실패하면 리뷰는 머지되지 않고(=유저 글 안 뜸), 작품 피드만 반환함
+ */
+const REVIEW_FEED_CANDIDATES = [
+  "/api/v1/reviews/feed",
+  "/api/v1/reviews",
+  "/api/v1/reviews/all",
+];
 
 // ---------- helpers ----------
 type JsonObject = Record<string, unknown>;
@@ -34,6 +45,35 @@ function asNumber(v: unknown, fallback = 0): number {
   return fallback;
 }
 
+function toEpochMs(v: unknown): number {
+  // createdAt이 ISO string / number / Timestamp-string 등 섞여올 수 있어서 방어
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+
+  if (typeof v === "string") {
+    const parsed = Date.parse(v);
+    if (!Number.isNaN(parsed)) return parsed;
+
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+
+  // 객체일 경우(드물게) valueOf()/toString() 시도
+  if (isObject(v)) {
+    const s = asString((v as any).toString?.(), "");
+    const parsed = Date.parse(s);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+
+  return 0;
+}
+
+function toIso(v: unknown): string {
+  const ms = toEpochMs(v);
+  if (ms > 0) return new Date(ms).toISOString();
+  // fallback: 지금 시간
+  return new Date().toISOString();
+}
+
 function pickEnvelopeData(raw: unknown): unknown {
   // { data: ... } envelope면 data만 사용
   if (!isObject(raw)) return raw;
@@ -41,98 +81,107 @@ function pickEnvelopeData(raw: unknown): unknown {
   return d ?? raw;
 }
 
-// ✅ role 값이 여러 형태로 올 수 있으니 FE 표준("ARTIST"|"USER")으로 정규화
-function normalizeRole(rawRole: unknown, isArtistHint?: unknown): FeedAuthorRole {
+function extractArray(body: unknown): unknown[] {
+  // 응답이 배열이거나, Page/content/items 형태일 수 있어서 최대한 커버
+  if (Array.isArray(body)) return body;
+
+  if (isObject(body)) {
+    const keys = ["items", "content", "list", "results", "result"];
+    for (const k of keys) {
+      const v = get(body, k);
+      if (Array.isArray(v)) return v;
+    }
+  }
+  return [];
+}
+
+function normalizeRole(rawRole: unknown, kind?: "ARTWORK" | "REVIEW" | "UNKNOWN"): FeedAuthorRole {
   const s = asString(rawRole, "").trim();
   const upper = s.toUpperCase();
 
   if (upper === "ARTIST") return "ARTIST";
   if (upper === "USER") return "USER";
-
-  // BE에서 "general"을 쓰는 경우
   if (upper === "GENERAL") return "USER";
 
-  // 소문자 방어
   const lower = s.toLowerCase();
   if (lower === "artist") return "ARTIST";
-  if (lower === "general") return "USER";
-  if (lower === "user") return "USER";
+  if (lower === "user" || lower === "general") return "USER";
 
-  // 힌트 필드가 있다면 사용
-  if (isArtistHint === true || isArtistHint === 1) return "ARTIST";
+  // kind 힌트 기반
+  if (kind === "REVIEW") return "USER";
+  if (kind === "ARTWORK") return "ARTIST";
 
-  // feed endpoint가 artworks/feed면 기본은 ARTIST로 잡는게 안전
-  return "ARTIST";
+  // 통합피드 기준 기본값은 USER가 더 안전(필터가 비어보이는 현상 방지)
+  return "USER";
 }
 
-// ✅ feed id는 반드시 prefix 강제해서 DETAIL_PATH가 안정적으로 동작하게 함
-function buildCanonicalId(raw: {
-  artworkId?: unknown;
-  reviewId?: unknown;
-  id?: unknown;
-}): { id: string; kind: "ARTWORK" | "REVIEW" | "UNKNOWN" } {
-  const artworkId = asString(raw.artworkId, "");
-  const reviewId = asString(raw.reviewId, "");
-  const baseId = asString(raw.id, "");
-
-  if (artworkId) return { id: `artwork-${artworkId}`, kind: "ARTWORK" };
-  if (reviewId) return { id: `review-${reviewId}`, kind: "REVIEW" };
-
-  // 이미 prefix가 붙어서 오는 케이스면 유지
-  if (baseId.startsWith("artwork-")) return { id: baseId, kind: "ARTWORK" };
-  if (baseId.startsWith("review-")) return { id: baseId, kind: "REVIEW" };
-
-  // feed가 artworks/feed라면 id 하나만 올 수도 있음 -> artwork로 간주
-  if (baseId) return { id: `artwork-${baseId}`, kind: "ARTWORK" };
-
-  return { id: "", kind: "UNKNOWN" };
-}
-
-type RawFeed = {
-  id?: string | number;
+// ---------- Raw types ----------
+type RawArtworkFeed = {
   artworkId?: string | number;
-  reviewId?: string | number;
+  id?: string | number;
 
   title?: string;
   content?: string;
 
-  imageUrl?: string;
-  thumbnailUrl?: string;
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
 
-  createdAt?: string;
+  createdAt?: string | number;
   date?: string;
 
   likes?: number | string;
   views?: number | string;
 
-  authorId?: string | number;
+  // 작가 정보(케이스별로 다를 수 있음)
+  artistMemberUuid?: string;
   memberUuid?: string;
-  artistMemberUuid?: string; // ✅ 자주 쓰는 케이스 대비
+  authorId?: string | number;
 
+  artistName?: string;
   nickname?: string;
   authorName?: string;
-  artistName?: string;
 
-  isArtist?: boolean | number;
+  role?: string; // 가끔 들어오는 경우 방어
   authorRole?: string;
-  role?: string;
 };
 
-function toFeedItem(v: unknown): FeedItem | null {
-  if (!isObject(v)) return null;
-  const x = v as RawFeed;
+type RawReviewFeed = {
+  reviewId?: string | number;
+  id?: string | number;
 
-  // ✅ id: prefix 강제
-  const { id } = buildCanonicalId({ artworkId: x.artworkId, reviewId: x.reviewId, id: x.id });
-  if (!id) return null;
+  artworkId?: string | number;
+  artworkTitle?: string;
+
+  title?: string;
+  content?: string;
+
+  imageUrl?: string | null;
+
+  createdAt?: string | number;
+
+  memberUuid?: string; // 작성자(유저)
+  nickname?: string;
+
+  // 리뷰에 딸려오는 작품의 작가 정보(작성자와 다름)
+  artistUuid?: string; // memberUuid
+  artistName?: string;
+
+  role?: string;
+  authorRole?: string;
+
+  tags?: string[];
+};
+
+function toFeedItemFromArtwork(v: unknown): FeedItem | null {
+  if (!isObject(v)) return null;
+  const x = v as RawArtworkFeed;
+
+  const artworkId = asString(x.artworkId ?? x.id, "");
+  if (!artworkId) return null;
 
   const imageUrl = asString(x.imageUrl, "") || asString(x.thumbnailUrl, "");
   const createdAt = asString(x.createdAt, "") || asString(x.date, "");
 
-  // ✅ authorRole: "artist/general" 등 정규화
-  const authorRole = normalizeRole(x.authorRole ?? x.role, x.isArtist);
-
-  // ✅ authorId: artworks/feed면 보통 artistMemberUuid가 있음
   const authorId =
     asString(x.artistMemberUuid, "") ||
     asString(x.authorId, "") ||
@@ -144,46 +193,85 @@ function toFeedItem(v: unknown): FeedItem | null {
     asString(x.nickname, "") ||
     "—";
 
-  return {
-    id,
-    authorRole,
+  const authorRole = normalizeRole(x.authorRole ?? x.role, "ARTWORK");
 
+  return {
+    id: `artwork-${artworkId}`,
+    authorRole: authorRole === "ARTIST" ? "ARTIST" : "ARTIST", // 작품은 기본 ARTIST로 고정하는 게 안전
     title: asString(x.title, "Untitled"),
     excerpt: asString(x.content, ""),
-
     authorName,
     authorId,
-
-    createdAt: createdAt || new Date().toISOString(),
+    createdAt: createdAt ? toIso(createdAt) : new Date().toISOString(),
     imageUrl: imageUrl || undefined,
-
     likes: asNumber(x.likes, 0),
     views: asNumber(x.views, 0),
     category: undefined,
   };
 }
 
-function normalizeFeedList(payload: unknown): FeedItem[] {
-  const body = pickEnvelopeData(payload);
+function toFeedItemFromReview(v: unknown): FeedItem | null {
+  if (!isObject(v)) return null;
+  const x = v as RawReviewFeed;
 
-  if (Array.isArray(body)) {
-    return body.map(toFeedItem).filter((x): x is FeedItem => x !== null);
-  }
+  const reviewId = asString(x.reviewId ?? x.id, "");
+  if (!reviewId) return null;
 
-  if (isObject(body)) {
-    const items = get(body, "items");
-    if (Array.isArray(items)) {
-      return items.map(toFeedItem).filter((x): x is FeedItem => x !== null);
+  const createdAt = asString(x.createdAt, "");
+  const imageUrl = asString(x.imageUrl, "");
+
+  return {
+    id: `review-${reviewId}`,
+    authorRole: normalizeRole(x.authorRole ?? x.role, "REVIEW"), // 리뷰는 USER로 가정
+    title: asString(x.title, "Review"),
+    excerpt: asString(x.content, ""),
+    authorName: asString(x.nickname, "—"),
+    authorId: asString(x.memberUuid, ""),
+    createdAt: createdAt ? toIso(createdAt) : new Date().toISOString(),
+    imageUrl: imageUrl || undefined,
+    likes: 0,
+    views: 0,
+    category: undefined,
+  };
+}
+
+// ---------- fetch ----------
+async function fetchPayload(path: string): Promise<unknown> {
+  const res = await http.get(path);
+  // http wrapper가 {data} 형태거나 data를 바로 주는 경우 모두 대응
+  const payload = isObject(res) && "data" in res ? (res as { data: unknown }).data : res;
+  return pickEnvelopeData(payload);
+}
+
+function sortByCreatedAtDesc(a: FeedItem, b: FeedItem): number {
+  return toEpochMs(b.createdAt) - toEpochMs(a.createdAt);
+}
+
+async function fetchReviewFeedBestEffort(): Promise<FeedItem[]> {
+  for (const path of REVIEW_FEED_CANDIDATES) {
+    try {
+      const body = await fetchPayload(path);
+      const arr = extractArray(body);
+      // 성공하면(빈 배열이어도) 그걸로 종료
+      return arr.map(toFeedItemFromReview).filter((x): x is FeedItem => x !== null);
+    } catch {
+      // 다음 후보로 넘어감
+      continue;
     }
   }
-
   return [];
 }
 
+// ---------- exported ----------
 export async function getFeedListReal(): Promise<FeedItem[]> {
-  const res = await http.get(FEED_PATH);
+  // 1) 작품 피드는 필수
+  const artworkBody = await fetchPayload(ARTWORK_FEED_PATH);
+  const artworkArr = extractArray(artworkBody);
+  const artworks = artworkArr.map(toFeedItemFromArtwork).filter((x): x is FeedItem => x !== null);
 
-  // http wrapper가 {data} 형태거나 data를 바로 주는 경우 모두 대응
-  const payload = isObject(res) && "data" in res ? (res as { data: unknown }).data : res;
-  return normalizeFeedList(payload);
+  // 2) 리뷰 피드는 best-effort (없으면 실패해도 작품만 보여줌)
+  const reviews = await fetchReviewFeedBestEffort();
+
+  // 3) merge + sort
+  return [...artworks, ...reviews].sort(sortByCreatedAtDesc);
 }

@@ -114,22 +114,28 @@
   transition: all 0.5s ease;
 }
 
-/* --- The Spotlight Logic (핵심) --- */
-
-/* 1. 컨테이너에 마우스가 들어오면 -> 자식인 FeedCard들을 전부 어둡게 */
-.feedContainer:hover > article {
+/* ✅ GRID에서만 spotlight */
+.feedContainer.mode-grid:hover > article {
   opacity: 0.3;
   filter: grayscale(80%) blur(1px);
   transform: scale(0.98);
 }
 
-/* 2. 그 중에서 마우스가 올라간(Hover) FeedCard만 -> 밝게 복구 */
-.feedContainer > article:hover {
+.feedContainer.mode-grid > article:hover {
   opacity: 1;
   filter: grayscale(0%) blur(0px);
   transform: scale(1.02);
   z-index: 2;
 }
+
+/* ✅ LIST에서는 효과 끄기 */
+.feedContainer.mode-list:hover > article,
+.feedContainer.mode-list > article:hover {
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+
 
 /* --- View Modes Layout --- */
 

@@ -85,7 +85,7 @@ export default function Login() {
   const [role, setRole] = useState<UserRole>("general" as UserRole);
 
   // 편의상 기본 입력값
-  const [email, setEmail] = useState("user@test.com");
+  const [email, setEmail] = useState("E107@ssafy.com");
   const [password, setPassword] = useState("123456789");
 
   const [showPw, setShowPw] = useState(false);

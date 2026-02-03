@@ -1,7 +1,7 @@
 // FE/src/pages/artworks/ArtworkCreate.tsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "./postCreate.css";
+import "./artworkcreate.css";
 
 import { useAuthStore } from "../../features/auth/store";
 import { createArtwork } from "../../features/artworks/api";

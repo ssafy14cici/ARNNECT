@@ -223,14 +223,17 @@ input:-webkit-autofill:active {
 
 .pw-toggle {
   position: absolute;
-  right: 0;
-  top: 10px;
+  right: 0; /* 우측 끝에 배치 */
+  top: 50%; /* 높이 중앙 정렬 */
+  transform: translateY(-50%); /* 정확한 중앙 보정 */
   background: none;
   border: none;
   color: rgba(255,255,255,0.4);
   font-size: 0.8rem;
   cursor: pointer;
   text-transform: uppercase;
+  z-index: 10; /* ⭐ 핵심: 인풋이나 라벨보다 위에 오도록 설정 */
+  padding: 5px; /* 클릭 영역 확보를 위해 약간의 패딩 추가 */
 }
 
 /* Options */
@@ -345,4 +348,10 @@ input:-webkit-autofill:active {
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+/* --- Browser Defaults Hide --- */
+/* Edge/IE의 기본 비밀번호 눈 아이콘 숨기기 */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
 }

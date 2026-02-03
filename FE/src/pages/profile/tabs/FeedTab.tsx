@@ -115,7 +115,7 @@ export default function FeedTab() {
 
   const goDetail = (contentId: string) => {
     if (isArtist) nav(`/artworks/${contentId}`);
-    else nav(`/posts/${contentId}`);
+    else nav(`/reviews/${contentId}`);
   };
 
   if (loading) {
