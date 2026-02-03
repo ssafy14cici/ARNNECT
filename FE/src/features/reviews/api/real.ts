@@ -1,7 +1,12 @@
 // FE/src/features/reviews/api/real.ts
 import { http } from "../../../shared/api/http";
+
+// 타입/변환기 내가 보낼 데이터(입력값) 형태 - 데이터를 FormData로 바꾸는 함수 
 import type { ReviewCreateReq } from "../model/types";
 import { toReviewCreateFormData } from "../model/mappers";
+
+// f로그인이 필요한 기능
+import { useAuthStore } from "../../auth/store";
 
 type JsonObject = Record<string, unknown>;
 function isObject(v: unknown): v is JsonObject {
@@ -13,6 +18,7 @@ function unwrap(res: unknown): unknown {
 }
 
 export async function createReviewReal(data: ReviewCreateReq): Promise<unknown> {
+  console.log("auth store:", useAuthStore.getState());
   const fd = toReviewCreateFormData(data);
   const res = await http.post("/api/v1/reviews", fd);
   return unwrap(res);
