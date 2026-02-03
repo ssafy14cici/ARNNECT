@@ -1,15 +1,38 @@
-// FE/src/pages/home/Home.tsx
 import "../../styles/home.css";
+import { useEffect, useRef } from "react";
+import { mountMuseumApp } from "../../museum/app/mountMuseumApp";
 
 export default function Home() {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const uiRoot = wrapRef.current;
+    if (!canvas || !uiRoot) return;
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const runtime = mountMuseumApp({
+      canvas,
+      uiRoot,                // ✅ 이거 꼭!
+      onExitToExterior: () => window.location.reload(),
+    });
+
+    return () => {
+      runtime.dispose();
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
+
   return (
-    <div className="home-temp-container">
-      {/* Navbar는 상위(App.tsx 등)에서 공통으로 처리된다고 가정하거나, 
-          필요시 여기에 <Navbar />를 추가하세요. */}
-      <div className="temp-content">
-        <h1>수정 예정</h1>
-        <p>PC 버전 홈 화면 준비 중입니다.</p>
-      </div>
+    <div
+      ref={wrapRef}
+      className="home-temp-container"
+      style={{ position: "relative", width: "100%", height: "100dvh", overflow: "hidden" }}
+    >
+      <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
     </div>
   );
 }

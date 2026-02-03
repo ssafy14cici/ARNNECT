@@ -14,28 +14,47 @@ import { createWaveField, type WaveFieldHandle } from "./waveField";
 
 export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOptions): Promise<IntroRuntime> {
   if (!(canvas instanceof HTMLCanvasElement)) {
-    throw new Error(`[Intro] mountIntro(canvas, ...) expected HTMLCanvasElement, got: ${Object.prototype.toString.call(canvas)}`);
+    throw new Error(
+      `[Intro] mountIntro(canvas, ...) expected HTMLCanvasElement, got: ${Object.prototype.toString.call(canvas)}`
+    );
+  }
+
+  const uiMount = opts.uiMount ?? document.body;
+
+  // ✅ UI scope 표식 (홀/전시장과 동일 컨벤션)
+  const UI_SCOPE = "intro";
+  function markUi<T extends HTMLElement>(el: T, scope = UI_SCOPE): T {
+    el.dataset.museumUi = "1";
+    el.dataset.museumUiScope = scope;
+    return el;
   }
 
   const holdMs = opts.holdMs ?? 1000;
 
-  const framingScale = opts.framingScale ?? 1.0; // 화면에서 건물 크기
+  const framingScale = opts.framingScale ?? 1.0;
   const safeAreaPadPx = opts.safeAreaPadPx ?? 16;
   const bottomSafeRatioOpt = opts.bottomSafeRatio ?? 0.02;
-  const topWhitespaceRatio = opts.topWhitespaceRatio; // 없으면 safeArea에서 기본
+  const topWhitespaceRatio = opts.topWhitespaceRatio;
   const outlierFactor = opts.focusBoxOutlierFactor ?? 8;
   const distanceFactor = opts.distanceFactor ?? 0.4;
 
   // =========================
   // 🌊 WAVE TUNING
   // =========================
-  const WAVE_URL = "/models/museum/wave.glb";
+  const WAVE_URL = `${import.meta.env.BASE_URL}museum/models/museum/wave.glb`;
   const WAVE_TILE_BY_FOCUS = 6.0;
   const WAVE_TILE_MIN = 100;
   const WAVE_HALF_TILES = 4;
 
   // ✅ UI 먼저 (safe-area 계산에 필요)
-  const ui = createIntroUI();
+  const ui = createIntroUI(uiMount);
+  // root / 주요 엘리먼트 표식
+  markUi(ui.root);
+  markUi(ui.enterBtn);
+  markUi(ui.fadeEl);
+  markUi(ui.heroMain);
+  markUi(ui.heroSub);
+
   ui.setState("loading");
   ui.setProgress(0, opts.skipLoading ? "" : "Loading…");
 
@@ -51,7 +70,6 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     powerPreference: "high-performance",
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -61,7 +79,20 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   const scene = new THREE.Scene();
   scene.fog = null;
 
-  const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.05, 5000);
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 5000);
+
+  // ✅ 캔버스 기준 resize (window 고정 사이즈 사용 금지)
+  function resize() {
+    const w = canvas.clientWidth || window.innerWidth;
+    const h = canvas.clientHeight || window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+  resize();
+  requestAnimationFrame(resize);
+  setTimeout(resize, 0);
 
   // lights
   const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.3);
@@ -105,7 +136,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
         const p = total > 0 ? loaded / total : 0;
         ui.setProgress(p, total > 0 ? `Loading… ${Math.round(p * 100)}%` : "Loading…");
       },
-      (e) => reject(e),
+      (e) => reject(e)
     );
   });
 
@@ -210,11 +241,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     if (!opts.hdriUrl) {
       const bg = scene.background;
       const fogColor = bg && (bg as any).isColor ? (bg as THREE.Color) : new THREE.Color("#0f1115");
-      scene.fog = new THREE.Fog(
-        fogColor,
-        tileWorld * (WAVE_HALF_TILES * 0.9),
-        tileWorld * (WAVE_HALF_TILES * 2.2),
-      );
+      scene.fog = new THREE.Fog(fogColor, tileWorld * (WAVE_HALF_TILES * 0.9), tileWorld * (WAVE_HALF_TILES * 2.2));
     }
   } catch (e) {
     console.warn("[Intro] wave load failed:", e);
@@ -261,8 +288,11 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   const pointerS = { x: 0, y: 0 };
 
   const onMove = (e: PointerEvent) => {
-    const nx = (e.clientX / window.innerWidth) * 2 - 1;
-    const ny = (e.clientY / window.innerHeight) * 2 - 1;
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width || window.innerWidth;
+    const h = rect.height || window.innerHeight;
+    const nx = ((e.clientX - rect.left) / w) * 2 - 1;
+    const ny = ((e.clientY - rect.top) / h) * 2 - 1;
     pointerT.x = clamp(nx, -1, 1);
     pointerT.y = clamp(-ny, -1, 1);
   };
@@ -317,7 +347,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     camera.lookAt(tmpTgt);
 
     if (signObj) {
-      stickElementToObjectTop(ui.heroSub, signObj, camera, -40);
+      stickElementToObjectTop(ui.heroSub, signObj, camera, canvas, -40);
     }
 
     renderer.render(scene, camera);
@@ -326,9 +356,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   raf = requestAnimationFrame(tick);
 
   const onResize = () => {
-    renderer.setSize(window.innerWidth, window.innerHeight, false);
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
+    resize();
 
     const { topSafeRatio, bottomSafeRatio } = computeSafeAreaRatios({
       ui,
@@ -357,6 +385,15 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   let holdRaf = 0;
   let entered = false;
 
+  // ✅ body로 캐리하지 말고 uiMount로 캐리 + transition scope로 표식
+  function carryFadeToUiMount() {
+    const el = ui.fadeEl;
+    if (!el) return null;
+    if (el.parentElement !== uiMount) uiMount.appendChild(el);
+    markUi(el, "transition"); // intro dispose에서 안 지워지게 scope 분리
+    return el;
+  }
+
   const startHold = (e: PointerEvent) => {
     if (entered) return;
     holding = true;
@@ -367,7 +404,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     } catch {}
 
-    const HERO_FADE_START = 0.7; // 70% 지점부터 hero 텍스트 사라지기 시작
+    const HERO_FADE_START = 0.7;
 
     const step = () => {
       if (!holding || entered) return;
@@ -375,9 +412,8 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
       const p = Math.min((performance.now() - holdStart) / holdMs, 1);
       ui.setHoldProgress(p);
 
-      // hero 텍스트 페이드아웃 (0.7 → 1.0 구간에서 1→0)
       if (p >= HERO_FADE_START) {
-        const fadeP = (p - HERO_FADE_START) / (1 - HERO_FADE_START); // 0→1
+        const fadeP = (p - HERO_FADE_START) / (1 - HERO_FADE_START);
         const op = Math.max(0, 1 - fadeP);
         ui.heroMain.style.opacity = String(op);
         ui.heroSub.style.opacity = String(op);
@@ -400,10 +436,10 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
           fadeEl: ui.fadeEl,
           stopDistance: enterStopDistance,
           onWhiteCovered: () => {
-            const carried = ui.carryFadeToBody();
+            const carried = carryFadeToUiMount();
             dispose({ keepCarriedFade: true });
             opts.onEntered();
-            scheduleFadeCleanup(carried, 15000);
+            if (carried) scheduleFadeCleanup(carried, 15000);
           },
         });
 
@@ -422,7 +458,6 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     cancelAnimationFrame(holdRaf);
     ui.setHoldProgress(0);
 
-    // hero 텍스트 복원
     ui.heroMain.style.opacity = "1";
     ui.heroSub.style.opacity = "1";
   };
@@ -438,6 +473,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     cancelAnimationFrame(holdRaf);
 
     window.removeEventListener("resize", onResize);
+    window.removeEventListener("resize", resize);
     window.removeEventListener("pointermove", onMove);
 
     ui.enterBtn.removeEventListener("pointerdown", startHold);
@@ -450,8 +486,13 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     gsap.killTweensOf(camera);
     gsap.killTweensOf(ui.fadeEl);
 
-    wave?.dispose();
+    // ✅ wave root 제거 순서 버그 수정
+    const waveRoot = wave?.root ?? null;
+    try {
+      wave?.dispose();
+    } catch {}
     wave = null;
+    if (waveRoot?.parent) waveRoot.parent.remove(waveRoot);
 
     // gltf dispose
     gltfScene.traverse((obj) => {
@@ -463,11 +504,6 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
       else disposeMaterial(mat);
     });
 
-    // remove wave root if still present
-    // (wave.dispose 내부에서 제거 안 할 수도 있어서 안전)
-    // @ts-ignore
-    if (wave?.root?.parent) wave.root.parent.remove(wave.root);
-
     // bg/env dispose
     if (scene.background === hdriBg) scene.background = null;
     if (scene.environment === hdriEnv) scene.environment = null;
@@ -475,6 +511,13 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     hdriEnv?.dispose?.();
 
     renderer.dispose();
+
+    // ✅ intro scope UI만 제거 (transition fade는 남겨야 함)
+    uiMount
+      .querySelectorAll(`[data-museum-ui="1"][data-museum-ui-scope="${UI_SCOPE}"]`)
+      .forEach((n) => n.remove());
+
+    // (혹시 root가 남아있으면)
     ui.root.remove();
   };
 
@@ -596,7 +639,13 @@ function disposeMaterial(mat: any) {
   mat.dispose?.();
 }
 
-function stickElementToObjectTop(el: HTMLElement, obj: THREE.Object3D, camera: THREE.PerspectiveCamera, yOffsetPx = -10) {
+function stickElementToObjectTop(
+  el: HTMLElement,
+  obj: THREE.Object3D,
+  camera: THREE.PerspectiveCamera,
+  canvas: HTMLCanvasElement,
+  yOffsetPx = -10
+) {
   const box = new THREE.Box3().setFromObject(obj);
   if (box.isEmpty()) return;
 
@@ -610,13 +659,16 @@ function stickElementToObjectTop(el: HTMLElement, obj: THREE.Object3D, camera: T
   }
   el.style.opacity = "1";
 
-  const x = (p.x * 0.5 + 0.5) * window.innerWidth;
-  const y = (-p.y * 0.5 + 0.5) * window.innerHeight + yOffsetPx;
+  const rect = canvas.getBoundingClientRect();
+  const w = rect.width || window.innerWidth;
+  const h = rect.height || window.innerHeight;
+
+  const x = (p.x * 0.5 + 0.5) * w + rect.left;
+  const y = (-p.y * 0.5 + 0.5) * h + rect.top + yOffsetPx;
 
   el.style.position = "fixed";
   el.style.left = `${x}px`;
   el.style.top = `${y}px`;
-
   el.style.transform = "translate(-50%, -100%)";
   el.style.marginTop = "0";
   el.style.textAlign = "center";

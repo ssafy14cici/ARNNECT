@@ -39,7 +39,7 @@ export async function startApp() {
   // =========================
   // GLB 로드
   // =========================
-  const root = await loadGallery("/models/gallery7.glb");
+  const root = await loadGallery("/models/gallery2.glb");
   viewer.scene.add(root);
 
   // ✅ 여기서 "칙칙/들쭉"의 원인을 정리함

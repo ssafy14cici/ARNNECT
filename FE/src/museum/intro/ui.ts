@@ -5,6 +5,7 @@ export type IntroUIState = "loading" | "ready";
 
 export type IntroUI = {
   root: HTMLElement;
+  carryFadeToBody: () => HTMLDivElement;
 
   heroOverlay: HTMLElement;
   heroMain: HTMLElement;
@@ -29,14 +30,40 @@ export type IntroUI = {
 
   disableEnter: () => void;
   beginEnter: () => void;
-  carryFadeToBody: () => HTMLDivElement;
+
+  // ✅ 이름 유지. 하지만 실제로는 "body"가 아니라 인자로 받은 mount로 이동
+  carryFadeToMount: (mount: HTMLElement) => HTMLDivElement;
 };
 
-export function createIntroUI(): IntroUI {
-  const root = document.createElement("div");
+export function createIntroUI(mount: HTMLElement = document.body): IntroUI {
+  // ✅ mount 참조를 클로저에 고정 (carryFade에서 사용)
+  const mountRef = mount;
+  const carryFadeToBody = () => carryFadeToMount(mountRef);
+
+  // ✅ 표식 헬퍼 (DevTools에서 쉽게 찾기)
+  function markUi<T extends HTMLElement>(el: T) {
+    el.dataset.museumUi = "1";
+    el.dataset.museumUiScope = "intro";
+    return el;
+  }
+
+  const root = markUi(document.createElement("div"));
   root.id = "intro-ui";
   root.dataset.state = "loading";
-  document.body.appendChild(root);
+  mountRef.appendChild(root);
+
+  /* ---------- menu ---------- */
+  const menuBtn = document.createElement("button");
+  menuBtn.className = "intro-menu-btn";
+  menuBtn.type = "button";
+
+  // ✅ 포커스/클릭 자체도 불가하게
+  menuBtn.tabIndex = -1;
+  menuBtn.setAttribute("aria-hidden", "true");
+  menuBtn.style.display = "none";
+  menuBtn.style.pointerEvents = "none";
+
+  // ❌ root.appendChild(menuBtn);  <- 유지: 붙이지 않음
 
   /* ---------- loading backdrop ---------- */
   const backdrop = document.createElement("div");
@@ -99,7 +126,6 @@ export function createIntroUI(): IntroUI {
   heroSub.textContent = "예술가와 당신이 연결되는 곳";
   root.appendChild(heroSub);
 
-
   /* ---------- enter content ---------- */
   const content = document.createElement("div");
   content.className = "intro-content";
@@ -127,9 +153,33 @@ export function createIntroUI(): IntroUI {
   enterBtn.appendChild(labelEl);
 
   /* ---------- fade ---------- */
-  const fadeEl = document.createElement("div");
+  // ✅ carryFadeToMount에서 참조하므로 먼저 선언만 해두고 아래에서 생성/할당
+  let fadeEl: HTMLDivElement;
+
+  fadeEl = markUi(document.createElement("div"));
   fadeEl.className = "intro-fade";
+  fadeEl.style.pointerEvents = "none"; // ✅ 클릭 방해 금지
   root.appendChild(fadeEl);
+
+  // ✅ 핵심: document.body로 보내지 말고 인자로 받은 mount(또는 createIntroUI의 mountRef)로 보낸다
+  const carryFadeToMount = (mountTarget: HTMLElement) => {
+    const el = fadeEl;
+
+    el.style.display = "block";
+    el.style.position = "fixed";
+    el.style.inset = "0";
+    el.style.zIndex = "999999";
+    el.style.pointerEvents = "none";
+
+    // ✅ 우선순위: 인자로 받은 mountTarget -> mountRef(살아있을 때) -> (최후) document.body
+    const target =
+      mountTarget?.isConnected ? mountTarget :
+      mountRef?.isConnected ? mountRef :
+      document.body;
+
+    target.appendChild(el); // ✅ body로 옮기는 코드 금지(단, mount가 죽어있으면 최후 fallback)
+    return el;
+  };
 
   /* ---------- transitions ---------- */
   heroMain.style.transition = "opacity 650ms ease, transform 650ms ease";
@@ -147,7 +197,7 @@ export function createIntroUI(): IntroUI {
     heroMain.style.transform = "translateY(-6px)";
     heroMain.style.display = "none";
 
-    // sub (중요: ready 재진입 시 먼저 떠있는 버그 방지)
+    // sub
     heroSub.style.opacity = "0";
     heroSub.style.transform = "translateY(-4px)";
     heroSub.style.display = "none";
@@ -173,7 +223,6 @@ export function createIntroUI(): IntroUI {
     menuBtn.style.opacity = "1";
     content.style.opacity = "1";
 
-    // ✅ 매번 ready 들어올 때 리셋하고 순서 고정
     clearHeroTimers();
     resetHeroText();
 
@@ -184,7 +233,7 @@ export function createIntroUI(): IntroUI {
       heroMain.style.transform = "translateY(0)";
     }, 120);
 
-    // 2) SUB는 나중에 (display도 이때 켬)
+    // 2) SUB 나중
     subTimer = window.setTimeout(() => {
       heroSub.style.display = "block";
       heroSub.style.opacity = "1";
@@ -207,25 +256,25 @@ export function createIntroUI(): IntroUI {
       art,
       { opacity: 0, scale: 0.92, filter: "blur(16px)" },
       { opacity: 1, scale: 1, filter: "blur(0px)", duration: 1.6, ease: "power3.out" },
-      0,
+      0
     );
     tl.fromTo(
       user,
       { opacity: 0, x: 120, filter: "blur(8px)" },
       { opacity: 1, x: 0, filter: "blur(0px)", duration: 1.4, ease: "power3.out" },
-      0.3,
+      0.3
     );
     tl.fromTo(
       connect,
       { opacity: 0, x: -120, filter: "blur(8px)" },
       { opacity: 1, x: 0, filter: "blur(0px)", duration: 1.4, ease: "power3.out" },
-      0.6,
+      0.6
     );
     tl.fromTo(
       arnnect,
       { opacity: 0, y: 50, filter: "blur(12px)" },
       { opacity: 1, y: 0, filter: "blur(0px)", duration: 1.4, ease: "power2.out" },
-      1.0,
+      1.0
     );
 
     tl.to(backdrop, {
@@ -327,16 +376,7 @@ export function createIntroUI(): IntroUI {
   const beginEnter = () => {
     fadeEl.style.display = "block";
     fadeEl.style.opacity = "0";
-  };
-
-  const carryFadeToBody = () => {
-    const el = fadeEl;
-    el.style.display = "block";
-    el.style.position = "fixed";
-    el.style.inset = "0";
-    el.style.zIndex = "999999";
-    document.body.appendChild(el);
-    return el;
+    fadeEl.style.pointerEvents = "none";
   };
 
   return {
@@ -358,6 +398,7 @@ export function createIntroUI(): IntroUI {
     setHoldProgress,
     disableEnter,
     beginEnter,
+    carryFadeToMount,
     carryFadeToBody,
   };
 }

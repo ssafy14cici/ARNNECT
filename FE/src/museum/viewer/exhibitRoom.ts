@@ -26,6 +26,8 @@ type Options = {
   debug?: boolean;
   autoFitIfOff?: boolean;
 
+  uiMount?: HTMLElement;
+
   onExitToHall: () => void;
 };
 
@@ -36,6 +38,25 @@ export async function mountExhibitRoom(
   const debug = opts.debug ?? true;
   const autoFitIfOff = opts.autoFitIfOff ?? true;
 
+  const uiMount = opts.uiMount ?? document.body;
+
+  // ===== lifecycle guard =====
+  let alive = true;
+
+  // ===== UI scope helpers =====
+  const UI_SCOPE = "exhibitRoom";
+  function markUi<T extends HTMLElement>(el: T): T {
+    el.dataset.museumUi = "1";
+    el.dataset.museumUiScope = UI_SCOPE;
+    return el;
+  }
+  function mountEl<T extends HTMLElement>(el: T, clickable = false): T {
+    markUi(el);
+    if (clickable) el.style.pointerEvents = "auto";
+    uiMount.appendChild(el);
+    return el;
+  }
+
   const getSize = () => {
     const w = canvas.clientWidth || window.innerWidth;
     const h = canvas.clientHeight || window.innerHeight;
@@ -44,10 +65,12 @@ export async function mountExhibitRoom(
 
   console.log("[exhibit] mountExhibitRoom entered", { glbUrl: opts.glbUrl, debug });
 
-  // ✅ GLB 응답 타입 강제 체크(캐시 꼬임/HTML 반환 잡기)
-  fetch(opts.glbUrl, { cache: "no-store" })
-    .then((r) => console.log("[glb check]", r.status, r.headers.get("content-type"), opts.glbUrl))
-    .catch((e) => console.error("[glb check] fetch failed", e));
+  // (debug용) GLB content-type 체크 — 필요 없으면 지워도 됨
+  if (debug) {
+    fetch(opts.glbUrl, { cache: "no-store" })
+      .then((r) => console.log("[glb check]", r.status, r.headers.get("content-type"), opts.glbUrl))
+      .catch((e) => console.error("[glb check] fetch failed", e));
+  }
 
   /* ===== Renderer ===== */
   const renderer = new THREE.WebGLRenderer({
@@ -73,12 +96,18 @@ export async function mountExhibitRoom(
   scene.background = new THREE.Color(bgColor);
   scene.fog = null;
 
-  // ✅ 환경광(이게 없으면 PBR 재질이 “검게 죽는” 케이스가 많음)
-  // const pmrem = new THREE.PMREMGenerator(renderer);
-  // const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  // scene.environment = envTex;
+  // 환경맵(기본 off)
+  const useEnv = false;
+  let pmrem: THREE.PMREMGenerator | null = null;
+  let envTex: THREE.Texture | null = null;
 
-  scene.environment = null;
+  if (useEnv) {
+    pmrem = new THREE.PMREMGenerator(renderer);
+    envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = envTex;
+  } else {
+    scene.environment = null;
+  }
 
   /* ===== Camera ===== */
   const camera = new THREE.PerspectiveCamera(55, w0 / h0, 0.05, 5000);
@@ -99,7 +128,6 @@ export async function mountExhibitRoom(
     camera.updateMatrixWorld(true);
   }
 
-  /** 마지막 이동 방향 (pass-through 연쇄용) */
   let lastDir: 1 | -1 = 1;
 
   function goTo(i: number, duration = 0.85, dir?: 1 | -1) {
@@ -121,24 +149,23 @@ export async function mountExhibitRoom(
       duration,
       ease: "power2.out",
       onUpdate: () => {
+        if (!alive) return;
         camera.position.lerpVectors(fromPos, toPos, state.t);
         lookTarget.lerpVectors(fromTarget, toTarget, state.t);
         camera.lookAt(lookTarget);
         camera.updateMatrixWorld(true);
       },
       onComplete: () => {
+        if (!alive) return;
         activeTween = null;
-        // pass-through: 멈추지 않고 같은 방향으로 계속 이동
-        if (points[i].pass) {
-          goTo(i + lastDir, 0.65, lastDir);
-        }
+        if (points[i].pass) goTo(i + lastDir, 0.65, lastDir);
       },
     });
   }
 
   applyPoseInstant(index);
 
-  /* ===== Lights (조금 더 강하게) ===== */
+  /* ===== Lights ===== */
   const ambient = new THREE.AmbientLight(0xdfe8ff, 1.0);
   scene.add(ambient);
 
@@ -164,24 +191,22 @@ export async function mountExhibitRoom(
   window.addEventListener("resize", onResize);
 
   /* ===== UI ===== */
-  const top = document.createElement("div");
+  const top = mountEl(document.createElement("div"));
   top.style.cssText =
     "position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:99999;" +
     "font-family:'MuseumClassic','Noto Sans KR',system-ui,sans-serif;" +
     "color:rgba(255,255,255,0.92);font-size:16px;letter-spacing:0.02em;" +
     "text-shadow:0 6px 18px rgba(0,0,0,0.55);pointer-events:none;";
   top.textContent = opts.titleText ?? "EXHIBIT";
-  document.body.appendChild(top);
 
-  const viewLabel = document.createElement("div");
+  const viewLabel = mountEl(document.createElement("div"));
   viewLabel.style.cssText =
     "position:fixed;left:50%;top:48px;transform:translateX(-50%);z-index:99999;" +
     "font-family:monospace;color:rgba(255,255,255,0.75);font-size:12px;" +
     "letter-spacing:0.08em;text-shadow:0 4px 14px rgba(0,0,0,0.55);pointer-events:none;";
   viewLabel.textContent = points.length ? `VIEWPOINT ${index}` : `VIEWPOINT -`;
-  document.body.appendChild(viewLabel);
 
-  const back = document.createElement("button");
+  const back = mountEl(document.createElement("button"), true);
   back.type = "button";
   back.textContent = "← 홀로 돌아가기";
   back.style.cssText =
@@ -189,38 +214,40 @@ export async function mountExhibitRoom(
     "padding:10px 14px;border:1px solid rgba(255,255,255,0.28);" +
     "background:rgba(0,0,0,0.35);backdrop-filter:blur(8px);" +
     "color:rgba(255,255,255,0.92);font-family:'MuseumClassic','Noto Sans KR',system-ui,sans-serif;" +
-    "font-size:14px;font-weight:800;cursor:pointer;";
-  document.body.appendChild(back);
+    "font-size:14px;font-weight:800;cursor:pointer;" +
+    "pointer-events:auto;touch-action:manipulation;";
 
-  // 로딩 오버레이
-  const loading = document.createElement("div");
+  // 전파만 차단
+  const onBackPtrDown = (e: PointerEvent) => e.stopPropagation();
+  back.addEventListener("pointerdown", onBackPtrDown, { capture: true });
+
+  const loading = mountEl(document.createElement("div"), true);
   loading.style.cssText =
     "position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:99998;" +
     "background:rgba(0,0,0,0.18);backdrop-filter:blur(6px);" +
     "font-family:ui-sans-serif,system-ui;color:rgba(255,255,255,0.92);" +
-    "font-size:14px;letter-spacing:0.06em;";
+    "font-size:14px;letter-spacing:0.06em;" +
+    "pointer-events:auto;";
   loading.textContent = "LOADING GALLERY…";
-  document.body.appendChild(loading);
 
   /* ===== FPS (PointerLockControls) ===== */
   const clock = new THREE.Clock();
   const fps = new PointerLockControls(camera, renderer.domElement);
 
   const eyeY = 1.6;
-  const speed = 3.2; // 튜닝 가능
+  const speed = 3.2;
   let fpsEnabled = false;
   const move = { f: false, b: false, l: false, r: false };
   const tmpDir = new THREE.Vector3();
 
-  const fpsLabel = document.createElement("div");
+  const fpsLabel = mountEl(document.createElement("div"));
   fpsLabel.style.cssText =
     "position:fixed;right:18px;top:18px;z-index:99999;" +
     "padding:8px 10px;border-radius:999px;" +
     "background:rgba(0,0,0,0.35);backdrop-filter:blur(8px);" +
     "color:rgba(255,255,255,0.85);font-family:monospace;font-size:12px;" +
-    "letter-spacing:0.08em;display:none;";
+    "letter-spacing:0.08em;display:none;pointer-events:none;";
   fpsLabel.textContent = "FPS: ON (WASD / ESC)";
-  document.body.appendChild(fpsLabel);
 
   const setFps = (on: boolean) => {
     fpsEnabled = on;
@@ -232,9 +259,8 @@ export async function mountExhibitRoom(
 
     fpsLabel.style.display = on ? "block" : "none";
 
-    if (on) {
-      fps.lock();
-    } else {
+    if (on) fps.lock();
+    else {
       fps.unlock();
       camera.position.y = eyeY;
     }
@@ -250,6 +276,7 @@ export async function mountExhibitRoom(
   fps.addEventListener("unlock", onFpsUnlock);
 
   const onCanvasClick = () => {
+    if (!alive) return;
     if (fpsEnabled && !fps.isLocked) fps.lock();
   };
   renderer.domElement.addEventListener("click", onCanvasClick);
@@ -270,21 +297,30 @@ export async function mountExhibitRoom(
   }
 
   function showArtDetailModal(mesh: THREE.Mesh) {
-    if (document.getElementById("exhibit-art-modal")) return;
+    if (uiMount.querySelector("#exhibit-art-modal")) return;
 
     const title = mesh.userData.__title ?? "작품";
     const panelName = mesh.userData.__panelName ?? "";
     const imageUrl = mesh.userData.__imageUrl ?? "";
 
-    const overlay = document.createElement("div");
+    if (fpsEnabled) setFps(false);
+    if (fps.isLocked) fps.unlock();
+    (document as any).exitPointerLock?.();
+
+    const overlay = mountEl(document.createElement("div"), true);
     overlay.id = "exhibit-art-modal";
     overlay.style.cssText =
-      "position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:99999;";
+      "position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:99999;" +
+      "pointer-events:auto;";
 
     const box = document.createElement("div");
     box.style.cssText =
       "background:#fff;border-radius:14px;padding:32px 36px;text-align:center;" +
-      "font-family:'MuseumClassic','Noto Sans KR',system-ui,sans-serif;min-width:300px;max-width:480px;";
+      "font-family:'MuseumClassic','Noto Sans KR',system-ui,sans-serif;min-width:300px;max-width:480px;" +
+      "pointer-events:auto;";
+
+    overlay.addEventListener("pointerdown", (e) => e.stopPropagation(), { capture: true });
+    box.addEventListener("pointerdown", (e) => e.stopPropagation(), { capture: true });
 
     if (imageUrl) {
       const img = document.createElement("img");
@@ -307,30 +343,38 @@ export async function mountExhibitRoom(
     btnRow.style.cssText = "display:flex;gap:12px;justify-content:center;";
 
     const detailBtn = document.createElement("button");
+    detailBtn.type = "button";
     detailBtn.style.cssText =
       "background:#333;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;cursor:pointer;font-family:inherit;";
     detailBtn.textContent = "작품 상세보기";
-    detailBtn.addEventListener("click", () => {
-      // TODO: 백엔드 연결 시 상세 페이지로 이동
+    detailBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       console.log("[exhibit] detail clicked:", { title, panelName, imageUrl });
       overlay.remove();
     });
 
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.style.cssText =
       "background:transparent;color:#666;border:1px solid #ccc;border-radius:8px;padding:10px 28px;font-size:14px;cursor:pointer;font-family:inherit;";
     closeBtn.textContent = "닫기";
-    closeBtn.addEventListener("click", () => overlay.remove());
+    closeBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      overlay.remove();
+    });
 
     btnRow.append(detailBtn, closeBtn);
     box.appendChild(btnRow);
 
-    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+
     overlay.appendChild(box);
-    document.body.appendChild(overlay);
   }
 
-  /** EX_PANEL_N → 대응하는 viewpoint index 매핑 (pass-through 코너 건너뜀) */
   const panelToViewpoint: Record<string, number> = {
     EX_PANEL_1: 1, EX_PANEL_2: 2, EX_PANEL_3: 3,
     EX_PANEL_4: 5, EX_PANEL_5: 6, EX_PANEL_6: 6,
@@ -338,11 +382,12 @@ export async function mountExhibitRoom(
     EX_PANEL_10: 10, EX_PANEL_11: 11,
   };
 
-  /** 카메라가 해당 viewpoint 근처에 있는지 판정하는 거리 임계값 */
   const CLOSE_THRESHOLD = 1.5;
 
   const onCanvasPointerDown = (e: PointerEvent) => {
+    if (!alive) return;
     if (fpsEnabled) return;
+
     const hit = raycastArt(e.clientX, e.clientY);
     if (!hit) return;
 
@@ -354,11 +399,8 @@ export async function mountExhibitRoom(
       const vpPos = new THREE.Vector3(vp.pos[0], vp.pos[1], vp.pos[2]);
       const dist = camera.position.distanceTo(vpPos);
 
-      if (dist < CLOSE_THRESHOLD) {
-        // 이미 가까이 있으면 모달 표시
-        showArtDetailModal(hit);
-      } else {
-        // 멀면 viewpoint로 이동만
+      if (dist < CLOSE_THRESHOLD) showArtDetailModal(hit);
+      else {
         goTo(vpIdx, 0.85);
         viewLabel.textContent = `VIEWPOINT ${vpIdx}`;
       }
@@ -367,7 +409,12 @@ export async function mountExhibitRoom(
   renderer.domElement.addEventListener("pointerdown", onCanvasPointerDown);
 
   const onCanvasPointerMove = (e: PointerEvent) => {
-    if (fpsEnabled) { renderer.domElement.style.cursor = ""; return; }
+    if (!alive) return;
+
+    if (fpsEnabled) {
+      renderer.domElement.style.cursor = "";
+      return;
+    }
     const hit = raycastArt(e.clientX, e.clientY);
     renderer.domElement.style.cursor = hit ? "pointer" : "";
   };
@@ -377,10 +424,16 @@ export async function mountExhibitRoom(
   const loader = new GLTFLoader();
   let glbRoot: THREE.Object3D | null = null;
 
+  // ✅ 패널 텍스처/재질 dispose를 위해 추적
+  const loadedPanelTextures = new Set<THREE.Texture>();
+  const replacedMaterialCandidates = new Set<THREE.Material>(); // 패널에 원래 붙어있던 재질 후보
+
   const loadOk = await new Promise<boolean>((resolve) => {
     loader.load(
       opts.glbUrl,
       async (gltf) => {
+        if (!alive) return resolve(false);
+
         try {
           glbRoot = gltf.scene;
           scene.add(glbRoot);
@@ -394,18 +447,8 @@ export async function mountExhibitRoom(
             });
           }
 
-          // 패널 후보 로그(작품 붙이기용)
-          const candidates: string[] = [];
-          glbRoot.traverse((o) => {
-            const n = o.name ?? "";
-            if (!n) return;
-            if (/^art_/i.test(n) || n.includes("ART") || n.toLowerCase().includes("panel")) candidates.push(n);
-          });
-          if (debug) console.log("[exhibit] panel candidates:", candidates);
-
           applyPoseInstant(index);
 
-          // ✅ 시점이 허공이면 bbox 기준 자동 프레이밍
           if (autoFitIfOff && glbRoot) {
             const box = new THREE.Box3().setFromObject(glbRoot);
             const size = box.getSize(new THREE.Vector3());
@@ -421,19 +464,24 @@ export async function mountExhibitRoom(
             }
           }
 
-          // ✅ 바닥 무광 블랙 처리
+          // 바닥 무광 블랙 (가능하면 "기존 재질 수정"으로 처리)
           glbRoot.traverse((o: THREE.Object3D) => {
-            const n = (o.name ?? "").toLowerCase();
             if (!(o as any).isMesh) return;
-            if (n.includes("floor") || n.includes("바닥") || n.includes("ground")) {
-              (o as THREE.Mesh).material = new THREE.MeshStandardMaterial({
-                color: 0x111111,
-                roughness: 1.0,
-                metalness: 0.0,
-                side: THREE.DoubleSide,
-              });
-              if (debug) console.log("[exhibit] floor darkened:", o.name);
+            const n = (o.name ?? "").toLowerCase();
+            if (!(n.includes("floor") || n.includes("바닥") || n.includes("ground"))) return;
+
+            const mesh = o as THREE.Mesh;
+            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            for (const mat of mats) {
+              const m: any = mat;
+              if (m?.color?.setHex) m.color.setHex(0x111111);
+              if (typeof m?.roughness === "number") m.roughness = 1.0;
+              if (typeof m?.metalness === "number") m.metalness = 0.0;
+              if (m) m.side = THREE.DoubleSide;
+              if (m) m.needsUpdate = true;
             }
+
+            if (debug) console.log("[exhibit] floor darkened:", o.name);
           });
 
           if (opts.panelItems?.length) {
@@ -442,39 +490,59 @@ export async function mountExhibitRoom(
             const missing: string[] = [];
 
             for (const item of opts.panelItems) {
-              // GLB 내에서 패널 오브젝트 찾기
+              if (!alive || !glbRoot) return resolve(false);
+
               let panelObj: THREE.Object3D | null = null;
+
               glbRoot.traverse((o: THREE.Object3D) => {
                 if (!panelObj && o.name === item.panelName) panelObj = o;
               });
               if (!panelObj) {
-                // loose match: 이름에 포함
                 const target = item.panelName.toLowerCase();
                 glbRoot.traverse((o: THREE.Object3D) => {
                   if (!panelObj && o.name.toLowerCase().includes(target)) panelObj = o;
                 });
               }
-              if (!panelObj) { missing.push(item.panelName); continue; }
+              if (!panelObj) {
+                missing.push(item.panelName);
+                continue;
+              }
 
-              // 메시 찾기
               let mesh: THREE.Mesh | null = null;
               if ((panelObj as any).isMesh) mesh = panelObj as THREE.Mesh;
-              else panelObj.traverse((o: THREE.Object3D) => { if (!mesh && (o as any).isMesh) mesh = o as THREE.Mesh; });
-              if (!mesh) { missing.push(item.panelName); continue; }
+              else
+                panelObj.traverse((o: THREE.Object3D) => {
+                  if (!mesh && (o as any).isMesh) mesh = o as THREE.Mesh;
+                });
+              if (!mesh) {
+                missing.push(item.panelName);
+                continue;
+              }
+
+              // 교체 전 재질 후보 추적 (나중에 "사용 안 하면" 안전하게 dispose)
+              const oldMat = mesh.material as any;
+              if (Array.isArray(oldMat)) oldMat.forEach((m) => m && replacedMaterialCandidates.add(m));
+              else if (oldMat) replacedMaterialCandidates.add(oldMat);
 
               try {
                 const tex = await texLoader.loadAsync(item.imageUrl);
+                if (!alive) return resolve(false);
+
                 tex.colorSpace = THREE.SRGBColorSpace;
-                // GLB UV를 그대로 사용 (flipY=false는 GLB 표준)
                 tex.flipY = false;
+
+                // 회전/플립 유지
                 tex.center.set(0.5, 0.5);
-                tex.rotation = Math.PI / 2; // 90° 회전 보정
+                tex.rotation = Math.PI / 2;
                 tex.wrapS = THREE.ClampToEdgeWrapping;
                 tex.wrapT = THREE.RepeatWrapping;
                 tex.repeat.set(1, -1);
                 tex.offset.set(0, 1);
                 tex.needsUpdate = true;
 
+                loadedPanelTextures.add(tex);
+
+                // 패널은 map이 달라야 하니 "패널별 material"로 교체하는 게 안전
                 mesh.material = new THREE.MeshStandardMaterial({
                   map: tex,
                   roughness: 0.9,
@@ -482,7 +550,6 @@ export async function mountExhibitRoom(
                   side: THREE.DoubleSide,
                 });
 
-                // 클릭용 데이터 저장
                 mesh.userData.__panelName = item.panelName;
                 mesh.userData.__title = item.title;
                 mesh.userData.__imageUrl = item.imageUrl;
@@ -494,6 +561,25 @@ export async function mountExhibitRoom(
                 missing.push(item.panelName);
               }
             }
+
+            // ✅ 교체된 "원래 재질" 중, glbRoot에서 더 이상 쓰지 않는 건 정리 (안전 체크)
+            if (glbRoot && replacedMaterialCandidates.size) {
+              const inUse = new Set<THREE.Material>();
+              glbRoot.traverse((o) => {
+                const m = o as THREE.Mesh;
+                if (!m.isMesh) return;
+                const mat = m.material as any;
+                if (Array.isArray(mat)) mat.forEach((mm) => mm && inUse.add(mm));
+                else if (mat) inUse.add(mat);
+              });
+
+              const disposedTex = new Set<THREE.Texture>();
+              for (const mat of replacedMaterialCandidates) {
+                if (inUse.has(mat)) continue;
+                disposeMaterialAndTextures(mat, disposedTex);
+              }
+            }
+
             if (debug) console.log("[exhibit] panels attached:", attached, "missing:", missing);
           }
 
@@ -506,6 +592,7 @@ export async function mountExhibitRoom(
         }
       },
       (evt) => {
+        if (!alive) return;
         if (!evt.total) return;
         const pct = Math.round((evt.loaded / evt.total) * 100);
         loading.textContent = `LOADING GALLERY… ${pct}%`;
@@ -519,17 +606,15 @@ export async function mountExhibitRoom(
   });
 
   if (!loadOk) {
-    // 로드 실패면 여기서 종료해도 됨
+    // 실패해도 루프는 돌릴 수 있지만, 보통은 여기서 더 강하게 끊어도 됨.
   }
 
-  /* ===== Render loop (바로 시작) ===== */
-  let alive = true;
+  /* ===== Render loop ===== */
   let raf = 0;
 
   const loop = () => {
     if (!alive) return;
 
-    // ===== FPS 이동 업데이트 =====
     if (fpsEnabled && fps.isLocked) {
       const dt = Math.min(clock.getDelta(), 0.05);
 
@@ -539,10 +624,8 @@ export async function mountExhibitRoom(
       if (dx !== 0) fps.moveRight(dx * speed * dt);
       if (dz !== 0) fps.moveForward(dz * speed * dt);
 
-      // 눈높이 고정
       camera.position.y = eyeY;
 
-      // lookTarget 업데이트 (뷰포인트 이동 돌아갈 때 꼬임 방지)
       tmpDir.set(0, 0, -1).applyQuaternion(camera.quaternion);
       lookTarget.copy(camera.position).add(tmpDir);
     } else {
@@ -556,14 +639,14 @@ export async function mountExhibitRoom(
 
   /* ===== Keyboard nav + debug ===== */
   const onKeyDown = (e: KeyboardEvent) => {
-    // FPS 토글
+    if (!alive) return;
+
     if (e.code === "KeyF") {
       e.preventDefault();
       toggleFps();
       return;
     }
 
-    // 디버그
     if (e.code === "KeyC") {
       console.log("[exhibit] camera", { pos: camera.position.toArray(), target: lookTarget.toArray(), fov: camera.fov });
       return;
@@ -576,7 +659,6 @@ export async function mountExhibitRoom(
       });
       return;
     }
-    // fit은 G키로 이동
     if (e.code === "KeyG" && glbRoot) {
       const box = new THREE.Box3().setFromObject(glbRoot);
       fitCameraToBox(camera, box);
@@ -587,48 +669,33 @@ export async function mountExhibitRoom(
       return;
     }
 
-    // FPS 입력 (켜져있으면 WASD만)
     if (fpsEnabled) {
-      if (e.code === "KeyW") {
-        e.preventDefault();
-        move.f = true;
-        return;
-      }
-      if (e.code === "KeyS") {
-        e.preventDefault();
-        move.b = true;
-        return;
-      }
-      if (e.code === "KeyA") {
-        e.preventDefault();
-        move.l = true;
-        return;
-      }
-      if (e.code === "KeyD") {
-        e.preventDefault();
-        move.r = true;
-        return;
-      }
+      if (e.code === "KeyW") { e.preventDefault(); move.f = true; return; }
+      if (e.code === "KeyS") { e.preventDefault(); move.b = true; return; }
+      if (e.code === "KeyA") { e.preventDefault(); move.l = true; return; }
+      if (e.code === "KeyD") { e.preventDefault(); move.r = true; return; }
 
-      // FPS 중에는 뷰포인트 이동 금지
       if (e.code === "ArrowLeft" || e.code === "ArrowRight") {
         e.preventDefault();
         return;
       }
     }
 
-    // 뷰포인트 이동( FPS 꺼져 있을 때만 )
     if (!points.length) return;
+
     if (e.code === "ArrowRight") {
       e.preventDefault();
       goTo(index + 1, 0.85, 1);
+      viewLabel.textContent = `VIEWPOINT ${index}`;
     } else if (e.code === "ArrowLeft") {
       e.preventDefault();
       goTo(index - 1, 0.85, -1);
+      viewLabel.textContent = `VIEWPOINT ${index}`;
     }
   };
 
   const onKeyUp = (e: KeyboardEvent) => {
+    if (!alive) return;
     if (!fpsEnabled) return;
     if (e.code === "KeyW") move.f = false;
     if (e.code === "KeyS") move.b = false;
@@ -639,9 +706,11 @@ export async function mountExhibitRoom(
   window.addEventListener("keydown", onKeyDown, { passive: false });
   window.addEventListener("keyup", onKeyUp, { passive: false });
 
-  /* ===== Back ===== */
+  /* ===== Destroy ===== */
   const destroy = () => {
+    if (!alive) return;
     alive = false;
+
     cancelAnimationFrame(raf);
     if (activeTween) activeTween.kill();
 
@@ -652,39 +721,71 @@ export async function mountExhibitRoom(
     renderer.domElement.removeEventListener("click", onCanvasClick);
     renderer.domElement.removeEventListener("pointerdown", onCanvasPointerDown);
     renderer.domElement.removeEventListener("pointermove", onCanvasPointerMove);
+
     fps.removeEventListener("unlock", onFpsUnlock);
-    fps.unlock();
-    fpsLabel.remove();
+    if (fps.isLocked) fps.unlock();
+    (document as any).exitPointerLock?.();
 
-    back.remove();
-    top.remove();
-    viewLabel.remove();
-    loading.remove();
-    document.getElementById("exhibit-art-modal")?.remove();
+    renderer.domElement.style.cursor = "";
 
+    // 모달 제거 (uiMount 기준)
+    uiMount.querySelector("#exhibit-art-modal")?.remove();
+
+    // 표식 기반 UI 싹 제거
+    uiMount.querySelectorAll(`[data-museum-ui="1"][data-museum-ui-scope="${UI_SCOPE}"]`).forEach((n) => n.remove());
+
+    // GLB 리소스 정리 (geometry/material + material이 참조하는 텍스처까지)
     if (glbRoot) {
+      const disposedTex = new Set<THREE.Texture>();
+      const disposedMat = new Set<THREE.Material>();
+      const disposedGeo = new Set<THREE.BufferGeometry>();
+
       glbRoot.traverse((o) => {
         const m = o as THREE.Mesh;
         if (!m.isMesh) return;
-        m.geometry?.dispose?.();
-        const mat = m.material as THREE.Material | THREE.Material[];
-        if (Array.isArray(mat)) mat.forEach((mm) => mm?.dispose?.());
-        else mat?.dispose?.();
+
+        const geo = m.geometry as THREE.BufferGeometry | undefined;
+        if (geo && !disposedGeo.has(geo)) {
+          disposedGeo.add(geo);
+          geo.dispose();
+        }
+
+        const matAny = m.material as any;
+        const mats: THREE.Material[] = Array.isArray(matAny) ? matAny : matAny ? [matAny] : [];
+        for (const mat of mats) {
+          if (!mat || disposedMat.has(mat)) continue;
+          disposedMat.add(mat);
+          disposeMaterialAndTextures(mat, disposedTex);
+        }
       });
     }
+    glbRoot = null;
+
+    // 패널 텍스처 추적분도 확실히 dispose (중복 dispose 방지용 Set이니 안전)
+    for (const t of loadedPanelTextures) {
+      try { t.dispose(); } catch {}
+    }
+    loadedPanelTextures.clear();
 
     envTex?.dispose?.();
-    pmrem.dispose();
+    pmrem?.dispose?.();
+    envTex = null;
+    pmrem = null;
 
     renderer.dispose();
   };
 
-  back.addEventListener("click", (e) => {
+  // back click
+  let exiting = false;
+  const onBackClick = (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (exiting) return;
+    exiting = true;
     destroy();
     opts.onExitToHall();
-  });
+  };
+  back.addEventListener("click", onBackClick, { capture: true });
 
   return { destroy, goTo, getIndex: () => index };
 }
@@ -709,4 +810,34 @@ function fitCameraToBox(camera: THREE.PerspectiveCamera, box: THREE.Box3) {
   camera.position.set(center.x, center.y + maxDim * 0.15, center.z + dist);
   camera.lookAt(center);
   camera.updateMatrixWorld(true);
+}
+
+/** material.dispose()만으로는 텍스처가 안 내려가서 직접 처리 */
+function disposeMaterialAndTextures(mat: THREE.Material, disposedTex: Set<THREE.Texture>) {
+  const m: any = mat;
+
+  const texKeys = [
+    "map",
+    "alphaMap",
+    "aoMap",
+    "bumpMap",
+    "displacementMap",
+    "emissiveMap",
+    "envMap",
+    "lightMap",
+    "metalnessMap",
+    "normalMap",
+    "roughnessMap",
+    "specularMap",
+  ] as const;
+
+  for (const k of texKeys) {
+    const t = m?.[k] as THREE.Texture | undefined;
+    if (t && !disposedTex.has(t)) {
+      disposedTex.add(t);
+      try { t.dispose(); } catch {}
+    }
+  }
+
+  try { mat.dispose(); } catch {}
 }
