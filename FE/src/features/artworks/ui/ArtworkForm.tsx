@@ -23,21 +23,19 @@ export default function ArtworkForm({
   const [previewUrl, setPreviewUrl] = useState<string>("");
 
   const [tags, setTags] = useState<string>((initial?.tags ?? []).join(", "));
-
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
 
   // ✅ fieldId는 DB에 1개라 고정
   const fieldId = FIXED_FIELD_ID;
 
-  // ✅ genreId는 드롭다운
+  // ✅ genreId: 토글 단일 선택
   const [genreId, setGenreId] = useState<number>(initial?.genreId ?? 1);
 
   // ✅ LocalDate: YYYY-MM-DD
   const [productionDate, setProductionDate] = useState<string>(
     initial?.productionDate ?? "",
   );
-
   const [size, setSize] = useState(initial?.size ?? "");
 
   const parsedTags = useMemo(
@@ -66,17 +64,11 @@ export default function ArtworkForm({
   };
 
   const validate = () => {
-    // ✅ create일 때만 이미지 필수
     if (mode === "create" && !image) return "이미지를 선택해주세요.";
-
     if (!title.trim()) return "작품 제목을 입력해주세요.";
     if (!genreId) return "장르를 선택해주세요.";
-
-    // ✅ BE UpdateArtworkRequest에선 productionDate/size가 NotNull이므로
-    // edit까지 고려하면 필수로 두는게 안전함 (create에서도 동일하게 강제 권장)
     if (!productionDate.trim()) return "제작일을 선택해주세요.";
     if (!size.trim()) return "사이즈(size)를 입력해주세요.";
-
     return null;
   };
 
@@ -84,17 +76,6 @@ export default function ArtworkForm({
     const err = validate();
     if (err) return alert(err);
 
-    // edit 모드에서 이미지 미선택이면 image가 null일 수 있음.
-    // 하지만 onSubmit 타입이 ArtworkCreateReq(= image: File)라서 강제로 넣으면 런타임 문제.
-    // 따라서 edit 모드에서도 "이미지 미선택"을 허용하려면
-    // 1) onSubmit 타입을 UpdateReq로 분리하거나
-    // 2) image를 optional로 바꾸는 게 맞다.
-    //
-    // 여기서는 "edit에서도 제출 시 image가 없으면 기존 image를 재사용" 전략으로 처리:
-    // initial.image가 File로 들어오는 케이스만 가능. (일반적으로 서버 이미지는 File이 아님)
-    //
-    // ✅ 현실적으로는 edit에서는 ArtworkUpdateReq를 쓰는 별도 폼이 맞지만,
-    // 요청대로 create 타입을 유지하며 최대한 안전하게 처리:
     const effectiveImage = image ?? initial?.image ?? null;
     if (!effectiveImage) return alert("이미지를 선택해주세요.");
 
@@ -151,28 +132,31 @@ export default function ArtworkForm({
           </div>
 
           <div className="pc-row-2">
-            {/* ✅ Field UI 제거: 고정값만 노출 */}
-            <div className="pc-input-group">
-              <label className="pc-label">Field</label>
-              <input className="pc-input" value="기본(1)" disabled />
-            </div>
 
+            {/* ✅ Genre: 토글(단일 선택) */}
             <div className="pc-input-group">
               <label className="pc-label">
                 Genre <span className="req">*</span>
               </label>
-              <select
-                className="pc-input"
-                value={genreId}
-                onChange={(e) => setGenreId(Number(e.target.value))}
-                disabled={!!submitting}
-              >
-                {GENRE_OPTIONS.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.ko}
-                  </option>
-                ))}
-              </select>
+
+              <div className="pc-genre-toggle">
+                {GENRE_OPTIONS.map((g) => {
+                  const active = g.id === genreId;
+                  return (
+                    <button
+                      key={g.id}
+                      type="button"
+                      className={`pc-genre-chip ${active ? "is-active" : ""}`}
+                      onClick={() => setGenreId(g.id)}
+                      disabled={!!submitting}
+                      aria-pressed={active}
+                      title={g.en}
+                    >
+                      {g.ko}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -189,6 +173,7 @@ export default function ArtworkForm({
                 disabled={!!submitting}
               />
             </div>
+
             <div className="pc-input-group">
               <label className="pc-label">
                 Size <span className="req">*</span>
@@ -205,10 +190,7 @@ export default function ArtworkForm({
 
           <div className="pc-input-group">
             <label className="pc-label">
-              Description{" "}
-              <span className="req">
-                {mode === "edit" ? "*" : ""}
-              </span>
+              Description <span className="req">{mode === "edit" ? "*" : ""}</span>
             </label>
             <textarea
               className="pc-textarea"
@@ -247,11 +229,7 @@ export default function ArtworkForm({
           disabled={!!submitting}
           type="button"
         >
-          {submitting
-            ? "Uploading..."
-            : mode === "edit"
-              ? "Save Changes"
-              : "Publish Artwork"}
+          {submitting ? "Uploading..." : mode === "edit" ? "Save Changes" : "Publish Artwork"}
         </button>
       </div>
     </>

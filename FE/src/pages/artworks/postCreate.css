@@ -201,3 +201,38 @@
   .pc-row-2 { flex-direction: column; gap: 40px; }
   .pc-input { font-size: 1.2rem; }
 }
+
+/* 토글(칩) 레이아웃 */
+.pc-genre-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* 기본 칩 */
+.pc-genre-chip {
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: transparent;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform 0.05s ease, opacity 0.15s ease;
+}
+
+.pc-genre-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* 선택 상태 */
+.pc-genre-chip.is-active {
+  border-color: rgba(0, 0, 0, 0.6);
+  font-weight: 600;
+}
+
+/* 클릭 피드백 */
+.pc-genre-chip:active {
+  transform: scale(0.98);
+}
