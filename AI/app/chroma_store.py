@@ -1,3 +1,5 @@
+# 이 코드는 chromaDB에 들어오는 데이터를 저장하고 쿼리하는 래퍼 클래스입니다.
+
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path

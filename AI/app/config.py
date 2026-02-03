@@ -1,7 +1,15 @@
+# 이 코드는 애플리케이션의 설정을 정의합니다. 환경 변수로 설정할 수 있으며, 기본값도 제공합니다.
+
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import os
+import torch
+
+class ServiceConfig:
+    def __init__(self):
+        auto = "cuda:0" if torch.cuda.is_available() else "cpu"
+        self.device = os.getenv("DEVICE", auto)
 
 @dataclass(frozen=True)
 class Settings:

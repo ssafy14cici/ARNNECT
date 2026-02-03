@@ -1,19 +1,11 @@
+# app/schemas.py
 from __future__ import annotations
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from typing import List, Optional
+from pydantic import BaseModel, Field, model_validator
 
-# --- Health ---
-class HealthResponse(BaseModel):
-    ok: bool
-    model_device: str
-    clip_device: str
-    num_items: int
-    chroma_collection: str
-
-# --- Log / Recommend ---
 class LogEvent(BaseModel):
-    artworkId: str = Field(..., description="Artwork identifier (str).")
-    action: str = Field("VIEW", description="Action type...")
+    artworkId: str = Field(..., description="Artwork identifier")
+    action: str = Field("VIEW", description="Action type (VIEW, LIKE, etc.)")
 
 class RecommendRequest(BaseModel):
     memberId: str
@@ -27,26 +19,25 @@ class RecommendResponse(BaseModel):
     memberId: str
     recommends: List[RecommendItem]
 
-# --- Embed Artwork (Updated) ---
-class EmbedImageRequest(BaseModel):
-    artworkId: str
-    artistId: str
-    imagePath: str
-    category: str
+# ✅ 추가: inputData 래핑/비래핑 둘 다 받는 입력 스펙
+class RecommendEnvelope(BaseModel):
+    # 1) 래핑된 형태
+    inputData: Optional[RecommendRequest] = None
 
-# [수정됨] 요청하신 출력 형식에 맞춘 응답 스키마
-class EmbedArtworkResponse(BaseModel):
-    artworkId: str
-    artistId: str
-    artworkVector: List[float]
-    category: str
+    # 2) 루트 형태
+    memberId: Optional[str] = None
+    logs: Optional[List[LogEvent]] = None
 
-# --- Artist Info ---
-class ArtistInfoRequest(BaseModel):
-    artistId: str
-    isUnknown: bool
+    @model_validator(mode="after")
+    def _normalize(self):
+        # inputData가 이미 있으면 OK
+        if self.inputData is not None:
+            return self
 
-class ArtistInfoResponse(BaseModel):
-    ok: bool
-    artistId: str
-    error: Optional[str] = None
+        # 루트 형태로 들어온 경우 -> inputData로 변환
+        if self.memberId is not None and self.logs is not None:
+            self.inputData = RecommendRequest(memberId=self.memberId, logs=self.logs)
+            return self
+
+        # 둘 다 아니면 입력 불완전
+        raise ValueError("Either inputData or (memberId and logs) must be provided.")

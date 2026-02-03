@@ -1,3 +1,5 @@
+# 이 코드는 artifacts/mappings 디렉토리에 artworkId와 모델 인덱스 간의 안정적인 매핑을 유지합니다.
+
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -6,9 +8,9 @@ from typing import Dict, Tuple, Optional
 
 class MappingStore:
     """
-    Maintains a stable mapping between artworkId (string) and model index (int).
-    - index 0 is reserved for PAD.
-    - new artworkIds get appended with a new index.
+    이것은 artifacts/mappings 디렉토리에 artworkId와 모델 인덱스 간의 안정적인 매핑을 유지합니다.
+    - 인덱스 0은 PAD로 예약되어 있습니다.
+    - 스레드 안전합니다.
     """
     def __init__(self, piece_to_index_path: Path, index_to_piece_path: Path):
         self.piece_to_index_path = Path(piece_to_index_path)

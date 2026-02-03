@@ -1,3 +1,5 @@
+# 이 코드는 아이템 벡터를 디스크에 저장하고 관리하는 기능을 제공합니다.
+
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -7,8 +9,10 @@ import numpy as np
 
 class ItemVectorTable:
     """
-    Disk-backed (memmap) table: [num_items, dim] float32
-    Index 0 is reserved for PAD (kept as zeros).
+    디스크 백드된 아이템 벡터 테이블입니다.
+    인덱스 0는 PAD로 예약되어 있습니다.
+    - 벡터는 float32로 저장됩니다.
+    - 벡터는 메모리 맵핑을 통해 접근됩니다.
     """
     def __init__(self, path: Path, num_items: int, dim: int = 512):
         self.path = Path(path)

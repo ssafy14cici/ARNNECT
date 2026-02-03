@@ -2,25 +2,31 @@ FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
 
 WORKDIR /workspace
 
-# 시스템 의존성 설치
+# 1. 시스템 패키지 설치
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
-# 파이썬 라이브러리 설치
+# 2. 파이썬 라이브러리 설치 (캐싱 효율을 위해 가장 먼저 수행)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# [전략 2 반영] 안전 장치: 마운트할 폴더 미리 생성
-# 트럭(볼륨)이 오기 전에 짐을 풀 선반을 만들어 두는 작업입니다.
+# 3. 필요한 폴더 구조 생성 (빈 폴더)
+# artifacts 폴더는 복사하는 게 아니라, 빈 공간만 만들어둡니다.
 RUN mkdir -p artifacts && mkdir -p artifacts/chroma_db
 
-# 코드 복사 (데이터 제외)
-COPY service.py ./service.py
-COPY bentofile.yaml ./bentofile.yaml
+# 4. [핵심] 필요한 파일만 콕 집어서 복사 (화이트리스트 방식)
+COPY service.py .
+COPY bentofile.yaml .
+COPY .env.example .
+COPY README.md .
+COPY Dockerfile .
+
+# 5. 필요한 폴더(소스코드) 복사
 COPY app ./app
-COPY scripts ./scripts
-# .env.example만 복사 (실제 .env는 볼륨에 넣을 예정)
-COPY .env.example ./.env.example
+
+# 참고: scripts 폴더는 복사 목록에 없으므로 제외됩니다.
 
 EXPOSE 8000
 
-CMD ["bentoml", "serve", "service:svc", "--host", "0.0.0.0", "--port", "8000"]
+# [주의] 아래 명령어의 'service:svc' 부분은 service.py 안의 클래스 이름과 맞춰야 합니다.
+# (예: service:RecommenderService)
+CMD ["bentoml", "serve", "service:RecommenderService", "--host", "0.0.0.0", "--port", "8000"]
