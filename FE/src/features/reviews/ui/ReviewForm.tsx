@@ -44,7 +44,7 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
     if (!imageFile) return "이미지를 선택해주세요.";
     if (!reviewTitle.trim()) return "제목을 입력해주세요.";
     if (!reviewText.trim()) return "내용을 입력해주세요.";
-    if (!artworkId.trim() || isNaN(Number(artworkId))) return "작품 ID는 숫자여야 합니다.";
+    if (!artworkId.trim() && isNaN(Number(artworkId))) return "작품 ID는 숫자여야 합니다.";
     return null;
   };
 
@@ -52,14 +52,27 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
     const err = validate();
     if (err) return alert(err);
 
-    await onSubmit({
+    // ✅ 필수값만 먼저 담기
+    const payload: ReviewCreateReq = {
       title: reviewTitle.trim(),
       content: reviewText.trim(),
-      artworkId: Number(artworkId),
-      tags: parsedTags,
-      imageFile: imageFile!,
-    });
+      imageFile: imageFile!, // validate에서 이미지 체크하니까 ! 사용 OK
+    };
+
+    // ✅ artworkId: 입력했을 때만 넣기 (비었으면 아예 필드 없음)
+    if (artworkId.trim()) {
+      payload.artworkId = Number(artworkId);
+    }
+
+    // ✅ tags: 입력이 있을 때만 넣기 (없으면 아예 필드 없음 = 서버에서 null/empty 취급)
+    if (parsedTags.length > 0) {
+      payload.tags = parsedTags;
+    }
+
+    await onSubmit(payload);
   };
+
+
 
   return (
     <>

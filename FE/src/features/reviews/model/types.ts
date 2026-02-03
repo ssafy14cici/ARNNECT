@@ -19,7 +19,7 @@ export type Review = {
 export interface ReviewCreateReq {
   title: string;
   content: string;
-  artworkId: number;
+  artworkId?: number;
   tags: string[];
   imageFile: File;
 
@@ -45,7 +45,7 @@ export type ReviewSummary = {
 // 상세 조회 응답 data 스키마
 export type ReviewDeatil = {
   reviewId: ReviewId;
-  artworkId: number;
+  artworkId?: number;
   artworkTitle: string;
   artistUuid?: string;
   artistName?: string;
@@ -70,7 +70,7 @@ export type ReviewCreateRes = {
 export type ReviewUpdateReq = {
   title: string;
   content: string;
-  artworkId: number;
+  artworkId?: number;
   imageUrl?: string;
-  tags: string[];
+  tags?: string[];
 };
