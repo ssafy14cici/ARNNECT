@@ -2,13 +2,12 @@ package com.ssafy.arnnect.artwork.presentation.controller;
 
 import com.ssafy.arnnect.artwork.application.dto.request.CreateArtworkRequest;
 import com.ssafy.arnnect.artwork.application.dto.request.UpdateArtworkRequest;
+import com.ssafy.arnnect.artwork.application.dto.response.ArtworkDetailResponse;
 import com.ssafy.arnnect.artwork.application.dto.response.ArtworkResponse;
-import com.ssafy.arnnect.artwork.application.dto.response.DetailArtworkResponse;
+import com.ssafy.arnnect.artwork.domain.entity.ArtworkDetail;
 import com.ssafy.arnnect.artwork.application.dto.response.FieldResponse;
 import com.ssafy.arnnect.artwork.application.dto.response.GenreResponse;
 import com.ssafy.arnnect.artwork.application.service.ArtworkService;
-import com.ssafy.arnnect.common.exception.BusinessException;
-import com.ssafy.arnnect.common.exception.ErrorCode;
 import com.ssafy.arnnect.security.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -45,7 +44,7 @@ public class ArtworkController {
     }
 
     @GetMapping("{artworkId}")
-    public ResponseEntity<DetailArtworkResponse> getDetailArtwork(@PathVariable Long artworkId){
+    public ResponseEntity<ArtworkDetailResponse> getDetailArtwork(@PathVariable Long artworkId){
         return ResponseEntity.ok(service.getDetailArtwork(artworkId));
     }
 
