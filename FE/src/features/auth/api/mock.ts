@@ -14,6 +14,7 @@ type StoredUser = {
   memberUuid: string;
   name: string;
   email: string;
+  nickname : string;
   password: string;
   role: UserRole;
   createdAt: string;
@@ -54,6 +55,7 @@ function seedMockUsers() {
     next.unshift({
       memberUuid: "mock-user-0001",
       name: "테스트유저",
+      nickname: "dPdi",
       email: "user@test.com",
       password: "123456789",
       role: "general",
@@ -65,6 +67,7 @@ function seedMockUsers() {
     next.unshift({
       memberUuid: "mock-artist-0001",
       name: "테스트예술가",
+      nickname: "dpsoa",
       email: "artist@test.com",
       password: "123456789",
       role: "artist",
@@ -124,6 +127,7 @@ export async function signupUserMock(payload: SignupUserRequest): Promise<void> 
   list.push({
     memberUuid: uid("user"),
     name: payload.name.trim(),
+    nickname: payload.nickname.trim(),
     email: payload.email.trim(),
     password: payload.password,
     role: payload.role ?? "general",
@@ -154,6 +158,7 @@ export async function signupArtistMock(payload: SignupArtistRequest): Promise<vo
   list.push({
     memberUuid: uid("artist"),
     name: payload.name.trim(),
+    nickname: payload.nickname.trim(),
     email: payload.email.trim(),
     password: payload.password,
     role: payload.role ?? "artist",

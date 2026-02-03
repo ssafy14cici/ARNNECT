@@ -18,15 +18,16 @@ export type LoginResponse = {
 
 // ✅ 유저 회원가입(백엔드 DTO가 다르면 여기만 바꾸면 됨)
 export type SignupUserRequest = {
+  name: string;
   email: string;
   password: string;
-  name: string;
+  phone: string;      // 숫자만 권장
+  birth: string;      // "yyyy-MM-dd"
   nickname: string;
-  phone: string;
-  birth: string; // "YYYY-MM-DD"
-  role: UserRole; // general 권장
   isAgree: boolean;
+  image?: File | null; // ✅ BE MultipartFile image 대응(옵션)
 };
+
 
 // ✅ 예술인 회원가입(POST /member/artist/signup)
 export type SignupArtistRequest = {

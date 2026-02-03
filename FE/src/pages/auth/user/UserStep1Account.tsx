@@ -77,6 +77,16 @@ export default function Step1Account({
       />
 
       <label className="auth-label">
+        닉네임 <span className="req">*</span>
+      </label>
+      <input
+        className="auth-dark-input"
+        value={value.nickname}
+        onChange={(e) => onChange({ ...value, nickname: e.target.value })}
+        placeholder="닉네임을 입력"
+      />
+
+      <label className="auth-label">
         비밀번호 <span className="req">*</span>
       </label>
       <input
@@ -106,8 +116,12 @@ export default function Step1Account({
       <input
         className="auth-dark-input"
         value={value.phone}
-        onChange={(e) => onChange({ ...value, phone: e.target.value })}
-        placeholder="010-1234-5678"
+        onChange={(e) => {
+          const onlyDigits = e.target.value.replace(/[^0-9]/g, "");
+          onChange({ ...value, phone: onlyDigits });
+        }}
+        placeholder="01012345678"
+        inputMode="numeric"
       />
 
       {error ? <div className="auth-error">{error}</div> : null}
