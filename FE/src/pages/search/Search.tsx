@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "../../features/auth/store";
-import { artworks as rawArtworks } from "../../features/artwork/data";
+import { artworks as rawArtworks } from "../../features/artworks/data";
 import "./search.css";
 
 import gsap from "gsap";

@@ -3,8 +3,8 @@ import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuthStore } from "../../features/auth/store";
 
-import { artworks } from "../../features/artwork/data";
-import { findArtworkById, toArtworkNumericId, type ArtworkBase } from "../../features/artwork/helpers";
+import { artworks } from "../../features/artworks/data";
+import { findArtworkById, toArtworkNumericId, type ArtworkBase } from "../../features/artworks/helpers";
 
 import { sendFanLetter } from "../../features/fanLetter/api";
 
