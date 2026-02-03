@@ -1,3 +1,4 @@
+// FE/src/pages/artworks/ArtworkCreate.tsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./postCreate.css";
@@ -5,6 +6,7 @@ import "./postCreate.css";
 import { useAuthStore } from "../../features/auth/store";
 import { createArtwork } from "../../features/artworks/api";
 import ArtworkForm from "../../features/artworks/ui/ArtworkForm";
+import type { ArtworkCreateReq } from "../../features/artworks/model/types";
 
 export default function ArtworkCreate() {
   const navigate = useNavigate();
@@ -13,7 +15,7 @@ export default function ArtworkCreate() {
 
   const [loading, setLoading] = useState(false);
 
-  const onSubmit = async (req: any) => {
+  const onSubmit = async (req: ArtworkCreateReq) => {
     if (!user?.memberUuid) {
       alert("로그인 후 이용해주세요.");
       return;

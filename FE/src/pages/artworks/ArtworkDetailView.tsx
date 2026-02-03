@@ -1,3 +1,5 @@
+//FE\src\pages\artworks\ArtworkDetailView.tsx
+
 import { useMemo, useState } from "react";
 import type { LocalComment } from "./ArtworkDetail";
 

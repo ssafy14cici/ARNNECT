@@ -132,13 +132,35 @@ export async function checkEmailDupReal(email: string): Promise<{
 
 /**
  * 유저 회원가입: POST /api/v1/member/users/signup
+ * ✅ BE CreateMemberRequest에 MultipartFile image가 있으므로 multipart/form-data 권장
  */
 export async function signupUserReal(payload: SignupUserRequest): Promise<void> {
+  const fd = new FormData();
+
+  fd.append("name", payload.name);
+  fd.append("email", payload.email);
+  fd.append("password", payload.password);
+
+  // ✅ BE phone regex가 하이픈 없는 숫자만 매칭함
+  // ^01(?:0|1|[6-9])(?:\\d{3}|\\d{4})\\d{4}$
+  fd.append("phone", payload.phone.replace(/[^0-9]/g, ""));
+
+  // ✅ LocalDate는 "yyyy-MM-dd" 문자열로 보통 바인딩됨
+  fd.append("birth", payload.birth);
+
+  fd.append("nickname", payload.nickname);
+  fd.append("isAgree", String(payload.isAgree));
+
+  if (payload.image instanceof File) {
+    fd.append("image", payload.image);
+  }
+
   await apiFetch<void>(`${PREFIX_MEMBER}/users/signup`, {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: fd,
   });
 }
+
 
 /**
  * 예술인 회원가입: POST /api/v1/member/artist/signup
