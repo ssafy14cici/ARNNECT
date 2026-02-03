@@ -19,6 +19,19 @@ public class CreateReviewRequest {
     MultipartFile image;
     List<String> tags;
 
+
+    public Review toEntity(Long memberId){
+        return Review.builder()
+                .artworkId(this.artworkId)
+                .memberId(memberId)
+                .title(this.title)
+                .content(this.content)
+                .savedImageName(null)
+                .originImageName(null)
+                .isDeleted(false)
+                .build();
+    }
+
     public Review toEntity(Long memberId, Map<String,String> imageList){
         return Review.builder()
                 .artworkId(this.artworkId)

@@ -3,6 +3,7 @@ package com.ssafy.arnnect.review.presentation.controller;
 import com.ssafy.arnnect.review.application.dto.request.CreateReviewRequest;
 import com.ssafy.arnnect.review.application.dto.request.UpdateReviewRequest;
 import com.ssafy.arnnect.review.application.dto.response.ReviewDetailResponse;
+import com.ssafy.arnnect.review.domain.entity.ReviewDetail;
 import com.ssafy.arnnect.review.application.dto.response.ReviewResponse;
 import com.ssafy.arnnect.review.application.service.ReviewService;
 import com.ssafy.arnnect.security.SecurityUtil;
@@ -21,7 +22,8 @@ public class ReviewController {
     @PostMapping
     public ResponseEntity<Void> createReview(CreateReviewRequest request){
         String memberUuid = SecurityUtil.getCurrentMemberUuid();
-        service.createReview(memberUuid, request);
+        if(request.getImage() != null) service.createReview(memberUuid, request);
+        else service.createReviewWithoutImg(memberUuid, request);
         return ResponseEntity.ok().build();
     }
 

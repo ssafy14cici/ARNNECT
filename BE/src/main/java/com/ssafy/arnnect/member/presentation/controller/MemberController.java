@@ -5,6 +5,7 @@ import com.ssafy.arnnect.member.application.dto.request.CreateMemberRequest;
 import com.ssafy.arnnect.member.application.dto.request.UpdateArtistRequest;
 import com.ssafy.arnnect.member.application.dto.request.UpdateMemberRequest;
 import com.ssafy.arnnect.member.application.dto.response.MemberInfoResponse;
+import com.ssafy.arnnect.member.domain.entity.MemberInfo;
 import com.ssafy.arnnect.member.application.dto.response.MyInfoResponse;
 import com.ssafy.arnnect.member.application.service.MemberService;
 import com.ssafy.arnnect.member.domain.entity.UserRole;
@@ -13,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 
