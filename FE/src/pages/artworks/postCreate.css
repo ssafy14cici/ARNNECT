@@ -3,25 +3,59 @@
 ========================================================================== */
 
 /* 테마 변수 설정 */
+/* ✅ 페이지는 고정 높이, 바깥 스크롤 차단 */
 .post-create-page {
-  min-height: 100vh;
+  height: 100vh;
   background-color: #050505;
   color: #fff;
   font-family: 'Pretendard', sans-serif;
   display: flex;
   justify-content: center;
+  overflow: hidden;
 }
+
+/* ✅ 컨테이너는 column 레이아웃 + footer 아래 빈공간 없애기 */
+.pc-container {
+  width: 100%;
+  max-width: 800px;
+
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+
+  padding: 60px 24px 0; 
+  position: relative;
+  animation: fadeIn 0.6s ease;
+}
+
+/* ✅ 스크롤은 여기서만: 남는 높이 전부 먹게 */
+.pc-content {
+  display: flex;
+  flex-direction: column;
+  gap: 60px;
+
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+
+  padding-bottom: 40px; /* footer랑 간격 */
+}
+
+/* ✅ 버튼은 항상 아래로 (content 길어도 footer는 고정 영역) */
+.pc-footer {
+  margin-top: auto;     /* ⭐️ footer를 바닥으로 밀어줌 */
+  padding: 24px 0 28px; /* footer 자체 여백 */
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
 
 .post-create-page.theme-artist { --accent: #C8A97E; }
 .post-create-page.theme-user { --accent: #ffffff; }
 
-.pc-container {
-  width: 100%;
-  max-width: 800px;
-  padding: 60px 24px 120px;
-  position: relative;
-  animation: fadeIn 0.6s ease;
-}
+
 
 /* --- Header --- */
 .pc-header {
@@ -29,6 +63,7 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 60px;
+  flex-shrink: 0; /* ✅ header 고정 */
 }
 
 .pc-title {
@@ -50,12 +85,7 @@
 .pc-close-btn:hover { color: #fff; }
 
 
-/* --- Content Layout --- */
-.pc-content {
-  display: flex;
-  flex-direction: column;
-  gap: 60px;
-}
+
 
 /* 1. Image Upload */
 .pc-upload-section {
@@ -65,7 +95,7 @@
 .pc-upload-box {
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 9; /* 와이드 비율 */
+  aspect-ratio: 16 / 9;
   border: 1px dashed rgba(255,255,255,0.2);
   background: rgba(255,255,255,0.02);
   cursor: pointer;
@@ -102,7 +132,7 @@
 .pc-form-section {
   display: flex;
   flex-direction: column;
-  gap: 40px; /* 필드 간 간격 */
+  gap: 40px;
 }
 
 .pc-input-group {
@@ -128,7 +158,7 @@
   padding: 12px 0;
   color: #fff;
   font-family: 'Pretendard', sans-serif;
-  font-size: 1.5rem; /* 큰 폰트 */
+  font-size: 1.5rem;
   font-weight: 400;
   border-radius: 0;
   transition: border-color 0.3s;
@@ -162,13 +192,6 @@
 }
 
 
-/* --- Footer Button --- */
-.pc-footer {
-  margin-top: 80px;
-  display: flex;
-  justify-content: flex-end;
-}
-
 .pc-submit-btn {
   background: var(--accent);
   color: #000;
@@ -178,7 +201,7 @@
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s, opacity 0.2s;
-  border-radius: 2px; /* 살짝 각지게 */
+  border-radius: 2px;
 }
 .pc-submit-btn:hover:not(:disabled) {
   transform: translateY(-2px);
@@ -202,7 +225,7 @@
   .pc-input { font-size: 1.2rem; }
 }
 
-/* 토글(칩) 레이아웃 */
+/* ---------------- 토글(칩) ---------------- */
 .pc-genre-toggle {
   display: flex;
   flex-wrap: wrap;
@@ -210,15 +233,20 @@
   margin-top: 8px;
 }
 
-/* 기본 칩 */
+/* ✅ 다크 테마에 맞게 흰색 계열로 수정 (기존: rgba(0,0,0,...)라 안 보임) */
 .pc-genre-chip {
-  border: 1px solid rgba(0, 0, 0, 0.14);
+  border: 1px solid rgba(255,255,255,0.22);
   background: transparent;
+  color: rgba(255,255,255,0.85);
   padding: 8px 12px;
   border-radius: 999px;
   font-size: 13px;
   cursor: pointer;
-  transition: transform 0.05s ease, opacity 0.15s ease;
+  transition: transform 0.05s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.pc-genre-chip:hover:not(:disabled) {
+  border-color: rgba(255,255,255,0.45);
 }
 
 .pc-genre-chip:disabled {
@@ -226,13 +254,32 @@
   cursor: not-allowed;
 }
 
-/* 선택 상태 */
+/* ✅ 선택 상태 */
 .pc-genre-chip.is-active {
-  border-color: rgba(0, 0, 0, 0.6);
+  border-color: var(--accent);
+  color: #fff;
   font-weight: 600;
 }
 
-/* 클릭 피드백 */
 .pc-genre-chip:active {
   transform: scale(0.98);
+}
+
+/* ---------------- 사이즈 입력 ---------------- */
+.pc-size-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pc-size-x {
+  opacity: 0.7;
+  font-size: 14px;
+  user-select: none;
+}
+
+.pc-size-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.65;
 }

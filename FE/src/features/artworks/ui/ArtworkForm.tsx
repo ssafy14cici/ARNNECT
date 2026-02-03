@@ -1,4 +1,3 @@
-// FE/src/features/artworks/ui/ArtworkForm.tsx
 import { useEffect, useMemo, useState } from "react";
 import type { ArtworkCreateReq } from "../model/types";
 import { FIXED_FIELD_ID, GENRE_OPTIONS } from "../model/constants";
@@ -6,12 +5,21 @@ import { FIXED_FIELD_ID, GENRE_OPTIONS } from "../model/constants";
 type Mode = "create" | "edit";
 
 type Props = {
-  /** create: 이미지 필수 / edit: 이미지 선택 */
-  mode?: Mode;
+  mode?: Mode; // create: 이미지 필수 / edit: 이미지 선택(하지만 현재 타입상 결국 필요)
   initial?: Partial<ArtworkCreateReq>;
   submitting?: boolean;
   onSubmit: (data: ArtworkCreateReq) => Promise<void> | void;
 };
+
+function splitSize(raw?: string) {
+  const s = (raw ?? "").trim();
+  if (!s) return { w: "", h: "" };
+
+  // "100*200" / "100×200" / "100x200" / "100 X 200" 등 방어
+  const normalized = s.replace(/\s/g, "").replace("×", "*").replace(/x/gi, "*");
+  const [w, h] = normalized.split("*");
+  return { w: w ?? "", h: h ?? "" };
+}
 
 export default function ArtworkForm({
   mode = "create",
@@ -26,26 +34,33 @@ export default function ArtworkForm({
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
 
-  // ✅ fieldId는 DB에 1개라 고정
+  // ✅ fieldId는 DB에 1개라 고정 (UI는 완전 제거)
   const fieldId = FIXED_FIELD_ID;
 
   // ✅ genreId: 토글 단일 선택
   const [genreId, setGenreId] = useState<number>(initial?.genreId ?? 1);
 
   // ✅ LocalDate: YYYY-MM-DD
-  const [productionDate, setProductionDate] = useState<string>(
-    initial?.productionDate ?? "",
-  );
-  const [size, setSize] = useState(initial?.size ?? "");
+  const [productionDate, setProductionDate] = useState<string>(initial?.productionDate ?? "");
+
+  // ✅ size: 가로/세로 입력 → 전송 시 "w*h"
+  const initSize = useMemo(() => splitSize(initial?.size), [initial?.size]);
+  const [sizeW, setSizeW] = useState(initSize.w);
+  const [sizeH, setSizeH] = useState(initSize.h);
 
   const parsedTags = useMemo(
-    () =>
-      tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
+    () => tags.split(",").map((t) => t.trim()).filter(Boolean),
     [tags],
   );
+
+  // initial 이미지가 File로 들어온 경우에도 프리뷰 생성
+  useEffect(() => {
+    if (!image) return;
+    const url = URL.createObjectURL(image);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 최초 1회만(초기 이미지 프리뷰용)
 
   useEffect(() => {
     return () => {
@@ -68,7 +83,10 @@ export default function ArtworkForm({
     if (!title.trim()) return "작품 제목을 입력해주세요.";
     if (!genreId) return "장르를 선택해주세요.";
     if (!productionDate.trim()) return "제작일을 선택해주세요.";
-    if (!size.trim()) return "사이즈(size)를 입력해주세요.";
+
+    if (!sizeW.trim() || !sizeH.trim()) return "사이즈(가로/세로)를 입력해주세요.";
+    if (Number.isNaN(Number(sizeW)) || Number.isNaN(Number(sizeH))) return "사이즈는 숫자만 입력해주세요.";
+
     return null;
   };
 
@@ -79,6 +97,8 @@ export default function ArtworkForm({
     const effectiveImage = image ?? initial?.image ?? null;
     if (!effectiveImage) return alert("이미지를 선택해주세요.");
 
+    const size = `${sizeW.trim()}*${sizeH.trim()}`;
+
     await onSubmit({
       title: title.trim(),
       description: description.trim() || undefined,
@@ -87,16 +107,17 @@ export default function ArtworkForm({
       genreId,
 
       productionDate: productionDate.trim(),
-      size: size.trim(),
+      size,
 
-      tags: parsedTags.length ? parsedTags : undefined,
+      tags: parsedTags,
       image: effectiveImage,
     });
   };
 
   return (
     <>
-      <div className="pc-content">
+      {/* ✅ 스크롤이 여기서 되도록: flex:1 + minHeight:0 + overflowY:auto */}
+      <div className="pc-content" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         <div className="pc-upload-section">
           <label className="pc-upload-box">
             <input
@@ -131,32 +152,31 @@ export default function ArtworkForm({
             />
           </div>
 
-          <div className="pc-row-2">
+          {/* ✅ Field UI 완전 제거 */}
 
-            {/* ✅ Genre: 토글(단일 선택) */}
-            <div className="pc-input-group">
-              <label className="pc-label">
-                Genre <span className="req">*</span>
-              </label>
+          {/* ✅ Genre: 토글(단일 선택) */}
+          <div className="pc-input-group">
+            <label className="pc-label">
+              Genre <span className="req">*</span>
+            </label>
 
-              <div className="pc-genre-toggle">
-                {GENRE_OPTIONS.map((g) => {
-                  const active = g.id === genreId;
-                  return (
-                    <button
-                      key={g.id}
-                      type="button"
-                      className={`pc-genre-chip ${active ? "is-active" : ""}`}
-                      onClick={() => setGenreId(g.id)}
-                      disabled={!!submitting}
-                      aria-pressed={active}
-                      title={g.en}
-                    >
-                      {g.ko}
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="pc-genre-toggle">
+              {GENRE_OPTIONS.map((g) => {
+                const active = g.id === genreId;
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    className={`pc-genre-chip ${active ? "is-active" : ""}`}
+                    onClick={() => setGenreId(g.id)}
+                    disabled={!!submitting}
+                    aria-pressed={active}
+                    title={g.en}
+                  >
+                    {g.ko}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -174,24 +194,40 @@ export default function ArtworkForm({
               />
             </div>
 
+            {/* ✅ Size: 가로 × 세로 입력 */}
             <div className="pc-input-group">
               <label className="pc-label">
                 Size <span className="req">*</span>
               </label>
-              <input
-                className="pc-input"
-                value={size}
-                onChange={(e) => setSize(e.target.value)}
-                placeholder="100x100cm"
-                disabled={!!submitting}
-              />
+
+              <div className="pc-size-row">
+                <input
+                  className="pc-input"
+                  value={sizeW}
+                  onChange={(e) => setSizeW(e.target.value)}
+                  placeholder="가로"
+                  inputMode="numeric"
+                  disabled={!!submitting}
+                />
+                <span className="pc-size-x">×</span>
+                <input
+                  className="pc-input"
+                  value={sizeH}
+                  onChange={(e) => setSizeH(e.target.value)}
+                  placeholder="세로"
+                  inputMode="numeric"
+                  disabled={!!submitting}
+                />
+              </div>
+
+              <div className="pc-size-hint">
+                전송: {sizeW || "—"}*{sizeH || "—"}
+              </div>
             </div>
           </div>
 
           <div className="pc-input-group">
-            <label className="pc-label">
-              Description <span className="req">{mode === "edit" ? "*" : ""}</span>
-            </label>
+            <label className="pc-label">Description</label>
             <textarea
               className="pc-textarea"
               value={description}
@@ -222,7 +258,8 @@ export default function ArtworkForm({
         </div>
       </div>
 
-      <div className="pc-footer">
+      {/* footer는 고정 영역 */}
+      <div className="pc-footer" style={{ flexShrink: 0 }}>
         <button
           className="pc-submit-btn"
           onClick={submit}
