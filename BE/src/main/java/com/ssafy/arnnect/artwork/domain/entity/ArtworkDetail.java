@@ -1,15 +1,13 @@
-package com.ssafy.arnnect.artwork.application.dto.response;
+package com.ssafy.arnnect.artwork.domain.entity;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
 import java.util.Date;
-import java.util.List;
 
 @Getter
 @Builder
-public class DetailArtworkResponse {
+public class ArtworkDetail {
     Long artworkId;
     String memberUuid;
     String nickname;
@@ -23,7 +21,6 @@ public class DetailArtworkResponse {
     String size;
     String imageUrl;
     Long likeCount;
-//    List<String> tags;
 
     public void updateUrl(String basicUrl){
         this.imageUrl = basicUrl+imageUrl;
