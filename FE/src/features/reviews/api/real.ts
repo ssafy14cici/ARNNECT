@@ -1,23 +1,19 @@
+// FE/src/features/reviews/api/real.ts
 import { http } from "../../../shared/api/http";
-import { useAuthStore } from "../../auth/store";
 import type { ReviewCreateReq } from "../model/types";
 import { toReviewCreateFormData } from "../model/mappers";
 
-function authHeader() {
-  const s = useAuthStore.getState();
-  const token = s.token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
+type JsonObject = Record<string, unknown>;
+function isObject(v: unknown): v is JsonObject {
+  return typeof v === "object" && v !== null;
+}
+function unwrap(res: unknown): unknown {
+  if (isObject(res) && "data" in res) return (res as { data: unknown }).data;
+  return res;
 }
 
-export async function createReviewReal(data: ReviewCreateReq) {
+export async function createReviewReal(data: ReviewCreateReq): Promise<unknown> {
   const fd = toReviewCreateFormData(data);
-
-  const res = await http.post("/api/v1/reviews", fd, {
-    headers: {
-      ...authHeader(),
-    },
-    withCredentials: true,
-  });
-
-  return res.data;
+  const res = await http.post("/api/v1/reviews", fd);
+  return unwrap(res);
 }

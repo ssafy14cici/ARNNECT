@@ -22,6 +22,5 @@ export interface ReviewCreateReq {
   tags: string[];
   imageFile: File;
 
-  // legacy/mock 호환용
-  author?: AuthorCtx;
 }
+

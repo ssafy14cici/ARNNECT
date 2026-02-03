@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "../posts/postCreate.css";
+import "./postCreate.css";
 
 import { useAuthStore } from "../../features/auth/store";
 import { createArtwork } from "../../features/artworks/api";

@@ -1,3 +1,5 @@
+//FE\src\features\reviews\model\mappers.ts
+
 import type { ReviewCreateReq } from "./types";
 
 function appendTags(fd: FormData, tags: string[]) {
