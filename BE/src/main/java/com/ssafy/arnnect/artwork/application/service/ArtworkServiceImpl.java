@@ -4,27 +4,22 @@ import com.ssafy.arnnect.artwork.application.dto.request.CreateArtworkRequest;
 import com.ssafy.arnnect.artwork.application.dto.request.UpdateArtworkRequest;
 import com.ssafy.arnnect.artwork.application.dto.response.ArtworkDetailResponse;
 import com.ssafy.arnnect.artwork.application.dto.response.ArtworkResponse;
-import com.ssafy.arnnect.artwork.domain.entity.ArtworkDetail;
+import com.ssafy.arnnect.artwork.domain.entity.*;
 import com.ssafy.arnnect.artwork.application.dto.response.FieldResponse;
 import com.ssafy.arnnect.artwork.application.dto.response.GenreResponse;
-import com.ssafy.arnnect.artwork.domain.entity.Artwork;
-import com.ssafy.arnnect.artwork.domain.entity.ArtworkTag;
-import com.ssafy.arnnect.artwork.domain.entity.Tag;
 import com.ssafy.arnnect.artwork.repository.*;
 import com.ssafy.arnnect.common.exception.BusinessException;
 import com.ssafy.arnnect.common.exception.ErrorCode;
 import com.ssafy.arnnect.common.file.FileStorageService;
 import com.ssafy.arnnect.common.file.FileType;
 import com.ssafy.arnnect.member.application.service.MemberService;
+import com.ssafy.arnnect.member.domain.entity.Member;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,6 +32,7 @@ public class ArtworkServiceImpl implements ArtworkService{
     private final GenreRepository genreRepository;
     private final TagRepository tagRepository;
     private final ArtworkTagRepository artworkTagRepository;
+    private final FavoriteRepository favoriteRepository;
     private final MemberService memberService;
     private final FileStorageService fileService;
 
@@ -121,6 +117,29 @@ public class ArtworkServiceImpl implements ArtworkService{
     @Override
     public List<GenreResponse> getGenreList(Integer fieldId) {
         return genreRepository.findByField_fieldId(fieldId).stream().map(GenreResponse::from).toList();
+    }
+
+    @Override
+    @Transactional
+    public Boolean toggleFavorite(String memberUuid, Long artworkId) {
+        Long memberId = memberService.getMemberId(memberUuid);
+        Optional<FavoriteArtwork> favorite = favoriteRepository
+                .findByMember_MemberIdAndArtwork_ArtworkId(memberId, artworkId);
+
+        if (favorite.isPresent()) {
+            FavoriteArtwork existingFavorite = favorite.get();
+            existingFavorite.toggleFavorite();
+            return existingFavorite.isFavorite();
+        } else {
+            FavoriteArtwork newFavorite = FavoriteArtwork.builder()
+                    .member(Member.builder().memberId(memberId).build())
+                    .artwork(Artwork.builder().artworkId(artworkId).build())
+                    .isFavorite(true)
+                    .build();
+
+            favoriteRepository.save(newFavorite);
+            return true;
+        }
     }
 
     private void createTag(List<String> tagNameList, Long artworkId){
