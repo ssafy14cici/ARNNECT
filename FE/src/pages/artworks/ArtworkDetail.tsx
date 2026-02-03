@@ -1,8 +1,9 @@
+// FE/src/pages/artworks/ArtworkDetail.tsx
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 
 import { useAuthStore } from "../../features/auth/store";
-import { artworks } from "../../features/artworks/data"; // 기존 유지
+import { http } from "../../shared/api/http"; // ✅ 실서버 호출용
 import "./artworkDetail.css";
 
 import ArtworkDetailView from "./ArtworkDetailView";
@@ -21,29 +22,57 @@ export type LocalComment = {
   createdAt?: string;
 };
 
-type ArtworkBase = {
-  readonly id: string | number;
-  readonly src: string;
+type ArtworkDetailData = {
+  id: string | number;
+  src: string;
 
-  readonly title?: string;
-  readonly artist?: string;
-  readonly artistName?: string;
-
-  readonly artistId?: string;
-  readonly artistMemberUuid?: string;
-
-  readonly description?: string;
-  readonly tags?: readonly string[];
-
-  readonly [key: string]: any;
-};
-
-type ArtworkDetailData = ArtworkBase & {
   title: string;
   artist: string;
   description: string;
   tags: string[];
+
+  // 팬레터/프로필 이동용(서버 응답에 맞춰 채움)
+  artistMemberUuid?: string;
+  artistId?: string;
+  artistName?: string;
 };
+
+/* ---------------- helpers (no any) ---------------- */
+type JsonObject = Record<string, unknown>;
+function isObject(v: unknown): v is JsonObject {
+  return typeof v === "object" && v !== null;
+}
+function get(obj: JsonObject, key: string): unknown {
+  return obj[key];
+}
+function asString(v: unknown, fallback = ""): string {
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return fallback;
+}
+function asNumber(v: unknown, fallback = 0): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return fallback;
+}
+function asStringArray(v: unknown): string[] {
+  if (Array.isArray(v)) {
+    return v
+      .map((x) => (typeof x === "string" ? x : isObject(x) ? asString(get(x, "name"), "") : ""))
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+function pickEnvelopeData(raw: unknown): unknown {
+  // 공통 envelope: { isSuccess, data, ... }면 data만
+  if (!isObject(raw)) return raw;
+  const d = get(raw, "data");
+  return d ?? raw;
+}
 
 function normalizeArtworkId(raw: unknown): string {
   const s = String(raw ?? "").trim();
@@ -51,73 +80,69 @@ function normalizeArtworkId(raw: unknown): string {
   return s.replace(/^artwork-/, "").replace(/^review-/, "");
 }
 
-function toArtworkNumericId(id: unknown): number | null {
-  const normalizedRaw = normalizeArtworkId(id);
+/**
+ * ⚠️ http baseURL이 "/api/v1" 포함이면 "/artworks"로 바꿔.
+ */
+const ARTWORK_DETAIL_PATH = "/api/v1/artworks";
 
-  if (typeof id === "number" && Number.isFinite(id)) return id;
+function mapArtworkDetail(payload: unknown): ArtworkDetailData | null {
+  const body = pickEnvelopeData(payload);
+  if (!isObject(body)) return null;
 
-  const s = normalizedRaw;
-  if (!s) return null;
+  // id
+  const idRaw = get(body, "artworkId") ?? get(body, "id");
+  const idStr = asString(idRaw, "");
+  const idNum = typeof idRaw === "number" ? idRaw : asNumber(idRaw, NaN);
+  const id: string | number = Number.isFinite(idNum) ? idNum : idStr;
 
-  const normalized = s.startsWith("a") ? s.slice(1) : s;
-  const n = parseInt(normalized, 10);
-  if (Number.isNaN(n)) return null;
-
-  if (n >= 1000) return n - 999;
-  return n;
-}
-
-function findArtworkById(list: readonly ArtworkBase[], id?: string) {
-  const normalized = normalizeArtworkId(id);
-  if (!normalized) return null;
-
-  const urlId = String(normalized);
-
-  return (
-    list.find((item) => {
-      const itemId = String(normalizeArtworkId(item.id));
-
-      if (
-        itemId === urlId ||
-        itemId === `a${urlId}` ||
-        itemId.replace(/^a/, "") === urlId.replace(/^a/, "")
-      ) {
-        return true;
-      }
-
-      const numericUrlId = parseInt(urlId.replace(/^a/, ""), 10);
-      const numericItemId = parseInt(itemId.replace(/^a/, ""), 10);
-
-      if (Number.isNaN(numericUrlId) || Number.isNaN(numericItemId)) return false;
-
-      if (numericUrlId >= 1000) {
-        const expectedItemId = numericUrlId - 999;
-        return numericItemId === expectedItemId;
-      }
-      return false;
-    }) || null
-  );
-}
-
-function getMockArtworkData(baseArtwork: ArtworkBase): ArtworkDetailData {
-  const rawId = normalizeArtworkId(baseArtwork.id);
-  const artworkNumber = String(rawId).replace(/^a/, "");
-
-  const title = baseArtwork.title || `Artwork #${artworkNumber}`;
-  const artist = baseArtwork.artist || baseArtwork.artistName || `ARTIST ${artworkNumber}`;
-
+  // title/desc
+  const title = asString(get(body, "title"), "Untitled");
   const description =
-    baseArtwork.description ||
-    `이 작품은 현대적 감각의 시리즈로, 빛과 공간의 대비를 통해 새로운 시각적 경험을 제공합니다.`;
+    asString(get(body, "description"), "") || asString(get(body, "content"), "");
 
-  const tags = baseArtwork.tags ? [...baseArtwork.tags] : ["현대미술", "시리즈", "공간", "빛"];
+  // image
+  const src =
+    asString(get(body, "imageUrl"), "") ||
+    asString(get(body, "thumbnailUrl"), "") ||
+    asString(get(body, "src"), "");
+
+  // tags
+  const tags =
+    asStringArray(get(body, "tags")) ||
+    asStringArray(get(body, "tagList")) ||
+    [];
+
+  // artist info (서버 필드명 여러 케이스 방어)
+  const artistMemberUuid =
+    asString(get(body, "artistMemberUuid"), "") ||
+    asString(get(body, "artistUuid"), "") ||
+    asString(get(body, "artistId"), "") ||
+    "";
+
+  const artistName =
+    asString(get(body, "artistName"), "") ||
+    asString(get(body, "artist"), "") ||
+    asString(get(body, "nickname"), "") ||
+    "";
+
+  // 화면에 보여줄 artist 문자열
+  const artist = artistName || (artistMemberUuid ? `ARTIST ${artistMemberUuid.slice(0, 4)}` : "Unknown");
+
+  if (!id || !src) {
+    // 상세에서 이미지가 필수인 UI면 null 처리(원하면 src 없어도 허용하도록 바꿔도 됨)
+    return null;
+  }
 
   return {
-    ...baseArtwork,
+    id,
+    src,
     title,
     artist,
-    description,
-    tags,
+    description: description || "설명이 없습니다.",
+    tags: tags.length ? tags : ["현대미술"],
+    artistMemberUuid: artistMemberUuid || undefined,
+    artistId: artistMemberUuid || undefined,
+    artistName: artistName || undefined,
   };
 }
 
@@ -125,10 +150,7 @@ export default function ArtworkDetail() {
   const { artworkId = "" } = useParams<{ artworkId: string }>();
   const navigate = useNavigate();
 
-  const normalizedArtworkId = useMemo(
-    () => artworkId.replace(/^artwork-/, ""),
-    [artworkId],
-  );
+  const normalizedArtworkId = useMemo(() => normalizeArtworkId(artworkId), [artworkId]);
 
   const user = useAuthStore((s) => s.user);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
@@ -143,39 +165,54 @@ export default function ArtworkDetail() {
   const [fanLetterOpen, setFanLetterOpen] = useState(false);
   const [fanLetterSending, setFanLetterSending] = useState(false);
 
-  const ARTWORKS = artworks as unknown as readonly ArtworkBase[];
+  const [artwork, setArtwork] = useState<ArtworkDetailData | null>(null);
 
-  const baseArtwork = useMemo(
-    () => findArtworkById(ARTWORKS, normalizedArtworkId),
-    [ARTWORKS, normalizedArtworkId],
-  );
-
-  const artwork = useMemo(
-    () => (baseArtwork ? getMockArtworkData(baseArtwork) : null),
-    [baseArtwork],
-  );
-
-  const similarArtworks = useMemo(() => {
-    if (!baseArtwork) return [];
-    return ARTWORKS.filter((item) => String(item.id) !== String(baseArtwork.id)).slice(0, 4);
-  }, [ARTWORKS, baseArtwork]);
-
-  const recommendArtworks = useMemo(() => ARTWORKS.slice(0, 4), [ARTWORKS]);
+  // ✅ 목데이터가 없으니 일단 빈 배열
+  const similarArtworks = useMemo(() => [], []);
+  const recommendArtworks = useMemo(() => [], []);
 
   const numericArtworkId = useMemo(() => {
-    const n = toArtworkNumericId(baseArtwork?.id ?? normalizedArtworkId);
-    return n ?? undefined;
-  }, [baseArtwork?.id, normalizedArtworkId]);
-
-  useEffect(() => {
-    setIsLoading(true);
-    setImageError(false);
-    const timer = setTimeout(() => setIsLoading(false), 300);
-    return () => clearTimeout(timer);
+    const n = parseInt(String(normalizedArtworkId), 10);
+    return Number.isFinite(n) ? n : undefined;
   }, [normalizedArtworkId]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
+  }, [normalizedArtworkId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setIsLoading(true);
+        setImageError(false);
+        setArtwork(null);
+
+        if (!normalizedArtworkId) throw new Error("작품 ID가 없습니다.");
+
+        const res = await http.get(`${ARTWORK_DETAIL_PATH}/${normalizedArtworkId}`);
+
+        // axios 스타일({ data }) or 래퍼가 data만 리턴 둘 다 대응
+        const payload =
+          isObject(res) && "data" in res ? (res as { data: unknown }).data : (res as unknown);
+
+        const mapped = mapArtworkDetail(payload);
+
+        if (cancelled) return;
+        setArtwork(mapped);
+      } catch (e) {
+        console.error(e);
+        if (cancelled) return;
+        setArtwork(null);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [normalizedArtworkId]);
 
   useEffect(() => {
@@ -243,16 +280,15 @@ export default function ArtworkDetail() {
 
   const onSendFanLetter = async (content: string) => {
     if (!isLoggedIn || !user?.memberUuid) return alert("로그인 후 이용해주세요.");
-    if (!artwork || !baseArtwork) return;
+    if (!artwork) return;
 
     const safeArtworkId =
-      numericArtworkId ?? (typeof artwork.id === "number" ? artwork.id : Number(artwork.id));
+      numericArtworkId ??
+      (typeof artwork.id === "number" ? artwork.id : Number(artwork.id));
 
     if (!Number.isFinite(safeArtworkId)) return alert("작품 ID를 확인할 수 없습니다.");
 
-    const artistMemberUuid =
-      (baseArtwork as any)?.artistMemberUuid ?? (baseArtwork as any)?.artistId ?? "";
-
+    const artistMemberUuid = artwork.artistMemberUuid ?? "";
     if (!artistMemberUuid) return alert("작가 정보를 확인할 수 없습니다.");
 
     setFanLetterSending(true);

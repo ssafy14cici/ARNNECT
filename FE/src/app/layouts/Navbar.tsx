@@ -79,51 +79,20 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, [isHome]);
 
-  // [수정] items를 모바일/PC에 따라 다른 순서로 반환
-  const items: MenuItem[] = useMemo(() => {
-    // 1. 공통 메뉴 아이템 정의
-    const menu = {
-      home: { key: "home", label: "Home", path: "/", shape: "knot" },
-      pref: { key: "yourpreference", label: "너의 취향은", path: "/preference", shape: "octahedron" },
-      search: { key: "search", label: "Search", path: "/search", shape: "sphere" },
-      close: { key: "close", label: "", type: "close" },
-      feed: { key: "feed", label: "Feed", path: "/feed", shape: "box" },
-      lounge: { key: "lounge", label: "Lounge", path: "/lounge", shape: "torus" },
-      profile: { key: "profile", label: "Profile", path: "/members/me/feed", shape: "sphere" },
-      auth: { key: "auth", label: "Login/Out", path: "", shape: "knot" },
-    };
-
-    if (isMobile) {
-      // [CASE 1] 모바일 순서 (2열 그리드 기준: Home 옆에 X 버튼)
-      // Home | Close
-      // Pref | Search
-      // ...
-      return [
-        menu.home,
-        menu.close, // 2번째로 이동
-        menu.pref,
-        menu.search,
-        menu.feed,
-        menu.lounge,
-        menu.profile,
-        menu.auth,
-      ] as MenuItem[];
-    }
-
-    // [CASE 2] PC 순서 (4열 그리드 기준: 우측 상단에 X 버튼)
-    // Home | Pref | Search | Close
-    // Feed | Lounge | Profile | Auth
-    return [
-      menu.home,
-      menu.pref,
-      menu.search,
-      menu.close, // 4번째
-      menu.feed,
-      menu.lounge,
-      menu.profile,
-      menu.auth,
-    ] as MenuItem[];
-  }, [isMobile]); // isMobile이 바뀔 때마다 재계산
+   // ✅ 메뉴 아이템 정의 (Shape 포함)
+  const items: MenuItem[] = useMemo(
+    () => [
+      { key: "home", label: "Home", path: "/", shape: "knot" },
+      { key: "close", label: "", type: "close" },
+      { key: "yourpreference", label: "너의 취향은", path: "/preference", shape: "octahedron" },
+      { key: "search", label: "Search", path: "/search", shape: "sphere" },
+      { key: "feed", label: "Feed", path: "/feed", shape: "box" },
+      { key: "lounge", label: "Lounge", path: "/lounge", shape: "torus" },
+      { key: "profile", label: "Profile", path: "/members/me/feed", shape: "sphere" },
+      { key: "auth", label: "Login/Out", path: "", shape: "knot" },
+    ],
+    [],
+  );
 
   const handleItemClick = (item: MenuItem) => {
     if (item.type === "close") {

@@ -1,15 +1,8 @@
-// FE/src/components/feed/FeedCard.tsx
+// FE/src/features/feed/ui/FeedCard.tsx
+import React from "react";
+import "./FeedCard.css";
 
-import React from 'react';
-import './FeedCard.css';
-import type { FeedItem, ViewMode } from "../types"; 
-
-interface FeedCardProps {
-  feed: FeedItem;
-  viewMode: ViewMode;
-  onClick?: () => void;
-  onAuthorClick?: (e: React.MouseEvent) => void;
-}
+import type { FeedAuthorRole, FeedItem, ViewMode } from "../model/types";
 
 /* helpers */
 function formatDate(iso?: string) {
@@ -21,7 +14,7 @@ function formatDate(iso?: string) {
   });
 }
 
-function BadgeIcon({ role }: { role: FeedRole }) {
+function BadgeIcon({ role }: { role: FeedAuthorRole }) {
   return role === "ARTIST" ? (
     <svg width="12" height="12" viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="2">
       <path d="M12 2l3 7h7l-5 5 2 7-7-4-7 4 2-7-5-5h7z" />
@@ -34,31 +27,44 @@ function BadgeIcon({ role }: { role: FeedRole }) {
   );
 }
 
-export const FeedCard: React.FC<FeedCardProps> = ({
-  feed,
-  viewMode,
-  onClick,
-  onAuthorClick,
-}) => {
+// ✅ category는 서버에서 확정 안 됐으니, 화면용으로만 추론
+type PostCategory = "ARTWORK" | "REVIEW";
+function inferCategory(feed: FeedItem): PostCategory {
+  // id prefix가 있으면 그걸 우선
+  if (feed.id.startsWith("artwork-")) return "ARTWORK";
+  if (feed.id.startsWith("review-")) return "REVIEW";
+  // 없으면 role 기반으로 fallback (기존 UI 의도 유지)
+  return feed.authorRole === "ARTIST" ? "ARTWORK" : "REVIEW";
+}
+
+type FeedCardProps = {
+  feed: FeedItem;
+  viewMode: ViewMode;
+  onClick?: () => void;
+  onAuthorClick?: (e: React.MouseEvent) => void;
+};
+
+export const FeedCard: React.FC<FeedCardProps> = ({ feed, viewMode, onClick, onAuthorClick }) => {
   const hasImage = Boolean(feed.imageUrl);
-  const category: PostCategory = feed.role === "ARTIST" ? "ARTWORK" : "REVIEW";
+  const category = inferCategory(feed);
 
   return (
     <article
-      className={`feed-card ${hasImage ? "" : "no-image"} ${
-        viewMode === "LIST" ? "mode-list" : "mode-grid"
-      }`}
+      className={`feed-card ${hasImage ? "" : "no-image"} ${viewMode === "LIST" ? "mode-list" : "mode-grid"}`}
       onClick={onClick}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => e.key === "Enter" && onClick()}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onClick?.();
+      }}
     >
       {/* image */}
       <div className="card-img-box">
-        {/* 뱃지 */}
+        {/* badge */}
         <div className={`card-badge ${feed.authorRole === "ARTIST" ? "artist" : "user"}`}>
           <BadgeIcon role={feed.authorRole} />
         </div>
+
         {hasImage ? (
           <img src={feed.imageUrl} alt={feed.title} loading="lazy" />
         ) : (
@@ -72,13 +78,12 @@ export const FeedCard: React.FC<FeedCardProps> = ({
 
         <div className="card-meta">
           <span className="card-cat">{category}</span>
-          {viewMode === "LIST" && feed.excerpt && (
-            <span className="card-desc">{feed.excerpt}</span>
-          )}
+          {viewMode === "LIST" && feed.excerpt ? <span className="card-desc">{feed.excerpt}</span> : null}
         </div>
 
         <div className="card-footer">
           <button
+            type="button"
             className="author-link"
             onClick={(e) => {
               e.stopPropagation();

@@ -24,8 +24,12 @@ function isRecord(v: unknown): v is JsonRecord {
 }
 
 function asString(v: unknown, fallback = ""): string {
-  return typeof v === "string" ? v : fallback;
+  if (typeof v === "string") return v;
+  if (typeof v === "number" && Number.isFinite(v)) return String(v);
+  if (typeof v === "boolean") return String(v);
+  return fallback;
 }
+
 
 function asNumber(v: unknown, fallback = 0): number {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
@@ -418,20 +422,20 @@ function toFeedItemFromArtwork(x: unknown): FeedItem | null {
   if (!isRecord(x)) return null;
   const id = asString((x as any).artworkId ?? (x as any).id ?? "");
   const imageUrl = asString((x as any).imageUrl ?? (x as any).thumbnailUrl ?? (x as any).artworkImageUrl ?? (x as any).posterUrl ?? "");
-  if (!id || !imageUrl) return null;
-
+  if (!id) return null;
+ 
   const createdAt = asString((x as any).createdAt ?? (x as any).createdDate ?? (x as any).date ?? new Date().toISOString());
-  return { id, imageUrl, createdAt };
+  return { id, imageUrl: imageUrl || "", createdAt };
 }
 
 function toFeedItemFromReview(x: unknown): FeedItem | null {
   if (!isRecord(x)) return null;
   const id = asString((x as any).reviewId ?? (x as any).id ?? "");
   const imageUrl = asString((x as any).imageUrl ?? (x as any).thumbnailUrl ?? (x as any).reviewImageUrl ?? "");
-  if (!id || !imageUrl) return null;
+  if (!id) return null;
 
   const createdAt = asString((x as any).createdAt ?? (x as any).createdDate ?? (x as any).date ?? new Date().toISOString());
-  return { id, imageUrl, createdAt };
+  return { id, imageUrl: imageUrl || "", createdAt };
 }
 
 export async function getArtistFeed(

@@ -7,9 +7,11 @@ export const isValidEmail = (v: string) => EMAIL_REGEX.test(v.trim());
 export type AccountStepValue = {
   email: string;
   name: string;
+  nickname: string;  // ✅ 필수
   password: string;
   phone: string;
 };
+
 
 export function maskPw(pw: string) {
   if (!pw) return "—";

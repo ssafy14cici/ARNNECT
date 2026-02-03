@@ -1,5 +1,4 @@
-// ✅ 기존 features/posts/types.ts 기반 (author는 mock/local에서 쓰던 흔적이라 optional 유지)
-
+// FE/src/features/artworks/model/types.ts
 export type PostRole = "USER" | "ARTIST";
 
 export type AuthorCtx = {
@@ -18,21 +17,43 @@ export type Artwork = {
   tags?: string[];
   createdAt?: string;
 
-  // (선택) 작가 식별
   artistUuid?: string;
   artistName?: string;
 };
 
+/**
+ * ✅ BE CreateArtworkRequest 매칭
+ * - fieldId: Integer (DB 1개 → FE에서 고정 1)
+ * - genreId: Integer (드롭다운)
+ * - productionDate: LocalDate ("YYYY-MM-DD")
+ * - image: MultipartFile
+ */
 export interface ArtworkCreateReq {
   title: string;
-  description: string;
-  field: string;
-  genre: string;
-  productionDate: number;
-  size: string;
-  tags: string[];
-  imageFile: File;
+  description?: string;
 
-  // legacy/mock 호환용
+  fieldId: number;
+  genreId: number;
+
+  productionDate?: string; // "YYYY-MM-DD"
+  size?: string;
+
+  image: File;
+  tags?: string[];
+
   author?: AuthorCtx;
+}
+
+
+export interface ArtworkUpdateReq {
+  title: string;
+  description: string;
+
+  fieldId: number;          // ✅ 필수 
+  genreId?: number;         // ✅ 선택
+  productionDate: string;   // ✅ 필수 "YYYY-MM-DD"
+  size: string;             // ✅ 필수
+
+  image?: File;             // ✅ 선택
+  tags?: string[];          // ✅ 선택
 }

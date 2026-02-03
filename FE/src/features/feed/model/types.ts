@@ -1,9 +1,10 @@
+// src/features/feed/model/types.ts
 export type FeedAuthorRole = "ARTIST" | "USER";
 export type FeedFilterKey = "ALL" | "ARTIST" | "USER";
 export type ViewMode = "GRID" | "LIST";
 
 export type FeedItem = {
-  id: string;               // "artwork-12" | "review-5" | "img-1" 등
+  id: string;
   authorRole: FeedAuthorRole;
 
   title: string;
@@ -12,7 +13,7 @@ export type FeedItem = {
   authorName: string;
   authorId: string;
 
-  createdAt: string;        // ISO
+  createdAt: string; // ISO
   imageUrl?: string;
 
   category?: string;

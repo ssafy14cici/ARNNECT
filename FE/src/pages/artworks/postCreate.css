@@ -1,0 +1,285 @@
+/* ==========================================================================
+   POST CREATE PAGE (Sophisticated Dark Mode)
+========================================================================== */
+
+/* 테마 변수 설정 */
+/* ✅ 페이지는 고정 높이, 바깥 스크롤 차단 */
+.post-create-page {
+  height: 100vh;
+  background-color: #050505;
+  color: #fff;
+  font-family: 'Pretendard', sans-serif;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* ✅ 컨테이너는 column 레이아웃 + footer 아래 빈공간 없애기 */
+.pc-container {
+  width: 100%;
+  max-width: 800px;
+
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+
+  padding: 60px 24px 0; 
+  position: relative;
+  animation: fadeIn 0.6s ease;
+}
+
+/* ✅ 스크롤은 여기서만: 남는 높이 전부 먹게 */
+.pc-content {
+  display: flex;
+  flex-direction: column;
+  gap: 60px;
+
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+
+  padding-bottom: 40px; /* footer랑 간격 */
+}
+
+/* ✅ 버튼은 항상 아래로 (content 길어도 footer는 고정 영역) */
+.pc-footer {
+  margin-top: auto;     /* ⭐️ footer를 바닥으로 밀어줌 */
+  padding: 24px 0 28px; /* footer 자체 여백 */
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+
+.post-create-page.theme-artist { --accent: #C8A97E; }
+.post-create-page.theme-user { --accent: #ffffff; }
+
+
+
+/* --- Header --- */
+.pc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 60px;
+  flex-shrink: 0; /* ✅ header 고정 */
+}
+
+.pc-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 3rem;
+  margin: 0;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.pc-close-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  padding: 8px;
+  transition: color 0.3s;
+}
+.pc-close-btn:hover { color: #fff; }
+
+
+
+
+/* 1. Image Upload */
+.pc-upload-section {
+  width: 100%;
+}
+
+.pc-upload-box {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px dashed rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.02);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+.pc-upload-box:hover {
+  border-color: var(--accent);
+  background: rgba(255,255,255,0.04);
+}
+
+.pc-upload-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.4);
+  gap: 16px;
+}
+.plus-icon { font-size: 3rem; font-weight: 300; }
+
+.pc-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+
+/* 2. Form Inputs (Underline Style) */
+.pc-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.pc-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pc-label {
+  font-size: 0.85rem;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+.pc-label .req { color: #ff5f5f; margin-left: 4px; }
+
+.pc-input, .pc-textarea {
+  width: 100%;
+  background: transparent !important;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+  padding: 12px 0;
+  color: #fff;
+  font-family: 'Pretendard', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 400;
+  border-radius: 0;
+  transition: border-color 0.3s;
+}
+
+.pc-input:focus, .pc-textarea:focus {
+  outline: none;
+  border-bottom-color: #fff;
+}
+
+.pc-input::placeholder, .pc-textarea::placeholder {
+  color: rgba(255,255,255,0.15);
+}
+
+.pc-row-2 {
+  display: flex;
+  gap: 24px;
+}
+.pc-row-2 > * { flex: 1; }
+
+/* Tags Preview */
+.pc-tags-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.pc-tags-preview span {
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.6);
+}
+
+
+.pc-submit-btn {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  padding: 16px 40px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, opacity 0.2s;
+  border-radius: 2px;
+}
+.pc-submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  opacity: 0.9;
+}
+.pc-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .pc-title { font-size: 2.2rem; }
+  .pc-row-2 { flex-direction: column; gap: 40px; }
+  .pc-input { font-size: 1.2rem; }
+}
+
+/* ---------------- 토글(칩) ---------------- */
+.pc-genre-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ✅ 다크 테마에 맞게 흰색 계열로 수정 (기존: rgba(0,0,0,...)라 안 보임) */
+.pc-genre-chip {
+  border: 1px solid rgba(255,255,255,0.22);
+  background: transparent;
+  color: rgba(255,255,255,0.85);
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform 0.05s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.pc-genre-chip:hover:not(:disabled) {
+  border-color: rgba(255,255,255,0.45);
+}
+
+.pc-genre-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ✅ 선택 상태 */
+.pc-genre-chip.is-active {
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.pc-genre-chip:active {
+  transform: scale(0.98);
+}
+
+/* ---------------- 사이즈 입력 ---------------- */
+.pc-size-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pc-size-x {
+  opacity: 0.7;
+  font-size: 14px;
+  user-select: none;
+}
+
+.pc-size-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.65;
+}

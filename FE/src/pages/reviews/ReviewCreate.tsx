@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "../posts/postCreate.css";
+import "./postCreate.css";
 
 import { useAuthStore } from "../../features/auth/store";
 import { createReview } from "../../features/reviews/api";
+import { USE_MOCK } from "../../shared/config/env";
+
 import ReviewForm from "../../features/reviews/ui/ReviewForm";
+import type { ReviewCreateReq } from "../../features/reviews/model/types"; // ✅ 타입 추가
 
 export default function ReviewCreate() {
   const navigate = useNavigate();
@@ -13,24 +16,18 @@ export default function ReviewCreate() {
 
   const [loading, setLoading] = useState(false);
 
-  const onSubmit = async (req: any) => {
-    if (!user?.memberUuid) {
+  // ✅ any -> ReviewCreateReq로 바꿔서 실수를 TS가 잡게 함
+  const onSubmit = async (req: ReviewCreateReq) => {
+    // ✅ mock 개발 중엔 로그인 없어도 테스트 가능하게
+    if (!USE_MOCK && !user?.memberUuid) {
       alert("로그인 후 이용해주세요.");
       return;
     }
 
     setLoading(true);
     try {
-      const author = {
-        id: user.memberUuid,
-        name: user.name,
-        role: appRole === "artist" ? "ARTIST" : "USER",
-      } as const;
-
-      await createReview({
-        ...req,
-        author,
-      });
+      // ✅ mock 단계에서 author는 일단 빼도 됨(타입/필드명 불일치로 헷갈리는 원인 제거)
+      await createReview(req);
 
       alert("등록되었습니다.");
       navigate(-1);
@@ -54,6 +51,7 @@ export default function ReviewCreate() {
           </button>
         </header>
 
+        {/* ✅ ReviewForm은 그대로. onSubmit에서 createReview 호출 */}
         <ReviewForm submitting={loading} onSubmit={onSubmit} />
       </div>
     </div>

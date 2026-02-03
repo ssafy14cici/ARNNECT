@@ -1,10 +1,10 @@
+// FE/src/pages/feed/Feed.tsx
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { FeedCard } from "../../features/feed/ui/FeedCard";
-import type { FeedFilterKey, FeedItem, ViewMode } from "../../features/feed/types";
+import type { FeedFilterKey, FeedItem, ViewMode } from "../../features/feed/model/types";
 import { getFeedList } from "../../features/feed/api";
-import { subscribePostsUpdated } from "../../features/posts/api/mock";
 import "./feed.css";
 
 const DETAIL_PATH = (it: FeedItem) => {
@@ -50,8 +50,7 @@ export default function Feed() {
 
   useEffect(() => {
     refetch();
-    const unsub = subscribePostsUpdated(() => refetch());
-    return () => unsub?.();
+    // ✅ mock subscribe 제거
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -61,9 +60,7 @@ export default function Feed() {
 
     const io = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && hasMore) {
-          setVisibleCount((v) => v + PAGE_SIZE);
-        }
+        if (entry.isIntersecting && hasMore) setVisibleCount((v) => v + PAGE_SIZE);
       },
       { threshold: 0.1 },
     );
@@ -83,18 +80,10 @@ export default function Feed() {
       <header className="feedHeader">
         <div className="feedControls">
           <div className="togglePill">
-            <button
-              type="button"
-              className={`pillBtn ${viewMode === "LIST" ? "active" : ""}`}
-              onClick={() => setViewMode("LIST")}
-            >
+            <button type="button" className={`pillBtn ${viewMode === "LIST" ? "active" : ""}`} onClick={() => setViewMode("LIST")}>
               List
             </button>
-            <button
-              type="button"
-              className={`pillBtn ${viewMode === "GRID" ? "active" : ""}`}
-              onClick={() => setViewMode("GRID")}
-            >
+            <button type="button" className={`pillBtn ${viewMode === "GRID" ? "active" : ""}`} onClick={() => setViewMode("GRID")}>
               Grid
             </button>
           </div>

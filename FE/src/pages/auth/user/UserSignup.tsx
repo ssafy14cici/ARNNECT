@@ -16,7 +16,7 @@ export default function UserSignup({ onBack }: { onBack: () => void }) {
   const [step, setStep] = useState<1 | 2>(1);
 
   const [u1, setU1] = useState<AccountStepValue>({
-    email: "", name: "", password: "", phone: "",
+    email: "", name: "", nickname: "", password: "", phone: "",
   });
   const [pw2, setPw2] = useState("");
 
@@ -80,15 +80,16 @@ export default function UserSignup({ onBack }: { onBack: () => void }) {
     setLoading(true);
     try {
       await apiSignupUser({
-       email: u1.email.trim(),
-       password: u1.password,
-       name: u1.name.trim(),
-       nickname: u1.name.trim(),      // ✅ 일단 name으로 대체 (닉네임 입력 UI 만들면 교체)
-       phone: u1.phone.trim(),
-       birth: "2000-01-01",           // ✅ TODO: UI에서 받도록 추가 권장
-       role: "general",
-       isAgree: privacyConsent,       // ✅ Step2 동의 여부 → isAgree 매핑
-     });
+        email: u1.email.trim(),
+        password: u1.password,
+        name: u1.name.trim(),
+        nickname: u1.nickname.trim(),                // ✅ 아직 UI 없으면 name으로 대체 OK
+        phone: u1.phone.replace(/[^0-9]/g, ""),  // ✅ 하이픈/공백 제거
+        birth: "2000-01-01",                     // TODO: UI에서 받기
+        isAgree: privacyConsent,
+        // image: 선택 구현하면 File 넣기
+      });
+
       nav("/login");
     } catch (err: any) {
       setError(err?.message ?? "회원가입에 실패했습니다.");

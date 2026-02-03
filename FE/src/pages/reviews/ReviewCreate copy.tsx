@@ -1,26 +1,29 @@
-// FE/src/pages/artworks/ArtworkCreate.tsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./postCreate.css";
 
 import { useAuthStore } from "../../features/auth/store";
-import { createArtwork } from "../../features/artworks/api";
-import ArtworkForm from "../../features/artworks/ui/ArtworkForm";
-import type { ArtworkCreateReq } from "../../features/artworks/model/types";
+import { createReview, USE_MOCK } from "../../features/reviews/api";
+import ReviewForm from "../../features/reviews/ui/ReviewForm";
 
-export default function ArtworkCreate() {
+import type { ReviewCreateReq } from "../../features/reviews/model/types";
+export default function ReviewCreate() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
-  const appRole = useAuthStore((s) => s.role); // "general" | "artist"
+  const appRole = useAuthStore((s) => s.role);
 
   const [loading, setLoading] = useState(false);
 
-  const onSubmit = async (req: ArtworkCreateReq) => {
-    if (!user?.memberUuid) {
+  const onSubmit = async (req: ReviewCreateReq) => {
+    // if (!user?.memberUuid) {
+    //   alert("로그인 후 이용해주세요.");
+    //   return;
+    // }
+    if (!USE_MOCK && !user?.memberUuid) {
       alert("로그인 후 이용해주세요.");
       return;
     }
-
+    
     setLoading(true);
     try {
       const author = {
@@ -28,11 +31,8 @@ export default function ArtworkCreate() {
         name: user.name,
         role: appRole === "artist" ? "ARTIST" : "USER",
       } as const;
-
-      await createArtwork({
-        ...req,
-        author, // real에서는 무시되어도 괜찮고(mock/로컬 호환용)
-      });
+      // 임시로 author 빼는 버전
+      await createReview(req);
 
       alert("등록되었습니다.");
       navigate(-1);
@@ -45,10 +45,10 @@ export default function ArtworkCreate() {
   };
 
   return (
-    <div className="post-create-page theme-artist">
+    <div className="post-create-page theme-user">
       <div className="pc-container">
         <header className="pc-header">
-          <h1 className="pc-title">New Artwork</h1>
+          <h1 className="pc-title">New Review</h1>
           <button className="pc-close-btn" onClick={() => navigate(-1)} type="button">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 6L6 18M6 6l12 12" />
@@ -56,7 +56,7 @@ export default function ArtworkCreate() {
           </button>
         </header>
 
-        <ArtworkForm submitting={loading} onSubmit={onSubmit} />
+        <ReviewForm submitting={loading} onSubmit={onSubmit} />
       </div>
     </div>
   );
