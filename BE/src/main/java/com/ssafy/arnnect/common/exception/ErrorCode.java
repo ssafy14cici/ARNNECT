@@ -25,7 +25,10 @@ public enum ErrorCode {
     ARTWORK_NOT_FOUND(HttpStatus.NOT_FOUND, "ARTWORK_001", "작품이 존재하지않습니다."),
 
     /** REVIEW **/
-    REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_001", "감상평이 존재하지않습니다.");
+    REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_001", "감상평이 존재하지않습니다."),
+
+    /** FanLetter **/
+    FANLETTER_NOT_FOUND(HttpStatus.NOT_FOUND, "FANLETTER_001", "팬레터가 존재하지않습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
