@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import "./postCreate.css";
 
 import { useAuthStore } from "../../features/auth/store";
-import { createReview, USE_MOCK } from "../../features/reviews/api"; // ✅ USE_MOCK import
+import { createReview } from "../../features/reviews/api";
+import { USE_MOCK } from "../../shared/config/env";
+
 import ReviewForm from "../../features/reviews/ui/ReviewForm";
 import type { ReviewCreateReq } from "../../features/reviews/model/types"; // ✅ 타입 추가
 
