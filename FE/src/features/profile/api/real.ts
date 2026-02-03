@@ -36,7 +36,7 @@ function asBool(v: unknown, fallback = false): boolean {
 }
 
 /**
- * ✅ role 정규화 (서버/토큰 어떤 형태든 최대한 방어)
+ * role 정규화
  * - "ARTIST", "ROLE_ARTIST", "artist" -> "ARTIST"
  * - "USER", "GENERAL", "ROLE_USER", "general" -> "USER"
  */
@@ -47,7 +47,11 @@ function normalizeRole(v: unknown): "USER" | "ARTIST" | null {
   return null;
 }
 
-/** 서버 응답이 공통 envelope({data})일 때 data만 뽑기 */
+function isArtistRoleLike(v: unknown): boolean {
+  return String(v ?? "").toUpperCase().includes("ARTIST");
+}
+
+/** 서버 응답이 공통 envelope({data}/{result})일 때 unwrap */
 function pickData(raw: unknown): unknown {
   if (isRecord(raw) && "data" in raw) return (raw as any).data;
   if (isRecord(raw) && "result" in raw) return (raw as any).result;
@@ -94,8 +98,8 @@ function getAccessTokenFromStore(): string | null {
 }
 
 /**
- * ✅ JWT payload 디코딩 (검증은 서버가 하므로 FE에서는 UI/분기용으로만 사용)
- * payload 예: { sub: "uuid", role: "ARTIST" | "USER", ... }
+ * JWT payload decode (UI 분기/표시용)
+ * - 검증은 서버가 하므로 FE는 "읽기"만 한다.
  */
 function parseJwtPayload(token: string): JsonRecord | null {
   try {
@@ -117,17 +121,26 @@ function parseJwtPayload(token: string): JsonRecord | null {
 function getRoleFromToken(): "USER" | "ARTIST" | null {
   const token = getAccessTokenFromStore();
   if (!token) return null;
+  const payload = parseJwtPayload(token);
+  if (!payload) return null;
+  return normalizeRole(payload.role);
+}
 
+function getMemberUuidFromToken(): string | null {
+  const token = getAccessTokenFromStore();
+  if (!token) return null;
   const payload = parseJwtPayload(token);
   if (!payload) return null;
 
-  return normalizeRole(payload.role);
+  // JwtTokenProvider에서 subject에 memberUuid 넣는 구조
+  const sub = payload.sub;
+  return typeof sub === "string" && sub.trim() ? sub : null;
 }
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getAccessTokenFromStore();
 
-  const headers = mergeHeaders({ "Content-Type": "application/json" }, init?.headers);
+  const headers = mergeHeaders({}, init?.headers);
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await fetch(url(path), {
@@ -137,7 +150,6 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!res.ok) {
-    // 여기 메시지는 최소화. 필요하면 res.text() 읽어서 message 뽑도록 확장 가능.
     throw new HttpError(res.status, `${init?.method ?? "GET"} ${path} failed (${res.status})`);
   }
 
@@ -180,51 +192,86 @@ function normalizeFeaturedIds(raw: unknown): string[] | undefined {
   return uniq.length ? uniq : undefined;
 }
 
-function isArtistRoleLike(v: unknown): boolean {
-  return String(v ?? "").toUpperCase().includes("ARTIST");
-}
-
 /**
- * ✅ 서버 프로필 -> 화면 프로필(공통 모델)
- * roleHint: 응답에 role이 없을 때(= /member/my 같은 케이스) 토큰 기반으로 role 고정 가능
+ * 서버 프로필 -> 화면 프로필(공통 모델)
+ * - roleHint/idHint를 받아서, 서버가 role/uuid를 안 주는 케이스(/member/my)도 안정화
+ * - MyInfoResponse / MemberInfoResponse 필드명(is_artist, followers 등)도 흡수
  */
-function normalizeProfile(raw: unknown, roleHint?: "USER" | "ARTIST"): ProfileModel {
+function normalizeProfile(raw: unknown, opts?: { roleHint?: "USER" | "ARTIST"; idHint?: string | null }): ProfileModel {
   const d = pickData(raw);
   const rec = isRecord(d) ? d : ({} as JsonRecord);
 
-  const role =
+  // role 후보: role / isArtist / is_artist
+  const roleFromField =
     normalizeRole((rec as any).role) ??
     normalizeRole((rec as any).userRole) ??
     normalizeRole((rec as any).memberRole) ??
-    roleHint ??
+    null;
+
+  const isArtistFlag =
+    typeof (rec as any).isArtist === "boolean"
+      ? (rec as any).isArtist
+      : typeof (rec as any).is_artist === "boolean"
+        ? (rec as any).is_artist
+        : typeof (rec as any).is_artist === "number"
+          ? Boolean((rec as any).is_artist)
+          : typeof (rec as any).isArtist === "number"
+            ? Boolean((rec as any).isArtist)
+            : null;
+
+  const role: "USER" | "ARTIST" =
+    roleFromField ??
+    (isArtistFlag != null ? (isArtistFlag ? "ARTIST" : "USER") : null) ??
+    opts?.roleHint ??
     "USER";
 
-  const id = asString((rec as any).memberUuid ?? (rec as any).id ?? (rec as any).artistId ?? (rec as any).userId ?? "");
-  const name = asString((rec as any).displayName ?? (rec as any).nickname ?? (rec as any).name ?? "—");
+  // id: 서버가 안 주면 token sub 또는 호출 파라미터로 보정
+  const id =
+    asString((rec as any).memberUuid ?? (rec as any).id ?? (rec as any).artistId ?? (rec as any).userId ?? "") ||
+    (opts?.idHint ?? "") ||
+    "";
 
+  const name =
+    asString((rec as any).displayName ?? (rec as any).nickname ?? (rec as any).name ?? "—");
+
+  // image: savedProfileImageName / saved_profile_image_name 같은 케이스도 수용
   const imageUrl =
     typeof (rec as any).profileImageUrl === "string"
       ? (rec as any).profileImageUrl
       : typeof (rec as any).profileImage === "string"
         ? (rec as any).profileImage
-        : typeof (rec as any).imageUrl === "string"
-          ? (rec as any).imageUrl
-          : typeof (rec as any).image === "string"
-            ? (rec as any).image
-            : null;
+        : typeof (rec as any).savedProfileImageName === "string"
+          ? (rec as any).savedProfileImageName
+          : typeof (rec as any).saved_profile_image_name === "string"
+            ? (rec as any).saved_profile_image_name
+            : typeof (rec as any).imageUrl === "string"
+              ? (rec as any).imageUrl
+              : typeof (rec as any).image === "string"
+                ? (rec as any).image
+                : null;
 
   const bio =
     typeof (rec as any).bio === "string"
       ? (rec as any).bio
-      : typeof (rec as any).artIntroduction === "string"
-        ? (rec as any).artIntroduction
-        : typeof (rec as any).introduction === "string"
-          ? (rec as any).introduction
-          : null;
+      : typeof (rec as any).introduction === "string"
+        ? (rec as any).introduction
+        : typeof (rec as any).artIntroduction === "string"
+          ? (rec as any).artIntroduction
+          : typeof (rec as any).introduction === "string"
+            ? (rec as any).introduction
+            : null;
 
-  const followersCount = asNumber((rec as any).followersCount ?? (rec as any).followerCount ?? 0);
-  const followingsCount = asNumber((rec as any).followingsCount ?? (rec as any).followingCount ?? 0);
-  const isFollowing = asBool((rec as any).isFollowing ?? (rec as any).following ?? false);
+  // followers/followings: MyInfoResponse가 followers/followings로 줄 가능성 반영
+  const followersCount = asNumber((rec as any).followersCount ?? (rec as any).followers ?? (rec as any).followerCount ?? 0);
+  const followingsCount = asNumber((rec as any).followingsCount ?? (rec as any).followings ?? (rec as any).followingCount ?? 0);
+
+  // isFollowing: is_follows / isFollows
+  const isFollowing =
+    asBool((rec as any).isFollowing ?? (rec as any).following ?? false) ||
+    (typeof (rec as any).isFollows === "number" ? Boolean((rec as any).isFollows) : false) ||
+    (typeof (rec as any).is_follows === "number" ? Boolean((rec as any).is_follows) : false) ||
+    (typeof (rec as any).isFollows === "boolean" ? (rec as any).isFollows : false) ||
+    (typeof (rec as any).is_follows === "boolean" ? (rec as any).is_follows : false);
 
   const badges = normalizeBadges((rec as any).badges);
   const featuredBadgeIds =
@@ -250,7 +297,9 @@ function normalizeProfile(raw: unknown, roleHint?: "USER" | "ARTIST"): ProfileMo
         ? (rec as any).genre
         : typeof (rec as any).genreName === "string"
           ? (rec as any).genreName
-          : undefined;
+          : typeof (rec as any).genre_name === "string"
+            ? (rec as any).genre_name
+            : undefined;
 
     const artist: ArtistProfile = {
       ...common,
@@ -271,14 +320,11 @@ function normalizeProfile(raw: unknown, roleHint?: "USER" | "ARTIST"): ProfileMo
           ? (rec as any).field
           : typeof (rec as any).fieldName === "string"
             ? (rec as any).fieldName
-            : undefined,
-      debutYear: typeof (rec as any).debutYear === "number" ? (rec as any).debutYear : undefined,
-      sns:
-        typeof (rec as any).sns === "string"
-          ? (rec as any).sns
-          : typeof (rec as any).snsPage === "string"
-            ? (rec as any).snsPage
-            : undefined,
+            : typeof (rec as any).field_name === "string"
+              ? (rec as any).field_name
+              : undefined,
+      debutYear: typeof (rec as any).debutYear === "number" ? (rec as any).debutYear : (typeof (rec as any).debut_year === "number" ? (rec as any).debut_year : undefined),
+      sns: typeof (rec as any).sns === "string" ? (rec as any).sns : (typeof (rec as any).snsPage === "string" ? (rec as any).snsPage : (typeof (rec as any).sns_page === "string" ? (rec as any).sns_page : undefined)),
       affiliation: typeof (rec as any).affiliation === "string" ? (rec as any).affiliation : undefined,
       isVerified: typeof (rec as any).isVerified === "boolean" ? (rec as any).isVerified : undefined,
       artIntroduction: typeof (rec as any).artIntroduction === "string" ? (rec as any).artIntroduction : undefined,
@@ -321,68 +367,20 @@ export type UpdateMyProfilePatch = {
 };
 
 /**
- * ✅ 내 프로필 조회
- * - BE가 role을 /member/my에 안 준다면, 토큰 role 기준으로 올바른 엔드포인트를 호출해야 함.
- * - 토큰 role이 없거나 엔드포인트가 없으면 fallback으로 /member/my 사용.
+ * ✅ 내 프로필 조회: BE 기준 /api/v1/member/my 단일
+ * - role/uuid가 응답에 없을 수 있으므로 token claim(sub/role)로 보정
  */
 export async function getMyProfile(): Promise<ProfileModel> {
-  const roleFromToken = getRoleFromToken(); // "USER" | "ARTIST" | null
+  const roleHint = getRoleFromToken();
+  const idHint = getMemberUuidFromToken();
 
-  // 1) 토큰에 role이 있으면 그 role 엔드포인트 우선
-  if (roleFromToken === "ARTIST") {
-    try {
-      const raw = await req<unknown>("/api/v1/member/artists/my");
-      return normalizeProfile(raw, "ARTIST");
-    } catch (e) {
-      // 엔드포인트 미구현/메서드 미지원일 때만 fallback
-      if (e instanceof HttpError && (e.status === 404 || e.status === 405)) {
-        // continue to fallback
-      } else {
-        throw e;
-      }
-    }
-  }
-
-  if (roleFromToken === "USER") {
-    try {
-      const raw = await req<unknown>("/api/v1/member/users/my");
-      return normalizeProfile(raw, "USER");
-    } catch (e) {
-      if (e instanceof HttpError && (e.status === 404 || e.status === 405)) {
-        // continue to fallback
-      } else {
-        throw e;
-      }
-    }
-  }
-
-  // 2) role이 없거나 fallback: artists/my → users/my → member/my 순
-  try {
-    const rawA = await req<unknown>("/api/v1/member/artists/my");
-    return normalizeProfile(rawA, "ARTIST");
-  } catch (eA) {
-    if (!(eA instanceof HttpError) || (eA.status !== 404 && eA.status !== 405 && eA.status !== 403)) {
-      // 401 같은 건 재로그인 이슈라 그대로 던지는 게 맞음
-      // 403은 "유저인데 artists/my 접근" 같은 경우라 users/my로 넘어가기 위해 허용
-      if (eA instanceof HttpError && eA.status === 401) throw eA;
-    }
-  }
-
-  try {
-    const rawU = await req<unknown>("/api/v1/member/users/my");
-    return normalizeProfile(rawU, "USER");
-  } catch (eU) {
-    if (eU instanceof HttpError && eU.status === 401) throw eU;
-    // 마지막 fallback
-  }
-
-  const raw = await req<unknown>("/api/v1/member/my");
-  return normalizeProfile(raw, roleFromToken ?? undefined);
+  const raw = await req<unknown>("/api/v1/member/my", { method: "GET" });
+  return normalizeProfile(raw, { roleHint: roleHint ?? undefined, idHint });
 }
 
 export async function getProfile(memberUuid: string): Promise<ProfileModel> {
-  const raw = await req<unknown>(`/api/v1/member/${encodeURIComponent(memberUuid)}`);
-  return normalizeProfile(raw);
+  const raw = await req<unknown>(`/api/v1/member/${encodeURIComponent(memberUuid)}`, { method: "GET" });
+  return normalizeProfile(raw, { idHint: memberUuid });
 }
 
 export async function getArtistProfile(memberUuid: string): Promise<ProfileModel> {
@@ -444,7 +442,7 @@ export async function getArtistFeed(
   qs.set("artist", artistUuid);
   if (cursor) qs.set("cursor", cursor);
 
-  const raw = await req<unknown>(`/api/v1/artworks?${qs.toString()}`);
+  const raw = await req<unknown>(`/api/v1/artworks?${qs.toString()}`, { method: "GET" });
   const d = pickData(raw);
 
   const list = pickList(d);
@@ -465,7 +463,7 @@ export async function getUserFeed(
     const qs = new URLSearchParams();
     if (cursor) qs.set("cursor", cursor);
 
-    const raw = await req<unknown>(`/api/v1/reviews/my${qs.toString() ? `?${qs}` : ""}`);
+    const raw = await req<unknown>(`/api/v1/reviews/my${qs.toString() ? `?${qs}` : ""}`, { method: "GET" });
     const d = pickData(raw);
 
     const list = pickList(d);
@@ -496,12 +494,14 @@ export async function sendFanLetter(artistUuid: string, content: string): Promis
   try {
     await req<unknown>("/api/v1/fanletters", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ artistUuid, content }),
     });
   } catch (e) {
     if (e instanceof HttpError && (e.status === 400 || e.status === 422)) {
       await req<unknown>("/api/v1/fanletters", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ artistId: artistUuid, content }),
       });
       return;
@@ -510,21 +510,68 @@ export async function sendFanLetter(artistUuid: string, content: string): Promis
   }
 }
 
+/** FormData 빌더 (@ModelAttribute 대응) */
+function buildFormData(patch: UpdateMyProfilePatch): FormData {
+  const fd = new FormData();
+
+  // 문자열/불리언만 처리 (현재 patch 타입 기준)
+  const put = (k: string, v: unknown) => {
+    if (v === undefined) return;
+    if (v === null) return;
+    if (typeof v === "string") {
+      if (!v.trim()) return;
+      fd.append(k, v);
+      return;
+    }
+    if (typeof v === "boolean") {
+      fd.append(k, String(v));
+      return;
+    }
+    // 숫자 등
+    if (typeof v === "number" && Number.isFinite(v)) {
+      fd.append(k, String(v));
+    }
+  };
+
+  put("nickname", patch.nickname);
+  put("displayName", patch.displayName);
+
+  // 서버 DTO가 어떤 키를 받는지에 따라 둘 다 넣고 싶으면 여기서 정책 결정
+  put("profileImage", patch.profileImage);
+  put("profileImageUrl", patch.profileImageUrl);
+
+  put("artIntroduction", patch.artIntroduction);
+  put("bio", patch.bio);
+
+  put("genre", patch.genre);
+  put("genreName", patch.genreName);
+
+  put("contactEnabled", patch.contactEnabled);
+  put("contactUrl", patch.contactUrl);
+
+  return fd;
+}
+
 /**
  * 내 프로필 수정
- * - ARTIST: /api/v1/member/artists/my
+ * - ARTIST: /api/v1/member/artist/my   (✅ 단수)
  * - USER:   /api/v1/member/users/my
+ * - BE가 @ModelAttribute라서 FormData로 PUT
  */
 export async function updateMyProfile(
   role: ProfileRole,
   patch: UpdateMyProfilePatch,
 ): Promise<ProfileModel> {
   const isArtist = isArtistRoleLike(role);
-  const path = isArtist ? "/api/v1/member/artists/my" : "/api/v1/member/users/my";
+  const path = isArtist ? "/api/v1/member/artist/my" : "/api/v1/member/users/my";
+
+  const fd = buildFormData(patch);
 
   await req<unknown>(path, {
     method: "PUT",
-    body: JSON.stringify(patch),
+    body: fd,
+    // FormData면 Content-Type을 직접 세팅하지 말 것 (브라우저가 boundary 붙여줌)
+    headers: {},
   });
 
   return getMyProfile();
