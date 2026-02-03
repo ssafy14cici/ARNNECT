@@ -99,17 +99,6 @@ export function createIntroUI(): IntroUI {
   heroSub.textContent = "예술가와 당신이 연결되는 곳";
   root.appendChild(heroSub);
 
-  /* ---------- menu ---------- */
-  const menuBtn = document.createElement("button");
-  menuBtn.className = "intro-menu-btn";
-  menuBtn.type = "button";
-  menuBtn.innerHTML = `
-    <span class="intro-menu-label">MENU</span>
-    <span class="intro-menu-icon" aria-hidden="true">
-      <span></span><span></span>
-    </span>
-  `;
-  root.appendChild(menuBtn);
 
   /* ---------- enter content ---------- */
   const content = document.createElement("div");

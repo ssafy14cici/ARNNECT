@@ -19,7 +19,7 @@ export async function startApp() {
 
   installDebugCapture(viewer.camera, targetRef);
 
-  const root = await loadGallery("/models/gallery1.glb");
+  const root = await loadGallery("/models/gallery2.glb");
   viewer.scene.add(root);
 
   const fps = installFpsDebug({
