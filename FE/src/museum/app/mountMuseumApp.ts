@@ -261,7 +261,7 @@ export function mountMuseumApp(args: {
     toastHere(`ENTER EXHIBIT: ${payload.artist}`);
 
     exhibitRuntime = await mountExhibitRoom(canvas, {
-      glbUrl: asset("museum/models/gallery/gallery2.glb"),
+      glbUrl: asset("museum/models/gallery/gallery3.glb"),
       resetRootTransform: true,
       uiMount,
       autoFitIfOff: true,
