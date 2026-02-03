@@ -22,4 +22,5 @@ public interface ArtworkService {
     List<FieldResponse> getFeildList();
     List<GenreResponse> getGenreList(Integer fieldId);
 
+    Boolean toggleFavorite(String memberUuid, Long artworkId);
 }
