@@ -31,7 +31,7 @@ export function toArtworkCreateFormData(data: ArtworkCreateReq): FormData {
   if (data.productionDate) fd.append("productionDate", data.productionDate);
   if (data.size) fd.append("size", data.size);
 
-  appendTags(fd, data.tags ?? []);
+  appendTags(fd, data.tags);
 
   // ✅ MultipartFile image
   fd.append("image", data.image);
@@ -65,9 +65,15 @@ export function toArtworkNumericId(id: unknown): number | null {
 
 
 
-function appendTags(fd: FormData, tags: string[]) {
+function appendTags(fd: FormData, tags?: string[]) {
+  // ✅ tags가 비었어도 "tags" 키를 보내고 싶다면
+  if (!tags || tags.length === 0) {
+    fd.append("tags", ""); // 서버로 tags 키 전송
+    return;
+  }
   tags.forEach((t) => fd.append("tags", t));
 }
+
 
 export function toArtworkUpdateFormData(data: ArtworkUpdateReq): FormData {
   const fd = new FormData();

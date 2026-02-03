@@ -3,35 +3,59 @@
 ========================================================================== */
 
 /* 테마 변수 설정 */
+/* ✅ 페이지는 고정 높이, 바깥 스크롤 차단 */
 .post-create-page {
-  height: 100vh;                 /* ✅ 하나로 통일 */
+  height: 100vh;
   background-color: #050505;
   color: #fff;
   font-family: 'Pretendard', sans-serif;
   display: flex;
   justify-content: center;
-  overflow: hidden;              /* ✅ 내부 스크롤은 pc-content가 담당 */
+  overflow: hidden;
 }
 
-.post-create-page.theme-artist { --accent: #C8A97E; }
-.post-create-page.theme-user { --accent: #ffffff; }
-
+/* ✅ 컨테이너는 column 레이아웃 + footer 아래 빈공간 없애기 */
 .pc-container {
   width: 100%;
   max-width: 800px;
 
-  /* ✅ header + content + footer를 column으로 쌓고,
-     content만 스크롤 되게 만드는 구조 */
   height: 100%;
   display: flex;
   flex-direction: column;
   min-height: 0;
 
-  /* ✅ 기존 padding-bottom(120px) 때문에 footer 영역/스크롤이 꼬일 수 있어서 제거 */
-  padding: 60px 24px 0;
+  padding: 60px 24px 0; 
   position: relative;
   animation: fadeIn 0.6s ease;
 }
+
+/* ✅ 스크롤은 여기서만: 남는 높이 전부 먹게 */
+.pc-content {
+  display: flex;
+  flex-direction: column;
+  gap: 60px;
+
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+
+  padding-bottom: 40px; /* footer랑 간격 */
+}
+
+/* ✅ 버튼은 항상 아래로 (content 길어도 footer는 고정 영역) */
+.pc-footer {
+  margin-top: auto;     /* ⭐️ footer를 바닥으로 밀어줌 */
+  padding: 24px 0 28px; /* footer 자체 여백 */
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+
+.post-create-page.theme-artist { --accent: #C8A97E; }
+.post-create-page.theme-user { --accent: #ffffff; }
+
+
 
 /* --- Header --- */
 .pc-header {
@@ -61,20 +85,7 @@
 .pc-close-btn:hover { color: #fff; }
 
 
-/* --- Content Layout --- */
-.pc-content {
-  display: flex;
-  flex-direction: column;
-  gap: 60px;
 
-  /* ✅ 여기만 스크롤 */
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-
-  /* ✅ footer와 간격 확보 */
-  padding-bottom: 40px;
-}
 
 /* 1. Image Upload */
 .pc-upload-section {
@@ -180,15 +191,6 @@
   color: rgba(255,255,255,0.6);
 }
 
-
-/* --- Footer Button --- */
-.pc-footer {
-  margin-top: 0;            /* ✅ content가 padding-bottom으로 간격 확보 */
-  padding: 24px 0 28px;     /* ✅ footer 자체 여백 */
-  display: flex;
-  justify-content: flex-end;
-  flex-shrink: 0;           /* ✅ footer 고정 */
-}
 
 .pc-submit-btn {
   background: var(--accent);

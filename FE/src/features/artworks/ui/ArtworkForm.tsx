@@ -109,7 +109,7 @@ export default function ArtworkForm({
       productionDate: productionDate.trim(),
       size,
 
-      tags: parsedTags.length ? parsedTags : undefined,
+      tags: parsedTags,
       image: effectiveImage,
     });
   };
