@@ -31,75 +31,6 @@ type Options = {
   onExitToHall: () => void;
 };
 
-/**
- * ✅ 텍스처 방향 보정 전략
- * - 기본(공통): 회전만 유지(필요 시)
- * - 플립(상하/좌우 뒤집기)은 "필요한 패널에만" 적용
- */
-type TexFix = {
-  rot?: number; // absolute rotation
-  rotAdd?: number; // additional rotation
-  flipX?: boolean; // mirror horizontally
-  flipY?: boolean; // mirror vertically
-};
-
-// ✅ 공통 회전(기존에 패널이 90도 돌아가야 맞았던 상태라면 유지)
-const DEFAULT_TEX_FIX: TexFix = {
-  rot: Math.PI / 2,
-};
-
-// ✅ 패널별 예외(여기만 만지면 됨)
-const PANEL_TEX_FIX: Record<string, TexFix> = {
-  // EX_PANEL_2만 좌우/상하 뒤집힘 증상 → 180도 추가 회전으로 상쇄(대개 이게 정답)
-  EX_PANEL_2: { rot: -Math.PI / 2,  flipY: true },
-
-  // 만약 EX_PANEL_2가 여전히 상하만 뒤집히면 → 아래로 바꿔서 테스트
-  // EX_PANEL_2: { flipY: true },
-
-  // 좌우만 뒤집히면
-  // EX_PANEL_2: { flipX: true },
-
-  // 좌우+상하(=flipX+flipY)
-  // EX_PANEL_2: { flipX: false, flipY: true },
-};
-
-function applyTexFix(tex: THREE.Texture, panelName: string, debug?: boolean) {
-  const fix = { ...DEFAULT_TEX_FIX, ...(PANEL_TEX_FIX[panelName] ?? {}) };
-
-  tex.center.set(0.5, 0.5);
-  tex.rotation = (fix.rot ?? 0) + (fix.rotAdd ?? 0);
-
-  const flipX = !!fix.flipX;
-  const flipY = !!fix.flipY;
-
-  if (flipX || flipY) {
-    // ✅ flip은 RepeatWrapping + negative repeat로 처리
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-
-    tex.repeat.set(flipX ? -1 : 1, flipY ? -1 : 1);
-    tex.offset.set(flipX ? 1 : 0, flipY ? 1 : 0);
-  } else {
-    // ✅ 기본은 뒤집지 않음
-    tex.wrapS = THREE.ClampToEdgeWrapping;
-    tex.wrapT = THREE.ClampToEdgeWrapping;
-
-    tex.repeat.set(1, 1);
-    tex.offset.set(0, 0);
-  }
-
-  tex.needsUpdate = true;
-
-  if (debug) {
-    console.log("[exhibit] tex fix", panelName, {
-      rotation: tex.rotation,
-      repeat: tex.repeat.toArray(),
-      offset: tex.offset.toArray(),
-      flipY: tex.flipY,
-    });
-  }
-}
-
 export async function mountExhibitRoom(
   canvas: HTMLCanvasElement,
   opts: Options
@@ -445,17 +376,10 @@ export async function mountExhibitRoom(
   }
 
   const panelToViewpoint: Record<string, number> = {
-    EX_PANEL_1: 1,
-    EX_PANEL_2: 2,
-    EX_PANEL_3: 3,
-    EX_PANEL_4: 5,
-    EX_PANEL_5: 6,
-    EX_PANEL_6: 6,
-    EX_PANEL_7: 7,
-    EX_PANEL_8: 7,
-    EX_PANEL_9: 8,
-    EX_PANEL_10: 10,
-    EX_PANEL_11: 11,
+    EX_PANEL_1: 1, EX_PANEL_2: 2, EX_PANEL_3: 3,
+    EX_PANEL_4: 5, EX_PANEL_5: 6, EX_PANEL_6: 6,
+    EX_PANEL_7: 7, EX_PANEL_8: 7, EX_PANEL_9: 8,
+    EX_PANEL_10: 10, EX_PANEL_11: 11,
   };
 
   const CLOSE_THRESHOLD = 1.5;
@@ -605,10 +529,16 @@ export async function mountExhibitRoom(
                 if (!alive) return resolve(false);
 
                 tex.colorSpace = THREE.SRGBColorSpace;
-                tex.flipY = false; // ✅ glTF UV 기준
+                tex.flipY = false;
 
-                // ✅ 여기서만 방향 보정
-                applyTexFix(tex, item.panelName, debug);
+                // 회전/플립 유지
+                tex.center.set(0.5, 0.5);
+                tex.rotation = Math.PI / 2;
+                tex.wrapS = THREE.ClampToEdgeWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(1, -1);
+                tex.offset.set(0, 1);
+                tex.needsUpdate = true;
 
                 loadedPanelTextures.add(tex);
 
@@ -740,26 +670,10 @@ export async function mountExhibitRoom(
     }
 
     if (fpsEnabled) {
-      if (e.code === "KeyW") {
-        e.preventDefault();
-        move.f = true;
-        return;
-      }
-      if (e.code === "KeyS") {
-        e.preventDefault();
-        move.b = true;
-        return;
-      }
-      if (e.code === "KeyA") {
-        e.preventDefault();
-        move.l = true;
-        return;
-      }
-      if (e.code === "KeyD") {
-        e.preventDefault();
-        move.r = true;
-        return;
-      }
+      if (e.code === "KeyW") { e.preventDefault(); move.f = true; return; }
+      if (e.code === "KeyS") { e.preventDefault(); move.b = true; return; }
+      if (e.code === "KeyA") { e.preventDefault(); move.l = true; return; }
+      if (e.code === "KeyD") { e.preventDefault(); move.r = true; return; }
 
       if (e.code === "ArrowLeft" || e.code === "ArrowRight") {
         e.preventDefault();
@@ -849,9 +763,7 @@ export async function mountExhibitRoom(
 
     // 패널 텍스처 추적분도 확실히 dispose (중복 dispose 방지용 Set이니 안전)
     for (const t of loadedPanelTextures) {
-      try {
-        t.dispose();
-      } catch {}
+      try { t.dispose(); } catch {}
     }
     loadedPanelTextures.clear();
 
@@ -923,13 +835,9 @@ function disposeMaterialAndTextures(mat: THREE.Material, disposedTex: Set<THREE.
     const t = m?.[k] as THREE.Texture | undefined;
     if (t && !disposedTex.has(t)) {
       disposedTex.add(t);
-      try {
-        t.dispose();
-      } catch {}
+      try { t.dispose(); } catch {}
     }
   }
 
-  try {
-    mat.dispose();
-  } catch {}
+  try { mat.dispose(); } catch {}
 }
