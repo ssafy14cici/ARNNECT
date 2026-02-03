@@ -1,3 +1,5 @@
+// FE\src\features\artwork\utils\findArtwork.ts
+
 export type ArtworkIdLike = string | number;
 
 export type HasId = { readonly id: ArtworkIdLike };

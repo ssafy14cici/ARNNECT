@@ -1,3 +1,5 @@
+//FE\src\features\posts\types.ts
+
 export type PostRole = "USER" | "ARTIST";
 
 export type AuthorCtx = {

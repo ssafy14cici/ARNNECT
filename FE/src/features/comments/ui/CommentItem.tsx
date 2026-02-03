@@ -1,8 +1,10 @@
+// FE/src/features/artwork/ui/comments/CommentItem.tsx
+
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { CommentForm } from "./CommentForm";
 import { ReplyList } from "./ReplyList";
-import type { Comment, CommentHandlers, ProfilePathFn } from "../../types";
+import type { Comment, CommentHandlers, ProfilePathFn } from "../model/types";
 
 type Props = CommentHandlers & {
   comment: Comment;

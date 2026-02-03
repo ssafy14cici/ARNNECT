@@ -1,6 +1,7 @@
 // FE/src/app/router/routes.tsx
 import type { RouteObject } from "react-router-dom";
 import { Navigate, createBrowserRouter, redirect } from "react-router-dom";
+
 import { useAuthStore } from "../../features/auth/store";
 import Guard from "./Guard";
 import AppLayout from "../layouts/AppLayout";
@@ -34,18 +35,20 @@ import Portfolio from "../../pages/lounge/artist/Portfolio";
 import FanLetter from "../../pages/lounge/artist/FanLetter";
 import FanLetterCompose from "../../pages/fanLetter/FanLetterCompose";
 
-import PostDetail from "../../pages/posts/PostDetail";
-import PostCreate from "../../pages/posts/PostCreate";
-import PostCreateRedirect from "../../pages/posts/PostCreateRedirect";
-
 import Profile from "../../pages/profile/Profile";
 import FeedTab from "../../pages/profile/tabs/FeedTab";
 import CollectionTab from "../../pages/profile/tabs/CollectionTab";
 import PortfolioTab from "../../pages/profile/tabs/PortfolioTab";
 
-import ArtworkDetail from "../../pages/artwork/ArtworkDetail";
-import NotFound from "../../pages/notfound/NotFound";
+import ArtworkCreate from "../../pages/artworks/ArtworkCreate";
+import ArtworkEdit from "../../pages/artworks/ArtworkEdit";
+import ArtworkDetail from "../../pages/artworks/ArtworkDetail";
 
+import ReviewCreate from "../../pages/reviews/ReviewCreate";
+import ReviewEdit from "../../pages/reviews/ReviewEdit";
+import ReviewDetail from "../../pages/reviews/ReviewDetail";
+
+import NotFound from "../../pages/notfound/NotFound";
 import PrivacyPolicy from "../../pages/legal/PrivacyPolicy";
 import TermsOfService from "../../pages/legal/TermsOfService";
 
@@ -53,16 +56,12 @@ const KEY_PREF_USED = "arnnect_pref_used_v1";
 const USE_MOCK = String(import.meta.env.VITE_USE_MOCK) === "true";
 
 function preferenceOnceLoader() {
-  // 로그인 상태면 항상 허용
   const { isLoggedIn } = useAuthStore.getState();
   if (isLoggedIn) return null;
 
-  // mock 모드에서만 "1회 사용" 제한을 로컬로 관리
   if (USE_MOCK) {
     const used = localStorage.getItem(KEY_PREF_USED) === "true";
-    if (used) {
-      throw redirect("/login");
-    }
+    if (used) throw redirect("/login");
   }
   return null;
 }
@@ -75,24 +74,20 @@ export const routes: RouteObject[] = [
       { path: "/", element: <Home />, handle: { navVariant: "home" } },
       { path: "/home/pc", element: <HomePC />, handle: { navVariant: "home" } },
       { path: "/home/mobile", element: <HomeMobile />, handle: { navVariant: "home" } },
+
       { path: "search", element: <Search /> },
       { path: "guide", element: <Guide /> },
 
-      // ✅ auth는 Public
       { path: "login", element: <Login /> },
       { path: "signup", element: <Signup /> },
 
-      // ✅ Feed는 Public
       { path: "feed", element: <Feed /> },
 
-      // ✅ Preference는 Public + loader로 1회 제한
       { path: "preference", element: <YourPreference />, loader: preferenceOnceLoader },
 
-      // legal (canonical)
       { path: "legal/privacy", element: <PrivacyPolicy /> },
       { path: "legal/terms", element: <TermsOfService /> },
 
-      // legal (legacy alias)
       { path: "privacy", element: <Navigate to="/legal/privacy" replace /> },
       { path: "terms", element: <Navigate to="/legal/terms" replace /> },
 
@@ -100,37 +95,59 @@ export const routes: RouteObject[] = [
       {
         element: <Guard requireAuth />,
         children: [
-          /* Create entry (role에 따라 분기) */
-          { path: "create", element: <PostCreateRedirect /> },
-
-          /* Artworks */
+          /* ---------------- Artworks ---------------- */
           {
             path: "artworks",
             children: [
+              // ✅ create (artist only)
               {
-                path: "new",
+                path: "create",
                 element: <Guard requireRole="artist" />,
-                children: [{ index: true, element: <PostCreate mode="ARTIST" /> }],
+                children: [{ index: true, element: <ArtworkCreate /> }],
               },
-              // ✅ 여기 param 이름이 routes에서는 artworkId
+
+              // (호환) /artworks/new -> /artworks/create
+              { path: "new", element: <Navigate to="/artworks/create" replace /> },
+
+              // detail
               { path: ":artworkId", element: <ArtworkDetail /> },
+
+              // edit (artist only)
+              {
+                path: ":artworkId/edit",
+                element: <Guard requireRole="artist" />,
+                children: [{ index: true, element: <ArtworkEdit /> }],
+              },
             ],
           },
 
-          /* Reviews */
+          /* ---------------- Reviews ---------------- */
           {
             path: "reviews",
             children: [
+              // ✅ create (general only)
               {
-                path: "new",
+                path: "create",
                 element: <Guard requireRole="general" />,
-                children: [{ index: true, element: <PostCreate mode="USER" /> }],
+                children: [{ index: true, element: <ReviewCreate /> }],
               },
-              { path: ":reviewId", element: <PostDetail /> },
+
+              // (호환) /reviews/new -> /reviews/create
+              { path: "new", element: <Navigate to="/reviews/create" replace /> },
+
+              // detail
+              { path: ":reviewId", element: <ReviewDetail /> },
+
+              // edit (general only)
+              {
+                path: ":reviewId/edit",
+                element: <Guard requireRole="general" />,
+                children: [{ index: true, element: <ReviewEdit /> }],
+              },
             ],
           },
 
-          /* Members(Profile) */
+          /* ---------------- Members(Profile) ---------------- */
           {
             path: "members",
             children: [
@@ -152,30 +169,26 @@ export const routes: RouteObject[] = [
           { path: "taste", element: <Taste /> },
           { path: "remind", element: <Quiz /> },
           { path: "analysis", element: <Taste /> },
-          { path: "analysis/total", element: <Taste /> }, // placeholder
+          { path: "analysis/total", element: <Taste /> },
 
           /* Tickets (canonical) */
           {
             path: "tickets",
             children: [
-              // /tickets
               {
                 element: <Guard requireRole="artist" />,
                 children: [{ index: true, element: <QrEntry /> }],
               },
-              // /tickets/issue
               {
                 path: "issue",
                 element: <Guard requireRole="artist" />,
                 children: [{ index: true, element: <TicketQr /> }],
               },
-              // /tickets/scan
               {
                 path: "scan",
                 element: <Guard requireRole="general" />,
                 children: [{ index: true, element: <CollectBookScan /> }],
               },
-              // /tickets/portfolio
               {
                 path: "portfolio",
                 element: <Guard requireRole="artist" />,
@@ -206,12 +219,16 @@ export const routes: RouteObject[] = [
             path: "profile/:id",
             loader: ({ params }) => redirect(`/members/${params.id ?? "me"}`),
           },
+
+          // ✅ posts 계열 페이지는 삭제. "예전 링크"만 새 경로로 보내기.
           {
             path: "posts",
             children: [
-              { path: "create", loader: () => redirect("/create") },
-              { path: "create/artist", loader: () => redirect("/create") },
-              { path: "create/user", loader: () => redirect("/create") },
+              { path: "create", loader: () => redirect("/members/me") },
+              { path: "create/artist", loader: () => redirect("/artworks/create") },
+              { path: "create/user", loader: () => redirect("/reviews/create") },
+
+              // 예전 posts/:id는 어디로 보낼지 확정 전이면 feed로 유지
               { path: ":id", loader: () => redirect("/feed") },
             ],
           },
@@ -219,11 +236,11 @@ export const routes: RouteObject[] = [
           /* ---------------- Lounge (B안: 내부 렌더링) ---------------- */
           {
             path: "lounge",
-            element: <Lounge />, // ✅ Lounge.tsx에 Outlet 필요
+            element: <Lounge />,
             children: [
               { index: true, element: <LoungeIndex /> },
 
-              // ✅ general
+              // general
               {
                 path: "collectbook",
                 element: <Guard requireRole="general" />,
@@ -250,7 +267,7 @@ export const routes: RouteObject[] = [
                 children: [{ index: true, element: <Quiz /> }],
               },
 
-              // ✅ artist
+              // artist
               {
                 path: "ticket",
                 element: <Guard requireRole="artist" />,
@@ -272,7 +289,7 @@ export const routes: RouteObject[] = [
                 children: [{ index: true, element: <FanLetter /> }],
               },
 
-              // ✅ fanletter compose (원하면 general로 제한)
+              // fanletter compose (general)
               {
                 path: "fanletters/compose/:id",
                 element: <Guard requireRole="general" />,

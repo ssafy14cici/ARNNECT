@@ -1,29 +1,130 @@
-// FE/src/pages/artwork/ArtworkDetail.tsx
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { artworks } from "../../features/artwork/data";
-import "./artworkDetail.css";
 
 import { useAuthStore } from "../../features/auth/store";
-import { ArtworkDetailView } from "./ArtworkDetailView";
-import {
-  findArtworkById,
-  getMockArtworkData,
-  type Comment,
-  type ArtworkBase,
-  toArtworkNumericId,
-} from "../../features/artwork/helpers";
+import { artworks } from "../../features/artworks/data"; // 기존 유지
+import "./artworkDetail.css";
+
+import ArtworkDetailView from "./ArtworkDetailView";
 import { sendFanLetter } from "../../features/fanLetter/api";
 
-// ✅ canonical로 통일
+/** ✅ canonical */
 export const PROFILE_PATH = (authorId: string) => `/members/${authorId}`;
 
+/** 기존 로컬 댓글 타입(그대로 유지) */
+export type LocalComment = {
+  id: string;
+  parentId: string | null;
+  content: string;
+  authorId?: string;
+  authorName?: string;
+  createdAt?: string;
+};
+
+type ArtworkBase = {
+  readonly id: string | number;
+  readonly src: string;
+
+  readonly title?: string;
+  readonly artist?: string;
+  readonly artistName?: string;
+
+  readonly artistId?: string;
+  readonly artistMemberUuid?: string;
+
+  readonly description?: string;
+  readonly tags?: readonly string[];
+
+  readonly [key: string]: any;
+};
+
+type ArtworkDetailData = ArtworkBase & {
+  title: string;
+  artist: string;
+  description: string;
+  tags: string[];
+};
+
+function normalizeArtworkId(raw: unknown): string {
+  const s = String(raw ?? "").trim();
+  if (!s) return "";
+  return s.replace(/^artwork-/, "").replace(/^review-/, "");
+}
+
+function toArtworkNumericId(id: unknown): number | null {
+  const normalizedRaw = normalizeArtworkId(id);
+
+  if (typeof id === "number" && Number.isFinite(id)) return id;
+
+  const s = normalizedRaw;
+  if (!s) return null;
+
+  const normalized = s.startsWith("a") ? s.slice(1) : s;
+  const n = parseInt(normalized, 10);
+  if (Number.isNaN(n)) return null;
+
+  if (n >= 1000) return n - 999;
+  return n;
+}
+
+function findArtworkById(list: readonly ArtworkBase[], id?: string) {
+  const normalized = normalizeArtworkId(id);
+  if (!normalized) return null;
+
+  const urlId = String(normalized);
+
+  return (
+    list.find((item) => {
+      const itemId = String(normalizeArtworkId(item.id));
+
+      if (
+        itemId === urlId ||
+        itemId === `a${urlId}` ||
+        itemId.replace(/^a/, "") === urlId.replace(/^a/, "")
+      ) {
+        return true;
+      }
+
+      const numericUrlId = parseInt(urlId.replace(/^a/, ""), 10);
+      const numericItemId = parseInt(itemId.replace(/^a/, ""), 10);
+
+      if (Number.isNaN(numericUrlId) || Number.isNaN(numericItemId)) return false;
+
+      if (numericUrlId >= 1000) {
+        const expectedItemId = numericUrlId - 999;
+        return numericItemId === expectedItemId;
+      }
+      return false;
+    }) || null
+  );
+}
+
+function getMockArtworkData(baseArtwork: ArtworkBase): ArtworkDetailData {
+  const rawId = normalizeArtworkId(baseArtwork.id);
+  const artworkNumber = String(rawId).replace(/^a/, "");
+
+  const title = baseArtwork.title || `Artwork #${artworkNumber}`;
+  const artist = baseArtwork.artist || baseArtwork.artistName || `ARTIST ${artworkNumber}`;
+
+  const description =
+    baseArtwork.description ||
+    `이 작품은 현대적 감각의 시리즈로, 빛과 공간의 대비를 통해 새로운 시각적 경험을 제공합니다.`;
+
+  const tags = baseArtwork.tags ? [...baseArtwork.tags] : ["현대미술", "시리즈", "공간", "빛"];
+
+  return {
+    ...baseArtwork,
+    title,
+    artist,
+    description,
+    tags,
+  };
+}
+
 export default function ArtworkDetail() {
-  // ✅ routes.tsx: /artworks/:artworkId 이므로 artworkId로 받아야 함
   const { artworkId = "" } = useParams<{ artworkId: string }>();
   const navigate = useNavigate();
 
-  // ✅ 혹시 legacy로 /artworks/artwork-a1 같이 들어오면 정리
   const normalizedArtworkId = useMemo(
     () => artworkId.replace(/^artwork-/, ""),
     [artworkId],
@@ -32,20 +133,18 @@ export default function ArtworkDetail() {
   const user = useAuthStore((s) => s.user);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
 
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [comments, setComments] = useState<LocalComment[]>([]);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
 
-  // ✅ FanLetter 모달 상태
   const [fanLetterOpen, setFanLetterOpen] = useState(false);
   const [fanLetterSending, setFanLetterSending] = useState(false);
 
   const ARTWORKS = artworks as unknown as readonly ArtworkBase[];
 
-  // ✅ id로 작품 찾기 (normalizedArtworkId 사용)
   const baseArtwork = useMemo(
     () => findArtworkById(ARTWORKS, normalizedArtworkId),
     [ARTWORKS, normalizedArtworkId],
@@ -63,7 +162,6 @@ export default function ArtworkDetail() {
 
   const recommendArtworks = useMemo(() => ARTWORKS.slice(0, 4), [ARTWORKS]);
 
-  // ✅ numeric artwork id (FanLetter payload용)
   const numericArtworkId = useMemo(() => {
     const n = toArtworkNumericId(baseArtwork?.id ?? normalizedArtworkId);
     return n ?? undefined;
@@ -80,10 +178,9 @@ export default function ArtworkDetail() {
     window.scrollTo(0, 0);
   }, [normalizedArtworkId]);
 
-  // ✅ 작품 없으면 홈으로 (지금 UI에서 Not Found를 보여주고 있으니 이건 취향)
   useEffect(() => {
     if (!isLoading && !artwork) {
-      const timer = setTimeout(() => navigate("/", { replace: true }), 2000);
+      const timer = setTimeout(() => navigate("/", { replace: true }), 1200);
       return () => clearTimeout(timer);
     }
   }, [artwork, isLoading, navigate]);
@@ -96,10 +193,7 @@ export default function ArtworkDetail() {
   };
 
   const addComment = (content: string) => {
-    if (!isLoggedIn) {
-      alert("로그인이 필요합니다.");
-      return;
-    }
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
 
     const authorId = user?.memberUuid ?? "me";
     const authorName = user?.name ?? "나";
@@ -118,10 +212,7 @@ export default function ArtworkDetail() {
   };
 
   const addReply = (parentId: string, content: string) => {
-    if (!isLoggedIn) {
-      alert("로그인이 필요합니다.");
-      return;
-    }
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
 
     const authorId = user?.memberUuid ?? "me";
     const authorName = user?.name ?? "나";
@@ -140,9 +231,8 @@ export default function ArtworkDetail() {
   };
 
   const deleteComment = (commentId: string) => {
-    if (window.confirm("삭제하시겠습니까?")) {
-      setComments((prev) => prev.filter((c) => c.id !== commentId && c.parentId !== commentId));
-    }
+    if (!window.confirm("삭제하시겠습니까?")) return;
+    setComments((prev) => prev.filter((c) => c.id !== commentId && c.parentId !== commentId));
   };
 
   const updateComment = (commentId: string, newContent: string) => {
@@ -151,37 +241,24 @@ export default function ArtworkDetail() {
     setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, content: value } : c)));
   };
 
-  // ✅ FanLetter 발송
   const onSendFanLetter = async (content: string) => {
-    if (!isLoggedIn || !user?.memberUuid) {
-      alert("로그인 후 이용해주세요.");
-      return;
-    }
+    if (!isLoggedIn || !user?.memberUuid) return alert("로그인 후 이용해주세요.");
     if (!artwork || !baseArtwork) return;
 
-    // ✅ artworkId: number로 보장
     const safeArtworkId =
       numericArtworkId ?? (typeof artwork.id === "number" ? artwork.id : Number(artwork.id));
 
-    if (!Number.isFinite(safeArtworkId)) {
-      alert("작품 ID를 확인할 수 없습니다.");
-      return;
-    }
+    if (!Number.isFinite(safeArtworkId)) return alert("작품 ID를 확인할 수 없습니다.");
 
-    // ✅ FanLetterSendInput 필수 필드: artistMemberUuid
-    // data.ts에 추가했지만, ArtworkBase 타입에 없을 수 있어서 any로 안전 접근
     const artistMemberUuid =
       (baseArtwork as any)?.artistMemberUuid ?? (baseArtwork as any)?.artistId ?? "";
 
-    if (!artistMemberUuid) {
-      alert("작가 정보를 확인할 수 없습니다.");
-      return;
-    }
+    if (!artistMemberUuid) return alert("작가 정보를 확인할 수 없습니다.");
 
     setFanLetterSending(true);
     try {
       await sendFanLetter({
-        artistMemberUuid,            // ✅ 추가 (타입 에러 해결)
+        artistMemberUuid,
         artworkId: safeArtworkId,
         artworkTitle: artwork.title,
         artistName: artwork.artist,
@@ -224,14 +301,10 @@ export default function ArtworkDetail() {
       onGoHome={goHome}
       onNavigateArtwork={goArtwork}
       profilePath={PROFILE_PATH}
-      // ✅ FanLetter
       fanLetterOpen={fanLetterOpen}
       fanLetterSending={fanLetterSending}
       onOpenFanLetter={() => {
-        if (!isLoggedIn) {
-          alert("로그인이 필요합니다.");
-          return;
-        }
+        if (!isLoggedIn) return alert("로그인이 필요합니다.");
         setFanLetterOpen(true);
       }}
       onCloseFanLetter={() => setFanLetterOpen(false)}

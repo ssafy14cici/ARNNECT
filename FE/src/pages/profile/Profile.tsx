@@ -19,6 +19,7 @@ export default function Profile() {
   const profileId = memberUuid ?? "";
 
   const authUser = useAuthStore((s) => s.user); // { memberUuid, ... } | null
+  const appRole = useAuthStore((s) => s.role); // "general" | "artist"
 
   const isOwner = useMemo(() => {
     if (profileId === "me") return true;
@@ -52,7 +53,7 @@ export default function Profile() {
           return;
         }
 
-        // 타인 프로필: 같은 엔드포인트지만 타입 분기 필요해서 artist → user fallback 유지
+        // 타인 프로필: artist -> user fallback
         try {
           const a = await profileApi.getArtistProfile(profileId);
           if (cancelled || reqSeq.current !== mySeq) return;
@@ -76,7 +77,12 @@ export default function Profile() {
   }, [profileId]);
 
   const navigate = useNavigate();
-  const goWrite = () => navigate("/posts/create");
+
+  const goWrite = () => {
+    // ✅ 로그인/role은 Guard가 members 라우트를 감싸고 있어서 여기선 role만 분기하면 됨
+    if (appRole === "artist") navigate("/artworks/create");
+    else navigate("/reviews/create");
+  };
 
   if (loading) {
     return (
@@ -89,7 +95,6 @@ export default function Profile() {
   if (error) return <div className="profile-error">{error}</div>;
   if (!profile) return <div className="profile-error">프로필을 찾을 수 없습니다.</div>;
 
-  // ✅ 이제 role은 "USER" | "ARTIST"로 고정
   const viewedIsArtist = profile.role === "ARTIST";
   const themeClass = viewedIsArtist ? "theme-artist" : "theme-user";
 
@@ -101,10 +106,7 @@ export default function Profile() {
 
         <div className="profile-tabs-wrapper">
           <nav className="profile-tabs">
-            <NavLink
-              to="feed"
-              className={({ isActive }) => `profile-tab ${isActive ? "active" : ""}`}
-            >
+            <NavLink to="feed" className={({ isActive }) => `profile-tab ${isActive ? "active" : ""}`}>
               피드
             </NavLink>
 
@@ -130,6 +132,7 @@ export default function Profile() {
           <Outlet context={{ profile, isOwner } as ProfileOutletContext} />
         </main>
 
+        {/* ✅ 내 프로필에서만 + 노출, 클릭 시 role에 따라 create 라우팅 */}
         {isOwner && (
           <button type="button" className="profile-fab" onClick={goWrite}>
             +
