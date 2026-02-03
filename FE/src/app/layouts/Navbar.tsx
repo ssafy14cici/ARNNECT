@@ -84,23 +84,11 @@ export default function Navbar() {
     () => [
       { key: "home", label: "Home", path: "/", shape: "knot" },
       { key: "close", label: "", type: "close" },
-      {
-        key: "yourpreference",
-        label: "너의 취향은",
-        path: "/preference",
-        shape: "octahedron",
-      },
+      { key: "yourpreference", label: "너의 취향은", path: "/preference", shape: "octahedron" },
       { key: "search", label: "Search", path: "/search", shape: "sphere" },
-       // 닫기 버튼은 3D 없음
-
       { key: "feed", label: "Feed", path: "/feed", shape: "box" },
       { key: "lounge", label: "Lounge", path: "/lounge", shape: "torus" },
-      {
-        key: "profile",
-        label: "Profile",
-        path: "/profile/me/feed",
-        shape: "sphere",
-      },
+      { key: "profile", label: "Profile", path: "/members/me/feed", shape: "sphere" },
       { key: "auth", label: "Login/Out", path: "", shape: "knot" },
     ],
     [],
