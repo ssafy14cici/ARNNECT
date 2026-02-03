@@ -1,3 +1,4 @@
+// FE\src\pages\profile\components\ProfileHeader.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { UpdateMyProfilePatch } from "../../../features/profile/api";
