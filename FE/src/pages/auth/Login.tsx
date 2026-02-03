@@ -7,29 +7,20 @@ import type { LoginResponse, UserRole } from "../../features/auth/types";
 import { useAuthStore } from "../../features/auth/store";
 
 import "./login.css";
-import { USE_MOCK } from "../../shared/config/env";
-
-// ✅ REAL 모드에서만 사용: /api/v1/member/my 로 role 확정
-// (경로는 유저 프로젝트에 맞게 조정: 현재는 real.ts에 getMyReal을 추가한다고 가정)
-import { getMyReal } from "../../features/auth/api/real";
 
 // ---------- helpers ----------
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
-function hasKey<K extends string>(obj: Record<string, unknown>, key: K): obj is Record<K, unknown> {
-  return key in obj;
-}
 function pickStr(obj: Record<string, unknown>, key: string): string | undefined {
-  if (!hasKey(obj, key)) return undefined;
   const v = obj[key];
   return typeof v === "string" ? v : undefined;
 }
 
 /**
  * ✅ 서버 role이 어떤 형태로 오든 FE 표준("general"|"artist")로 정규화
- * - ARTIST / artist / ROLE_ARTIST / ... => artist
- * - USER / GENERAL / general / ROLE_USER / ... => general
+ * - "ARTIST", "artist", "ROLE_ARTIST" => artist
+ * - 그 외는 general 처리
  */
 function normalizeRole(input: unknown): "general" | "artist" {
   const v = String(input ?? "").toLowerCase();
@@ -38,7 +29,7 @@ function normalizeRole(input: unknown): "general" | "artist" {
   return "general";
 }
 
-/** ✅ UI 토글은 UserRole을 쓰되, CSS가 USER/ARTIST 클래스에 의존할 수 있어 UI용 라벨로 변환 */
+/** ✅ UI 토글은 UserRole을 쓰되 CSS가 USER/ARTIST 클래스에 의존할 수 있어 UI용 라벨로 변환 */
 function toUiRole(role: UserRole): "USER" | "ARTIST" {
   return String(role).toLowerCase().includes("artist") ? "ARTIST" : "USER";
 }
@@ -57,6 +48,30 @@ function pickToken(res: unknown): string | null {
   return token && token.trim() ? token : null;
 }
 
+/**
+ * ✅ JWT payload 디코드 (서명 검증은 서버가 함 → FE는 UI/라우팅 용도로만 사용)
+ * payload에서 보통:
+ * - sub: memberUuid
+ * - role: "USER" | "ARTIST" (혹은 프로젝트 enum)
+ */
+function parseJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+
+    // base64url -> base64
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64.padEnd(Math.ceil(b64.length / 4) * 4, "=");
+
+    const jsonStr = atob(padded);
+    const payload = JSON.parse(jsonStr) as unknown;
+
+    return isRecord(payload) ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function Login() {
   const nav = useNavigate();
   const location = useLocation();
@@ -66,7 +81,7 @@ export default function Login() {
 
   const login = useAuthStore((s) => s.login);
 
-  // ✅ UI 토글 (프로젝트 UserRole이 "general" | "artist" 인 전제)
+  // ✅ UI 토글 (BE 인증에는 영향 없음: 스타일/UX 용)
   const [role, setRole] = useState<UserRole>("general" as UserRole);
 
   // 편의상 기본 입력값
@@ -80,9 +95,9 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
 
   const uiRole = toUiRole(role);
-
   const themeColor = uiRole === "USER" ? "#ffffff" : "#C8A97E";
-  const subTitle = uiRole === "USER" ? "Discover your taste in art." : "Share your inspiration with the world.";
+  const subTitle =
+    uiRole === "USER" ? "Discover your taste in art." : "Share your inspiration with the world.";
 
   useEffect(() => setError(null), [role, email, password]);
 
@@ -92,58 +107,36 @@ export default function Login() {
     setError(null);
 
     try {
-      // apiLogin은 (mock/real) 모두 LoginResponse 형태를 리턴한다고 가정
       const res: LoginResponse = await apiLogin({ email, password, role });
 
       const token = pickToken(res);
       if (!token) throw new Error("로그인 응답에 accessToken(token)이 없습니다.");
 
-      // ✅ 선택한 탭(role)
-      const selectedRole = normalizeRole(role);
+      // ✅ BE가 role을 토큰 claim으로 넣어주므로, 여기서 role 확정
+      const payload = parseJwtPayload(token);
+      const rawRole = payload?.role;
+      const rawSub = payload?.sub;
 
-      // ✅ REAL: 무조건 /member/my로 실제 role 확정
-      // - /member/my가 실패하면 role을 신뢰할 수 없으니 로그인 실패 처리 (원하는 UX 기준)
-      if (!USE_MOCK) {
-        const my = await getMyReal(token);
-
-        // 서버가 role을 안 주는 경우: 프론트만으로 계정 타입 판별 불가
-        if (my.role == null) {
-          throw new Error("서버(/member/my) 응답에 role이 없어 계정 유형을 판별할 수 없습니다.");
-        }
-
-        const actualRole = normalizeRole(my.role);
-
-        // ✅ 탭(선택 role)과 실제 role이 다르면 로그인 거절
-        if (actualRole !== selectedRole) {
-          throw new Error(
-            actualRole === "artist"
-              ? "아티스트 계정입니다. Artist 탭으로 로그인하세요."
-              : "유저 계정입니다. Collector 탭으로 로그인하세요.",
-          );
-        }
-
-        login({
-          token,
-          role: actualRole,
-          remember,
-          user: {
-            memberUuid: my.memberUuid || "me",
-            name: my.name || "user",
-          },
-        });
-
-        nav(returnUrl || "/", { replace: true });
-        return;
+      if (!rawSub || typeof rawSub !== "string") {
+        throw new Error("토큰 payload에 sub(memberUuid)가 없습니다.");
+      }
+      if (rawRole == null) {
+        // 현재 BE JwtTokenProvider에서 claim("role", role.name()) 하므로 일반적으로 여기 안 걸려야 정상
+        throw new Error("토큰 payload에 role이 없습니다.");
       }
 
-      // ✅ MOCK: 실제 role 확정 루트가 없으니 선택 role로 저장
+      const actualRole = normalizeRole(rawRole);
+      const memberUuid = rawSub;
+
+      // ✅ UI에서 토글을 잘못 눌러도, 실제 role로 저장(자동 정정)
       login({
         token,
-        role: selectedRole,
+        role: actualRole,
         remember,
         user: {
-          memberUuid: "me",
-          name: "user",
+          memberUuid,
+          // name은 토큰에 없으니 우선 email로 대체 (프로필 페이지에서 /member/my로 채우면 됨)
+          name: email,
         },
       });
 
@@ -227,7 +220,11 @@ export default function Login() {
 
             <div className="form-options">
               <label className="custom-check">
-                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                />
                 <span className="check-text">Keep me logged in</span>
               </label>
             </div>
