@@ -1,12 +1,11 @@
 package com.ssafy.arnnect.member.repository;
 
-import com.ssafy.arnnect.member.application.dto.response.MemberInfoResponse;
+import com.ssafy.arnnect.member.domain.entity.MemberInfo;
 import com.ssafy.arnnect.member.domain.entity.Member;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.util.List;
 import java.util.Optional;
 
 public interface MemberRepository extends JpaRepository<Member, Long> {
@@ -39,5 +38,5 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
         FROM member_profile_view v
         WHERE v.member_uuid = :memberUuid
         """, nativeQuery = true)
-    MemberInfoResponse findMemberInfo(@Param("memberUuid") String targetUuid, @Param("viewerId") long myId);
+    MemberInfo findMemberInfo(@Param("memberUuid") String targetUuid, @Param("viewerId") long myId);
 }
