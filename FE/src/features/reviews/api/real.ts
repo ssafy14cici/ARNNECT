@@ -1,4 +1,6 @@
 // FE/src/features/reviews/api/real.ts
+throw new Error("createReviewReal called — mock 모드인데 real이 실행됐습니다. import/분기 확인 필요");
+
 import { http } from "../../../shared/api/http";
 
 // 타입/변환기 내가 보낼 데이터(입력값) 형태 - 데이터를 FormData로 바꾸는 함수 

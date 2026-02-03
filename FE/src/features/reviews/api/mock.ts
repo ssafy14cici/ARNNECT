@@ -1,28 +1,62 @@
 // src/features/reviews/api/mock.ts
-import type { ReviewCreateReq, ReviewId } from "../model/types";
+import type { Review, ReviewCreateReq, ReviewId } from "../model/types";
 
-/**
- * ✅ 진짜 DB 대신 "메모리"에 저장하는 가짜 저장소
- * 페이지 새로고침하면 초기화됨(=mock이니까 괜찮음)
- */
 let seq = 1000;
+let store: Review[] = [];
+
+function nowISO() {
+  return new Date().toISOString();
+}
+
+function fileToObjectUrl(file: File) {
+  return URL.createObjectURL(file);
+}
 
 export async function createReviewMock(data: ReviewCreateReq) {
-  /**
-   * ✅ 서버가 보통 주는 값 흉내:
-   * - reviewId: 새로 생성된 리뷰 ID
-   * - imageUrl: 업로드된 이미지 URL(여긴 실제 업로드 없으니 objectURL로 대체 가능)
-   */
+  console.log("[reviews/api/mock] createReviewMock called", data);
+  console.log("mock createReview called", data);
+
   const reviewId: ReviewId = ++seq;
+  const imageUrl = fileToObjectUrl(data.imageFile);
 
-  // 파일을 화면에서 미리보기 가능한 URL로 만들어줌(브라우저 내부 임시 URL)
-  const imageUrl = URL.createObjectURL(data.imageFile);
+  const created: Review = {
+    reviewId,
+    title: data.title,
+    content: data.content,
+    artworkId: data.artworkId,
+    tags: data.tags ?? [],
+    createdAt: nowISO(),
+    imageUrl,
+    authorName: data.author?.name,
+    authorUuid: (data.author as any)?.uuid ?? (data.author as any)?.id,
+  };
 
-  // ✅ 서버 공통 응답 봉투 비슷하게 만들어서 리턴(나중에 real로 바꿀 때 UI 변화 최소화)
+  store = [created, ...store];
+
   return {
     success: true,
     code: "OK",
     message: "mock: 감상평이 등록되었습니다.",
     data: { reviewId, imageUrl },
   };
+}
+
+export async function listReviewsByArtworkMock(artworkId: number) {
+  const list = store.filter((r) => r.artworkId === artworkId);
+  return { success: true, code: "OK", message: "mock: 작품 감상평 목록", data: list };
+}
+
+export async function getReviewDetailMock(reviewId: ReviewId) {
+  const found = store.find((r) => String(r.reviewId) === String(reviewId)) ?? null;
+  return { success: true, code: "OK", message: "mock: 감상평 상세", data: found };
+}
+
+export async function updateReviewMock(reviewId: ReviewId, patch: Partial<Review>) {
+  store = store.map((r) => (String(r.reviewId) === String(reviewId) ? { ...r, ...patch } : r));
+  return { success: true, code: "OK", message: "mock: 감상평 수정", data: null };
+}
+
+export async function deleteReviewMock(reviewId: ReviewId) {
+  store = store.filter((r) => String(r.reviewId) !== String(reviewId));
+  return { success: true, code: "OK", message: "mock: 감상평 삭제", data: null };
 }
