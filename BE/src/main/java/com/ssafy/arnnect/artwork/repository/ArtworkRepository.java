@@ -76,6 +76,7 @@ public interface ArtworkRepository extends JpaRepository<Artwork, Long> {
     @Query(value = """
         SELECT
         	m.member_uuid,
+        	m.nickname,
             a.artwork_id,
             a.title,
             a.description,
