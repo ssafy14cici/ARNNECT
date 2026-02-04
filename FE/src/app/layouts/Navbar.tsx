@@ -56,13 +56,16 @@ export default function Navbar() {
     if (open) {
       document.addEventListener("keydown", onKeyDown);
       document.body.style.overflow = "hidden";
+      document.body.classList.add("nav-menu-open");
     } else {
       document.body.style.overflow = "";
+      document.body.classList.remove("nav-menu-open");
     }
 
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = "";
+      document.body.classList.remove("nav-menu-open");
     };
   }, [open]);
 

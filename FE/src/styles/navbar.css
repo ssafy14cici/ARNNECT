@@ -265,3 +265,18 @@
   from { opacity: 0; transform: scale(0.9); }
   to { opacity: 1; transform: scale(1); }
 }
+
+/* =========================
+   메뉴 열릴 때 오버레이 숨기기
+========================= */
+body.nav-menu-open [data-museum-ui],
+body.nav-menu-open .intro-ui,
+body.nav-menu-open .museum-overlay,
+body.nav-menu-open .hall-overlay,
+body.nav-menu-open .exhibit-overlay,
+body.nav-menu-open [class*="overlay"],
+body.nav-menu-open [class*="Overlay"] {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
