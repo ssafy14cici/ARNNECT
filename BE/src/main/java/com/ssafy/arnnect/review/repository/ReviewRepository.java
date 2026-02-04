@@ -12,6 +12,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     Optional<Review> findByReviewIdAndMemberId(Long reviewId, Long memberId);
     List<Review> findByArtworkIdAndIsDeletedOrderByReviewIdDesc(Long artworkId, Boolean isDeleted);
     List<Review> findByMemberIdAndIsDeletedOrderByReviewIdDesc(Long memberId, Boolean isDeleted);
+    List<Review> findAllByOrderByReviewIdDesc();
 
     @Query(value = """
         select\s

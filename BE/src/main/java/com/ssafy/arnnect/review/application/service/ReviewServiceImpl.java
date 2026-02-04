@@ -108,6 +108,11 @@ public class ReviewServiceImpl implements ReviewService{
 
     }
 
+    @Override
+    public List<ReviewResponse> getReviewFeedList() {
+        return repository.findAllByOrderByReviewIdDesc().stream().map(
+                (review)->ReviewResponse.from(review, fileService.getBaseDir(FileType.REVIEW))).toList();
+    }
 
     private void createTag(List<String> tagNameList, Long reviewId){
         /**

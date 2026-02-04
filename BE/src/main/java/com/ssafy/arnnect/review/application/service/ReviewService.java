@@ -17,4 +17,5 @@ public interface ReviewService {
     List<ReviewResponse> getReviewListOfArtwork(Long artworkId);
     List<ReviewResponse> getMyReviewList(String memberUuid);
     ReviewDetailResponse getReviewDetail(Long reviewId);
+    List<ReviewResponse> getReviewFeedList();
 }
