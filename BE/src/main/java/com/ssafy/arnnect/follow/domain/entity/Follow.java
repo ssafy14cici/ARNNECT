@@ -3,18 +3,18 @@ package com.ssafy.arnnect.follow.domain.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "follow")
 @IdClass(FollowId.class)
+@EntityListeners(AuditingEntityListener.class)
 @Getter
-@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString
 public class Follow {
     @Id
     @Column(name = "source_id", nullable = false)
@@ -25,16 +25,6 @@ public class Follow {
     private Long targetId;
 
     @CreatedDate
-    @Column(name = "created_at")
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
-
-    public void createFollow(FollowId followId){
-        this.sourceId = followId.getSourceId();
-        this.targetId = followId.getTargetId();
-    }
-
-    public void deleteFollow(FollowId followId){
-        this.sourceId = followId.getSourceId();
-        this.targetId = followId.getTargetId();
-    }
 }

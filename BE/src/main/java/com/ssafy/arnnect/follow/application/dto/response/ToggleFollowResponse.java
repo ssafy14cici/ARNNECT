@@ -1,5 +1,6 @@
 package com.ssafy.arnnect.follow.application.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -10,7 +11,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Builder
 public class ToggleFollowResponse {
-    private boolean isFollowing;
+    private Boolean isFollowing;
     private Integer followerCount;
 
     public static ToggleFollowResponse from(boolean isFollowing, Integer followerCount){
