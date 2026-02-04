@@ -1,8 +1,7 @@
 // FE/src/pages/reviews/ReviewDetail.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-
-import "./reviewcreate.css";
+import "./reviewdetail.css";
 
 import { http } from "../../shared/api/http";
 import { getReviewDetail } from "../../features/reviews/api";
@@ -10,6 +9,7 @@ import { useAuthStore } from "../../features/auth/store";
 
 import {
   resolveMediaUrl,
+  fetchImageAsObjectUrl,
   getAccessTokenFromStore,
   safeToInt,
 } from "../artworks/detail/utils";
@@ -53,33 +53,6 @@ function normalizeId(raw: unknown): string {
   return s.replace(/^review-/, "").replace(/^artwork-/, "");
 }
 
-/**
- * ✅ 리뷰 이미지 URL도 artwork와 동일하게 처리하되,
- * 서버가 /review/* 또는 /src/review/* 형태로 올 수 있어 보정
- */
-function resolveReviewMediaUrl(input?: string | null): string {
-  const url = resolveMediaUrl(input);
-  if (!url) return "";
-
-  // 절대 URL이면 pathname 보정
-  try {
-    const u = new URL(url);
-
-    // /review/* 로 오면 /src/review/* 로 보정
-    if (u.pathname.startsWith("/review/")) {
-      u.pathname = `/src${u.pathname}`;
-      return u.toString();
-    }
-
-    // /src/review/* 는 그대로
-    return u.toString();
-  } catch {
-    // 상대 경로일 수 있음
-    if (url.startsWith("/review/")) return `/src${url}`;
-    return url;
-  }
-}
-
 function unwrapAxiosData(res: unknown): unknown {
   return res && typeof res === "object" && "data" in (res as any) ? (res as any).data : res;
 }
@@ -96,12 +69,6 @@ function authConfig() {
 const COMMENTS_PATH = "/api/v1/comments";
 const FOLLOW_TOGGLE_PATH = "/api/v1/follow";
 
-/**
- * 댓글 목록(리뷰): BE 구현이 갈릴 수 있어서 후보 URL을 여러개 시도
- * - 유저가 말한 artwork는 /comments?artworkId=3
- * - 리뷰도 비슷하게 /comments?reviewId=xx 일 가능성 높음
- * - 공용스펙(targetType/targetId)도 같이 커버
- */
 async function fetchReviewComments(reviewId: number): Promise<LocalComment[]> {
   const tryUrls = [
     `${COMMENTS_PATH}?reviewId=${encodeURIComponent(String(reviewId))}`,
@@ -155,16 +122,12 @@ async function deleteComment(commentId: string): Promise<void> {
 }
 
 async function toggleFollow(targetMemberUuid: string): Promise<void> {
-  // 스펙: POST /follow/{memberUuid} (toggle)
   await http.post(`${FOLLOW_TOGGLE_PATH}/${encodeURIComponent(targetMemberUuid)}`, {}, authConfig());
 }
 
-/**
- * 리뷰 좋아요는 현재 명세가 불명확해서:
- * - UI는 기본 제공(낙관적 토글)
- * - 서버 엔드포인트 생기면 여기만 연결
- */
-async function toggleReviewLikeOnServer(_reviewId: number): Promise<{ isLiked?: boolean; likeCount?: number } | null> {
+async function toggleReviewLikeOnServer(
+  _reviewId: number,
+): Promise<{ isLiked?: boolean; likeCount?: number } | null> {
   // TODO: 서버 라우트 확정되면 연결
   return null;
 }
@@ -184,7 +147,6 @@ export default function ReviewDetail() {
     return Number.isFinite(n) ? n : undefined;
   }, [normalizedReviewId]);
 
-  // ✅ AuthUser에는 nickname이 없으므로 name만 사용
   const myDisplayName = useMemo(() => {
     const n = String(user?.name ?? "").trim();
     return n || "나";
@@ -193,13 +155,16 @@ export default function ReviewDetail() {
   const [review, setReview] = useState<ReviewDetailData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // 이미지
   const [imageError, setImageError] = useState(false);
+  const [imageObjectUrl, setImageObjectUrl] = useState<string | null>(null);
+  const [imageFallbackTried, setImageFallbackTried] = useState(false);
 
-  // 좋아요 UI 상태(서버 값 있으면 주입)
+  // 좋아요
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
 
-  // 팔로우 UI 상태(초기값은 false, 실제 여부는 리스트 API 붙이면 됨)
+  // 팔로우
   const [isFollowing, setIsFollowing] = useState(false);
 
   // 댓글
@@ -234,8 +199,12 @@ export default function ReviewDetail() {
     (async () => {
       try {
         setLoading(true);
-        setImageError(false);
         setReview(null);
+
+        // 이미지 상태 초기화
+        setImageError(false);
+        setImageObjectUrl(null);
+        setImageFallbackTried(false);
 
         if (!normalizedReviewId) throw new Error("리뷰 ID가 없습니다.");
 
@@ -258,6 +227,15 @@ export default function ReviewDetail() {
       cancelled = true;
     };
   }, [normalizedReviewId]);
+
+  // blob URL revoke (메모리 누수 방지)
+  useEffect(() => {
+    return () => {
+      if (imageObjectUrl && imageObjectUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(imageObjectUrl);
+      }
+    };
+  }, [imageObjectUrl]);
 
   // 댓글 로드
   useEffect(() => {
@@ -317,14 +295,12 @@ export default function ReviewDetail() {
     if (!isOwner) return alert("본인 리뷰만 삭제할 수 있습니다.");
     if (!window.confirm("정말 삭제하시겠습니까?")) return;
 
-    // TODO: 리뷰 삭제 API 연결 필요
     alert("삭제 API 연결 필요(현재 UI만 준비됨)");
   };
 
   const onToggleLike = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
 
-    // ✅ 낙관적 UI
     const prevLiked = isLiked;
     const prevCount = likeCount;
 
@@ -342,7 +318,6 @@ export default function ReviewDetail() {
       }
     } catch (e) {
       console.error(e);
-      // 롤백
       setIsLiked(prevLiked);
       setLikeCount(prevCount);
       alert("좋아요 처리 실패");
@@ -352,7 +327,6 @@ export default function ReviewDetail() {
   const onToggleFollow = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
 
-    // 팔로우 대상으로: 작가 UUID가 있으면 작가, 없으면 리뷰 작성자
     const target = String(review?.artistUuid || review?.memberUuid || "").trim();
     if (!target) return;
 
@@ -399,7 +373,11 @@ export default function ReviewDetail() {
     setCommentText("");
 
     try {
-      const created = await createReviewComment({ reviewId: numericReviewId, content: trimmed, parentCommentId: null });
+      const created = await createReviewComment({
+        reviewId: numericReviewId,
+        content: trimmed,
+        parentCommentId: null,
+      });
       if (created) {
         setComments((prev) => prev.map((c) => (c.id === tempId ? created : c)));
       } else {
@@ -487,6 +465,41 @@ export default function ReviewDetail() {
     }
   };
 
+  // ✅ 이미지 src: 1) blob 성공하면 blob 우선 2) 아니면 resolveMediaUrl
+  const resolvedImgSrc = useMemo(() => {
+    if (imageObjectUrl) return imageObjectUrl;
+    return resolveMediaUrl(review?.imageUrl);
+  }, [imageObjectUrl, review?.imageUrl]);
+
+  // ✅ <img> 로드 실패 시: Authorization 필요할 수 있으니 blob fallback 시도
+  const onImgError = async () => {
+    if (imageFallbackTried) {
+      setImageError(true);
+      return;
+    }
+
+    setImageFallbackTried(true);
+
+    const raw = String(review?.imageUrl ?? "").trim();
+    if (!raw) {
+      setImageError(true);
+      return;
+    }
+
+    try {
+      const objUrl = await fetchImageAsObjectUrl(raw);
+      if (objUrl) {
+        setImageObjectUrl(objUrl);
+        setImageError(false);
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    setImageError(true);
+  };
+
   if (loading) {
     return (
       <div className="review-detail-page">
@@ -509,8 +522,6 @@ export default function ReviewDetail() {
       </div>
     );
   }
-
-  const imgSrc = resolveReviewMediaUrl(review.imageUrl);
 
   return (
     <div className="review-detail-page">
@@ -559,16 +570,16 @@ export default function ReviewDetail() {
         </header>
 
         <section className="rd-image">
-          {!imgSrc ? (
+          {!resolvedImgSrc ? (
             <div className="rd-image-fallback">이미지가 없습니다.</div>
           ) : imageError ? (
             <div className="rd-image-fallback">이미지 로드 실패</div>
           ) : (
             <img
-              src={imgSrc}
+              src={resolvedImgSrc}
               alt={review.title ?? "review"}
               className="rd-image-img"
-              onError={() => setImageError(true)}
+              onError={onImgError}
             />
           )}
         </section>

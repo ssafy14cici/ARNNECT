@@ -5,8 +5,11 @@ export type CommentTargetType = "ARTWORK" | "REVIEW";
 
 /**
  * UI에서 쓰는 표준 Comment 모델
- * - id는 string으로 통일(서버가 number여도 String() 변환)
+ * - id는 string으로 통일(서버가 number/long이어도 String 변환)
  * - parentId: 대댓글이면 부모 댓글 id, 아니면 null
+ *
+ * ⚠️ 현재 BE CommentResponse에는 작성자 식별자가 없고 nickName만 있음.
+ *    그래서 "내 댓글" 판별은 authorName(=nickName)과 내 nickname 비교로 임시 처리.
  */
 export type Comment = {
   id: CommentId;
@@ -17,13 +20,15 @@ export type Comment = {
   content: string;
   parentId: CommentId | null;
 
+  /** (선택) BE가 나중에 내려주면 사용 */
   authorId?: string;
+
+  /** BE CommentResponse.nickName 매핑 */
   authorName?: string;
 
-  createdAt?: string; // ISO string (BE에서 안 주면 undefined)
+  createdAt?: string; // BE에서 안 주면 undefined
 };
 
-/** 댓글 생성 입력(프론트 표준) */
 export type CreateCommentInput = {
   targetType: CommentTargetType;
   targetId: number;
@@ -31,16 +36,14 @@ export type CreateCommentInput = {
   parentId?: CommentId | null;
 };
 
-/** 댓글 수정 입력(프론트 표준) */
 export type UpdateCommentInput = {
   content: string;
 };
 
-/** UI 핸들러(기존 컴포넌트와 호환) */
 export type CommentHandlers = {
-  onDelete: (id: CommentId) => void;
-  onUpdate: (id: CommentId, content: string) => void;
-  onAddReply: (parentId: CommentId, content: string) => void;
+  onDelete: (id: CommentId) => void | Promise<void>;
+  onUpdate: (id: CommentId, content: string) => void | Promise<void>;
+  onAddReply: (parentId: CommentId, content: string) => void | Promise<void>;
 };
 
 export type ProfilePathFn = (authorId: string) => string;

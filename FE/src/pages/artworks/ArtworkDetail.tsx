@@ -475,6 +475,8 @@ export default function ArtworkDetail() {
         onEditComment={onEditComment}
         onDeleteComment={onDeleteComment}
         onReplyComment={onReplyComment}
+        artistProfilePath={artwork.artistMemberUuid ? `/profile/${encodeURIComponent(artwork.artistMemberUuid)}` : undefined}
+        commentAuthorProfilePath={(authorId) => `/profile/${encodeURIComponent(authorId)}`}
       />
 
       {fanLetterOpen && (
