@@ -9,6 +9,7 @@ import type {
   Badge,
 } from "../types";
 
+
 import { useAuthStore } from "../../auth/store";
 
 const BASE = String(import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -157,9 +158,23 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     throw new HttpError(res.status, `${init?.method ?? "GET"} ${path} failed (${res.status})`);
   }
 
-  const data = (await res.json()) as unknown;
-  return data as T;
+  // ✅ 204 / empty body 방어
+  const ct = res.headers.get("content-type") ?? "";
+  if (ct.includes("application/json")) {
+    return (await res.json()) as T;
+  }
+
+  const text = await res.text();
+  if (!text) return undefined as T;
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return text as unknown as T;
+  }
 }
+
+
 
 /** badges: unknown -> Badge[] */
 function normalizeBadges(raw: unknown): Badge[] | undefined {
@@ -352,23 +367,25 @@ function normalizeProfile(raw: unknown, opts?: { roleHint?: "USER" | "ARTIST"; i
   return user;
 }
 
-/** 프로필 수정 payload */
-export type UpdateMyProfilePatch = {
-  nickname?: string;
-  displayName?: string;
-
-  profileImage?: string | null;
-  profileImageUrl?: string | null;
-
-  artIntroduction?: string;
-  bio?: string;
-
-  genre?: string;
-  genreName?: string;
-
-  contactEnabled?: boolean;
-  contactUrl?: string | null;
+/** ✅ BE DTO 기준 프로필 수정 payload */
+export type UpdateMemberPatch = {
+  password?: string;        // 8~255
+  nickname?: string;        // 1~50
+  image?: File | null;      // MultipartFile
 };
+
+export type UpdateArtistPatch = UpdateMemberPatch & {
+  fieldId?: number;         // >=1
+  genreId?: number;         // >=1
+  debutYear?: number;       // <=2100
+  snsPage?: string;         // <=500
+  affiliation?: string;     // <=50
+  introduction?: string;    // <=1000
+};
+
+export type UpdateMyProfilePatch = UpdateMemberPatch | UpdateArtistPatch;
+
+
 
 /**
  * ✅ 내 프로필 조회: BE 기준 /api/v1/member/my 단일
@@ -514,72 +531,92 @@ export async function sendFanLetter(artistUuid: string, content: string): Promis
   }
 }
 
-/** FormData 빌더 (@ModelAttribute 대응) */
-function buildFormData(patch: UpdateMyProfilePatch): FormData {
+/** ✅ FormData 빌더 (@ModelAttribute 대응) - BE DTO 필드명 그대로 */
+function buildUpdateFormData(role: ProfileRole, patch: UpdateMyProfilePatch): FormData {
   const fd = new FormData();
+  const isArtist = isArtistRoleLike(role);
 
-  // 문자열/불리언만 처리 (현재 patch 타입 기준)
-  const put = (k: string, v: unknown) => {
-    if (v === undefined) return;
-    if (v === null) return;
-    if (typeof v === "string") {
-      if (!v.trim()) return;
-      fd.append(k, v);
-      return;
-    }
-    if (typeof v === "boolean") {
-      fd.append(k, String(v));
-      return;
-    }
-    // 숫자 등
-    if (typeof v === "number" && Number.isFinite(v)) {
-      fd.append(k, String(v));
-    }
+  const putStr = (k: string, v: unknown, opts?: { allowEmpty?: boolean }) => {
+    if (v === undefined || v === null) return;
+    if (typeof v !== "string") return;
+
+    // 기본: 빈 값은 미전송(검증 실패/불필요 업데이트 방지)
+    if (!opts?.allowEmpty && !v.trim()) return;
+
+    fd.append(k, v);
   };
 
-  put("nickname", patch.nickname);
-  put("displayName", patch.displayName);
+  const putNum = (k: string, v: unknown) => {
+    if (v === undefined || v === null) return;
+    const n = typeof v === "number" ? v : Number(v);
+    if (!Number.isFinite(n)) return;
+    fd.append(k, String(n));
+  };
 
-  // 서버 DTO가 어떤 키를 받는지에 따라 둘 다 넣고 싶으면 여기서 정책 결정
-  put("profileImage", patch.profileImage);
-  put("profileImageUrl", patch.profileImageUrl);
+  const putFile = (k: string, v: unknown) => {
+    if (v instanceof File) fd.append(k, v);
+  };
 
-  put("artIntroduction", patch.artIntroduction);
-  put("bio", patch.bio);
+  // ✅ 공통(UpdateMemberRequest)
+  putStr("password", (patch as any).password);
+  putStr("nickname", (patch as any).nickname);
+  putFile("image", (patch as any).image);
 
-  put("genre", patch.genre);
-  put("genreName", patch.genreName);
+  // ✅ 아티스트(UpdateArtistRequest)
+  if (isArtist) {
+    putNum("fieldId", (patch as any).fieldId);
+    putNum("genreId", (patch as any).genreId);
+    putNum("debutYear", (patch as any).debutYear);
 
-  put("contactEnabled", patch.contactEnabled);
-  put("contactUrl", patch.contactUrl);
+    // 이 3개는 "비우기"도 가능성이 있어 allowEmpty: true
+    putStr("snsPage", (patch as any).snsPage, { allowEmpty: true });
+    putStr("affiliation", (patch as any).affiliation, { allowEmpty: true });
+    putStr("introduction", (patch as any).introduction, { allowEmpty: true });
+  }
 
   return fd;
 }
 
 /**
- * 내 프로필 수정
- * - ARTIST: /api/v1/member/artist/my   (✅ 단수)
+ * ✅ 내 프로필 수정
  * - USER:   /api/v1/member/users/my
- * - BE가 @ModelAttribute라서 FormData로 PUT
+ * - ARTIST: /api/v1/member/artists/my (우선) -> 404면 /api/v1/member/artist/my fallback
  */
 export async function updateMyProfile(
   role: ProfileRole,
   patch: UpdateMyProfilePatch,
 ): Promise<ProfileModel> {
   const isArtist = isArtistRoleLike(role);
-  const path = isArtist ? "/api/v1/member/artist/my" : "/api/v1/member/users/my";
 
-  const fd = buildFormData(patch);
+  const paths = isArtist
+    ? ["/api/v1/member/artists/my", "/api/v1/member/artist/my"]
+    : ["/api/v1/member/users/my"];
 
-  await req<unknown>(path, {
-    method: "PUT",
-    body: fd,
-    // FormData면 Content-Type을 직접 세팅하지 말 것 (브라우저가 boundary 붙여줌)
-    headers: {},
-  });
+  const fd = buildUpdateFormData(role, patch);
 
-  return getMyProfile();
+  let lastErr: unknown = null;
+
+  for (const path of paths) {
+    try {
+      await req<unknown>(path, {
+        method: "PUT",
+        body: fd,
+        // ✅ FormData는 Content-Type 직접 세팅 X (boundary 자동)
+        headers: {},
+      });
+
+      return getMyProfile();
+    } catch (e) {
+      lastErr = e;
+      if (e instanceof HttpError && e.status === 404) continue;
+      throw e;
+    }
+  }
+
+  throw lastErr instanceof Error ? lastErr : new Error("프로필 수정 실패");
 }
+
+
 
 /**
  * 대표뱃지 엔드포인트 확정 전: no-op

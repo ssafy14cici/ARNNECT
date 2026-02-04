@@ -35,7 +35,7 @@ function shuffle<T>(arr: T[]) {
 
 async function fetchMyFeed(): Promise<Artwork[]> {
   // TODO: 실제 API로 교체
-  // 예: const res = await fetch("/api/users/me/feed", { credentials: "include" });
+  // 예: const res = await fetch("/api/v1/remind", { credentials: "include" });
   // const data = await res.json();
   // return data.items.map(...)
   return [

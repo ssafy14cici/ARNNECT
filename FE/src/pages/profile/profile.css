@@ -472,3 +472,46 @@
     transform: translateX(-50%);
   }
 }
+/* ===========================
+   EDIT MODAL - FILE UPLOAD
+=========================== */
+.profileFileBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.profileFileBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.profileFileInput {
+  display: none;
+}
+
+.profileImagePreviewRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.profileImagePreview {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: #111;
+}

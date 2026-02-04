@@ -46,9 +46,7 @@ function normalizeId(raw: unknown): string {
 }
 
 // ------------------- API PATHS -------------------
-const REVIEW_BASE = "/api/v1/reviews";
-const REVIEW_DETAIL_SUFFIX = "/detail"; // ✅ /{id}/detail 사용 시
-// const REVIEW_DETAIL_SUFFIX = "";      // ✅ /{id} 사용 시
+const REVIEW_BASE = "/api/v1/reviews"; // ✅ 스샷 기준: /reviews/{id}
 
 // ------------------- Types -------------------
 type ReviewDetailData = {
@@ -87,22 +85,47 @@ function mapReviewDetail(payload: unknown): ReviewDetailData | null {
   const body = pickEnvelopeData(payload);
   if (!isObject(body)) return null;
 
-  const reviewId = asNumber(get(body, "reviewId"), NaN);
-  const artworkId = asNumber(get(body, "artworkId"), NaN);
+  // ✅ reviewId가 reviewId or id로 올 수 있게
+  const reviewId = asNumber(get(body, "reviewId"), asNumber(get(body, "id"), NaN));
+  const artworkId = asNumber(get(body, "artworkId"), asNumber(get(body, "artwork_id"), NaN));
   if (!Number.isFinite(reviewId) || !Number.isFinite(artworkId)) return null;
 
   const title = asString(get(body, "title"), "");
   const content = asString(get(body, "content"), "");
-  const imageUrl = asString(get(body, "imageUrl"), "").trim();
-  const createdAtIso = toIso(get(body, "createdAt"));
+  const imageUrl = asString(get(body, "imageUrl"), asString(get(body, "image"), "")).trim();
 
-  const memberUuid = asString(get(body, "memberUuid"), "").trim();
-  const nickname = asString(get(body, "nickname"), "").trim() || "—";
+  // ✅ createdAtIso / createdAt 모두 허용
+  const createdAtIso = toIso(get(body, "createdAtIso") ?? get(body, "createdAt"));
 
-  const artistUuid = asString(get(body, "artistUuid"), "").trim();
-  const artistName = asString(get(body, "artistName"), "").trim() || "Unknown Artist";
+  // ✅ 작성자 키도 여러 케이스 허용
+  const memberUuid =
+    asString(get(body, "memberUuid"), "").trim() ||
+    asString(get(body, "authorUuid"), "").trim() ||
+    asString(get(body, "writerUuid"), "").trim();
 
-  const artworkTitle = asString(get(body, "artworkTitle"), "Untitled Artwork");
+  const nickname =
+    asString(get(body, "nickname"), "").trim() ||
+    asString(get(body, "authorName"), "").trim() ||
+    asString(get(body, "writerName"), "").trim() ||
+    "—";
+
+  // ✅ 작가 키도 여러 케이스 허용
+  const artistUuid =
+    asString(get(body, "artistUuid"), "").trim() ||
+    asString(get(body, "artistMemberUuid"), "").trim() ||
+    asString(get(body, "artistId"), "").trim();
+
+  const artistName =
+    asString(get(body, "artistName"), "").trim() ||
+    asString(get(body, "artist"), "").trim() ||
+    "Unknown Artist";
+
+  const artworkTitle =
+    asString(get(body, "artworkTitle"), "").trim() ||
+    asString(get(body, "artworkName"), "").trim() ||
+    asString(get(body, "artwork"), "").trim() ||
+    "Untitled Artwork";
+
   const tags = asStringArray(get(body, "tags"));
   const safeTags = tags.length ? tags : [];
 
@@ -133,6 +156,7 @@ export default function ReviewEdit() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [origin, setOrigin] = useState<ReviewDetailData | null>(null);
 
@@ -159,7 +183,8 @@ export default function ReviewEdit() {
       try {
         setLoading(true);
 
-        const res = await http.get(`${REVIEW_BASE}/${normalizedReviewId}${REVIEW_DETAIL_SUFFIX}`);
+        // ✅ 스샷 기준: GET /api/v1/reviews/{id}
+        const res = await http.get(`${REVIEW_BASE}/${normalizedReviewId}`);
         const payload = isObject(res) && "data" in res ? (res as { data: unknown }).data : res;
 
         const mapped = mapReviewDetail(payload);
@@ -206,8 +231,7 @@ export default function ReviewEdit() {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
-    // 중복 제거
-    return Array.from(new Set(arr));
+    return Array.from(new Set(arr)); // 중복 제거
   }, [tagsText]);
 
   const onCancel = () => {
@@ -226,25 +250,48 @@ export default function ReviewEdit() {
 
     setSaving(true);
     try {
-      // ✅ 가장 보편적인 PUT 형태 (BE 스펙에 맞게 키 수정 가능)
       const body = {
         title: nextTitle,
         content: nextContent,
-        imageUrl: imageUrl.trim() || null,
+        imageUrl: imageUrl.trim() || null, // ⚠️ BE가 파일(FormData)면 여기 바꿔야 함
         tags: parsedTags.length ? parsedTags : [],
-        // artworkId가 수정 불가면 굳이 안 보내도 됨
+        // artworkId가 수정 불가면 제거해도 됨. 일단 안전하게 유지.
         artworkId: origin.artworkId,
       };
 
-      await http.put(`${REVIEW_BASE}/${origin.reviewId}`, body);
+      // ✅ 스샷 기준: PUT /api/v1/reviews/{id}
+      await http.put(`${REVIEW_BASE}/${normalizedReviewId}`, body);
 
       alert("수정되었습니다.");
-      nav(`/reviews/${origin.reviewId}`);
+      nav(`/reviews/${normalizedReviewId}`);
     } catch (e) {
       console.error(e);
       alert("수정 실패");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onDelete = async () => {
+    if (!canEdit) return;
+    if (!normalizedReviewId) return;
+
+    const ok = window.confirm("정말 삭제할까요? (되돌릴 수 없습니다)");
+    if (!ok) return;
+
+    setDeleting(true);
+    try {
+      // ✅ 스샷 기준: DELETE /api/v1/reviews/{id}
+      await http.delete(`${REVIEW_BASE}/${normalizedReviewId}`);
+
+      alert("삭제되었습니다.");
+      // TODO: 유저 라우트 구조에 맞게 리스트/홈으로 이동 경로 조정
+      nav("/reviews", { replace: true });
+    } catch (e) {
+      console.error(e);
+      alert("삭제 실패");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -278,10 +325,13 @@ export default function ReviewEdit() {
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" onClick={onCancel} disabled={saving}>
+          <button type="button" onClick={onCancel} disabled={saving || deleting}>
             취소
           </button>
-          <button type="button" onClick={onSave} disabled={!canEdit || saving}>
+          <button type="button" onClick={onDelete} disabled={!canEdit || saving || deleting}>
+            {deleting ? "Deleting..." : "삭제"}
+          </button>
+          <button type="button" onClick={onSave} disabled={!canEdit || saving || deleting}>
             {saving ? "Saving..." : "저장"}
           </button>
         </div>
@@ -299,7 +349,7 @@ export default function ReviewEdit() {
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            disabled={!canEdit || saving}
+            disabled={!canEdit || saving || deleting}
             style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: 10 }}
             placeholder="제목을 입력하세요"
           />
@@ -310,7 +360,7 @@ export default function ReviewEdit() {
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            disabled={!canEdit || saving}
+            disabled={!canEdit || saving || deleting}
             rows={10}
             style={{ padding: "12px", border: "1px solid #ddd", borderRadius: 10, resize: "vertical" }}
             placeholder="내용을 입력하세요"
@@ -322,7 +372,7 @@ export default function ReviewEdit() {
           <input
             value={imageUrl}
             onChange={(e) => setImageUrl(e.target.value)}
-            disabled={!canEdit || saving}
+            disabled={!canEdit || saving || deleting}
             style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: 10 }}
             placeholder="https://..."
           />
@@ -333,7 +383,6 @@ export default function ReviewEdit() {
                 alt="preview"
                 style={{ width: "100%", maxHeight: 360, objectFit: "cover", borderRadius: 12 }}
                 onError={(e) => {
-                  // 이미지 깨지면 미리보기 숨김
                   (e.currentTarget as HTMLImageElement).style.display = "none";
                 }}
               />
@@ -346,7 +395,7 @@ export default function ReviewEdit() {
           <input
             value={tagsText}
             onChange={(e) => setTagsText(e.target.value)}
-            disabled={!canEdit || saving}
+            disabled={!canEdit || saving || deleting}
             style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: 10 }}
             placeholder="예: 현대미술, 회화, 풍경"
           />
