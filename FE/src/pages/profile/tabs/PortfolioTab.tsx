@@ -62,11 +62,12 @@ export default function PortfolioTab() {
         {/* ✅ 버튼 영역 */}
         <div style={{ display: "flex", gap: 8 }}>
           {/* ✅ 관람자(일반 유저)도 3D 전시장 진입 가능하게 */}
-          <Link
+          {/* <Link
             to={`/exhibit/${profile.id}`}
             className="tab-btn"
             state={{ from: "profile", artistId: profile.id }}
-          >
+          > */}
+          <Link to="/exhibit" className="tab-btn">
             3D 전시장 보기
           </Link>
 

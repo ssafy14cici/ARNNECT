@@ -98,6 +98,24 @@ export default function Hall() {
         ref={canvasRef}
         style={{ width: "100%", height: "100%", display: "block" }}
       />
+
+      {/* 조작 가이드 오버레이 */}
+      <img
+        src={asset("how.png")}
+        alt="조작 가이드"
+        className="hall-guide-overlay"
+        style={{
+          position: "fixed",
+          bottom: "60px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          opacity: 0.6,
+          pointerEvents: "none",
+          zIndex: 9980,
+          width: "22.5%",
+          height: "auto",
+        }}
+      />
     </div>
   );
 }

@@ -1,17 +1,16 @@
 // FE/src/features/comments/ui/CommentItem.tsx
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { CommentForm } from "./CommentForm";
 import { ReplyList } from "./ReplyList";
 import type { Comment, CommentHandlers, ProfilePathFn } from "../model/types";
-import { useAuthStore } from "../../auth/store"; // ✅ 추가 (경로 프로젝트에 맞게)
+import { useAuthStore } from "../../auth/store";
 
 type Props = CommentHandlers & {
   comment: Comment;
   allComments: Comment[];
   profilePath: ProfilePathFn;
-  canEdit?: (comment: Comment) => boolean; // 있으면 이걸 우선 사용
 };
 
 export function CommentItem({
@@ -21,9 +20,13 @@ export function CommentItem({
   onUpdate,
   onAddReply,
   profilePath,
-  canEdit,
 }: Props) {
-  const me = useAuthStore((s) => s.user?.memberUuid); // ✅ 내 id
+  // ✅ 내 식별자(있는 것만 뽑아 씀)
+  const meUuid = useAuthStore((s) => s.user?.memberUuid);
+  const meNickname = useAuthStore((s) => {
+    const u: any = s.user;
+    return (u?.nickname ?? u?.nickName ?? u?.name ?? "") as string;
+  });
 
   const [isEditing, setIsEditing] = useState(false);
   const [editInput, setEditInput] = useState(comment.content);
@@ -33,18 +36,23 @@ export function CommentItem({
   const authorName = comment.authorName ?? "Anonymous";
   const authorId = comment.authorId;
 
-  // ✅ canEdit가 없으면 "내 댓글만" 기본 로직 적용
+  /**
+   * ✅ editable 판정 (현재 BE DTO에 맞춘 임시안)
+   * 1) authorId가 있으면 UUID/ID 비교
+   * 2) 없으면 nickName(=authorName) vs 내 nickname 비교
+   *
+   * ⚠️ 정확한 판정 원하면 BE에서 CommentResponse에 memberId/memberUuid/isMine 중 하나를 내려줘야 함.
+   */
   const editable = useMemo(() => {
-    if (canEdit) return canEdit(comment);
-    if (!me) return false;
-    if (!authorId) return false; // authorId가 없으면 판단 불가 -> 숨김
-    return String(authorId) === String(me);
-  }, [canEdit, comment, me, authorId]);
+    if (meUuid && authorId) return String(authorId) === String(meUuid);
+    if (meNickname && authorName) return String(authorName) === String(meNickname);
+    return false;
+  }, [meUuid, authorId, meNickname, authorName]);
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     const value = String(editInput ?? "").trim();
     if (!value) return;
-    onUpdate(comment.id, value);
+    await onUpdate(comment.id, value);
     setIsEditing(false);
   };
 
@@ -53,7 +61,7 @@ export function CommentItem({
       <div className="comment-box">
         <div className="comment-header">
           {authorId ? (
-            <Link to={profilePath(authorId)} className="comment-author">
+            <Link to={profilePath(String(authorId))} className="comment-author">
               {authorName}
             </Link>
           ) : (
@@ -72,7 +80,12 @@ export function CommentItem({
               value={editInput}
               onChange={(e) => setEditInput(e.target.value)}
               autoFocus
-              onKeyDown={(e) => e.key === "Enter" && saveEdit()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  saveEdit();
+                }
+              }}
             />
             <button type="button" className="comment-edit-btn btn-save" onClick={saveEdit}>
               Save
@@ -80,7 +93,10 @@ export function CommentItem({
             <button
               type="button"
               className="comment-edit-btn btn-cancel"
-              onClick={() => setIsEditing(false)}
+              onClick={() => {
+                setIsEditing(false);
+                setEditInput(comment.content);
+              }}
             >
               Cancel
             </button>
@@ -91,7 +107,11 @@ export function CommentItem({
 
             <div className="comment-actions">
               {!isReply && (
-                <button type="button" className="action-btn" onClick={() => setIsReplyOpen((v) => !v)}>
+                <button
+                  type="button"
+                  className="action-btn"
+                  onClick={() => setIsReplyOpen((v) => !v)}
+                >
                   Reply
                 </button>
               )}
@@ -108,7 +128,11 @@ export function CommentItem({
                   >
                     Edit
                   </button>
-                  <button type="button" className="action-btn delete" onClick={() => onDelete(comment.id)}>
+                  <button
+                    type="button"
+                    className="action-btn delete"
+                    onClick={() => onDelete(comment.id)}
+                  >
                     Delete
                   </button>
                 </>
@@ -123,8 +147,8 @@ export function CommentItem({
           <CommentForm
             isReply
             placeholder="Write a reply..."
-            onAdd={(text) => {
-              onAddReply(comment.id, text);
+            onAdd={async (text) => {
+              await onAddReply(comment.id, text);
               setIsReplyOpen(false);
             }}
           />
@@ -139,7 +163,6 @@ export function CommentItem({
           onUpdate={onUpdate}
           onAddReply={onAddReply}
           profilePath={profilePath}
-          canEdit={canEdit}
         />
       )}
     </li>
