@@ -1,15 +1,13 @@
-//FE\src\features\comments\ui\CommentList.tsx
-
+// FE/src/features/comments/ui/CommentList.tsx
 import type { Comment, CommentHandlers, ProfilePathFn } from "../model/types";
 import { CommentItem } from "./CommentItem";
 
 type Props = CommentHandlers & {
   comments: Comment[];
   profilePath: ProfilePathFn;
-  canEdit?: (comment: Comment) => boolean;
 };
 
-export function CommentList({ comments, onDelete, onUpdate, onAddReply, profilePath, canEdit }: Props) {
+export function CommentList({ comments, onDelete, onUpdate, onAddReply, profilePath }: Props) {
   const rootComments = comments.filter((c) => c.parentId === null);
 
   return (
@@ -24,11 +22,10 @@ export function CommentList({ comments, onDelete, onUpdate, onAddReply, profileP
             onUpdate={onUpdate}
             onAddReply={onAddReply}
             profilePath={profilePath}
-            canEdit={canEdit}
           />
         ))
       ) : (
-        <div className="comment-empty">Be the first to share your thoughts.</div>
+        <li className="comment-empty">Be the first to share your thoughts.</li>
       )}
     </ul>
   );

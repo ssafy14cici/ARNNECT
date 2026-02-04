@@ -1,5 +1,4 @@
-//FE\src\features\comments\ui\ReplyList.tsx
-
+// FE/src/features/comments/ui/ReplyList.tsx
 import { CommentItem } from "./CommentItem";
 import type { Comment, CommentHandlers, CommentId, ProfilePathFn } from "../model/types";
 
@@ -7,7 +6,6 @@ type Props = CommentHandlers & {
   parentId: CommentId;
   allComments: Comment[];
   profilePath: ProfilePathFn;
-  canEdit?: (comment: Comment) => boolean;
 };
 
 export const ReplyList = ({
@@ -17,7 +15,6 @@ export const ReplyList = ({
   onUpdate,
   onAddReply,
   profilePath,
-  canEdit,
 }: Props) => {
   const replies = allComments.filter((c) => c.parentId === parentId);
   if (replies.length === 0) return null;
@@ -33,7 +30,6 @@ export const ReplyList = ({
           onUpdate={onUpdate}
           onAddReply={onAddReply}
           profilePath={profilePath}
-          canEdit={canEdit}
         />
       ))}
     </ul>
