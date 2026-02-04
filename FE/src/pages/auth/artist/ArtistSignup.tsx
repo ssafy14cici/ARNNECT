@@ -112,12 +112,12 @@ export default function ArtistSignup() {
 
     if (!email) {
       setEmailChecked(false);
-      setEmailCheckMsg("이메일을 입력해줘");
+      setEmailCheckMsg("이메일을 입력해주세요");
       return;
     }
     if (!isValidEmail(email)) {
       setEmailChecked(false);
-      setEmailCheckMsg("이메일 형식을 확인해줘");
+      setEmailCheckMsg("이메일 형식을 확인해주세요");
       return;
     }
 
@@ -139,49 +139,49 @@ export default function ArtistSignup() {
 
   const validateStep1 = (): string | null => {
     const email = (a1.email ?? "").trim();
-    if (!email) return "이메일을 입력해줘";
-    if (!isValidEmail(email)) return "이메일 형식을 확인해줘";
-    if (!emailChecked) return "이메일 중복 확인을 완료해줘";
+    if (!email) return "이메일을 입력해주세요";
+    if (!isValidEmail(email)) return "이메일 형식을 확인해주세요";
+    if (!emailChecked) return "이메일 중복 확인을 완료해주세요";
 
     const name = (a1.name ?? "").trim();
-    if (!name) return "이름을 입력해줘";
+    if (!name) return "이름을 입력해주세요";
 
     const pw = a1.password ?? "";
-    if (pw.length < 8) return "비밀번호는 8자 이상이어야 해";
-    if (pw !== password2) return "비밀번호 확인이 일치하지 않아";
+    if (pw.length < 8) return "비밀번호는 8자 이상이어야 합니다";
+    if (pw !== password2) return "비밀번호 확인이 일치하지 않습니다";
 
     const phone = normalizePhone(a1.phone ?? "");
-    if (!phone) return "전화번호를 입력해줘";
-    if (phone.length < 9) return "전화번호 형식을 확인해줘";
+    if (!phone) return "전화번호를 입력해주세요";
+    if (phone.length < 9) return "전화번호 형식을 확인해주세요";
 
     return null;
   };
 
   const validateStep2 = (): string | null => {
-    if (!a2.nickname.trim()) return "닉네임을 입력해줘";
-    if (!a2.birth) return "생년월일을 선택해줘";
-    if (!a2.affiliation.trim()) return "소속을 입력해줘";
+    if (!a2.nickname.trim()) return "닉네임을 입력해주세요";
+    if (!a2.birth) return "생년월일을 선택해주세요";
+    if (!a2.affiliation.trim()) return "소속을 입력해주세요";
 
-    if (!a2.debutYear.trim()) return "데뷔연도를 입력해줘";
+    if (!a2.debutYear.trim()) return "데뷔연도를 입력해주세요";
     const debut = Number(a2.debutYear);
     if (!Number.isFinite(debut) || debut < 1900 || debut > 2100) {
-      return "데뷔연도 형식을 확인해줘";
+      return "데뷔연도 형식을 확인해주세요";
     }
 
-    if (!a2.genreId) return "장르를 선택해줘";
-    if (!a2.sns.trim()) return "SNS/개인웹 주소를 입력해줘";
+    if (!a2.genreId) return "장르를 선택해주세요";
+    if (!a2.sns.trim()) return "SNS/개인웹 주소를 입력해주세요";
 
     return null;
   };
 
   const validateStep3 = (): string | null => {
-    if (!(a3.document instanceof File)) return "증빙서류(document)를 첨부해줘";
-    if (!a3.artIntroduction.trim()) return "작가 소개(artIntroduction)를 입력해줘";
+    if (!(a3.document instanceof File)) return "증빙서류(document)를 첨부해주세요";
+    if (!a3.artIntroduction.trim()) return "작가 소개(artIntroduction)를 입력해주세요";
     return null;
   };
 
   const validateStep4 = (): string | null => {
-    if (!agree) return "약관 동의가 필요해";
+    if (!agree) return "약관 동의가 필요합니다";
     return null;
   };
 
