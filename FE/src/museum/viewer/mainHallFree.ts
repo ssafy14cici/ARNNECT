@@ -1261,19 +1261,55 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     exhibitBtn.style.cssText = "background:#333;color:#fff;border:none;border-radius:8px;padding:10px 32px;font-size:15px;cursor:pointer;font-family:inherit;";
     exhibitBtn.textContent = "전시보러가기";
 
+    // const openExhibit = (e: Event) => {
+    //   e.preventDefault();
+    //   e.stopPropagation();
+
+    //   overlay2.remove();
+
+    //   opts.onOpenExhibit?.({
+    //     artId: payload.artId,
+    //     artist: payload.artist,
+    //     artworkTitle: payload.artworkTitle,
+    //     fromWaypointId: currentId,
+    //   });
+    // };
     const openExhibit = (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
 
-      overlay2.remove();
-
-      opts.onOpenExhibit?.({
+      console.log("[openExhibit] fired", {
         artId: payload.artId,
         artist: payload.artist,
         artworkTitle: payload.artworkTitle,
         fromWaypointId: currentId,
+        hasCallback: typeof opts.onOpenExhibit === "function",
       });
+
+      try {
+        overlay2.remove();
+
+        // ✅ 콜백이 없으면 여기서 바로 알 수 있게
+        if (typeof opts.onOpenExhibit !== "function") {
+          console.warn("[openExhibit] opts.onOpenExhibit is missing");
+          return;
+        }
+
+        opts.onOpenExhibit({
+          artId: payload.artId,
+          artist: payload.artist,
+          artworkTitle: payload.artworkTitle,
+          fromWaypointId: currentId,
+        });
+
+        console.log("[openExhibit] callback called");
+      } catch (err) {
+        console.error("[openExhibit] error", err);
+      }
     };
+
+
+
 
     // ✅ click이 씹히는 케이스 대비
     exhibitBtn.addEventListener("pointerup", openExhibit);

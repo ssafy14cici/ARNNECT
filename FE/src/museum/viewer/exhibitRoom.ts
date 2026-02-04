@@ -29,6 +29,10 @@ type Options = {
   uiMount?: HTMLElement;
 
   onExitToHall: () => void;
+
+    // ✅ 전시장에서 "작품 상세보기" 눌렀을 때 라우팅은 바깥(React)에서 하게 콜백으로 뺌
+  onOpenArtwork?: (artworkId: string | number) => void;
+
 };
 
 /**
@@ -416,12 +420,29 @@ export async function mountExhibitRoom(
     detailBtn.style.cssText =
       "background:#333;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;cursor:pointer;font-family:inherit;";
     detailBtn.textContent = "작품 상세보기";
+    // detailBtn.addEventListener("click", (e) => {
+    //   e.preventDefault();
+    //   e.stopPropagation();
+    //   console.log("[exhibit] detail clicked:", { title, panelName, imageUrl });
+    //   overlay.remove();
+    // });
+
     detailBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log("[exhibit] detail clicked:", { title, panelName, imageUrl });
+
+      const artworkId = mesh.userData.__artworkId;
+
+      console.log("[exhibit] detail clicked:", { artworkId, title, panelName, imageUrl });
+
       overlay.remove();
+
+      // ✅ React 라우팅은 exhibitRoom이 직접 못하니까 콜백으로 넘김
+      if (artworkId !== undefined && opts.onOpenArtwork) {
+        opts.onOpenArtwork(artworkId);
+      }
     });
+
 
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
@@ -623,6 +644,8 @@ export async function mountExhibitRoom(
                 mesh.userData.__panelName = item.panelName;
                 mesh.userData.__title = item.title;
                 mesh.userData.__imageUrl = item.imageUrl;
+                mesh.userData.__artworkId = (item as any).artworkId ?? (item as any).id;
+
                 clickableArtMeshes.push(mesh);
 
                 attached++;

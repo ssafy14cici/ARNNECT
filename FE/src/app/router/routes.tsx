@@ -40,6 +40,7 @@ import Profile from "../../pages/profile/Profile";
 import FeedTab from "../../pages/profile/tabs/FeedTab";
 import CollectionTab from "../../pages/profile/tabs/CollectionTab";
 import PortfolioTab from "../../pages/profile/tabs/PortfolioTab";
+import Exhibit from "../../pages/exhibit/Exhibit";
 
 import ArtworkCreate from "../../pages/artworks/ArtworkCreate";
 import ArtworkEdit from "../../pages/artworks/ArtworkEdit";
@@ -81,6 +82,7 @@ export const routes: RouteObject[] = [
 
       { path: "main-hall", element: <HomePC />},
       { path: "hall", element: <Hall />},
+      { path: "exhibit", element: <Exhibit /> },
 
       // 로그인하면 회원가입을 막기
       {
@@ -290,6 +292,7 @@ export const routes: RouteObject[] = [
               },
               {
                 path: "portfolio",
+                // 일반 유저 홀에서 전시장 진입을 위해 주석처리?
                 element: <Guard requireRole="artist" />,
                 children: [{ index: true, element: <Portfolio /> }],
               },

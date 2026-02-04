@@ -23,6 +23,7 @@ export default function PortfolioTab() {
 
     (async () => {
       try {
+        // ✅ 이 탭은 "리스트"만 담당 (3D 전시는 별도 라우트에서)
         const page = await profileApi.getArtistFeed(profile.id);
         if (!cancelled) setItems(page.items ?? []);
       } catch (e) {
@@ -58,11 +59,24 @@ export default function PortfolioTab() {
       <div className="tab-header">
         <h3 className="tab-title">Portfolio</h3>
 
-        {isOwner && (
-          <Link to="/artworks/create" className="tab-btn">
-            Add Artwork
+        {/* ✅ 버튼 영역 */}
+        <div style={{ display: "flex", gap: 8 }}>
+          {/* ✅ 관람자(일반 유저)도 3D 전시장 진입 가능하게 */}
+          <Link
+            to={`/exhibit/${profile.id}`}
+            className="tab-btn"
+            state={{ from: "profile", artistId: profile.id }}
+          >
+            3D 전시장 보기
           </Link>
-        )}
+
+          {/* ✅ 작가 본인만 작품 추가 가능 */}
+          {isOwner && (
+            <Link to="/artworks/create" className="tab-btn">
+              Add Artwork
+            </Link>
+          )}
+        </div>
       </div>
 
       {items.length === 0 ? (
@@ -72,37 +86,48 @@ export default function PortfolioTab() {
         </div>
       ) : (
         <div className="tab-grid-2">
-          {items.map((it) => (
-            <article key={it.id} className="tab-card">
-              <div className="tab-card-body">
-                <div className="tab-card-title" style={{ marginBottom: 8 }}>
-                  작품 #{it.id}
-                </div>
+          {items.map((it) => {
+            // ✅ 여기서 it.id를 artworkId로 취급 (프로젝트 구조상 "작품 #id"로 쓰고 있었음)
+            const artworkId = it.id;
 
-                <div
-                  style={{
-                    width: "100%",
-                    aspectRatio: "4/3",
-                    overflow: "hidden",
-                    borderRadius: 12,
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    marginBottom: 10,
-                  }}
+            return (
+              <article key={it.id} className="tab-card">
+                {/* ✅ 카드 클릭하면 작품 상세로 이동 */}
+                <Link
+                  to={`/artworks/${artworkId}`}
+                  style={{ color: "inherit", textDecoration: "none", display: "block" }}
                 >
-                  <img
-                    src={it.imageUrl}
-                    alt=""
-                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
-                </div>
+                  <div className="tab-card-body">
+                    <div className="tab-card-title" style={{ marginBottom: 8 }}>
+                      작품 #{it.id}
+                    </div>
 
-                <div className="tab-card-info">Created: {it.createdAt ?? "-"}</div>
-              </div>
-            </article>
-          ))}
+                    <div
+                      style={{
+                        width: "100%",
+                        aspectRatio: "4/3",
+                        overflow: "hidden",
+                        borderRadius: 12,
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        marginBottom: 10,
+                      }}
+                    >
+                      <img
+                        src={it.imageUrl}
+                        alt=""
+                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    </div>
+
+                    <div className="tab-card-info">Created: {it.createdAt ?? "-"}</div>
+                  </div>
+                </Link>
+              </article>
+            );
+          })}
         </div>
       )}
     </div>
