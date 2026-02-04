@@ -1,4 +1,3 @@
-// FE/src/pages/profile/components/ProfileHeader.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../profile.css";
@@ -12,7 +11,9 @@ import basicProfile from "../../../assets/basicprofile.png";
 import type { ArtistProfile, UserProfile, Badge } from "../../../features/profile/types";
 
 import ProfileEditModal from "./ProfileEditModal";
-import ProfileQnaPanel from "./ProfileQnaPanel";
+
+// ✅ QnA 패널 제거, 팬레터 모달로 교체
+import FanLetterSendModal from "../../../features/fanLetter/ui/FanLetterSendModal";
 
 type ProfileModel = ArtistProfile | UserProfile;
 
@@ -43,8 +44,8 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
   const [busy, setBusy] = useState(false);
 
-  // QnA
-  const [qnaOpen, setQnaOpen] = useState(false);
+  // ✅ FanLetter modal open
+  const [fanLetterOpen, setFanLetterOpen] = useState(false);
 
   // Edit modal open
   const [editOpen, setEditOpen] = useState(false);
@@ -66,14 +67,18 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
     return ids.map((id) => map.get(id)).filter(Boolean) as Badge[];
   }, [profile]);
 
-  const genre = useMemo(() => (isArtist ? (profile as ArtistProfile).genre : undefined), [isArtist, profile]);
+  const genre = useMemo(
+    () => (isArtist ? (profile as ArtistProfile).genre : undefined),
+    [isArtist, profile],
+  );
 
   const contactEnabled = useMemo(() => {
     if (!isArtist) return false;
     return (profile as ArtistProfile).contactEnabled !== false;
   }, [isArtist, profile]);
 
-  const canAskQnA = !isOwner && isArtist && contactEnabled && viewerRole === "general";
+  // ✅ “QnA” → “팬레터”
+  const canSendFanLetter = !isOwner && isArtist && contactEnabled && viewerRole === "general";
 
   const avatarSrc = useMemo(() => {
     const u = String(profile.imageUrl ?? "").trim();
@@ -134,18 +139,18 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
     }
   };
 
-  const submitQnA = async (message: string) => {
-    if (!canAskQnA) return false;
-    if (!profile.id) return false;
+  // ✅ 기존 QnA 전송 로직을 “팬레터 전송”으로 이름/메시지만 교체
+  const submitFanLetter = async (message: string) => {
+    if (!canSendFanLetter) return;
+    if (!profile.id) return;
 
     setBusy(true);
     try {
       await profileApi.sendFanLetter(profile.id, message);
-      alert("QnA 전송 완료");
-      return true;
+      alert("팬레터 전송 완료");
+      setFanLetterOpen(false);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "QnA 전송 실패");
-      return false;
+      alert(e instanceof Error ? e.message : "팬레터 전송 실패");
     } finally {
       setBusy(false);
     }
@@ -259,7 +264,12 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
                       로그아웃
                     </button>
 
-                    <button className="profileMenuItem" onClick={() => setManageOpen(false)} role="menuitem" type="button">
+                    <button
+                      className="profileMenuItem"
+                      onClick={() => setManageOpen(false)}
+                      role="menuitem"
+                      type="button"
+                    >
                       닫기
                     </button>
                   </div>
@@ -271,9 +281,9 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
                   {profile.isFollowing ? "언팔로우" : "팔로우"}
                 </button>
 
-                {canAskQnA && (
-                  <button className="profileBtn" onClick={() => setQnaOpen(true)} type="button">
-                    QnA
+                {canSendFanLetter && (
+                  <button className="profileBtn" onClick={() => setFanLetterOpen(true)} type="button">
+                    팬레터
                   </button>
                 )}
               </>
@@ -282,7 +292,14 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
         </div>
       </div>
 
-      <ProfileQnaPanel open={qnaOpen} busy={busy} canAsk={canAskQnA} onClose={() => setQnaOpen(false)} onSubmit={submitQnA} />
+      {/* ✅ ProfileQnaPanel 삭제 → FanLetterSendModal 사용 */}
+      <FanLetterSendModal
+        open={fanLetterOpen}
+        sending={busy}
+        artistName={profile.name}
+        onClose={() => setFanLetterOpen(false)}
+        onSend={submitFanLetter}
+      />
 
       <ProfileEditModal
         open={editOpen}

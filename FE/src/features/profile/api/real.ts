@@ -536,12 +536,12 @@ function buildUpdateFormData(role: ProfileRole, patch: UpdateMyProfilePatch): Fo
   const fd = new FormData();
   const isArtist = isArtistRoleLike(role);
 
-  const putStr = (k: string, v: unknown, opts?: { allowEmpty?: boolean }) => {
+  const putStr = (k: string, v: unknown) => {
     if (v === undefined || v === null) return;
     if (typeof v !== "string") return;
 
-    // 기본: 빈 값은 미전송(검증 실패/불필요 업데이트 방지)
-    if (!opts?.allowEmpty && !v.trim()) return;
+    // ✅ 빈 값은 미전송(= BE updateArtist 정책과 정합)
+    if (!v.trim()) return;
 
     fd.append(k, v);
   };
@@ -568,14 +568,15 @@ function buildUpdateFormData(role: ProfileRole, patch: UpdateMyProfilePatch): Fo
     putNum("genreId", (patch as any).genreId);
     putNum("debutYear", (patch as any).debutYear);
 
-    // 이 3개는 "비우기"도 가능성이 있어 allowEmpty: true
-    putStr("snsPage", (patch as any).snsPage, { allowEmpty: true });
-    putStr("affiliation", (patch as any).affiliation, { allowEmpty: true });
-    putStr("introduction", (patch as any).introduction, { allowEmpty: true });
+    // ✅ 빈 문자열은 보내도 BE가 무시하므로 "아예 미전송"으로 통일
+    putStr("snsPage", (patch as any).snsPage);
+    putStr("affiliation", (patch as any).affiliation);
+    putStr("introduction", (patch as any).introduction);
   }
 
   return fd;
 }
+
 
 /**
  * ✅ 내 프로필 수정

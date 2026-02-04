@@ -1,7 +1,4 @@
-// FE/src/features/artwork/ui/comments/CommentList.tsx
-
-import type { Comment, CommentHandlers, ProfilePathFn } from "../../comments/model/types";
-
+import type { Comment, CommentHandlers, ProfilePathFn } from "../model/types";
 import { CommentItem } from "./CommentItem";
 
 type Props = CommentHandlers & {

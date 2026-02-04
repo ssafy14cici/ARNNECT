@@ -1,7 +1,6 @@
-// FE/src/features/artwork/ui/comments/CommentItem.tsx
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
+
 import { CommentForm } from "./CommentForm";
 import { ReplyList } from "./ReplyList";
 import type { Comment, CommentHandlers, ProfilePathFn } from "../model/types";
@@ -40,7 +39,7 @@ export function CommentItem({
   };
 
   return (
-    <li className="comment-item-li">
+    <li className={`comment-item-li ${isReply ? "is-reply" : ""}`}>
       <div className="comment-box">
         <div className="comment-header">
           {authorId ? (
@@ -65,8 +64,16 @@ export function CommentItem({
               autoFocus
               onKeyDown={(e) => e.key === "Enter" && saveEdit()}
             />
-            <button className="comment-edit-btn btn-save" onClick={saveEdit}>Save</button>
-            <button className="comment-edit-btn btn-cancel" onClick={() => setIsEditing(false)}>Cancel</button>
+            <button type="button" className="comment-edit-btn btn-save" onClick={saveEdit}>
+              Save
+            </button>
+            <button
+              type="button"
+              className="comment-edit-btn btn-cancel"
+              onClick={() => setIsEditing(false)}
+            >
+              Cancel
+            </button>
           </div>
         ) : (
           <>
@@ -74,7 +81,7 @@ export function CommentItem({
 
             <div className="comment-actions">
               {!isReply && (
-                <button className="action-btn" onClick={() => setIsReplyOpen((v) => !v)}>
+                <button type="button" className="action-btn" onClick={() => setIsReplyOpen((v) => !v)}>
                   Reply
                 </button>
               )}
@@ -82,6 +89,7 @@ export function CommentItem({
               {editable && (
                 <>
                   <button
+                    type="button"
                     className="action-btn"
                     onClick={() => {
                       setIsEditing(true);
@@ -90,7 +98,7 @@ export function CommentItem({
                   >
                     Edit
                   </button>
-                  <button className="action-btn delete" onClick={() => onDelete(comment.id)}>
+                  <button type="button" className="action-btn delete" onClick={() => onDelete(comment.id)}>
                     Delete
                   </button>
                 </>
@@ -100,7 +108,7 @@ export function CommentItem({
         )}
       </div>
 
-      {isReplyOpen && (
+      {isReplyOpen && !isReply && (
         <div className="reply-form-wrap">
           <CommentForm
             isReply

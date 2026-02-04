@@ -119,23 +119,32 @@ export default function ProfileEditModal({
   const handleSave = async () => {
     const nextFeatured = Array.from(new Set(draftFeaturedBadgeIds)).slice(0, 3);
 
+    // ✅ BE updateArtist 정책(빈 문자열 무시)과 정합 맞추기:
+    //    - 문자열은 trim 후 빈 값이면 undefined로 보내서 "아예 미전송" 되게 함.
+    const nickname = draftNickname.trim() || profile.name;
+    const password = draftPassword.trim() || undefined;
+
+    const snsPageTrim = draftSnsPage.trim();
+    const affiliationTrim = draftAffiliation.trim();
+    const introductionTrim = draftIntroduction.trim();
+
     const payload: UpdateMyProfilePatch = isArtist
       ? {
-          nickname: draftNickname.trim() || profile.name,
-          password: draftPassword.trim() || undefined,
+          nickname,
+          password,
           image: draftImageFile ?? undefined,
 
           fieldId: draftFieldId,
           genreId: draftGenreId,
           debutYear: draftDebutYear,
 
-          snsPage: draftSnsPage,        // allowEmpty는 FormData builder에서 처리
-          affiliation: draftAffiliation,
-          introduction: draftIntroduction,
+          snsPage: snsPageTrim ? snsPageTrim : undefined,
+          affiliation: affiliationTrim ? affiliationTrim : undefined,
+          introduction: introductionTrim ? introductionTrim : undefined,
         }
       : {
-          nickname: draftNickname.trim() || profile.name,
-          password: draftPassword.trim() || undefined,
+          nickname,
+          password,
           image: draftImageFile ?? undefined,
         };
 
@@ -199,13 +208,10 @@ export default function ProfileEditModal({
                   src={imagePreviewUrl ?? (profile.imageUrl ?? "")}
                   alt="프로필 미리보기"
                   onError={(e) => {
-                    // 이미지가 깨지면 숨김 처리
                     (e.currentTarget as HTMLImageElement).style.display = "none";
                   }}
                 />
-                <span className="profileHelp">
-                  새 파일을 선택하면 업로드됩니다. (URL 입력 방식 X)
-                </span>
+                <span className="profileHelp">새 파일을 선택하면 업로드됩니다. (URL 입력 방식 X)</span>
               </div>
             </div>
 

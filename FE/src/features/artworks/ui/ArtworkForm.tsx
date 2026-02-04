@@ -1,50 +1,67 @@
-import { useEffect, useMemo, useState } from "react";
+// FE/src/features/artworks/ui/ArtworkForm.tsx
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ArtworkCreateReq } from "../model/types";
 import { FIXED_FIELD_ID, GENRE_OPTIONS } from "../model/constants";
 
 type Mode = "create" | "edit";
 
-type Props = {
-  mode?: Mode; // create: 이미지 필수 / edit: 이미지 선택(하지만 현재 타입상 결국 필요)
-  initial?: Partial<ArtworkCreateReq>;
-  submitting?: boolean;
-  onSubmit: (data: ArtworkCreateReq) => Promise<void> | void;
+// ✅ edit 제출 값: image는 선택(optional)
+export type ArtworkFormEditValue = Omit<ArtworkCreateReq, "image"> & {
+  image?: File;
+  imageUrl?: string; // ✅ 기존 이미지 미리보기용(서버 url)
 };
+
+type Props =
+  | {
+      mode?: "create";
+      initial?: Partial<ArtworkCreateReq>;
+      submitting?: boolean;
+      onSubmit: (data: ArtworkCreateReq) => Promise<void> | void;
+    }
+  | {
+      mode: "edit";
+      initial?: Partial<ArtworkFormEditValue>;
+      submitting?: boolean;
+      onSubmit: (data: ArtworkFormEditValue) => Promise<void> | void;
+    };
 
 function splitSize(raw?: string) {
   const s = (raw ?? "").trim();
   if (!s) return { w: "", h: "" };
 
-  // "100*200" / "100×200" / "100x200" / "100 X 200" 등 방어
   const normalized = s.replace(/\s/g, "").replace("×", "*").replace(/x/gi, "*");
   const [w, h] = normalized.split("*");
   return { w: w ?? "", h: h ?? "" };
 }
 
-export default function ArtworkForm({
-  mode = "create",
-  initial,
-  submitting,
-  onSubmit,
-}: Props) {
-  const [image, setImage] = useState<File | null>(initial?.image ?? null);
-  const [previewUrl, setPreviewUrl] = useState<string>("");
+export default function ArtworkForm(props: Props) {
+  const mode: Mode = props.mode ?? "create";
+  const initial = props.initial;
+  const submitting = props.submitting;
+  const onSubmit = props.onSubmit as any;
 
-  const [tags, setTags] = useState<string>((initial?.tags ?? []).join(", "));
-  const [title, setTitle] = useState(initial?.title ?? "");
-  const [description, setDescription] = useState(initial?.description ?? "");
+  // ✅ image는 File만 관리(새로 선택한 이미지)
+  const [image, setImage] = useState<File | null>((initial as any)?.image ?? null);
+
+  // ✅ previewUrl은 서버 url(문자열) 또는 objectURL 둘 다 가능
+  const [previewUrl, setPreviewUrl] = useState<string>("");
+  const objectUrlRef = useRef<string | null>(null);
+
+  const [tags, setTags] = useState<string>(((initial as any)?.tags ?? []).join(", "));
+  const [title, setTitle] = useState((initial as any)?.title ?? "");
+  const [description, setDescription] = useState((initial as any)?.description ?? "");
 
   // ✅ fieldId는 DB에 1개라 고정 (UI는 완전 제거)
   const fieldId = FIXED_FIELD_ID;
 
   // ✅ genreId: 토글 단일 선택
-  const [genreId, setGenreId] = useState<number>(initial?.genreId ?? 1);
+  const [genreId, setGenreId] = useState<number>((initial as any)?.genreId ?? 1);
 
   // ✅ LocalDate: YYYY-MM-DD
-  const [productionDate, setProductionDate] = useState<string>(initial?.productionDate ?? "");
+  const [productionDate, setProductionDate] = useState<string>((initial as any)?.productionDate ?? "");
 
   // ✅ size: 가로/세로 입력 → 전송 시 "w*h"
-  const initSize = useMemo(() => splitSize(initial?.size), [initial?.size]);
+  const initSize = useMemo(() => splitSize((initial as any)?.size), [(initial as any)?.size]);
   const [sizeW, setSizeW] = useState(initSize.w);
   const [sizeH, setSizeH] = useState(initSize.h);
 
@@ -53,29 +70,48 @@ export default function ArtworkForm({
     [tags],
   );
 
-  // initial 이미지가 File로 들어온 경우에도 프리뷰 생성
+  // ✅ 최초 마운트 시: (1) initial.imageUrl 있으면 그대로 미리보기
+  //               (2) initial.image(File) 있으면 objectURL 만들어 미리보기
   useEffect(() => {
-    if (!image) return;
-    const url = URL.createObjectURL(image);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 최초 1회만(초기 이미지 프리뷰용)
+    // 1) 서버 이미지 url
+    const initialImageUrl = String((initial as any)?.imageUrl ?? "").trim();
+    if (initialImageUrl) {
+      setPreviewUrl(initialImageUrl);
+      return;
+    }
 
+    // 2) File로 들어온 초기 이미지(거의 create에서만)
+    if (image) {
+      const url = URL.createObjectURL(image);
+      objectUrlRef.current = url;
+      setPreviewUrl(url);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 최초 1회만
+
+  // unmount 시 objectURL만 revoke
   useEffect(() => {
     return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
     };
-  }, [previewUrl]);
+  }, []);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    // 이전 objectURL 정리
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
 
     setImage(file);
-    setPreviewUrl(URL.createObjectURL(file));
+
+    const nextUrl = URL.createObjectURL(file);
+    objectUrlRef.current = nextUrl;
+    setPreviewUrl(nextUrl);
   };
 
   const validate = () => {
@@ -94,39 +130,50 @@ export default function ArtworkForm({
     const err = validate();
     if (err) return alert(err);
 
-    const effectiveImage = image ?? initial?.image ?? null;
-    if (!effectiveImage) return alert("이미지를 선택해주세요.");
-
     const size = `${sizeW.trim()}*${sizeH.trim()}`;
 
-    await onSubmit({
+    // ✅ create는 image 필수
+    if (mode === "create") {
+      if (!image) return alert("이미지를 선택해주세요.");
+
+      const req: ArtworkCreateReq = {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        fieldId,
+        genreId,
+        productionDate: productionDate.trim(),
+        size,
+        tags: parsedTags,
+        image,
+      };
+
+      await onSubmit(req);
+      return;
+    }
+
+    // ✅ edit는 image 선택(optional)
+    const req: ArtworkFormEditValue = {
       title: title.trim(),
       description: description.trim() || undefined,
-
       fieldId,
       genreId,
-
       productionDate: productionDate.trim(),
       size,
-
       tags: parsedTags,
-      image: effectiveImage,
-    });
+      image: image ?? undefined,
+      imageUrl: String((initial as any)?.imageUrl ?? "").trim() || undefined,
+    };
+
+    await onSubmit(req);
   };
 
   return (
     <>
-      {/* ✅ 스크롤이 여기서 되도록: flex:1 + minHeight:0 + overflowY:auto */}
       <div className="pc-content" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         <div className="pc-upload-section">
           <label className="pc-upload-box">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              hidden
-              disabled={!!submitting}
-            />
+            <input type="file" accept="image/*" onChange={handleImageChange} hidden disabled={!!submitting} />
+
             {previewUrl ? (
               <img src={previewUrl} alt="Preview" className="pc-preview-img" />
             ) : (
@@ -152,9 +199,6 @@ export default function ArtworkForm({
             />
           </div>
 
-          {/* ✅ Field UI 완전 제거 */}
-
-          {/* ✅ Genre: 토글(단일 선택) */}
           <div className="pc-input-group">
             <label className="pc-label">
               Genre <span className="req">*</span>
@@ -194,7 +238,6 @@ export default function ArtworkForm({
               />
             </div>
 
-            {/* ✅ Size: 가로 × 세로 입력 */}
             <div className="pc-input-group">
               <label className="pc-label">
                 Size <span className="req">*</span>
@@ -258,14 +301,8 @@ export default function ArtworkForm({
         </div>
       </div>
 
-      {/* footer는 고정 영역 */}
       <div className="pc-footer" style={{ flexShrink: 0 }}>
-        <button
-          className="pc-submit-btn"
-          onClick={submit}
-          disabled={!!submitting}
-          type="button"
-        >
+        <button className="pc-submit-btn" onClick={submit} disabled={!!submitting} type="button">
           {submitting ? "Uploading..." : mode === "edit" ? "Save Changes" : "Publish Artwork"}
         </button>
       </div>

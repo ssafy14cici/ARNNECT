@@ -1,11 +1,11 @@
-// FE/src/features/fanLetter/ui/FanLetterSendModal.tsx
 import { useEffect, useMemo, useState } from "react";
 import "./fanLetterSendModal.css";
 
 type Props = {
   open: boolean;
   sending?: boolean;
-  artworkTitle: string;
+
+  artworkTitle?: string; // ✅ optional
   artistName: string;
 
   onClose: () => void;
@@ -25,6 +25,8 @@ export default function FanLetterSendModal({
   useEffect(() => {
     if (!open) setContent("");
   }, [open]);
+
+  const showArtwork = Boolean(String(artworkTitle ?? "").trim());
 
   const disabled = useMemo(() => {
     if (!open) return true;
@@ -56,10 +58,12 @@ export default function FanLetterSendModal({
         </header>
 
         <div className="fl-body">
-          <div className="fl-row">
-            <label className="fl-label">Artwork</label>
-            <input className="fl-input" value={artworkTitle} readOnly />
-          </div>
+          {showArtwork && (
+            <div className="fl-row">
+              <label className="fl-label">Artwork</label>
+              <input className="fl-input" value={artworkTitle ?? ""} readOnly />
+            </div>
+          )}
 
           <div className="fl-row">
             <label className="fl-label">To</label>

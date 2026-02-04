@@ -7,6 +7,7 @@ import type {
   CreateCommentInput,
   UpdateCommentInput,
 } from "../model/types";
+import { normalizeId, toParentCommentId } from "../model/types";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -14,8 +15,10 @@ function isRecord(v: unknown): v is JsonRecord {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-function asString(v: unknown, fallback = ""): string {
-  return typeof v === "string" ? v : fallback;
+/** axios 응답의 envelope({data}) / raw 모두 대응 */
+function pickData(raw: unknown): unknown {
+  if (isRecord(raw) && "data" in raw) return raw.data;
+  return raw;
 }
 
 function asNumber(v: unknown): number | null {
@@ -31,11 +34,6 @@ function normalizeTargetType(v: unknown): CommentTargetType | null {
   return null;
 }
 
-function pickData(raw: unknown): unknown {
-  if (isRecord(raw) && "data" in raw) return raw.data;
-  return raw;
-}
-
 function pickList(raw: unknown): unknown[] {
   const d = pickData(raw);
   if (Array.isArray(d)) return d;
@@ -46,43 +44,46 @@ function pickList(raw: unknown): unknown[] {
   return [];
 }
 
-type NormalizeCtx = { targetType: CommentTargetType; targetId: number };
-
-function normalizeComment(x: unknown, ctx?: NormalizeCtx): Comment | null {
+/**
+ * BE CommentResponse:
+ * {
+ *  targetType: string,
+ *  targetId: number,
+ *  commentId: number,
+ *  content: string,
+ *  nickName: string,
+ *  parentCommentId: number | null
+ * }
+ */
+function normalizeCommentFromResponse(x: unknown, ctx?: { targetType: CommentTargetType; targetId: number }): Comment | null {
   if (!isRecord(x)) return null;
 
-  const id = asString(x.id ?? x.commentId ?? "");
+  const id = normalizeId(x.commentId ?? x.id ?? x.comment_id);
   if (!id) return null;
 
-  const content = asString(x.content ?? "");
-  const parentIdRaw = x.parentId ?? x.parentCommentId ?? null;
-  const parentId =
-    parentIdRaw === null || parentIdRaw === undefined ? null : String(parentIdRaw);
+  const content = String(x.content ?? "").trim();
 
-  const createdAt = typeof x.createdAt === "string" ? x.createdAt : undefined;
+  const targetType =
+    normalizeTargetType(x.targetType) ??
+    normalizeTargetType(x.target) ??
+    ctx?.targetType ??
+    null;
 
-  const authorId =
-    typeof x.authorId === "string"
-      ? x.authorId
-      : typeof x.memberUuid === "string"
-        ? x.memberUuid
-        : undefined;
+  const targetId = asNumber(x.targetId ?? ctx?.targetId) ?? null;
+
+  const parentRaw = x.parentCommentId ?? x.parentId ?? null;
+  const parentId = parentRaw === null || parentRaw === undefined ? null : normalizeId(parentRaw);
 
   const authorName =
-    typeof x.authorName === "string"
-      ? x.authorName
+    typeof x.nickName === "string"
+      ? x.nickName
       : typeof x.nickname === "string"
         ? x.nickname
         : typeof x.name === "string"
           ? x.name
           : undefined;
 
-  // ✅ targetType/targetId: 서버가 주면 쓰고, 없으면 ctx로 채움
-  const targetType =
-    normalizeTargetType(x.targetType ?? x.target ?? x.type) ?? ctx?.targetType ?? null;
-
-  const targetId =
-    asNumber(x.targetId ?? x.target_id ?? x.idTarget ?? x.target) ?? ctx?.targetId ?? null;
+  const createdAt = typeof x.createdAt === "string" ? x.createdAt : undefined;
 
   if (!targetType || targetId === null) return null;
 
@@ -92,36 +93,41 @@ function normalizeComment(x: unknown, ctx?: NormalizeCtx): Comment | null {
     targetId,
     content,
     parentId,
-    createdAt,
-    authorId,
     authorName,
+    createdAt,
   };
 }
 
 /**
  * ✅ 목록 조회
+ * - 스샷 기준: GET /api/v1/comments?artworkId=1
+ * - 흔들릴 수 있어서 후보 쿼리 여러 개 시도
  */
 export async function listCommentsReal(
   targetType: CommentTargetType,
   targetId: number,
 ): Promise<Comment[]> {
-  // 백엔드 명세/구현이 흔들릴 수 있어서 후보 URL 여러 개 시도
-  const tryUrls: string[] =
+  const id = encodeURIComponent(String(targetId));
+
+  const candidates =
     targetType === "ARTWORK"
-      ? [`/api/v1/comments?artwork=${encodeURIComponent(String(targetId))}`]
+      ? [
+          `/api/v1/comments?artworkId=${id}`, // ✅ screenshot
+          `/api/v1/comments?artwork=${id}`,   // fallback
+          `/api/v1/comments?target=${encodeURIComponent(targetType)}&id=${id}`, // fallback
+        ]
       : [
-          `/api/v1/comments?review=${encodeURIComponent(String(targetId))}`,
-          `/api/v1/comments?target=${encodeURIComponent(targetType)}&id=${encodeURIComponent(
-            String(targetId),
-          )}`,
+          `/api/v1/comments?reviewId=${id}`, // 예상
+          `/api/v1/comments?review=${id}`,   // fallback
+          `/api/v1/comments?target=${encodeURIComponent(targetType)}&id=${id}`, // fallback
         ];
 
-  for (const u of tryUrls) {
+  for (const url of candidates) {
     try {
-      const res = await http.get(u);
+      const res = await http.get(url);
       const list = pickList(res.data);
       return list
-        .map((it) => normalizeComment(it, { targetType, targetId }))
+        .map((it) => normalizeCommentFromResponse(it, { targetType, targetId }))
         .filter((v): v is Comment => Boolean(v));
     } catch {
       // next
@@ -133,70 +139,96 @@ export async function listCommentsReal(
 
 /**
  * ✅ 댓글 수
+ * - 명세: GET /api/v1/comments/count?target=ARTWORK&id=1
  */
 export async function countCommentsReal(
   targetType: CommentTargetType,
   targetId: number,
 ): Promise<number> {
-  const res = await http.get(
-    `/api/v1/comments/count?target=${encodeURIComponent(targetType)}&id=${encodeURIComponent(
-      String(targetId),
-    )}`,
-  );
+  const t = encodeURIComponent(targetType);
+  const id = encodeURIComponent(String(targetId));
 
-  const d = pickData(res.data);
+  const candidates = [
+    `/api/v1/comments/count?target=${t}&id=${id}`,
+    `/api/v1/comments/count?targetType=${t}&targetId=${id}`,
+  ];
 
-  if (typeof d === "number") return d;
-  if (isRecord(d) && typeof d.count === "number") return d.count;
-  if (Array.isArray(d)) return d.length;
+  for (const url of candidates) {
+    try {
+      const res = await http.get(url);
+      const d = pickData(res.data);
+
+      if (typeof d === "number") return d;
+      if (isRecord(d) && typeof d.count === "number") return d.count;
+      if (isRecord(d) && typeof d.data === "number") return d.data;
+      if (Array.isArray(d)) return d.length;
+    } catch {
+      // next
+    }
+  }
 
   return 0;
 }
 
 /**
  * ✅ 생성
+ * POST /api/v1/comments
+ * body: { targetType, targetId, content, parentCommentId }
  */
 export async function createCommentReal(input: CreateCommentInput): Promise<Comment> {
   const body = {
     targetType: input.targetType,
     targetId: input.targetId,
     content: input.content,
-    parentCommentId: input.parentId ?? null,
+    parentCommentId: toParentCommentId(input.parentId ?? null),
   };
 
   const res = await http.post("/api/v1/comments", body);
   const d = pickData(res.data);
 
-  const normalized = normalizeComment(d, { targetType: input.targetType, targetId: input.targetId });
-  if (normalized) return normalized;
+  const normalized =
+    normalizeCommentFromResponse(d, { targetType: input.targetType, targetId: input.targetId }) ??
+    // 서버가 생성 결과를 안 주는 경우 fallback
+    ({
+      id: crypto.randomUUID(),
+      targetType: input.targetType,
+      targetId: input.targetId,
+      content: input.content,
+      parentId: input.parentId ?? null,
+      createdAt: new Date().toISOString(),
+    } as Comment);
 
-  // 서버가 생성 댓글을 안 주는 케이스 fallback
-  return {
-    id: asString((d as any)?.id ?? (d as any)?.commentId ?? crypto.randomUUID()),
-    targetType: input.targetType,
-    targetId: input.targetId,
-    content: input.content,
-    parentId: input.parentId ?? null,
-    createdAt: new Date().toISOString(),
-    authorId: undefined,
-    authorName: undefined,
-  };
+  return normalized;
 }
 
 /**
  * ✅ 수정
+ * PUT /api/v1/comments/{commentId}
+ * - UpdateCommentRequest에 commentId가 body에도 있어서, 우선 둘 다 보내고
+ *   400/422면 content만 보내는 fallback
  */
-export async function updateCommentReal(
-  commentId: CommentId,
-  patch: UpdateCommentInput,
-): Promise<void> {
-  await http.put(`/api/v1/comments/${encodeURIComponent(String(commentId))}`, {
-    content: patch.content,
-  });
+export async function updateCommentReal(commentId: CommentId, patch: UpdateCommentInput): Promise<void> {
+  const pathId = encodeURIComponent(String(commentId));
+  const numeric = asNumber(commentId);
+
+  try {
+    await http.put(`/api/v1/comments/${pathId}`, {
+      commentId: numeric ?? undefined,
+      content: patch.content,
+    });
+  } catch (e: any) {
+    const status = e?.response?.status;
+    if (status === 400 || status === 422) {
+      await http.put(`/api/v1/comments/${pathId}`, { content: patch.content });
+      return;
+    }
+    throw e;
+  }
 }
 
 /**
  * ✅ 삭제
+ * DELETE /api/v1/comments/{commentId}
  */
 export async function deleteCommentReal(commentId: CommentId): Promise<void> {
   await http.delete(`/api/v1/comments/${encodeURIComponent(String(commentId))}`);

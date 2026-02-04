@@ -1,6 +1,7 @@
 // FE/src/pages/artwork/ArtworkDetail.tsx
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
+
 import { useAuthStore } from "../../features/auth/store";
 import { http } from "../../shared/api/http";
 import { sendFanLetter } from "../../features/fanLetter/api";
@@ -39,6 +40,16 @@ function asNumber(v: unknown, fallback = 0): number {
   }
   return fallback;
 }
+function asBool(v: unknown, fallback = false): boolean {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v !== 0;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (s === "true" || s === "1" || s === "yes" || s === "y") return true;
+    if (s === "false" || s === "0" || s === "no" || s === "n") return false;
+  }
+  return fallback;
+}
 function asStringArray(v: unknown): string[] {
   if (Array.isArray(v)) {
     return v
@@ -61,8 +72,8 @@ function normalizeArtworkId(raw: unknown): string {
 
 /**
  * ✅ 이미지 URL 정규화
- * - BE가 https://domain/artwork/uuid (절대 URL)로 주면 그대로 사용
- * - 혹시 /artwork/uuid 또는 artwork/uuid 같은 상대경로가 섞여도 안전하게 보정
+ * - BE가 https://domain/... (절대 URL)로 주면 그대로 사용
+ * - /review/xxx, review/xxx 같은 상대경로가 섞여도 origin 붙여서 보정
  *
  * NOTE:
  * - 이미지 경로가 API_BASE(/api/v1)랑 다를 수 있어서 origin만 사용
@@ -125,18 +136,26 @@ async function fetchImageAsObjectUrl(imageUrl: string): Promise<string | null> {
 }
 
 const ARTWORK_DETAIL_PATH = "/api/v1/artworks";
+const REVIEWS_BY_ARTWORK_PATH = "/api/v1/reviews";
+const FAVORITES_TOGGLE_PATH = "/api/v1/favorites";
 
-// ------------------- Mapper -------------------
+// ------------------- Artwork Mapper -------------------
 type ArtworkDetailData = {
   id: string | number;
-  src: string; // ✅ 항상 "최종 사용 가능한" URL(또는 경로)
+  src: string;
   title: string;
   artist: string;
   description: string;
   tags: string[];
+
+  // ✅ 오너 판별에 쓰는 값: "작품의 작가 member uuid"
   artistMemberUuid?: string;
   artistId?: string;
   artistName?: string;
+
+  // ✅ 좋아요 초기값(서버가 내려주면 사용)
+  favoriteCount?: number;
+  isFavorited?: boolean;
 };
 
 function mapArtworkDetail(payload: unknown): ArtworkDetailData | null {
@@ -156,7 +175,6 @@ function mapArtworkDetail(payload: unknown): ArtworkDetailData | null {
     asString(get(body, "thumbnailUrl"), "") ||
     asString(get(body, "src"), "");
 
-  // ✅ BE가 https://domain/artwork/uuid 로 주는 케이스면 그대로 유지됨
   const src = resolveMediaUrl(rawSrc);
 
   const tags = asStringArray(get(body, "tags")) || asStringArray(get(body, "tagList")) || [];
@@ -165,6 +183,7 @@ function mapArtworkDetail(payload: unknown): ArtworkDetailData | null {
     asString(get(body, "artistMemberUuid"), "") ||
     asString(get(body, "artistUuid"), "") ||
     asString(get(body, "artistId"), "") ||
+    asString(get(body, "memberUuid"), "") ||
     "";
 
   const artistName =
@@ -174,6 +193,12 @@ function mapArtworkDetail(payload: unknown): ArtworkDetailData | null {
     "";
 
   const artist = artistName || (artistMemberUuid ? `ARTIST ${artistMemberUuid.slice(0, 4)}` : "Unknown");
+
+  // ✅ 좋아요 값(있으면)
+  const favoriteCount =
+    asNumber(get(body, "favoriteCount"), asNumber(get(body, "likeCount"), asNumber(get(body, "count"), NaN)));
+  const isFavorited =
+    asBool(get(body, "isFavorited"), asBool(get(body, "favorited"), asBool(get(body, "isFavorite"), false)));
 
   if (!id || !src) return null;
 
@@ -187,12 +212,82 @@ function mapArtworkDetail(payload: unknown): ArtworkDetailData | null {
     artistMemberUuid: artistMemberUuid || undefined,
     artistId: artistMemberUuid || undefined,
     artistName: artistName || undefined,
+    favoriteCount: Number.isFinite(favoriteCount) ? favoriteCount : undefined,
+    isFavorited: typeof isFavorited === "boolean" ? isFavorited : undefined,
   };
+}
+
+// ------------------- Reviews List Mapper -------------------
+type ReviewSummary = {
+  reviewId: string | number;
+  title: string;
+  imageUrl?: string;
+};
+
+function mapReviewSummary(v: unknown): ReviewSummary | null {
+  if (!isObject(v)) return null;
+
+  const reviewIdRaw = get(v, "reviewId") ?? get(v, "id");
+  const reviewId = typeof reviewIdRaw === "number" ? reviewIdRaw : asString(reviewIdRaw, "").trim();
+  if (!reviewId && reviewId !== 0) return null;
+
+  const title = asString(get(v, "title"), "Untitled");
+  const imageUrl = asString(get(v, "imageUrl"), "").trim();
+
+  return {
+    reviewId,
+    title,
+    imageUrl: imageUrl || undefined,
+  };
+}
+
+function mapReviewList(payload: unknown): ReviewSummary[] {
+  const body = pickEnvelopeData(payload);
+
+  if (Array.isArray(body)) {
+    return body.map(mapReviewSummary).filter(Boolean) as ReviewSummary[];
+  }
+
+  if (isObject(body)) {
+    const arr = get(body, "items") ?? get(body, "reviews") ?? get(body, "content") ?? get(body, "list");
+    if (Array.isArray(arr)) {
+      return arr.map(mapReviewSummary).filter(Boolean) as ReviewSummary[];
+    }
+  }
+
+  return [];
+}
+
+// ------------------- Favorites(Toggle) -------------------
+type FavoriteToggleResult = {
+  isFavorited?: boolean;
+  favoriteCount?: number;
+};
+
+function parseFavoriteToggleResult(payload: unknown): FavoriteToggleResult {
+  const body = pickEnvelopeData(payload);
+  if (!isObject(body)) return {};
+
+  const isFavorited =
+    asBool(get(body, "isFavorited"), asBool(get(body, "favorited"), asBool(get(body, "isFavorite"), undefined as any)));
+
+  const favoriteCount =
+    asNumber(get(body, "favoriteCount"), asNumber(get(body, "likeCount"), asNumber(get(body, "count"), undefined as any)));
+
+  const out: FavoriteToggleResult = {};
+  if (typeof isFavorited === "boolean") out.isFavorited = isFavorited;
+  if (typeof favoriteCount === "number" && Number.isFinite(favoriteCount)) out.favoriteCount = favoriteCount;
+  return out;
+}
+
+async function toggleFavoriteOnServer(artworkId: number): Promise<FavoriteToggleResult> {
+  const res = await http.post(FAVORITES_TOGGLE_PATH, { artworkId });
+  const payload = isObject(res) && "data" in res ? (res as { data: unknown }).data : (res as unknown);
+  return parseFavoriteToggleResult(payload);
 }
 
 // ------------------- [Main Component] -------------------
 export default function ArtworkDetail() {
-  // 1. Hooks & State
   const { artworkId = "" } = useParams<{ artworkId: string }>();
   const navigate = useNavigate();
 
@@ -203,6 +298,11 @@ export default function ArtworkDetail() {
   // Data State
   const [artwork, setArtwork] = useState<ArtworkDetailData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Reviews
+  const [reviews, setReviews] = useState<ReviewSummary[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState<string | null>(null);
 
   // UI State
   const [imageError, setImageError] = useState(false);
@@ -224,32 +324,17 @@ export default function ArtworkDetail() {
   const blobUrlRef = useRef<string | null>(null);
   const [triedAuthBlob, setTriedAuthBlob] = useState(false);
 
-  // Mock Data (비슷한 작품 & 추천 작품)
-  const similarArtworks = useMemo(
-    () => [
-      { id: 101, title: "Abstract Blue", src: "https://via.placeholder.com/300x400/111/555" },
-      { id: 102, title: "Golden Age", src: "https://via.placeholder.com/300x400/222/666" },
-      { id: 103, title: "Silence", src: "https://via.placeholder.com/300x400/333/777" },
-      { id: 104, title: "Void", src: "https://via.placeholder.com/300x400/444/888" },
-    ],
-    [],
-  );
-
-  const recommendArtworks = useMemo(
-    () => [
-      { id: 201, title: "Red Dot", src: "https://via.placeholder.com/300x400/555/999" },
-      { id: 202, title: "Lines", src: "https://via.placeholder.com/300x400/666/aaa" },
-      { id: 203, title: "Chaos", src: "https://via.placeholder.com/300x400/777/bbb" },
-      { id: 204, title: "Order", src: "https://via.placeholder.com/300x400/888/ccc" },
-    ],
-    [],
-  );
-
-  // 2. Computations
   const numericArtworkId = useMemo(() => {
     const n = parseInt(String(normalizedArtworkId), 10);
     return Number.isFinite(n) ? n : undefined;
   }, [normalizedArtworkId]);
+
+  // ✅ 내 작품 판별: "현재 로그인 user.memberUuid" === "작품의 artistMemberUuid"
+  const isOwner = useMemo(() => {
+    const me = String(user?.memberUuid ?? "").trim();
+    const owner = String(artwork?.artistMemberUuid ?? artwork?.artistId ?? "").trim();
+    return !!me && !!owner && me === owner;
+  }, [user?.memberUuid, artwork?.artistMemberUuid, artwork?.artistId]);
 
   const rootComments = useMemo(() => comments.filter((c) => c.parentId == null), [comments]);
 
@@ -264,11 +349,11 @@ export default function ArtworkDetail() {
     return m;
   }, [comments]);
 
-  // 3. Effects
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [normalizedArtworkId]);
 
+  // ✅ 작품 상세
   useEffect(() => {
     let cancelled = false;
 
@@ -296,8 +381,14 @@ export default function ArtworkDetail() {
 
         setArtwork(mapped);
 
-        // ✅ 기본은 BE가 준 절대 URL을 그대로 표시
+        // ✅ 기본은 BE가 준 URL을 그대로 표시
         if (mapped?.src) setDisplayImgSrc(mapped.src);
+
+        // ✅ 좋아요 초기값(서버가 주면 동기화)
+        if (typeof mapped?.isFavorited === "boolean") setIsLiked(mapped.isFavorited);
+        if (typeof mapped?.favoriteCount === "number" && Number.isFinite(mapped.favoriteCount)) {
+          setLikeCount(mapped.favoriteCount);
+        }
       } catch (e) {
         console.error(e);
         if (cancelled) return;
@@ -312,6 +403,40 @@ export default function ArtworkDetail() {
     };
   }, [normalizedArtworkId]);
 
+  // ✅ 작품 감상평 리스트
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const safeId = numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
+      if (!safeId || !Number.isFinite(safeId)) return;
+
+      try {
+        setReviewsLoading(true);
+        setReviewsError(null);
+
+        const res = await http.get(`${REVIEWS_BY_ARTWORK_PATH}?artworkId=${encodeURIComponent(String(safeId))}`);
+        const payload = isObject(res) && "data" in res ? (res as { data: unknown }).data : (res as unknown);
+
+        const list = mapReviewList(payload);
+
+        if (cancelled) return;
+        setReviews(list);
+      } catch (e) {
+        console.error(e);
+        if (cancelled) return;
+        setReviews([]);
+        setReviewsError("감상평을 불러오지 못했습니다.");
+      } finally {
+        if (!cancelled) setReviewsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [numericArtworkId, artwork?.id]);
+
   useEffect(() => {
     if (!isLoading && !artwork) {
       const timer = setTimeout(() => navigate("/", { replace: true }), 1200);
@@ -319,12 +444,37 @@ export default function ArtworkDetail() {
     }
   }, [artwork, isLoading, navigate]);
 
-  // 4. Handlers
-  const handleLike = () => {
-    setIsLiked((prev) => {
-      setLikeCount((cnt) => (prev ? cnt - 1 : cnt + 1));
-      return !prev;
-    });
+  // ------------------- Handlers -------------------
+  const handleToggleFavorite = async () => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+
+    const safeId =
+      numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
+    if (!safeId || !Number.isFinite(safeId)) return;
+
+    // ✅ 옵티미스틱 업데이트
+    const prevLiked = isLiked;
+    const prevCount = likeCount;
+
+    const nextLiked = !prevLiked;
+    setIsLiked(nextLiked);
+    setLikeCount((c) => (nextLiked ? c + 1 : Math.max(0, c - 1)));
+
+    try {
+      const result = await toggleFavoriteOnServer(safeId);
+
+      // ✅ 서버가 최종값 내려주면 동기화
+      if (typeof result.isFavorited === "boolean") setIsLiked(result.isFavorited);
+      if (typeof result.favoriteCount === "number" && Number.isFinite(result.favoriteCount)) {
+        setLikeCount(result.favoriteCount);
+      }
+    } catch (e) {
+      console.error(e);
+      // ❌ 실패 시 롤백
+      setIsLiked(prevLiked);
+      setLikeCount(prevCount);
+      alert("좋아요 처리 실패");
+    }
   };
 
   const addComment = (content: string) => {
@@ -387,18 +537,41 @@ export default function ArtworkDetail() {
     }
   };
 
+  const onDeleteArtwork = async () => {
+    if (!artwork) return;
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+    if (!isOwner) return alert("본인 작품만 삭제할 수 있습니다.");
+    if (!window.confirm("정말 삭제하시겠습니까?")) return;
+
+    try {
+      const id = normalizedArtworkId || String(artwork.id);
+      await http.delete(`${ARTWORK_DETAIL_PATH}/${id}`);
+      alert("삭제되었습니다.");
+      navigate("/", { replace: true });
+    } catch (e) {
+      console.error(e);
+      alert("삭제 중 오류가 발생했습니다.");
+    }
+  };
+
   const goHome = () => navigate("/");
-  const goArtwork = (id: string) => navigate(`/artworks/${id}`);
+  const goReview = (id: string | number) => navigate(`/reviews/${id}`);
+
+  // ✅ 유저가 말한 edit 이동 경로: /artworks/:artworkId
+  const goEditArtwork = () => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+    if (!isOwner) return alert("본인 작품만 수정할 수 있습니다.");
+    navigate(`/artworks/${normalizedArtworkId}`);
+  };
 
   /**
-   * ✅ 이미지 로딩 실패 시 fallback:
-   * - 첫 실패: (인증 필요할 수 있으니) 토큰 포함 fetch로 blob 받아 objectURL 적용 시도
+   * ✅ hero 이미지 로딩 실패 시 fallback:
+   * - 첫 실패: 토큰 포함 fetch로 blob 받아 objectURL 적용 시도
    * - 두 번째 실패: 최종 imageError 처리
    */
   const handleImageError = async () => {
     if (imageError) return;
 
-    // 이미 blob fallback 시도했으면 종료
     if (triedAuthBlob) {
       setImageError(true);
       return;
@@ -406,7 +579,6 @@ export default function ArtworkDetail() {
 
     setTriedAuthBlob(true);
 
-    // artwork/src 없으면 실패 처리
     const raw = artwork?.src ?? "";
     if (!raw) {
       setImageError(true);
@@ -419,7 +591,6 @@ export default function ArtworkDetail() {
       return;
     }
 
-    // 이전 blob URL 정리
     if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
     blobUrlRef.current = objUrl;
 
@@ -435,7 +606,7 @@ export default function ArtworkDetail() {
     };
   }, []);
 
-  // 5. Render
+  // ------------------- Render -------------------
   if (isLoading) {
     return (
       <div className="artwork-detail-page" style={{ display: "grid", placeItems: "center" }}>
@@ -481,7 +652,6 @@ export default function ArtworkDetail() {
           </div>
         </div>
 
-        {/* Scroll Indicator */}
         <div className="scroll-indicator">
           <span>Scroll</span>
           <div className="scroll-line"></div>
@@ -493,14 +663,18 @@ export default function ArtworkDetail() {
         <div className="content-wrapper">
           {/* Action Bar */}
           <div className="action-bar">
-            <div className="action-left">{/* 필요 시 여기에 추가 정보 배치 */}</div>
+            <div className="action-left" />
+
             <div className="action-right">
-              <button className={`btn-icon ${isLiked ? "active" : ""}`} onClick={handleLike}>
+              {/* ✅ 좋아요: 서버 토글로 교체 */}
+              <button className={`btn-icon ${isLiked ? "active" : ""}`} onClick={handleToggleFavorite}>
                 {isLiked ? "♥" : "♡"} {likeCount}
               </button>
+
               <button className="btn-icon" onClick={() => setIsFollowing(!isFollowing)}>
                 {isFollowing ? "Following" : "Follow"}
               </button>
+
               <button
                 className="btn-icon gold"
                 onClick={() => {
@@ -510,6 +684,18 @@ export default function ArtworkDetail() {
               >
                 ✉ FanLetter
               </button>
+
+              {/* ✅ 내 작품이면 수정/삭제 노출 */}
+              {isOwner && (
+                <>
+                  <button className="btn-icon" type="button" onClick={goEditArtwork}>
+                    Edit
+                  </button>
+                  <button className="btn-icon" type="button" onClick={onDeleteArtwork}>
+                    Delete
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -523,39 +709,57 @@ export default function ArtworkDetail() {
                 </span>
               ))}
             </div>
+
+            {/* 디버깅 필요하면 잠깐 켜기
+            <pre style={{ fontSize: 12, opacity: 0.7 }}>
+              me: {String(user?.memberUuid ?? "")} / owner: {String(artwork.artistMemberUuid ?? "")}
+            </pre>
+            */}
           </section>
 
-          {/* Similar Artworks */}
+          {/* ✅ 작품의 감상평 리스트 */}
           <section className="discovery-section">
-            <h3 className="section-title">Similar Works</h3>
-            <div className="artwork-grid">
-              {similarArtworks.map((a: any) => (
-                <button key={a.id} type="button" className="grid-card" onClick={() => goArtwork(String(a.id))}>
-                  <div className="card-thumb">
-                    <img src={a.src || artwork.src} alt={a.title} />
-                  </div>
-                  <div className="card-info">{a.title ?? "Untitled"}</div>
-                </button>
-              ))}
-            </div>
+            <h3 className="section-title">Reviews</h3>
+
+            {reviewsLoading ? (
+              <div style={{ opacity: 0.7 }}>Loading reviews...</div>
+            ) : reviewsError ? (
+              <div style={{ opacity: 0.7 }}>{reviewsError}</div>
+            ) : reviews.length === 0 ? (
+              <div style={{ opacity: 0.7 }}>등록된 감상평이 없습니다.</div>
+            ) : (
+              <div className="artwork-grid">
+                {reviews.map((r) => (
+                  <button
+                    key={String(r.reviewId)}
+                    type="button"
+                    className="grid-card"
+                    onClick={() => goReview(r.reviewId)}
+                  >
+                    <div className="card-thumb">
+                      {r.imageUrl ? (
+                        <img
+                          src={resolveMediaUrl(r.imageUrl)}
+                          alt={r.title}
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <div style={{ width: "100%", height: 180, background: "#111", opacity: 0.15 }} />
+                      )}
+                    </div>
+
+                    <div className="card-info" style={{ display: "grid", gap: 4 }}>
+                      <div>{r.title ?? "Untitled"}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </section>
 
-          {/* Recommended Artworks */}
-          <section className="discovery-section">
-            <h3 className="section-title">You may also like</h3>
-            <div className="artwork-grid">
-              {recommendArtworks.map((a: any) => (
-                <button key={a.id} type="button" className="grid-card" onClick={() => goArtwork(String(a.id))}>
-                  <div className="card-thumb">
-                    <img src={a.src || artwork.src} alt={a.title} />
-                  </div>
-                  <div className="card-info">{a.title ?? "Untitled"}</div>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          {/* Comments Section */}
+          {/* Comments Section (아직 로컬 state) */}
           <section className="comments-container">
             <h3 className="section-title" style={{ fontSize: "1.5rem", marginBottom: 20 }}>
               Comments ({comments.length})

@@ -1,5 +1,4 @@
-//FE/src/features/reviews/ui/ReviewForm.tsx
-
+// FE/src/features/reviews/ui/ReviewForm.tsx
 import { useEffect, useMemo, useState } from "react";
 import type { ReviewCreateReq } from "../model/types";
 
@@ -46,7 +45,11 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
     if (!imageFile) return "이미지를 선택해주세요.";
     if (!reviewTitle.trim()) return "제목을 입력해주세요.";
     if (!reviewText.trim()) return "내용을 입력해주세요.";
-    if (!artworkId.trim() && isNaN(Number(artworkId))) return "작품 ID는 숫자여야 합니다.";
+
+    if (!artworkId.trim()) return "작품 ID를 입력해주세요.";
+    const n = Number(artworkId);
+    if (!Number.isFinite(n)) return "작품 ID는 숫자여야 합니다.";
+
     return null;
   };
 
@@ -54,34 +57,23 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
     const err = validate();
     if (err) return alert(err);
 
-    // ✅ 필수값만 먼저 담기
     const payload: ReviewCreateReq = {
       title: reviewTitle.trim(),
       content: reviewText.trim(),
-      imageFile: imageFile!, // validate에서 이미지 체크하니까 ! 사용 OK
+      artworkId: Number(artworkId),
+      tags: parsedTags,            // ✅ 항상 보냄(없으면 [])
+      imageFile: imageFile!,       // validate에서 체크
     };
-
-    // ✅ artworkId: 입력했을 때만 넣기 (비었으면 아예 필드 없음)
-    if (artworkId.trim()) {
-      payload.artworkId = Number(artworkId);
-    }
-
-    // ✅ tags: 입력이 있을 때만 넣기 (없으면 아예 필드 없음 = 서버에서 null/empty 취급)
-    if (parsedTags.length > 0) {
-      payload.tags = parsedTags;
-    }
 
     await onSubmit(payload);
   };
-
-
 
   return (
     <>
       <div className="pc-content">
         <div className="pc-upload-section">
           <label className="pc-upload-box">
-            <input type="file" accept="image/*" onChange={handleImageChange} hidden />
+            <input type="file" accept="image/*" onChange={handleImageChange} hidden disabled={!!submitting} />
             {previewUrl ? (
               <img src={previewUrl} alt="Preview" className="pc-preview-img" />
             ) : (
@@ -103,6 +95,7 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
               value={reviewTitle}
               onChange={(e) => setReviewTitle(e.target.value)}
               placeholder="Title of your review"
+              disabled={!!submitting}
             />
           </div>
 
@@ -116,6 +109,7 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
               onChange={(e) => setArtworkId(e.target.value)}
               placeholder="Target Artwork ID"
               type="number"
+              disabled={!!submitting}
             />
           </div>
 
@@ -129,6 +123,7 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
               onChange={(e) => setReviewText(e.target.value)}
               rows={8}
               placeholder="Share your thoughts..."
+              disabled={!!submitting}
             />
           </div>
 
@@ -139,6 +134,7 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
               value={tags}
               onChange={(e) => setTags(e.target.value)}
               placeholder="art, exhibition, mood (comma separated)"
+              disabled={!!submitting}
             />
             {parsedTags.length > 0 && (
               <div className="pc-tags-preview">

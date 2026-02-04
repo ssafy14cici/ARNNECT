@@ -3,11 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 import "./fanLetter.css";
 
 import { useAuthStore } from "../../../features/auth/store";
-import type { FanLetterFilter, FanLetterViewMode, FanLetter as FanLetterModel } from "../../../features/fanLetter/types";
-import { answerFanLetter, listFanLettersForArtist, subscribeFanLettersUpdated } from "../../../features/fanLetter/api";
+import type { FanLetter as FanLetterModel } from "../../../features/fanLetter/types";
+import { createFanLetterAnswer, fetchArtistFanLetters } from "../../../features/fanLetter/api";
+
+type FanLetterViewMode = "postit" | "list";
+type FanLetterFilter = "all" | "unanswered" | "answered";
 
 function formatDate(s: string) {
-  // yyyy-MM-dd or ISO -> 보기 좋게
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return s;
   return d.toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" });
@@ -29,23 +31,29 @@ export default function FanLetter() {
   const [answerText, setAnswerText] = useState("");
   const [sending, setSending] = useState(false);
 
+  const canUse = role === "artist" && Boolean(artistMemberUuid);
+
   const refetch = async () => {
     if (!artistMemberUuid) return;
+
     setLoading(true);
     try {
-      const data = await listFanLettersForArtist(artistMemberUuid);
+      const data = await fetchArtistFanLetters(artistMemberUuid);
       setItems(data);
+    } catch (e) {
+      console.error(e);
+      setItems([]);
+      alert("팬레터 목록 조회에 실패했습니다.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (!canUse) return;
     refetch();
-    const unsub = subscribeFanLettersUpdated(() => refetch());
-    return () => unsub?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [artistMemberUuid]);
+  }, [artistMemberUuid, canUse]);
 
   const filtered = useMemo(() => {
     const base =
@@ -62,8 +70,6 @@ export default function FanLetter() {
     });
   }, [items, filter]);
 
-  const canUse = role === "artist" && Boolean(artistMemberUuid);
-
   const openReply = (id: number) => {
     setReplyingId(id);
     setAnswerText("");
@@ -76,13 +82,14 @@ export default function FanLetter() {
   };
 
   const submitAnswer = async () => {
-    if (!replyingId) return;
+    if (replyingId == null) return;
+
     const txt = answerText.trim();
     if (!txt) return alert("답변 내용을 입력해주세요.");
 
     setSending(true);
     try {
-      await answerFanLetter(replyingId, { answer: txt });
+      await createFanLetterAnswer(replyingId, txt);
       alert("답변이 등록되었습니다.");
       closeReply();
       await refetch();
@@ -127,13 +134,25 @@ export default function FanLetter() {
           </div>
 
           <div className="filters">
-            <button type="button" className={`filterBtn ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>
+            <button
+              type="button"
+              className={`filterBtn ${filter === "all" ? "active" : ""}`}
+              onClick={() => setFilter("all")}
+            >
               All
             </button>
-            <button type="button" className={`filterBtn ${filter === "unanswered" ? "active" : ""}`} onClick={() => setFilter("unanswered")}>
+            <button
+              type="button"
+              className={`filterBtn ${filter === "unanswered" ? "active" : ""}`}
+              onClick={() => setFilter("unanswered")}
+            >
               Unanswered
             </button>
-            <button type="button" className={`filterBtn ${filter === "answered" ? "active" : ""}`} onClick={() => setFilter("answered")}>
+            <button
+              type="button"
+              className={`filterBtn ${filter === "answered" ? "active" : ""}`}
+              onClick={() => setFilter("answered")}
+            >
               Answered
             </button>
           </div>
@@ -204,7 +223,12 @@ export default function FanLetter() {
               <button type="button" className="replyBtn ghost" onClick={closeReply} disabled={sending}>
                 Cancel
               </button>
-              <button type="button" className="replyBtn primary" onClick={submitAnswer} disabled={sending || !answerText.trim()}>
+              <button
+                type="button"
+                className="replyBtn primary"
+                onClick={submitAnswer}
+                disabled={sending || !answerText.trim()}
+              >
                 {sending ? "Saving..." : "Save"}
               </button>
             </footer>

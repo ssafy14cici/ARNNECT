@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { http } from "../../shared/api/http";
-import ArtworkForm from "../../features/artworks/ui/ArtworkForm";
+import ArtworkForm, { type ArtworkFormEditValue } from "../../features/artworks/ui/ArtworkForm";
 import { updateArtwork, deleteArtwork } from "../../features/artworks/api";
 import { FIXED_FIELD_ID } from "../../features/artworks/model/constants";
 import type { ArtworkUpdateReq } from "../../features/artworks/model/types";
@@ -15,6 +15,7 @@ type Detail = {
   productionDate?: string; // "YYYY-MM-DD"
   size?: string;
   tags?: string[];
+  imageUrl?: string; // ✅ 기존 이미지 미리보기
 };
 
 export default function ArtworkEdit() {
@@ -31,19 +32,20 @@ export default function ArtworkEdit() {
 
     (async () => {
       if (!normalizedId) return;
+
       setLoading(true);
       try {
         const res = await http.get(`/api/v1/artworks/${normalizedId}`);
-        const payload = (res && typeof res === "object" && "data" in res) ? (res as any).data : res;
+        const payload = res && typeof res === "object" && "data" in res ? (res as any).data : res;
 
-        // ⚠️ 여기 매핑은 실제 DetailArtworkResponse 필드명에 맞춰 조정 필요
         const d: Detail = {
           title: payload?.title ?? "",
-          description: payload?.description ?? "",
-          genreId: payload?.genreId ?? undefined,
-          productionDate: payload?.productionDate ?? "", // LocalDate면 보통 "YYYY-MM-DD"
+          description: payload?.description ?? payload?.content ?? "",
+          genreId: payload?.genreId ?? 1,
+          productionDate: payload?.productionDate ?? "",
           size: payload?.size ?? "",
           tags: payload?.tags ?? [],
+          imageUrl: payload?.imageUrl ?? payload?.thumbnailUrl ?? "",
         };
 
         if (!cancelled) setInitial(d);
@@ -60,17 +62,20 @@ export default function ArtworkEdit() {
     };
   }, [normalizedId]);
 
-  const onSave = async (form: any) => {
-    // form을 ArtworkUpdateReq로 맞춰서 들어오게(ArtworkForm 수정 후)
+  const onSave = async (form: ArtworkFormEditValue) => {
+    if (!normalizedId) return;
+
+    // ✅ TS 에러 해결 포인트:
+    // ArtworkUpdateReq는 string 필수인데, form 값은 string|undefined일 수 있으니 ""로 보정
     const req: ArtworkUpdateReq = {
-      title: form.title,
-      description: form.description,
+      title: form.title ?? "",
+      description: form.description ?? "",
       fieldId: FIXED_FIELD_ID,
-      genreId: form.genreId,
-      productionDate: form.productionDate,
-      size: form.size,
-      tags: form.tags,
-      image: form.image, // 선택
+      genreId: form.genreId ?? 1,
+      productionDate: form.productionDate ?? "",
+      size: form.size ?? "",
+      tags: form.tags ?? [],
+      image: form.image ?? undefined, // ✅ 선택(optional)
     };
 
     setLoading(true);
@@ -87,7 +92,9 @@ export default function ArtworkEdit() {
   };
 
   const onDelete = async () => {
+    if (!normalizedId) return;
     if (!window.confirm("삭제하시겠습니까?")) return;
+
     setLoading(true);
     try {
       await deleteArtwork(normalizedId);
@@ -128,8 +135,8 @@ export default function ArtworkEdit() {
           </div>
         </header>
 
-        {/* ✅ ArtworkForm이 edit 모드/initial 지원하게 수정되어 있어야 함 */}
-        <ArtworkForm submitting={loading} onSubmit={onSave} initial={initial as any} />
+        {/* ✅ edit 모드 */}
+        <ArtworkForm mode="edit" submitting={loading} onSubmit={onSave} initial={initial ?? undefined} />
       </div>
     </div>
   );
