@@ -49,6 +49,7 @@ public interface ArtworkRepository extends JpaRepository<Artwork, Long> {
     		where fa.artwork_id = a.artwork_id and fa.is_favorite=1) as like_count
     from artwork a
     left join member m on m.member_id = a.member_id
+    where a.is_deleted = false
     order by a.artwork_id DESC;
     """, nativeQuery = true)
     List<ArtworkResponse> findAllOrderDesc();
@@ -66,7 +67,7 @@ public interface ArtworkRepository extends JpaRepository<Artwork, Long> {
             where fa.artwork_id = a.artwork_id and fa.is_favorite=1) as like_count
     from artwork a\s
     left join member m on m.member_id = a.member_id\s
-    where m.member_uuid = :memberUuid
+    where m.member_uuid = :memberUuid and a.is_deleted = false
     order by a.artwork_id DESC;
     """, nativeQuery = true)
     List<ArtworkResponse> findArtworkByArtist(@Param("memberUuid") String memberUuid);
