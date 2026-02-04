@@ -84,7 +84,8 @@ export default function FanLetterCompose() {
       try {
         // ✅ baseURL에 /api/v1 포함이면 '/artworks/:id'
         // (미포함이면 '/api/v1/artworks/:id' 로 변경)
-        const res = await http.get(`/artworks/${artworkIdNum}`);
+        const res = await http.get(`/api/v1/artworks/${artworkIdNum}`);
+
 
         const payload =
           isObject(res) && "data" in res ? (res as { data: unknown }).data : (res as unknown);

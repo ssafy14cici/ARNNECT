@@ -1,6 +1,6 @@
 // FE/src/pages/hall/Hall.tsx
 import "../../styles/home.css";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { mountMainHallFree } from "../../museum/viewer/mainHallFree";
@@ -17,6 +17,9 @@ export default function Hall() {
 
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // 가이드 토글 상태 (false: info.png, true: how.png)
+  const [showGuide, setShowGuide] = useState(false);
 
   // 다른 페이지에서 Hall로 돌아올 때 startWaypointId를 state로 넘길 수 있음
   const startWaypointId = (location.state as any)?.startWaypointId ?? 0;
@@ -41,7 +44,7 @@ export default function Hall() {
 
     // ✅ 3D 메인홀 마운트
     const rt = mountMainHallFree(canvas, {
-      glbUrl: asset("museum/models/museum/mh_add_5.glb"),
+      glbUrl: asset("museum/models/museum/mh.glb"),
       startWaypointId,
       uiMount: uiLayer,
 
@@ -52,7 +55,7 @@ export default function Hall() {
 
       /**
        * ✅ "전시보러가기" 버튼을 눌렀을 때 mainHallFree.ts가 이 콜백을 호출한다.
-       * 여기서 React Router로 페이지 이동을 처리해줘야 함.
+       * 여기서 React Router로 페이지 이동을 처리해주세요야 함.
        */
       onOpenExhibit: ({ artId, artist, artworkTitle, fromWaypointId }) => {
         console.log("[Hall] onOpenExhibit:", {
@@ -98,6 +101,49 @@ export default function Hall() {
         ref={canvasRef}
         style={{ width: "100%", height: "100%", display: "block" }}
       />
+
+      {/* 가이드 토글 버튼 */}
+      {!showGuide && (
+        <img
+          src={asset("info.png")}
+          alt="가이드 보기"
+          className="hall-guide-overlay"
+          onClick={() => setShowGuide(true)}
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            right: "24px",
+            opacity: 0.5,
+            cursor: "pointer",
+            zIndex: 9980,
+            width: "40px",
+            height: "auto",
+            transition: "opacity 0.2s",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.5")}
+        />
+      )}
+
+      {/* 조작 가이드 오버레이 */}
+      {showGuide && (
+        <img
+          src={asset("how.png")}
+          alt="조작 가이드"
+          className="hall-guide-overlay"
+          onClick={() => setShowGuide(false)}
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            right: "24px",
+            opacity: 0.85,
+            cursor: "pointer",
+            zIndex: 9980,
+            width: "45%",
+            height: "auto",
+          }}
+        />
+      )}
     </div>
   );
 }

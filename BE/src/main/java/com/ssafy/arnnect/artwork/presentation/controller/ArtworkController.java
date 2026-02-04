@@ -2,11 +2,8 @@ package com.ssafy.arnnect.artwork.presentation.controller;
 
 import com.ssafy.arnnect.artwork.application.dto.request.CreateArtworkRequest;
 import com.ssafy.arnnect.artwork.application.dto.request.UpdateArtworkRequest;
-import com.ssafy.arnnect.artwork.application.dto.response.ArtworkDetailResponse;
-import com.ssafy.arnnect.artwork.application.dto.response.ArtworkResponse;
+import com.ssafy.arnnect.artwork.application.dto.response.*;
 import com.ssafy.arnnect.artwork.domain.entity.ArtworkDetail;
-import com.ssafy.arnnect.artwork.application.dto.response.FieldResponse;
-import com.ssafy.arnnect.artwork.application.dto.response.GenreResponse;
 import com.ssafy.arnnect.artwork.application.service.ArtworkService;
 import com.ssafy.arnnect.security.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +53,11 @@ public class ArtworkController {
     @GetMapping()
     public ResponseEntity<List<ArtworkResponse>> getArtworkListOfArtist(@RequestParam String artist){
         return ResponseEntity.ok(service.getArtworkListOfArtist(artist));
+    }
+
+    @GetMapping("/new")
+    public ResponseEntity<List<NewArtistRepresentativeResponse>> getNewArtist(){
+        return ResponseEntity.ok(service.getNewArtist());
     }
 
     @GetMapping("/field")

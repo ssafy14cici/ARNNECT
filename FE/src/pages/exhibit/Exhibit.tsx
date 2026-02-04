@@ -1,5 +1,5 @@
 import "../../styles/home.css";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { mountExhibitRoom } from "../../museum/viewer/exhibitRoom";
@@ -41,6 +41,9 @@ export default function Exhibit() {
 
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // 가이드 토글 상태 (false: info.png, true: how_ex.png)
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -110,6 +113,49 @@ export default function Exhibit() {
       style={{ position: "relative", width: "100%", height: "100dvh", overflow: "hidden" }}
     >
       <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+
+      {/* 가이드 토글 버튼 */}
+      {!showGuide && (
+        <img
+          src={asset("info_ex.png")}
+          alt="가이드 보기"
+          className="exhibit-guide-overlay"
+          onClick={() => setShowGuide(true)}
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            right: "24px",
+            opacity: 0.5,
+            cursor: "pointer",
+            zIndex: 9980,
+            width: "40px",
+            height: "auto",
+            transition: "opacity 0.2s",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.5")}
+        />
+      )}
+
+      {/* 조작 가이드 오버레이 */}
+      {showGuide && (
+        <img
+          src={asset("how_ex.png")}
+          alt="조작 가이드"
+          className="exhibit-guide-overlay"
+          onClick={() => setShowGuide(false)}
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            right: "24px",
+            opacity: 0.85,
+            cursor: "pointer",
+            zIndex: 9980,
+            width: "40%",
+            height: "auto",
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -60,38 +60,58 @@ export function safeToInt(v: unknown): number | null {
 }
 
 /**
- * ✅ 이미지 URL 정규화 + /src 보정
- * - 절대 URL이면 그대로(단, pathname이 /artwork/* 면 /src/artwork/* 로 보정)
- * - 상대경로면 VITE_API_BASE_URL의 origin 붙임
- * - 상대경로가 /artwork/* 면 /src/artwork/* 로 보정
+ * ✅ 이미지 URL 정규화 + /src 보정 (artwork + review 공통)
+ *
+ * - 절대 URL이면:
+ *   - pathname이 /artwork/* 또는 /review/* 면 /src/* 로 보정
+ *   - DEV(import.meta.env.DEV)에서는 "상대경로(/src/...)"로 바꿔서 Vite proxy를 타게 함
+ *
+ * - 상대경로면:
+ *   - /artwork/* 또는 /review/* 면 /src/* 로 보정
+ *   - DEV에서는 상대경로 그대로 반환(프록시)
+ *   - PROD에서는 VITE_API_BASE_URL의 origin을 붙여 반환
  */
 export function resolveMediaUrl(input?: string | null): string {
   const u0 = String(input ?? "").trim();
   if (!u0 || u0 === "null" || u0 === "undefined") return "";
   if (u0.startsWith("data:") || u0.startsWith("blob:")) return u0;
 
+  const needsSrcPrefix = (p: string) =>
+    !p.startsWith("/src/") && (p.startsWith("/artwork/") || p.startsWith("/review/"));
+
+  const isDev = !!import.meta.env.DEV;
+
   // 1) 절대 URL 처리
   if (/^https?:\/\//i.test(u0)) {
     try {
       const url = new URL(u0);
-      // 서버가 실제로 /src/artwork/* 에서 서빙하는 경우 보정
-      if (url.pathname.startsWith("/artwork/")) {
+
+      if (needsSrcPrefix(url.pathname)) {
         url.pathname = `/src${url.pathname}`;
       }
+
+      // ✅ DEV에서는 절대 URL을 상대경로로 바꿔서 프록시 타게
+      if (isDev) {
+        return `${url.pathname}${url.search}${url.hash}`;
+      }
+
       return url.toString();
     } catch {
       return u0;
     }
   }
 
-  // 2) 상대경로 처리
+  // 2) 상대 경로 처리
   let path = u0.startsWith("/") ? u0 : `/${u0}`;
 
-  // ✅ 핵심 보정: /artwork/* → /src/artwork/*
-  if (path.startsWith("/artwork/")) {
+  if (needsSrcPrefix(path)) {
     path = `/src${path}`;
   }
 
+  // ✅ DEV: 프록시
+  if (isDev) return path;
+
+  // ✅ PROD: VITE_API_BASE_URL origin 붙이기
   const apiBase = String(import.meta.env.VITE_API_BASE_URL ?? "").trim();
   let origin = "";
   try {

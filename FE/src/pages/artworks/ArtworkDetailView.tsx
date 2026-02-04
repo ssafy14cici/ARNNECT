@@ -1,17 +1,16 @@
 import { useMemo } from "react";
-import { resolveMediaUrl, safeToInt } from "./detail/utils";
+import { Link } from "react-router-dom"; // ✅ 추가
+import { resolveMediaUrl } from "./detail/utils";
 import type { ArtworkDetailData, ReviewSummary, LocalComment } from "./detail/mappers";
 
 type Props = {
   artwork: ArtworkDetailData;
   isOwner: boolean;
 
-  // hero 이미지
   displayImgSrc: string;
   imageError: boolean;
   onHeroImgError: () => void;
 
-  // 좋아요/팔로우/팬레터
   isLiked: boolean;
   likeCount: number;
   isFollowing: boolean;
@@ -19,18 +18,15 @@ type Props = {
   onToggleFollow: () => void;
   onOpenFanLetter: () => void;
 
-  // 편집/삭제/이동
   onGoEdit: () => void;
   onDeleteArtwork: () => void;
   onGoHome: () => void;
   onGoReview: (id: string | number) => void;
 
-  // 리뷰
   reviews: ReviewSummary[];
   reviewsLoading: boolean;
   reviewsError: string | null;
 
-  // 댓글
   comments: LocalComment[];
   commentsLoading: boolean;
   commentsError: string | null;
@@ -40,6 +36,15 @@ type Props = {
   onEditComment: (id: string, current: string) => void;
   onDeleteComment: (id: string) => void;
   onReplyComment: (parentId: string) => void;
+
+  /** ✅ 추가: 작가 프로필 경로 (없으면 링크 비활성) */
+  artistProfilePath?: string;
+
+  /**
+   * ✅ 추가: 댓글 작성자 프로필 경로 만들기
+   * - LocalComment에 authorId가 있을 때만 링크로 보여주기 위해 사용
+   */
+  commentAuthorProfilePath?: (authorId: string) => string;
 };
 
 export default function ArtworkDetailView(p: Props) {
@@ -56,13 +61,40 @@ export default function ArtworkDetailView(p: Props) {
     return m;
   }, [p.comments]);
 
+  const ArtistName = () => {
+    if (p.artistProfilePath) {
+      return (
+        <Link className="hero-artist-link" to={p.artistProfilePath}>
+          {p.artwork.artist}
+        </Link>
+      );
+    }
+    return <span className="hero-artist-link">{p.artwork.artist}</span>;
+  };
+
+  const AuthorName = ({ name, authorId }: { name: string; authorId?: string }) => {
+    const id = String(authorId ?? "").trim();
+    if (id && p.commentAuthorProfilePath) {
+      return (
+        <Link className="comment-author-link" to={p.commentAuthorProfilePath(id)}>
+          {name}
+        </Link>
+      );
+    }
+    return <span className="comment-author-link">{name}</span>;
+  };
+
   return (
     <div className="artwork-detail-page">
       {/* Hero */}
       <section className="artwork-hero">
         <div className="hero-content">
           <h1 className="hero-title">{p.artwork.title}</h1>
-          <div className="hero-artist">by {p.artwork.artist}</div>
+
+          {/* ✅ 작가 클릭 */}
+          <div className="hero-artist">
+            by <ArtistName />
+          </div>
 
           <div className="hero-frame">
             {p.imageError ? (
@@ -201,8 +233,11 @@ export default function ArtworkDetailView(p: Props) {
               {rootComments.map((c) => (
                 <div key={c.id} className="comment-item">
                   <div className="comment-meta">
-                    <strong>{c.authorName ?? "User"}</strong>
+                    <strong>
+                      <AuthorName name={c.authorName ?? "User"} authorId={(c as any).authorId} />
+                    </strong>
                   </div>
+
                   <div className="comment-text">{c.content}</div>
 
                   <div className="comment-actions">
@@ -222,7 +257,9 @@ export default function ArtworkDetailView(p: Props) {
                       {(repliesByParent.get(c.id) ?? []).map((r) => (
                         <div key={r.id} className="reply-item">
                           <div className="comment-meta">
-                            <strong>{r.authorName ?? "User"}</strong>
+                            <strong>
+                              <AuthorName name={r.authorName ?? "User"} authorId={(r as any).authorId} />
+                            </strong>
                           </div>
                           <div className="comment-text">{r.content}</div>
                         </div>

@@ -1,6 +1,7 @@
 package com.ssafy.arnnect.artwork.repository;
 
 import com.ssafy.arnnect.artwork.application.dto.response.ArtworkResponse;
+import com.ssafy.arnnect.artwork.application.dto.response.NewArtistRepresentativeResponse;
 import com.ssafy.arnnect.artwork.domain.entity.ArtworkDetail;
 import com.ssafy.arnnect.artwork.domain.entity.Artwork;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -71,4 +72,38 @@ public interface ArtworkRepository extends JpaRepository<Artwork, Long> {
     order by a.artwork_id DESC;
     """, nativeQuery = true)
     List<ArtworkResponse> findArtworkByArtist(@Param("memberUuid") String memberUuid);
+
+    @Query(value = """
+        SELECT
+        	m.member_uuid,
+        	m.nickname,
+            a.artwork_id,
+            a.title,
+            a.description,
+            a.production_date,
+            concat('artwork',a.saved_image_name) as saved_image_name
+        FROM artwork a
+        JOIN artist at ON at.member_id = a.member_id
+        JOIN member m ON m.member_id = a.member_id\s
+        WHERE at.is_new = true
+        AND a.is_deleted = false
+        AND a.member_id IN (
+            SELECT member_id
+            FROM artwork
+            WHERE is_deleted = false
+            GROUP BY member_id
+            HAVING COUNT(*) >= 6
+        )
+        AND a.artwork_id = (
+            SELECT artwork_id
+            FROM artwork a2
+            WHERE a2.member_id = a.member_id
+              AND a2.is_deleted = false
+            ORDER BY a2.artwork_id DESC
+            LIMIT 1
+        )
+        ORDER BY a.artwork_id DESC
+        LIMIT 6;
+    """, nativeQuery = true)
+    List<NewArtistRepresentativeResponse> getNewArtist();
 }
