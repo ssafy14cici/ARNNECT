@@ -9,6 +9,7 @@ import AppLayout from "../layouts/AppLayout";
 import Home from "../../pages/home/Home";
 import HomePC from "../../pages/home/HomePC";
 import HomeMobile from "../../pages/home/HomeMobile";
+import Hall from "../../pages/hall/Hall";
 
 import Search from "../../pages/search/Search";
 import Guide from "../../pages/guide/Guide";
@@ -78,8 +79,17 @@ export const routes: RouteObject[] = [
       { path: "search", element: <Search /> },
       { path: "guide", element: <Guide /> },
 
-      { path: "login", element: <Login /> },
-      { path: "signup", element: <Signup /> },
+      { path: "main-hall", element: <HomePC />},
+      { path: "hall", element: <Hall />},
+
+      // 로그인하면 회원가입을 막기
+      {
+        element: <Guard guestOnly redirectTo="/main-hall" />,
+        children: [
+          { path: "login", element: <Login /> },
+          { path: "signup", element: <Signup /> },
+        ],
+      },
 
       { path: "feed", element: <Feed /> },
 

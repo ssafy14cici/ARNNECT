@@ -140,7 +140,54 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     );
   });
 
+
   scene.add(gltfScene);
+  // ✅ [DEBUG] GLB 내부 "큰 메쉬" / "수상한 재질" 찾기
+  const DEBUG_SCAN_GLB = true;
+
+  if (DEBUG_SCAN_GLB) {
+    gltfScene.updateMatrixWorld(true);
+
+    // 전체 박스(참고용)
+    const whole = new THREE.Box3().setFromObject(gltfScene);
+    const wholeSize = whole.getSize(new THREE.Vector3());
+    const wholeMax = Math.max(wholeSize.x, wholeSize.y, wholeSize.z);
+
+    type Row = { name: string; maxDim: number; vol: number; flags: string[] };
+    const rows: Row[] = [];
+
+    gltfScene.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+
+      const box = new THREE.Box3().setFromObject(mesh);
+      const s = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(s.x, s.y, s.z);
+      const vol = s.x * s.y * s.z;
+
+      const flags: string[] = [];
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const m of mats) {
+        const mm: any = m;
+        if (!mm) continue;
+        if (mm.transparent) flags.push("transparent");
+        if (mm.opacity === 0) flags.push("opacity0");
+        if (mm.depthWrite) flags.push("depthWrite");
+        if (mm.depthTest === false) flags.push("noDepthTest");
+        if (mm.side === THREE.DoubleSide) flags.push("doubleSide");
+        if (mm.color && mm.color.isColor && mm.color.getHexString() === "000000") flags.push("blackColor");
+      }
+
+      rows.push({ name: mesh.name || "(no-name)", maxDim, vol, flags });
+    });
+
+    rows.sort((a, b) => b.maxDim - a.maxDim);
+    console.group("[Intro][GLB] largest meshes by maxDim");
+    console.log("wholeMax =", wholeMax, "wholeSize =", wholeSize);
+    console.table(rows.slice(0, 20));
+    console.groupEnd();
+  }
+
   gltfScene.updateMatrixWorld(true);
 
   // ✅ 간판 오브젝트(있으면)
@@ -247,7 +294,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     console.warn("[Intro] wave load failed:", e);
     wave = null;
   }
-
+  
   renderer.render(scene, camera);
 
   requestAnimationFrame(() => {
@@ -349,7 +396,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     if (signObj) {
       stickElementToObjectTop(ui.heroSub, signObj, camera, canvas, -40);
     }
-
+    
     renderer.render(scene, camera);
     raf = requestAnimationFrame(tick);
   };

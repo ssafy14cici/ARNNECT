@@ -140,7 +140,7 @@ export default function Login() {
         },
       });
 
-      nav(returnUrl || "/", { replace: true });
+      nav("/main-hall", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "이메일 또는 비밀번호를 확인해주세요.");
     } finally {
