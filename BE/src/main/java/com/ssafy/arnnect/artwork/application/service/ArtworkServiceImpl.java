@@ -2,11 +2,8 @@ package com.ssafy.arnnect.artwork.application.service;
 
 import com.ssafy.arnnect.artwork.application.dto.request.CreateArtworkRequest;
 import com.ssafy.arnnect.artwork.application.dto.request.UpdateArtworkRequest;
-import com.ssafy.arnnect.artwork.application.dto.response.ArtworkDetailResponse;
-import com.ssafy.arnnect.artwork.application.dto.response.ArtworkResponse;
+import com.ssafy.arnnect.artwork.application.dto.response.*;
 import com.ssafy.arnnect.artwork.domain.entity.*;
-import com.ssafy.arnnect.artwork.application.dto.response.FieldResponse;
-import com.ssafy.arnnect.artwork.application.dto.response.GenreResponse;
 import com.ssafy.arnnect.artwork.repository.*;
 import com.ssafy.arnnect.common.exception.BusinessException;
 import com.ssafy.arnnect.common.exception.ErrorCode;
@@ -107,6 +104,11 @@ public class ArtworkServiceImpl implements ArtworkService{
         List<ArtworkResponse> response = repository.findArtworkByArtist(memberUuid);
         response.forEach(r -> r.updateUrl(fileService.getBaseDir(FileType.ARTWORK)));
         return response;
+    }
+
+    @Override
+    public List<NewArtistRepresentativeResponse> getNewArtist() {
+        return repository.getNewArtist();
     }
 
     @Override
