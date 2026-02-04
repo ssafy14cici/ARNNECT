@@ -4,10 +4,16 @@ import "./fanLetter.css";
 
 import { useAuthStore } from "../../../features/auth/store";
 import type { FanLetter as FanLetterModel } from "../../../features/fanLetter/types";
-import { createFanLetterAnswer, fetchArtistFanLetters } from "../../../features/fanLetter/api";
+import {
+  fetchArtistFanLetters,
+  createFanLetterAnswer,
+  updateFanLetterAnswer,
+  deleteFanLetterAnswer,
+} from "../../../features/fanLetter/api";
 
 type FanLetterViewMode = "postit" | "list";
 type FanLetterFilter = "all" | "unanswered" | "answered";
+type ReplyMode = "create" | "edit";
 
 function formatDate(s: string) {
   const d = new Date(s);
@@ -28,6 +34,7 @@ export default function FanLetter() {
   const [filter, setFilter] = useState<FanLetterFilter>("unanswered");
 
   const [replyingId, setReplyingId] = useState<number | null>(null);
+  const [replyMode, setReplyMode] = useState<ReplyMode>("create");
   const [answerText, setAnswerText] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -35,7 +42,6 @@ export default function FanLetter() {
 
   const refetch = async () => {
     if (!artistMemberUuid) return;
-
     setLoading(true);
     try {
       const data = await fetchArtistFanLetters(artistMemberUuid);
@@ -70,15 +76,23 @@ export default function FanLetter() {
     });
   }, [items, filter]);
 
-  const openReply = (id: number) => {
+  const openCreate = (id: number) => {
     setReplyingId(id);
+    setReplyMode("create");
     setAnswerText("");
+  };
+
+  const openEdit = (id: number, currentAnswer?: string) => {
+    setReplyingId(id);
+    setReplyMode("edit");
+    setAnswerText(currentAnswer ?? "");
   };
 
   const closeReply = () => {
     if (sending) return;
     setReplyingId(null);
     setAnswerText("");
+    setReplyMode("create");
   };
 
   const submitAnswer = async () => {
@@ -89,13 +103,37 @@ export default function FanLetter() {
 
     setSending(true);
     try {
-      await createFanLetterAnswer(replyingId, txt);
-      alert("답변이 등록되었습니다.");
+      if (replyMode === "create") {
+        await createFanLetterAnswer(replyingId, txt);
+        alert("답변이 등록되었습니다.");
+      } else {
+        await updateFanLetterAnswer(replyingId, txt);
+        alert("답변이 수정되었습니다.");
+      }
+
       closeReply();
       await refetch();
     } catch (e) {
       console.error(e);
-      alert("답변 등록에 실패했습니다.");
+      alert(replyMode === "create" ? "답변 등록에 실패했습니다." : "답변 수정에 실패했습니다.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const removeAnswer = async () => {
+    if (replyingId == null) return;
+    if (!confirm("답변을 삭제할까요?")) return;
+
+    setSending(true);
+    try {
+      await deleteFanLetterAnswer(replyingId);
+      alert("답변이 삭제되었습니다.");
+      closeReply();
+      await refetch();
+    } catch (e) {
+      console.error(e);
+      alert("답변 삭제에 실패했습니다.");
     } finally {
       setSending(false);
     }
@@ -186,11 +224,41 @@ export default function FanLetter() {
 
               <div className="flActions">
                 {!fl.isAnswered ? (
-                  <button type="button" className="flBtn primary" onClick={() => openReply(fl.id)}>
+                  <button type="button" className="flBtn primary" onClick={() => openCreate(fl.id)}>
                     Reply
                   </button>
                 ) : (
-                  <span className="flBadge">Answered</span>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <button
+                      type="button"
+                      className="flBtn"
+                      onClick={() => openEdit(fl.id, fl.answer)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="flBtn danger"
+                      onClick={async () => {
+                        if (!confirm("답변을 삭제할까요?")) return;
+                        setSending(true);
+                        try {
+                          await deleteFanLetterAnswer(fl.id);
+                          alert("답변이 삭제되었습니다.");
+                          await refetch();
+                        } catch (e) {
+                          console.error(e);
+                          alert("답변 삭제에 실패했습니다.");
+                        } finally {
+                          setSending(false);
+                        }
+                      }}
+                      disabled={sending}
+                    >
+                      Delete
+                    </button>
+                    <span className="flBadge">Answered</span>
+                  </div>
                 )}
               </div>
             </article>
@@ -198,12 +266,12 @@ export default function FanLetter() {
         </section>
       )}
 
-      {/* Reply Modal */}
+      {/* Reply/Edit Modal */}
       {replyingId !== null && (
         <div className="replyBackdrop" onMouseDown={closeReply}>
           <div className="replyModal" onMouseDown={(e) => e.stopPropagation()}>
             <header className="replyHeader">
-              <div className="replyTitle">Write Answer</div>
+              <div className="replyTitle">{replyMode === "create" ? "Write Answer" : "Edit Answer"}</div>
               <button type="button" className="replyX" onClick={closeReply} disabled={sending}>
                 ✕
               </button>
@@ -223,6 +291,18 @@ export default function FanLetter() {
               <button type="button" className="replyBtn ghost" onClick={closeReply} disabled={sending}>
                 Cancel
               </button>
+
+              {replyMode === "edit" && (
+                <button
+                  type="button"
+                  className="replyBtn ghost"
+                  onClick={removeAnswer}
+                  disabled={sending}
+                >
+                  Delete
+                </button>
+              )}
+
               <button
                 type="button"
                 className="replyBtn primary"

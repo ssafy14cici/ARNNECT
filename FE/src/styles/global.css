@@ -1,28 +1,24 @@
+/* FE/src/styles/global.css */
+
 /* ==========================================================================
-   1. Font Import (Pretendard) - 세련된 고딕 폰트
+   1. Font Import (Pretendard)
 ========================================================================== */
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
 
 /* ==========================================================================
-   2. Theme Variables (Sophisticated Dark Mode)
+   2. Theme Variables
 ========================================================================== */
 :root {
-  /* 배경: 깊이감 있는 블랙 */
   --bg: #050505;
-  
-  /* 텍스트: 선명한 화이트 */
   --fg: #ffffff;
-  --fg-dim: rgba(255, 255, 255, 0.6);   /* 보조 텍스트 */
-  
-  /* 라인: 아주 얇고 투명한 화이트 (그리드용) */
+  --fg-dim: rgba(255, 255, 255, 0.6);
   --line: rgba(255, 255, 255, 0.15);
-  
-  /* 폰트 스택 */
-  --font-stack: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+
+  --font-stack: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
 }
 
 /* ==========================================================================
-   3. Global Reset & Base Styles
+   3. Base Reset
 ========================================================================== */
 * {
   box-sizing: border-box;
@@ -30,18 +26,29 @@
   padding: 0;
 }
 
+/* ✅ 모바일 스크롤/레이아웃 안정화 핵심 */
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
-  margin: 0;
   background-color: var(--bg);
   color: var(--fg);
   font-family: var(--font-stack);
-  
-  /* 다크 모드에서 폰트가 더 선명하고 얇게 보이도록 처리 */
+
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  
-  /* 가로 스크롤 방지 */
+
+  /* ✅ 가로 스크롤 방지 */
   overflow-x: hidden;
+
+  /* ✅ 기본은 body도 스크롤 가능 */
+  overflow-y: auto;
+
+  /* ✅ iOS 스크롤 관성 */
+  -webkit-overflow-scrolling: touch;
 }
 
 /* 링크 및 버튼 기본 스타일 초기화 */
@@ -63,19 +70,19 @@ button {
    4. Layout Utilities
 ========================================================================== */
 .app-shell {
-  min-height: 100vh;
+  /* ✅ 모바일 주소창 변화 대응 */
+  min-height: 100dvh;
   position: relative;
 }
 
-/* 일반 페이지(Feed, Lounge 등)에서 네비바와 겹치지 않게 여백을 주는 용도 
-   (Home 같은 풀스크롤 페이지에서는 사용하지 않음) */
+/* 일반 페이지(Feed, Lounge 등)에서 네비바와 겹치지 않게 */
 .page-content {
-  padding-top: 80px; /* 네비바 높이만큼 여백 */
-  min-height: 100vh;
+  padding-top: 80px;
+  min-height: 100dvh;
 }
 
 /* ==========================================================================
-   5. Selection Style (드래그 시 반전 효과)
+   5. Selection Style
 ========================================================================== */
 ::selection {
   background: #ffffff;
@@ -83,7 +90,7 @@ button {
 }
 
 /* ==========================================================================
-   6. Custom Scrollbar (다크 테마)
+   6. Custom Scrollbar (Desktop only)
 ========================================================================== */
 ::-webkit-scrollbar {
   width: 8px;

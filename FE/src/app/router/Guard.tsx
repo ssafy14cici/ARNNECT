@@ -8,8 +8,8 @@ type GuardProps = {
   requireAuth?: boolean;
   requireRole?: Role;
 
-  guestOnly?: boolean; // 비로그인만 접근 가능(로그인/회원가입)
-  redirectTo?: string; // 로그인 상태일 때 보내줄 곳
+  guestOnly?: boolean;
+  redirectTo?: string;
 };
 
 export default function Guard({
@@ -18,22 +18,27 @@ export default function Guard({
   guestOnly,
   redirectTo = "/feed",
 }: GuardProps) {
-  const { isLoggedIn, role } = useAuthStore();
+  const { isLoggedIn, role, hydrating } = useAuthStore();
   const location = useLocation();
 
-  // ✅ DEV 우회: 보호 라우트(requireAuth/requireRole)에만 적용
-  // guestOnly는 dev에서도 정상 동작해야 하므로 우회 제외
+  // ✅ DEV 우회: 보호 라우트에만 적용 (guestOnly는 제외)
   const shouldBypassInDev =
     import.meta.env.DEV && (requireAuth || requireRole) && !guestOnly;
 
   if (shouldBypassInDev) return <Outlet />;
 
-  // ✅ guestOnly는 최우선: 로그인 상태면 차단, 아니면 통과
+  // ✅ hydrate 끝나기 전에는 판정하지 말고 대기(특히 새로고침 직후)
+  // requireAuth/requireRole/guestOnly 모두에서 깜빡임 방지
+  if (hydrating) {
+    return null; // 원하면 로딩 컴포넌트로 교체
+  }
+
+  // ✅ guestOnly: 로그인 상태면 차단
   if (guestOnly) {
     return isLoggedIn ? <Navigate to={redirectTo} replace /> : <Outlet />;
   }
 
-  // ✅ requireRole은 "로그인 필요"를 내포한다고 보는 게 안전
+  // ✅ requireRole은 auth를 내포
   if ((requireAuth || requireRole) && !isLoggedIn) {
     return (
       <Navigate

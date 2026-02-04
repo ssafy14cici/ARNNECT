@@ -1,47 +1,54 @@
 // vite.config.ts
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
-import { VitePWA } from 'vite-plugin-pwa';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
-      devOptions: { enabled: false }, // 필요하면 true로
-
+      registerType: "autoUpdate",
+      devOptions: { enabled: false },
       workbox: {
-        maximumFileSizeToCacheInBytes: 100 * 1024 * 1024, // 100MB
-
+        maximumFileSizeToCacheInBytes: 100 * 1024 * 1024,
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname.endsWith('.glb'),
-            handler: 'CacheFirst',
+            urlPattern: ({ url }) => url.pathname.endsWith(".glb"),
+            handler: "CacheFirst",
             options: {
-              cacheName: 'glb-cache',
+              cacheName: "glb-cache",
               cacheableResponse: { statuses: [200] },
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 30 * 24 * 60 * 60, // 30일
-              },
-              // ❌ networkTimeoutSeconds 제거 (NetworkFirst에서만 가능)
+              expiration: { maxEntries: 20, maxAgeSeconds: 30 * 24 * 60 * 60 },
             },
           },
         ],
       },
-
-      manifest: {
-        name: 'Museum',
-        short_name: 'Museum',
-        start_url: '/',
-        display: 'standalone',
-      },
+      manifest: { name: "Museum", short_name: "Museum", start_url: "/", display: "standalone" },
     }),
   ],
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, 'src'),
+    alias: { "@": path.resolve(__dirname, "src") },
+  },
+
+  // ✅ 추가
+  server: {
+    proxy: {
+      "/api/v1": {
+        target: "https://i14e107.p.ssafy.io:8001",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/artwork": {
+        target: "https://i14e107.p.ssafy.io:8001",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/review": {
+        target: "https://i14e107.p.ssafy.io:8001",
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 });
