@@ -8,7 +8,14 @@ export type AuthUser = {
   name: string;
 };
 
+type PersistedAuth = {
+  token: string | null;
+  role: AppRole | null;
+  user: AuthUser | null;
+};
+
 type AuthState = {
+  // ✅ isLoggedIn은 token으로부터 계산되게 유지(상태로 들고 있어도 되지만 일관성 중요)
   isLoggedIn: boolean;
   token: string | null;
   role: AppRole | null;
@@ -19,102 +26,77 @@ type AuthState = {
   hydrate: () => void;
 };
 
-const USE_MOCK = String(import.meta.env.VITE_USE_MOCK) === "true";
+// ✅ key는 프로젝트용으로 바꾸는게 좋음(기존 키 유지해도 동작은 함)
+const KEY = "arnnect_auth_v1";
 
-// ✅ mock에서는 localStorage, real에서는 sessionStorage(remember 체크 시에만 저장)
-const KEY_MOCK = "comet_mock_auth_v1";
-const KEY_REAL = "arnnect_auth_session_v1";
-
-type PersistShape = Pick<AuthState, "token" | "role" | "user">;
-
-function safeParse(raw: string | null): PersistShape | null {
-  if (!raw) return null;
+function load(): PersistedAuth | null {
   try {
-    return JSON.parse(raw) as PersistShape;
+    // 1) localStorage(로그인 유지) 우선
+    const a = localStorage.getItem(KEY);
+    if (a) return JSON.parse(a) as PersistedAuth;
+
+    // 2) 없으면 sessionStorage(세션 유지)
+    const b = sessionStorage.getItem(KEY);
+    if (b) return JSON.parse(b) as PersistedAuth;
+
+    return null;
   } catch {
     return null;
   }
 }
 
-function loadPersisted(): PersistShape | null {
+function save(partial: PersistedAuth, remember?: boolean) {
   try {
-    const storage = USE_MOCK ? localStorage : sessionStorage;
-    const key = USE_MOCK ? KEY_MOCK : KEY_REAL;
-    return safeParse(storage.getItem(key));
+    // remember=true면 localStorage, 아니면 sessionStorage
+    if (remember) {
+      localStorage.setItem(KEY, JSON.stringify(partial));
+      sessionStorage.removeItem(KEY);
+    } else {
+      sessionStorage.setItem(KEY, JSON.stringify(partial));
+      localStorage.removeItem(KEY);
+    }
   } catch {
-    return null;
+    // 저장 실패 시 무시(용량/권한 문제 등)
   }
 }
 
-/**
- * ✅ 저장 정책
- * - mock: 항상 localStorage 저장(기존 정책 유지)
- * - real: remember=true일 때만 sessionStorage 저장
- */
-function savePersisted(partial: PersistShape, remember?: boolean) {
-  try {
-    if (USE_MOCK) {
-      localStorage.setItem(KEY_MOCK, JSON.stringify(partial));
-      return;
-    }
-    // real 모드: remember 체크 안 하면 저장하지 않음
-    if (!remember) {
-      sessionStorage.removeItem(KEY_REAL);
-      return;
-    }
-    sessionStorage.setItem(KEY_REAL, JSON.stringify(partial));
-  } catch {
-    // ignore
-  }
-}
-
-function clearPersisted() {
-  try {
-    if (USE_MOCK) localStorage.removeItem(KEY_MOCK);
-    sessionStorage.removeItem(KEY_REAL);
-  } catch {
-    // ignore
-  }
+function clear() {
+  localStorage.removeItem(KEY);
+  sessionStorage.removeItem(KEY);
 }
 
 export const useAuthStore = create<AuthState>((set) => {
-  const saved = loadPersisted();
+  const saved = load();
+
+  const token = saved?.token ?? null;
+  const role = saved?.role ?? null;
+  const user = saved?.user ?? null;
 
   return {
-    isLoggedIn: !!saved?.token,
-    token: saved?.token ?? null,
-    role: saved?.role ?? null,
-    user: saved?.user ?? null,
+    token,
+    role,
+    user,
+    isLoggedIn: !!token,
 
-    /**
-     * ✅ hydrate 정책
-     * - mock: localStorage 복구
-     * - real: sessionStorage(remember=true로 저장된 경우)만 복구
-     *   (중요) real 모드에서 load가 null이면 "강제 로그아웃 set" 하지 않음
-     *   → 초기 상태를 유지하게 해서 페이지 이동/레이아웃 재마운트 때 로그아웃 덮어쓰기 방지
-     */
     hydrate: () => {
-      const next = loadPersisted();
-
-      // ✅ real 모드에서 저장된 세션이 없다면 아무 것도 덮어쓰지 않음
-      if (!USE_MOCK && !next) return;
-
+      const next = load();
+      const t = next?.token ?? null;
       set({
-        isLoggedIn: !!next?.token,
-        token: next?.token ?? null,
+        token: t,
         role: (next?.role as AppRole) ?? null,
         user: (next?.user as AuthUser) ?? null,
+        isLoggedIn: !!t,
       });
     },
 
-    login: ({ token, role, remember, user }) => {
-      set({ isLoggedIn: true, token, role, user });
-      savePersisted({ token, role, user }, remember);
+    login: ({ token, role, user, remember }) => {
+      set({ token, role, user, isLoggedIn: true });
+      save({ token, role, user }, remember);
     },
 
     logout: () => {
-      set({ isLoggedIn: false, token: null, role: null, user: null });
-      clearPersisted();
+      set({ token: null, role: null, user: null, isLoggedIn: false });
+      clear();
     },
   };
 });
