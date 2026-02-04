@@ -134,7 +134,7 @@ export default function Navbar() {
         style={shouldHideHeader ? { display: "none" } : undefined}
       >
         <div className="navInner">
-          <button className="navBrand" type="button" onClick={() => navigate("/")}>
+          <button className="navBrand" type="button" onClick={() => navigate(isLoggedIn ? "/hall" : "/")}>
             ARNNECT
           </button>
 

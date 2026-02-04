@@ -144,7 +144,7 @@ export function mountMuseumApp(args: {
 
     mountIntro(canvas, {
       uiMount,
-      glbUrl: asset("museum/models/museum/intro_2.glb"),
+      glbUrl: asset("museum/models/museum/intro_53.glb"),
       prefetchUrl: asset("museum/models/museum/mh_add_5.glb"),
 
       doorName: "USA0_USA0_0",

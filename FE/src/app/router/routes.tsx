@@ -84,7 +84,7 @@ export const routes: RouteObject[] = [
 
       // 로그인하면 회원가입을 막기
       {
-        element: <Guard guestOnly redirectTo="/main-hall" />,
+        element: <Guard guestOnly redirectTo="/hall" />,
         children: [
           { path: "login", element: <Login /> },
           { path: "signup", element: <Signup /> },

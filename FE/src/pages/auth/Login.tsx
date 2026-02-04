@@ -139,7 +139,8 @@ export default function Login() {
           name: email,
         },
       });
-
+      
+      console.log("LOGIN OK -> go /main-hall");
       nav("/main-hall", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "이메일 또는 비밀번호를 확인해주세요.");
