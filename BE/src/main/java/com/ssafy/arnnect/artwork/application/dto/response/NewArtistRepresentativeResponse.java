@@ -13,6 +13,7 @@ import java.sql.Date;
 @Builder
 public class NewArtistRepresentativeResponse {
     private String memberUuid;
+    private String nickname;
     private Long artworkId;
     private String title;
     private String description;
