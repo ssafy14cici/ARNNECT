@@ -12,7 +12,7 @@ public interface ArtworkService {
     void updateArtwork(String memberUuid, Long artworkId, UpdateArtworkRequest request);
     void deleteArtwork(String memberUuid, Long artworkId);
 
-    ArtworkDetailResponse getDetailArtwork(Long artworkId);
+    ArtworkDetailResponse getDetailArtwork(String memberUuid, Long artworkId);
     List<ArtworkResponse> getArtworkList();
     List<ArtworkResponse> getArtworkListOfArtist(String memberUuid);
     List<NewArtistRepresentativeResponse> getNewArtist();

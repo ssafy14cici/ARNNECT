@@ -9,6 +9,8 @@ import com.ssafy.arnnect.common.exception.BusinessException;
 import com.ssafy.arnnect.common.exception.ErrorCode;
 import com.ssafy.arnnect.common.file.FileStorageService;
 import com.ssafy.arnnect.common.file.FileType;
+import com.ssafy.arnnect.common.logs.UserLogAction;
+import com.ssafy.arnnect.common.logs.UserLoggable;
 import com.ssafy.arnnect.member.application.service.MemberService;
 import com.ssafy.arnnect.member.domain.entity.Member;
 import jakarta.transaction.Transactional;
@@ -85,8 +87,9 @@ public class ArtworkServiceImpl implements ArtworkService{
         artwork.deleteArtwork();
     }
 
+    @UserLoggable(action = UserLogAction.VIEW)
     @Override
-    public ArtworkDetailResponse getDetailArtwork(Long artworkId) {
+    public ArtworkDetailResponse getDetailArtwork(String memberUuid, Long artworkId) {
         List<Tag> tags = artworkTagRepository.getByArtworkId(artworkId);
         return ArtworkDetailResponse.from(repository.findByDetailArtwork(artworkId).orElseThrow(
                 ()-> new BusinessException(ErrorCode.ARTWORK_NOT_FOUND)), tags, fileService.getBaseDir(FileType.ARTWORK));
@@ -123,6 +126,7 @@ public class ArtworkServiceImpl implements ArtworkService{
 
     @Override
     @Transactional
+    @UserLoggable(action = UserLogAction.LIKE)
     public Boolean toggleFavorite(String memberUuid, Long artworkId) {
         Long memberId = memberService.getMemberId(memberUuid);
         Optional<FavoriteArtwork> favorite = favoriteRepository

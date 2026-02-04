@@ -42,7 +42,8 @@ public class ArtworkController {
 
     @GetMapping("{artworkId}")
     public ResponseEntity<ArtworkDetailResponse> getDetailArtwork(@PathVariable Long artworkId){
-        return ResponseEntity.ok(service.getDetailArtwork(artworkId));
+        String memberUuid = SecurityUtil.getCurrentMemberUuid();
+        return ResponseEntity.ok(service.getDetailArtwork(memberUuid, artworkId));
     }
 
     @GetMapping("/feed")

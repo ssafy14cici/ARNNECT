@@ -10,7 +10,6 @@ import java.util.List;
 
 public interface ReviewService {
     void createReview(String memberUuid, CreateReviewRequest request);
-
     void createReviewWithoutImg(String memberUuid, CreateReviewRequest request);
     void updateReview(String memberUuid, Long reviewId, UpdateReviewRequest request);
     void deleteReview(String memberUuid, Long reviewId);
