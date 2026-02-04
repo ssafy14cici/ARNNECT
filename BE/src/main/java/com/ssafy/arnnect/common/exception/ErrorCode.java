@@ -31,7 +31,11 @@ public enum ErrorCode {
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "COMMENT_001", "댓글이 존재하지않습니다."),
 
     /** FanLetter **/
-    FANLETTER_NOT_FOUND(HttpStatus.NOT_FOUND, "FANLETTER_001", "팬레터가 존재하지않습니다.");
+    FANLETTER_NOT_FOUND(HttpStatus.NOT_FOUND, "FANLETTER_001", "팬레터가 존재하지않습니다."),
+    
+    /** TICKET **/
+    TICKET_NOT_FOUND(HttpStatus.NOT_FOUND, "TICKET_001", "티켓이 존재하지않습니다."),
+    INVALID_TICKET_CODE(HttpStatus.BAD_REQUEST, "TICKET_002", "유효하지않은 티켓입니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
