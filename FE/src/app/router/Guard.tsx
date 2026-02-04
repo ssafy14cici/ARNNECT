@@ -1,4 +1,4 @@
-// FE/src/app/router/guards.tsx
+// FE/src/app/router/Guard.tsx
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuthStore } from "../../features/auth/store";
 
@@ -7,9 +7,8 @@ export type Role = "general" | "artist";
 type GuardProps = {
   requireAuth?: boolean;
   requireRole?: Role;
-
-  guestOnly?: boolean; // 비로그인만 접근 가능(로그인/회원가입)
-  redirectTo?: string; // 로그인 상태일 때 보내줄 곳
+  guestOnly?: boolean;
+  redirectTo?: string;
 };
 
 export default function Guard({
@@ -18,22 +17,24 @@ export default function Guard({
   guestOnly,
   redirectTo = "/feed",
 }: GuardProps) {
-  const { isLoggedIn, role } = useAuthStore();
+  const { isLoggedIn, role, hydrated } = useAuthStore();
   const location = useLocation();
 
-  // ✅ DEV 우회: 보호 라우트(requireAuth/requireRole)에만 적용
-  // guestOnly는 dev에서도 정상 동작해야 하므로 우회 제외
-  const shouldBypassInDev =
-    import.meta.env.DEV && (requireAuth || requireRole) && !guestOnly;
+  // ✅ "원할 때만" DEV 우회 (기본 false 권장)
+  const BYPASS_GUARD =
+    import.meta.env.DEV && String(import.meta.env.VITE_BYPASS_GUARD) === "true";
 
-  if (shouldBypassInDev) return <Outlet />;
+  if (BYPASS_GUARD && (requireAuth || requireRole) && !guestOnly) {
+    return <Outlet />;
+  }
 
-  // ✅ guestOnly는 최우선: 로그인 상태면 차단, 아니면 통과
+  // ✅ hydrate 끝나기 전엔 판정하지 말고 대기(깜빡임/뚫림 방지)
+  if (!hydrated) return null; // 또는 로딩 컴포넌트
+
   if (guestOnly) {
     return isLoggedIn ? <Navigate to={redirectTo} replace /> : <Outlet />;
   }
 
-  // ✅ requireRole은 "로그인 필요"를 내포한다고 보는 게 안전
   if ((requireAuth || requireRole) && !isLoggedIn) {
     return (
       <Navigate

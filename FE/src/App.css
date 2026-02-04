@@ -1,9 +1,18 @@
+/* FE\src\App.css */
+/* FE/src/App.css */
+
+/* ✅ Vite 기본 템플릿 스타일 무력화 */
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  text-align: initial;
 }
+
+/* 아래 로고/카드 등 Vite 기본 스타일은 프로젝트 UI에 필요 없으면 제거(이미 제거한 상태) */
+
 
 .logo {
   height: 6em;

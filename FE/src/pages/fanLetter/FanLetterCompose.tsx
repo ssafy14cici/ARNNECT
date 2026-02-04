@@ -1,4 +1,5 @@
-// FE/src/pages/fanLetter/FanLetterCompose.tsx
+//FE\src\pages\fanLetter\FanLetterCompose.tsx
+
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -12,11 +13,8 @@ type LocationState = {
   artworkTitle?: string;
   artistName?: string;
 
-  // ✅ 정식 키
+  // ✅ 정식 키만 사용
   artistMemberUuid?: string;
-
-  // 레거시 fallback
-  artistId?: string;
 };
 
 type JsonObject = Record<string, unknown>;
@@ -36,7 +34,6 @@ function asString(v: unknown, fallback = ""): string {
 }
 
 function unwrapEnvelope(raw: unknown): unknown {
-  // 공통 envelope { isSuccess, data, ... } 형태 대응
   if (!isObject(raw)) return raw;
   const d = get(raw, "data");
   return d ?? raw;
@@ -45,7 +42,6 @@ function unwrapEnvelope(raw: unknown): unknown {
 function normalizeArtworkId(raw: unknown): string {
   const s = String(raw ?? "").trim();
   if (!s) return "";
-  // route에서 artwork-xxx 같은 prefix가 붙을 수 있어서 제거
   return s.replace(/^artwork-/, "").replace(/^review-/, "");
 }
 
@@ -60,7 +56,6 @@ function toArtworkNumericId(raw: unknown): number | null {
 }
 
 export default function FanLetterCompose() {
-  // ✅ 라우트 param 명이 id/artworkId 어느 쪽이든 커버
   const params = useParams() as Record<string, string | undefined>;
   const rawParamId = params.id ?? params.artworkId ?? "";
 
@@ -71,60 +66,52 @@ export default function FanLetterCompose() {
   const user = useAuthStore((s) => s.user);
   const role = useAuthStore((s) => s.role); // "general" | "artist" | null
 
-  // ✅ param → number
   const artworkIdNum = useMemo(() => toArtworkNumericId(rawParamId), [rawParamId]);
 
-  // ✅ 화면에 보여줄 데이터는 state 우선, 없으면 API로 보강
   const [artworkTitle, setArtworkTitle] = useState(state.artworkTitle ?? "");
   const [artistName, setArtistName] = useState(state.artistName ?? "");
+  const [artistMemberUuid, setArtistMemberUuid] = useState(state.artistMemberUuid ?? "");
 
-  const [artistMemberUuid, setArtistMemberUuid] = useState(
-    state.artistMemberUuid ?? state.artistId ?? "",
-  );
-
-  // ✅ state가 비었을 때: 작품 상세에서 title/artist 정보 보강
   useEffect(() => {
     if (!artworkIdNum) return;
 
-    // 이미 핵심 정보가 있으면 굳이 호출 안 함
+    // 이미 핵심 정보 있으면 호출 생략
     if (artworkTitle && artistMemberUuid) return;
 
     let cancelled = false;
 
     (async () => {
       try {
-        // baseURL이 /api/v1 포함이면 아래 경로에서 /api/v1 제거해야 함
-        const res = await http.get(`/api/v1/artworks/${artworkIdNum}`);
+        // ✅ baseURL에 /api/v1 포함이면 '/artworks/:id'
+        // (미포함이면 '/api/v1/artworks/:id' 로 변경)
+        const res = await http.get(`/artworks/${artworkIdNum}`);
+
         const payload =
           isObject(res) && "data" in res ? (res as { data: unknown }).data : (res as unknown);
 
         const data = unwrapEnvelope(payload);
         if (cancelled) return;
-
         if (!isObject(data)) return;
 
-        // title
         const nextTitle =
           asString(get(data, "title"), "") ||
           asString(get(data, "artworkTitle"), "");
 
-        // artist name / nickname
         const nextArtistName =
           asString(get(data, "artistName"), "") ||
           asString(get(data, "artist"), "") ||
           asString(get(data, "nickname"), "");
 
-        // artist memberUuid
+        // ✅ artistId fallback 제거 (정식 키만)
         const nextArtistMemberUuid =
           asString(get(data, "artistMemberUuid"), "") ||
-          asString(get(data, "artistId"), "") ||
           asString(get(data, "memberUuid"), "");
 
         if (!artworkTitle && nextTitle) setArtworkTitle(nextTitle);
         if (!artistName && nextArtistName) setArtistName(nextArtistName);
         if (!artistMemberUuid && nextArtistMemberUuid) setArtistMemberUuid(nextArtistMemberUuid);
       } catch {
-        // 조용히 무시: state만으로도 동작 가능
+        // 무시(상태값만으로도 동작)
       }
     })();
 
@@ -157,21 +144,21 @@ export default function FanLetterCompose() {
       alert("작품 ID를 확인할 수 없습니다.");
       return;
     }
-    if (!content.trim()) {
+
+    const message = content.trim();
+    if (!message) {
       alert("내용을 입력해주세요.");
       return;
     }
 
     setSending(true);
     try {
+      // ✅ 실API 최소 payload만 전송
       await sendFanLetter({
-        artistMemberUuid, // ✅ 필수
-        artworkId: artworkIdNum, // ✅ number
-        artworkTitle, // 레거시 호환
-        artistName, // 옵션 메타
-        senderId: user.memberUuid, // 옵션 메타
-        senderName: user.name, // 레거시 호환
-        content: content.trim(), // ✅ 필수
+        artistMemberUuid,
+        artworkId: artworkIdNum,
+        content: message,
+        artworkTitle,
       });
 
       alert("팬레터가 발송되었습니다.");

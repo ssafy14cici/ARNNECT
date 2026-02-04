@@ -1,73 +1,73 @@
-/* ==========================================================================
-   ARTWORK DETAIL (Immersive Gallery Theme with Parallax)
-========================================================================== */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap');
 
-/* 페이지 전체 컨테이너 */
+/* ==========================================================================
+   RESET & LAYOUT
+========================================================================== */
 .artwork-detail-page {
-  background-color: #050505; /* Deep Black */
+  background-color: #050505;
   color: #fff;
   font-family: 'Pretendard', sans-serif;
   width: 100%;
   min-height: 100vh;
   position: relative;
-  overflow-x: hidden; /* 가로 스크롤 방지 */
 }
 
-/* --- 1. Hero Section (Parallax Effect) --- */
+/* ==========================================================================
+   1. HERO SECTION (Parallax)
+========================================================================== */
 .artwork-hero {
-  height: 100vh; /* 화면 꽉 채움 */
+  height: 100vh;
   width: 100%;
-  position: sticky; /* 스크롤 시 잠시 고정되는 느낌 */
+  position: sticky; /* 스크롤 시 뒤에 고정됨 */
   top: 0;
-  z-index: 1; /* 컨텐츠보다 뒤에 위치 */
+  z-index: 1;
   
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 80px 20px 40px;
+  padding: 0 20px;
   
-  /* 배경을 살짝 어둡게 해서 글씨가 잘 보이게 */
-  background: radial-gradient(circle at center, #1a1a1a 0%, #050505 80%);
+  background: radial-gradient(circle at center, #1a1a1a 0%, #050505 90%);
+  overflow: hidden;
 }
 
 .hero-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 40px;
-  width: 100%;
-  max-width: 1400px;
+  position: relative;
+  z-index: 2;
   text-align: center;
-  animation: fadeUp 1s ease;
-  /* 스크롤 내려가도 내용이 살짝 보이게 투명도 조절 */
-  transition: opacity 0.5s ease;
+  width: 100%;
+  max-width: 1200px;
+  animation: fadeUp 1.2s ease;
 }
 
+/* Title & Artist */
 .hero-title {
   font-family: 'Playfair Display', serif;
-  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  font-size: clamp(2.5rem, 6vw, 5rem);
   font-weight: 400;
-  margin: 0;
+  margin: 0 0 10px 0;
   line-height: 1.1;
   letter-spacing: -0.02em;
-  text-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  text-shadow: 0 20px 40px rgba(0,0,0,0.8);
 }
 
 .hero-artist {
-  font-size: 1.1rem;
-  color: rgba(255,255,255,0.8);
-  font-family: 'Playfair Display', serif; 
+  font-family: 'Playfair Display', serif;
+  font-size: 1.2rem;
+  color: #C8A97E; /* Gold Accent */
   font-style: italic;
+  margin-bottom: 40px;
 }
 
-/* Frame (Image) */
+/* Main Image Frame */
 .hero-frame {
   position: relative;
-  max-height: 60vh;
-  height: auto;
-  box-shadow: 0 30px 60px rgba(0,0,0,0.6); /* 그림자 강화 */
-  transition: transform 0.5s ease;
+  display: inline-block;
+  box-shadow: 0 40px 80px rgba(0,0,0,0.7);
+  border: 1px solid rgba(255,255,255,0.05);
+  background: #000;
 }
 
 .hero-img {
@@ -81,13 +81,13 @@
 /* Scroll Indicator */
 .scroll-indicator {
   position: absolute;
-  bottom: 40px;
+  bottom: 30px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   opacity: 0.6;
   animation: blink 2s infinite;
   z-index: 10;
@@ -96,382 +96,240 @@
   font-size: 0.7rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
+  font-weight: 300;
 }
 .scroll-line {
   width: 1px;
-  height: 60px;
+  height: 50px;
   background: linear-gradient(to bottom, #fff, transparent);
 }
 
-
-/* --- 2. Body Content (Scroll Up Effect) --- */
+/* ==========================================================================
+   2. BODY CONTENT (Overlays the Hero)
+========================================================================== */
 .artwork-body {
   position: relative;
-  z-index: 2; /* Hero보다 위에 위치 */
-  background-color: #050505; /* 본문 배경색 (Hero를 덮음) */
-  margin-top: 100vh; /* Hero 높이만큼 띄워서 시작하는 것처럼 보이지만... */
-  /* 사실 margin-top은 sticky 효과랑 충돌 날 수 있으므로 padding-top으로 조정하거나
-     그냥 자연스럽게 흐르도록 둠. 여기서는 position: relative로 덮는 방식 사용. */
-  
-  width: 100%;
-  min-height: 100vh; /* 최소 높이 확보 */
-  box-shadow: 0 -50px 100px rgba(0,0,0,1); /* 상단 그림자로 자연스러운 연결 */
-  
-  /* 실제 컨텐츠 레이아웃 */
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 100px 24px 150px; /* 상단 패딩 넉넉하게 */
+  z-index: 10; /* Hero 위에 올라옴 */
+  background-color: #050505;
+  box-shadow: 0 -50px 100px rgba(0,0,0,1);
+  padding: 100px 24px 150px;
+  min-height: 100vh;
 }
 
-/* Action Bar */
+.content-wrapper {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+/* Action Bar (Like, Follow) */
 .action-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 80px;
-  padding-bottom: 20px;
+  margin-bottom: 60px;
+  padding-bottom: 24px;
   border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
-.follow-btn {
-  padding: 12px 30px;
-  border: 1px solid rgba(255,255,255,0.3);
-  background: transparent;
+.action-left h2 { margin: 0; font-size: 1.5rem; }
+.action-left p { margin: 4px 0 0; opacity: 0.6; font-size: 0.9rem; }
+
+.action-right {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.btn-icon {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.2);
   color: #fff;
+  padding: 8px 16px;
   border-radius: 50px;
   cursor: pointer;
   transition: all 0.3s;
-  font-size: 0.9rem;
-  letter-spacing: 0.05em;
-}
-.follow-btn:hover { border-color: #fff; background: rgba(255,255,255,0.1); }
-.follow-btn.active { background: #fff; color: #000; border-color: #fff; font-weight: 600; }
-
-.action-right { display: flex; gap: 20px; }
-.like-btn, .share-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: transparent;
-  border: none;
-  color: rgba(255,255,255,0.6);
-  cursor: pointer;
-  font-size: 1rem;
-  transition: color 0.3s;
+  gap: 6px;
+  font-size: 0.9rem;
 }
-.like-btn:hover, .share-btn:hover { color: #fff; }
-.like-btn.active { color: #ff5f5f; }
-.like-btn svg { fill: currentColor; }
+.btn-icon:hover { background: rgba(255,255,255,0.1); border-color: #fff; }
+.btn-icon.active { color: #ff5f5f; border-color: #ff5f5f; }
+.btn-icon.gold { color: #C8A97E; border-color: #C8A97E; }
 
-
-/* Info Section */
+/* Description & Tags */
 .info-section { margin-bottom: 100px; }
-.section-label {
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  color: #C8A97E; /* Gold Accent */
-  margin-bottom: 24px;
-  font-weight: 600;
-}
-.desc-text {
-  font-size: 1.15rem;
+.description {
+  font-size: 1.1rem;
   line-height: 1.8;
-  color: rgba(255,255,255,0.9);
-  margin-bottom: 40px;
+  color: rgba(255,255,255,0.85);
   white-space: pre-wrap;
+  margin-bottom: 30px;
   font-weight: 300;
 }
-.tags-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.tags-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .tag-pill {
-  padding: 8px 16px;
-  background: rgba(255,255,255,0.05);
+  padding: 6px 14px;
+  background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 50px;
-  font-size: 0.85rem;
-  color: rgba(255,255,255,0.7);
-  transition: all 0.3s;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.6);
 }
-.tag-pill:hover { border-color: #C8A97E; color: #C8A97E; }
 
-
-/* Comments */
-.comments-section { margin-bottom: 120px; }
-.comments-section .count { font-weight: 400; color: rgba(255,255,255,0.5); }
-
-
-/* Discovery Grid */
+/* ==========================================================================
+   3. DISCOVERY GRID (Similar & Recommend)
+========================================================================== */
 .discovery-section {
-  border-top: 1px solid rgba(255,255,255,0.1);
-  padding-top: 100px;
-}
-.section-heading {
-  font-family: 'Playfair Display', serif;
-  font-size: 3rem;
-  text-align: center;
-  margin-bottom: 80px;
-  font-weight: 400;
-  color: #fff;
+  margin-top: 80px;
 }
 
-.grid-group { margin-bottom: 80px; }
-.grid-label {
-  font-size: 1.1rem;
-  margin-bottom: 30px;
-  color: #C8A97E;
+.section-title {
   font-family: 'Playfair Display', serif;
-  font-style: italic;
-  border-left: 2px solid #C8A97E;
+  font-size: 2rem;
+  margin-bottom: 30px;
+  color: #fff;
+  border-left: 3px solid #C8A97E;
   padding-left: 16px;
 }
 
 .artwork-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
+  grid-template-columns: repeat(4, 1fr); /* 4열 그리드 */
+  gap: 20px;
 }
 
 .grid-card {
-  aspect-ratio: 3 / 4; /* 세로형 비율 */
-  position: relative;
-  overflow: hidden;
+  background: none;
+  border: none;
+  padding: 0;
   cursor: pointer;
-  background: #111;
+  text-align: left;
+  group: hover;
 }
-.grid-card img {
+
+.card-thumb {
+  width: 100%;
+  aspect-ratio: 3 / 4; /* 세로형 비율 */
+  background: #111;
+  overflow: hidden;
+  position: relative;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.card-thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.6s ease;
-  filter: grayscale(30%);
+  transition: transform 0.6s ease, filter 0.6s ease;
+  filter: grayscale(40%);
 }
-.grid-card:hover img {
+
+.grid-card:hover .card-thumb img {
   transform: scale(1.05);
   filter: grayscale(0%);
 }
-.card-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-.grid-card:hover .card-overlay { opacity: 1; }
-.card-overlay span {
-  border: 1px solid #fff;
-  padding: 10px 20px;
-  border-radius: 50px;
-  font-size: 0.8rem;
-  color: #fff;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
 
+.card-info { font-size: 0.9rem; opacity: 0.8; transition: color 0.3s; }
+.grid-card:hover .card-info { color: #C8A97E; }
 
-/* Responsive */
-@media (max-width: 1024px) {
-  .artwork-grid { grid-template-columns: repeat(2, 1fr); }
-  .hero-title { font-size: 3rem; }
-}
-
-@media (max-width: 768px) {
-  /* 모바일에서는 Parallax 끄고 일반 스크롤 */
-  .artwork-hero { position: relative; height: auto; min-height: 80vh; }
-  .artwork-body { margin-top: 0; }
-  
-  .hero-title { font-size: 2.2rem; }
-  .action-bar { flex-direction: column; gap: 20px; align-items: flex-start; }
-  .action-right { width: 100%; justify-content: space-between; }
-  .artwork-grid { grid-template-columns: 1fr; }
-}
-
-/* Animations */
-@keyframes spin { to { transform: rotate(360deg); } }
-@keyframes fadeUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes blink { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.8; } }
 
 /* ==========================================================================
-   COMMENT SECTION (Minimalist Dark Theme)
-   기존 artworkDetail.css 하단에 추가하세요.
+   4. COMMENTS (Minimalist)
 ========================================================================== */
-
-/* --- Comment Form (Input) --- */
-.comment-form {
-  display: flex;
-  gap: 16px;
-  align-items: flex-end; /* 밑줄 라인 맞춤 */
-  margin-bottom: 40px;
-  background: transparent;
+.comments-container {
+  margin-top: 100px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 60px;
 }
 
-.comment-input {
+/* 입력창 */
+.comment-input-wrap {
+  display: flex;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.3);
+  padding-bottom: 8px;
+  margin-bottom: 40px;
+}
+.input-minimal {
   flex: 1;
   background: transparent;
   border: none;
-  border-bottom: 1px solid rgba(255,255,255,0.2);
-  padding: 12px 0;
   color: #fff;
-  font-family: 'Pretendard', sans-serif;
   font-size: 1rem;
-  border-radius: 0;
-  transition: border-color 0.3s ease;
+  padding: 8px 0;
 }
-
-.comment-input:focus {
-  outline: none;
-  border-bottom-color: #fff; /* 포커스 시 흰색 */
-}
-
-.comment-input::placeholder {
-  color: rgba(255,255,255,0.3);
-}
-
-.comment-submit-btn {
+.input-minimal:focus { outline: none; }
+.btn-submit {
   background: transparent;
-  border: 1px solid rgba(255,255,255,0.3);
   color: #fff;
-  padding: 10px 20px;
-  border-radius: 50px;
+  border: 1px solid rgba(255,255,255,0.4);
+  padding: 6px 16px;
+  border-radius: 20px;
   cursor: pointer;
   font-size: 0.85rem;
-  font-weight: 500;
-  transition: all 0.3s;
-  white-space: nowrap;
-  height: 40px;
 }
+.btn-submit:hover { background: #fff; color: #000; }
 
-.comment-submit-btn:hover {
-  background: #fff;
-  color: #000;
-  border-color: #fff;
-}
-
-
-/* --- Comment List --- */
-.comment-list-ul {
-  list-style: none;
-  padding: 0;
-  margin-top: 40px;
-}
-
-/* --- Comment Item --- */
-.comment-item-li {
-  margin-bottom: 40px;
-  animation: fadeIn 0.5s ease;
-}
-
-.comment-box {
-  /* 박스 배경 제거, 투명하고 미니멀하게 */
-  background: transparent; 
-  padding: 0;
-  border: none;
-  position: relative;
-}
-
-/* Header: 작성자 + 날짜 */
-.comment-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.comment-author {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #fff; /* White */
-  text-decoration: none;
-  transition: color 0.2s;
-}
-.comment-author:hover { color: #C8A97E; /* Gold hover */ }
-
-.comment-date {
-  font-size: 0.75rem;
-  color: rgba(255,255,255,0.3);
-}
-
-/* Body: 내용 */
-.comment-content {
-  font-size: 1rem;
-  line-height: 1.6;
-  color: rgba(255,255,255,0.8);
-  margin-bottom: 12px;
-  white-space: pre-wrap; /* 줄바꿈 허용 */
-}
-
-/* Actions: 답글/수정/삭제 */
-.comment-actions {
-  display: flex;
-  gap: 16px;
+/* 리스트 */
+.comment-list { display: flex; flexDirection: column; gap: 30px; }
+.comment-item { animation: fadeIn 0.5s ease; }
+.comment-meta {
   font-size: 0.8rem;
+  color: rgba(255,255,255,0.4);
+  margin-bottom: 6px;
 }
-
-.action-btn {
+.comment-meta strong { color: #fff; font-weight: 600; margin-right: 6px; }
+.comment-text { font-size: 0.95rem; line-height: 1.5; color: rgba(255,255,255,0.9); }
+.comment-actions { margin-top: 8px; display: flex; gap: 10px; }
+.text-btn {
   background: none;
   border: none;
   color: rgba(255,255,255,0.4);
+  font-size: 0.75rem;
   cursor: pointer;
   padding: 0;
-  transition: color 0.2s;
 }
-.action-btn:hover { color: #fff; text-decoration: underline; }
-.action-btn.delete:hover { color: #ff5f5f; }
+.text-btn:hover { color: #fff; text-decoration: underline; }
 
+/* 대댓글 */
+.replies { margin-top: 12px; padding-left: 16px; border-left: 1px solid rgba(255,255,255,0.1); }
+.reply-item { margin-top: 12px; }
 
-/* --- Edit Mode --- */
-.comment-edit-wrap {
-  display: flex;
-  gap: 10px;
-  align-items: flex-end;
-  width: 100%;
+/* ==========================================================================
+   5. MODAL & UTILS
+========================================================================== */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(5px);
+  z-index: 1000;
+  display: grid; place-items: center;
 }
-.comment-edit-btn {
-  font-size: 0.85rem;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  border: none;
+.modal-box {
+  width: min(500px, 90%);
+  background: #111;
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 30px;
+  border-radius: 0; /* 각진 엣지 */
 }
-.btn-save { background: #C8A97E; color: #000; font-weight: 600; }
-.btn-cancel { background: rgba(255,255,255,0.1); color: #fff; }
-
-
-/* --- Reply Section --- */
-.reply-container {
-  margin-top: 20px;
-  margin-left: 0;
-  padding-left: 20px;
-  border-left: 1px solid rgba(255,255,255,0.1); /* 계층 구조 선 */
+.modal-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+.modal-textarea {
+  width: 100%; background: #000; border: 1px solid #333;
+  color: #fff; padding: 12px; font-size: 0.95rem;
 }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 
-.reply-form-wrap {
-  margin-top: 16px;
-  padding-left: 20px;
-  border-left: 1px solid rgba(255,255,255,0.1);
-}
+/* Animations */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes blink { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.8; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-/* Empty State */
-.comment-empty {
-  text-align: center;
-  color: rgba(255,255,255,0.3);
-  padding: 60px 0;
-  font-size: 0.9rem;
-  letter-spacing: 0.05em;
-  font-style: italic;
-}
-
-.fanletter-btn{
-  margin-left: 10px;
-  padding: 10px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.18);
-  background: rgba(255,255,255,0.06);
-  color: #fff;
-  cursor: pointer;
-}
-.fanletter-btn:hover{
-  background: rgba(255,255,255,0.10);
+/* Responsive */
+@media (max-width: 768px) {
+  .artwork-grid { grid-template-columns: repeat(2, 1fr); }
+  .hero-title { font-size: 3rem; }
+  .artwork-hero { height: 80vh; }
+  .action-bar { flex-direction: column; align-items: flex-start; gap: 20px; }
 }

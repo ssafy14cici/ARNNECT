@@ -143,7 +143,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
   scene.add(gltfScene);
   gltfScene.updateMatrixWorld(true);
 
-  // ✅ 간판 오브젝트(있으면)
+  // 간판 오브젝트(있으면)
   const signObj = findByName(gltfScene, "ARNNECT");
 
   // bbox
@@ -247,7 +247,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     console.warn("[Intro] wave load failed:", e);
     wave = null;
   }
-
+  
   renderer.render(scene, camera);
 
   requestAnimationFrame(() => {
@@ -349,7 +349,7 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
     if (signObj) {
       stickElementToObjectTop(ui.heroSub, signObj, camera, canvas, -40);
     }
-
+    
     renderer.render(scene, camera);
     raf = requestAnimationFrame(tick);
   };

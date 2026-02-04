@@ -1,35 +1,50 @@
 // FE/src/pages/reviews/ReviewDetail.tsx
-import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
-import { useAuthStore } from "../../features/auth/store";
+import "./reviewcreate.css";
+
+import { http } from "../../shared/api/http";
 import { getReviewDetail } from "../../features/reviews/api";
-import { sendFanLetter } from "../../features/fanLetter/api";
+import { useAuthStore } from "../../features/auth/store";
+
+import {
+  resolveMediaUrl,
+  getAccessTokenFromStore,
+  safeToInt,
+} from "../artworks/detail/utils";
+
+import {
+  mapCommentResponseList,
+  mapSingleComment,
+  type LocalComment,
+} from "../artworks/detail/mappers";
 
 export const PROFILE_PATH = (authorId: string) => `/members/${authorId}`;
 
-export type LocalComment = {
-  id: string;
-  parentId: string | null;
-  content: string;
-  authorId?: string;
-  authorName?: string;
-  createdAt?: string;
-};
+type ReviewId = string | number;
 
-type ReviewDetailData = {
-  reviewId: number;
-  artworkId?: number;
+export type ReviewDetailData = {
+  reviewId: ReviewId;
+
+  artworkId: number;
   artworkTitle: string;
-  artistUuid?: string;
-  artistName?: string;
+
+  title: string;
+  content: string;
+
   imageUrl?: string;
-  title?: string;
-  content?: string;
   createdAt?: string;
   tags?: string[];
-  memberUuid?: string;
-  nickname?: string;
+
+  memberUuid: string; // 리뷰 작성자 uuid
+  nickname: string; // 리뷰 작성자 닉네임
+
+  artistUuid: string; // 작품 작가 uuid(서버가 주면)
+  artistName: string;
+
+  likeCount?: number; // 서버가 주면 흡수
+  isLiked?: boolean; // 서버가 주면 흡수
 };
 
 function normalizeId(raw: unknown): string {
@@ -38,38 +53,199 @@ function normalizeId(raw: unknown): string {
   return s.replace(/^review-/, "").replace(/^artwork-/, "");
 }
 
+/**
+ * ✅ 리뷰 이미지 URL도 artwork와 동일하게 처리하되,
+ * 서버가 /review/* 또는 /src/review/* 형태로 올 수 있어 보정
+ */
+function resolveReviewMediaUrl(input?: string | null): string {
+  const url = resolveMediaUrl(input);
+  if (!url) return "";
+
+  // 절대 URL이면 pathname 보정
+  try {
+    const u = new URL(url);
+
+    // /review/* 로 오면 /src/review/* 로 보정
+    if (u.pathname.startsWith("/review/")) {
+      u.pathname = `/src${u.pathname}`;
+      return u.toString();
+    }
+
+    // /src/review/* 는 그대로
+    return u.toString();
+  } catch {
+    // 상대 경로일 수 있음
+    if (url.startsWith("/review/")) return `/src${url}`;
+    return url;
+  }
+}
+
+function unwrapAxiosData(res: unknown): unknown {
+  return res && typeof res === "object" && "data" in (res as any) ? (res as any).data : res;
+}
+
+function authConfig() {
+  const token = getAccessTokenFromStore();
+  return {
+    withCredentials: true,
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  };
+}
+
+// ------------------- API (Comments / Follow / Like) -------------------
+const COMMENTS_PATH = "/api/v1/comments";
+const FOLLOW_TOGGLE_PATH = "/api/v1/follow";
+
+/**
+ * 댓글 목록(리뷰): BE 구현이 갈릴 수 있어서 후보 URL을 여러개 시도
+ * - 유저가 말한 artwork는 /comments?artworkId=3
+ * - 리뷰도 비슷하게 /comments?reviewId=xx 일 가능성 높음
+ * - 공용스펙(targetType/targetId)도 같이 커버
+ */
+async function fetchReviewComments(reviewId: number): Promise<LocalComment[]> {
+  const tryUrls = [
+    `${COMMENTS_PATH}?reviewId=${encodeURIComponent(String(reviewId))}`,
+    `${COMMENTS_PATH}?review=${encodeURIComponent(String(reviewId))}`,
+    `${COMMENTS_PATH}?target=REVIEW&id=${encodeURIComponent(String(reviewId))}`,
+    `${COMMENTS_PATH}?targetType=REVIEW&targetId=${encodeURIComponent(String(reviewId))}`,
+    `${COMMENTS_PATH}?targetType=REVIEW&targetId=${encodeURIComponent(String(reviewId))}&page=0&size=200`,
+  ];
+
+  let lastErr: unknown = null;
+
+  for (const url of tryUrls) {
+    try {
+      const res = await http.get(url, authConfig());
+      const payload = unwrapAxiosData(res);
+      return mapCommentResponseList(payload);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+
+  throw lastErr;
+}
+
+async function createReviewComment(args: {
+  reviewId: number;
+  content: string;
+  parentCommentId?: number | null;
+}): Promise<LocalComment | null> {
+  const res = await http.post(
+    COMMENTS_PATH,
+    {
+      targetType: "REVIEW",
+      targetId: args.reviewId,
+      content: args.content,
+      parentCommentId: args.parentCommentId ?? null,
+    },
+    authConfig(),
+  );
+
+  const payload = unwrapAxiosData(res);
+  return mapSingleComment(payload);
+}
+
+async function updateComment(commentId: string, content: string): Promise<void> {
+  await http.put(`${COMMENTS_PATH}/${encodeURIComponent(commentId)}`, { content }, authConfig());
+}
+
+async function deleteComment(commentId: string): Promise<void> {
+  await http.delete(`${COMMENTS_PATH}/${encodeURIComponent(commentId)}`, authConfig());
+}
+
+async function toggleFollow(targetMemberUuid: string): Promise<void> {
+  // 스펙: POST /follow/{memberUuid} (toggle)
+  await http.post(`${FOLLOW_TOGGLE_PATH}/${encodeURIComponent(targetMemberUuid)}`, {}, authConfig());
+}
+
+/**
+ * 리뷰 좋아요는 현재 명세가 불명확해서:
+ * - UI는 기본 제공(낙관적 토글)
+ * - 서버 엔드포인트 생기면 여기만 연결
+ */
+async function toggleReviewLikeOnServer(_reviewId: number): Promise<{ isLiked?: boolean; likeCount?: number } | null> {
+  // TODO: 서버 라우트 확정되면 연결
+  return null;
+}
+
+// ------------------- Component -------------------
 export default function ReviewDetail() {
   const { reviewId = "" } = useParams<{ reviewId: string }>();
   const nav = useNavigate();
 
-  const normalizedReviewId = useMemo(() => normalizeId(reviewId), [reviewId]);
-
   const user = useAuthStore((s) => s.user);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+
+  const normalizedReviewId = useMemo(() => normalizeId(reviewId), [reviewId]);
+
+  const numericReviewId = useMemo(() => {
+    const n = Number.parseInt(String(normalizedReviewId), 10);
+    return Number.isFinite(n) ? n : undefined;
+  }, [normalizedReviewId]);
+
+  // ✅ AuthUser에는 nickname이 없으므로 name만 사용
+  const myDisplayName = useMemo(() => {
+    const n = String(user?.name ?? "").trim();
+    return n || "나";
+  }, [user?.name]);
 
   const [review, setReview] = useState<ReviewDetailData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [imageError, setImageError] = useState(false);
+
+  // 좋아요 UI 상태(서버 값 있으면 주입)
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
 
-  const [fanLetterOpen, setFanLetterOpen] = useState(false);
-  const [fanLetterText, setFanLetterText] = useState("");
-  const [fanLetterSending, setFanLetterSending] = useState(false);
+  // 팔로우 UI 상태(초기값은 false, 실제 여부는 리스트 API 붙이면 됨)
+  const [isFollowing, setIsFollowing] = useState(false);
 
+  // 댓글
+  const [comments, setComments] = useState<LocalComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsError, setCommentsError] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState("");
+
+  const isOwner = useMemo(() => {
+    const me = String(user?.memberUuid ?? "").trim();
+    const owner = String(review?.memberUuid ?? "").trim();
+    return !!me && !!owner && me === owner;
+  }, [user?.memberUuid, review?.memberUuid]);
+
+  const rootComments = useMemo(() => comments.filter((c) => c.parentId == null), [comments]);
+
+  const repliesByParent = useMemo(() => {
+    const m = new Map<string, LocalComment[]>();
+    for (const c of comments) {
+      if (!c.parentId) continue;
+      const list = m.get(c.parentId) ?? [];
+      list.push(c);
+      m.set(c.parentId, list);
+    }
+    return m;
+  }, [comments]);
+
+  // 상세 로드
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
       try {
         setLoading(true);
+        setImageError(false);
+        setReview(null);
+
         if (!normalizedReviewId) throw new Error("리뷰 ID가 없습니다.");
 
-        // ✅ /api/v1/reviews/{id} 로 호출 (절대 /detail 붙이지 않음)
-        const data = await getReviewDetail(normalizedReviewId);
+        const data = (await getReviewDetail(normalizedReviewId)) as ReviewDetailData;
 
         if (cancelled) return;
-        setReview(data as ReviewDetailData);
+        setReview(data);
+
+        if (typeof data?.isLiked === "boolean") setIsLiked(data.isLiked);
+        if (typeof data?.likeCount === "number" && Number.isFinite(data.likeCount)) setLikeCount(data.likeCount);
       } catch (e) {
         console.error(e);
         if (!cancelled) setReview(null);
@@ -83,6 +259,36 @@ export default function ReviewDetail() {
     };
   }, [normalizedReviewId]);
 
+  // 댓글 로드
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (!numericReviewId || !Number.isFinite(numericReviewId)) return;
+
+      try {
+        setCommentsLoading(true);
+        setCommentsError(null);
+
+        const list = await fetchReviewComments(numericReviewId);
+
+        if (cancelled) return;
+        setComments(list);
+      } catch (e) {
+        console.error(e);
+        if (cancelled) return;
+        setComments([]);
+        setCommentsError("댓글을 불러오지 못했습니다.");
+      } finally {
+        if (!cancelled) setCommentsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [numericReviewId]);
+
   useEffect(() => {
     if (!loading && !review) {
       const t = setTimeout(() => nav("/", { replace: true }), 1200);
@@ -90,175 +296,362 @@ export default function ReviewDetail() {
     }
   }, [loading, review, nav]);
 
-  const onSendFanLetter = async (content: string) => {
-    if (!isLoggedIn || !user?.memberUuid) return alert("로그인 후 이용해주세요.");
-    if (!review) return;
+  const onClickProfile = () => {
+    if (!review?.memberUuid) return;
+    nav(PROFILE_PATH(review.memberUuid));
+  };
 
-    const artworkId = review.artworkId;
-    const artistMemberUuid = review.artistUuid;
+  const onGoArtwork = () => {
+    if (!review?.artworkId) return;
+    nav(`/artworks/${review.artworkId}`);
+  };
 
-    if (!artworkId || !artistMemberUuid) return alert("팬레터에 필요한 정보가 없습니다.");
+  const onGoEdit = () => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+    if (!isOwner) return alert("본인 리뷰만 수정할 수 있습니다.");
+    nav(`/reviews/${normalizedReviewId}/edit`);
+  };
 
-    setFanLetterSending(true);
+  const onDelete = async () => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+    if (!isOwner) return alert("본인 리뷰만 삭제할 수 있습니다.");
+    if (!window.confirm("정말 삭제하시겠습니까?")) return;
+
+    // TODO: 리뷰 삭제 API 연결 필요
+    alert("삭제 API 연결 필요(현재 UI만 준비됨)");
+  };
+
+  const onToggleLike = async () => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+
+    // ✅ 낙관적 UI
+    const prevLiked = isLiked;
+    const prevCount = likeCount;
+
+    const nextLiked = !prevLiked;
+    setIsLiked(nextLiked);
+    setLikeCount((cnt) => (nextLiked ? cnt + 1 : Math.max(0, cnt - 1)));
+
     try {
-      await sendFanLetter({
-        artistMemberUuid,
-        artworkId,
-        artworkTitle: review.artworkTitle,
-        artistName: review.artistName ?? "",
-        senderId: user.memberUuid,
-        senderName: user.name,
-        content,
-      });
-      alert("팬레터가 발송되었습니다.");
-      setFanLetterOpen(false);
-      setFanLetterText("");
+      if (!numericReviewId) return;
+
+      const res = await toggleReviewLikeOnServer(numericReviewId);
+      if (res) {
+        if (typeof res.isLiked === "boolean") setIsLiked(res.isLiked);
+        if (typeof res.likeCount === "number" && Number.isFinite(res.likeCount)) setLikeCount(res.likeCount);
+      }
     } catch (e) {
       console.error(e);
-      alert("팬레터 발송 실패");
+      // 롤백
+      setIsLiked(prevLiked);
+      setLikeCount(prevCount);
+      alert("좋아요 처리 실패");
+    }
+  };
+
+  const onToggleFollow = async () => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+
+    // 팔로우 대상으로: 작가 UUID가 있으면 작가, 없으면 리뷰 작성자
+    const target = String(review?.artistUuid || review?.memberUuid || "").trim();
+    if (!target) return;
+
+    const prev = isFollowing;
+    setIsFollowing(!prev);
+
+    try {
+      await toggleFollow(target);
+    } catch (e) {
+      console.error(e);
+      setIsFollowing(prev);
+      alert("팔로우 처리 실패");
+    }
+  };
+
+  const refetchComments = async () => {
+    if (!numericReviewId || !Number.isFinite(numericReviewId)) return;
+
+    setCommentsLoading(true);
+    try {
+      const list = await fetchReviewComments(numericReviewId);
+      setComments(list);
+    } catch (e) {
+      console.error(e);
+      setComments([]);
+      setCommentsError("댓글을 불러오지 못했습니다.");
     } finally {
-      setFanLetterSending(false);
+      setCommentsLoading(false);
+    }
+  };
+
+  const onSubmitComment = async () => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+    if (!numericReviewId || !Number.isFinite(numericReviewId)) return;
+
+    const trimmed = commentText.trim();
+    if (!trimmed) return;
+
+    const tempId = `temp-${crypto.randomUUID()}`;
+    setComments((prev) => [
+      ...prev,
+      { id: tempId, parentId: null, content: trimmed, authorName: myDisplayName },
+    ]);
+    setCommentText("");
+
+    try {
+      const created = await createReviewComment({ reviewId: numericReviewId, content: trimmed, parentCommentId: null });
+      if (created) {
+        setComments((prev) => prev.map((c) => (c.id === tempId ? created : c)));
+      } else {
+        await refetchComments();
+      }
+    } catch (e) {
+      console.error(e);
+      setComments((prev) => prev.filter((c) => c.id !== tempId));
+      alert("댓글 작성 실패");
+    }
+  };
+
+  const onEditComment = async (id: string, current: string) => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+
+    const next = prompt("수정 내용", current);
+    if (next == null) return;
+
+    const value = next.trim();
+    if (!value) return;
+
+    const prev = comments;
+    setComments((cur) => cur.map((c) => (c.id === id ? { ...c, content: value } : c)));
+
+    try {
+      await updateComment(id, value);
+    } catch (e) {
+      console.error(e);
+      setComments(prev);
+      alert("댓글 수정 실패");
+    }
+  };
+
+  const onDeleteComment = async (id: string) => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+    if (!window.confirm("삭제하시겠습니까?")) return;
+
+    const prev = comments;
+    setComments((cur) => cur.filter((c) => c.id !== id && c.parentId !== id));
+
+    try {
+      await deleteComment(id);
+    } catch (e) {
+      console.error(e);
+      setComments(prev);
+      alert("댓글 삭제 실패");
+    }
+  };
+
+  const onReplyComment = async (parentId: string) => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+    if (!numericReviewId || !Number.isFinite(numericReviewId)) return;
+
+    const reply = prompt("답글 내용");
+    if (reply == null) return;
+
+    const trimmed = reply.trim();
+    if (!trimmed) return;
+
+    const parentNum = safeToInt(parentId);
+    if (parentNum == null) return alert("부모 댓글 ID 파싱 실패");
+
+    const tempId = `temp-${crypto.randomUUID()}`;
+    setComments((prev) => [
+      ...prev,
+      { id: tempId, parentId, content: trimmed, authorName: myDisplayName },
+    ]);
+
+    try {
+      const created = await createReviewComment({
+        reviewId: numericReviewId,
+        content: trimmed,
+        parentCommentId: parentNum,
+      });
+
+      if (created) {
+        setComments((prev) => prev.map((c) => (c.id === tempId ? created : c)));
+      } else {
+        await refetchComments();
+      }
+    } catch (e) {
+      console.error(e);
+      setComments((prev) => prev.filter((c) => c.id !== tempId));
+      alert("답글 작성 실패");
     }
   };
 
   if (loading) {
     return (
-      <div style={{ maxWidth: 980, margin: "0 auto", padding: "120px 24px" }}>
-        <h2 style={{ margin: 0 }}>Loading...</h2>
+      <div className="review-detail-page">
+        <div className="review-detail-container">
+          <h2 className="review-detail-loading">Loading...</h2>
+        </div>
       </div>
     );
   }
 
   if (!review) {
     return (
-      <div style={{ maxWidth: 980, margin: "0 auto", padding: "120px 24px" }}>
-        <h2 style={{ margin: 0 }}>리뷰를 찾을 수 없습니다.</h2>
-        <button style={{ marginTop: 16 }} onClick={() => nav("/")} type="button">
-          홈으로
-        </button>
+      <div className="review-detail-page">
+        <div className="review-detail-container">
+          <h2 className="review-detail-loading">리뷰를 찾을 수 없습니다.</h2>
+          <button className="rd-btn" onClick={() => nav("/")} type="button">
+            홈으로
+          </button>
+        </div>
       </div>
     );
   }
 
+  const imgSrc = resolveReviewMediaUrl(review.imageUrl);
+
   return (
-    <div style={{ maxWidth: 980, margin: "0 auto", padding: "110px 24px 60px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center" }}>
-        <div>
-          <h2 style={{ margin: 0 }}>{review.title ?? "Untitled"}</h2>
-          <div style={{ marginTop: 6, opacity: 0.72 }}>
-            {review.nickname ?? "—"} · {review.createdAt ? new Date(review.createdAt).toLocaleString() : ""}
-          </div>
-          <div style={{ marginTop: 6, opacity: 0.8 }}>
-            {review.artworkTitle} · {review.artistName ?? "Unknown Artist"}
-          </div>
-        </div>
+    <div className="review-detail-page">
+      <div className="review-detail-container">
+        <header className="rd-header">
+          <div className="rd-title-block">
+            <h2 className="rd-title">{review.title ?? "Untitled"}</h2>
 
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            type="button"
-            onClick={() => {
-              setIsLiked((prev) => {
-                setLikeCount((cnt) => (prev ? cnt - 1 : cnt + 1));
-                return !prev;
-              });
-            }}
-          >
-            {isLiked ? "♥" : "♡"} {likeCount}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (!isLoggedIn) return alert("로그인이 필요합니다.");
-              setFanLetterOpen(true);
-            }}
-          >
-            FanLetter
-          </button>
-        </div>
-      </div>
-
-      <div style={{ marginTop: 22 }}>
-        {!review.imageUrl ? (
-          <div style={{ width: "100%", height: 240, background: "#f5f5f5", display: "grid", placeItems: "center" }}>
-            이미지가 없습니다.
-          </div>
-        ) : imageError ? (
-          <div style={{ width: "100%", height: 240, background: "#eee", display: "grid", placeItems: "center" }}>
-            이미지 로드 실패
-          </div>
-        ) : (
-          <img
-            src={review.imageUrl}
-            alt={review.title ?? "review"}
-            style={{ width: "100%", maxHeight: 520, objectFit: "cover", borderRadius: 12 }}
-            onError={() => setImageError(true)}
-          />
-        )}
-      </div>
-
-      <div style={{ marginTop: 18, lineHeight: 1.7 }}>
-        <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{review.content ?? ""}</p>
-        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {(review.tags ?? []).map((t) => (
-            <span key={t} style={{ padding: "4px 10px", border: "1px solid #ddd", borderRadius: 999 }}>
-              #{t}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {fanLetterOpen && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.55)",
-            display: "grid",
-            placeItems: "center",
-            padding: 24,
-            zIndex: 1000,
-          }}
-          onClick={() => setFanLetterOpen(false)}
-        >
-          <div
-            style={{ width: "min(520px, 100%)", background: "#fff", borderRadius: 14, padding: 16 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h3 style={{ margin: 0 }}>Send FanLetter</h3>
-              <button type="button" onClick={() => setFanLetterOpen(false)}>
-                X
+            <div className="rd-meta">
+              <button type="button" className="rd-link" onClick={onClickProfile}>
+                {review.nickname ?? "—"}
               </button>
+              <span className="rd-dot">·</span>
+              <span>{review.createdAt ? new Date(review.createdAt).toLocaleString() : ""}</span>
             </div>
 
-            <textarea
-              value={fanLetterText}
-              onChange={(e) => setFanLetterText(e.target.value)}
-              rows={6}
-              placeholder="내용을 입력하세요"
-              style={{ width: "100%", marginTop: 12, padding: 12, resize: "vertical" }}
+            <div className="rd-submeta">
+              <button type="button" className="rd-link" onClick={onGoArtwork}>
+                {review.artworkTitle}
+              </button>
+              <span className="rd-dot">·</span>
+              <span>{review.artistName ?? "Unknown Artist"}</span>
+            </div>
+          </div>
+
+          <div className="rd-actions">
+            <button type="button" className="rd-btn" onClick={onToggleLike}>
+              {isLiked ? "♥" : "♡"} {likeCount}
+            </button>
+
+            <button type="button" className="rd-btn" onClick={onToggleFollow}>
+              {isFollowing ? "Following" : "Follow"}
+            </button>
+
+            {isOwner && (
+              <>
+                <button type="button" className="rd-btn" onClick={onGoEdit}>
+                  수정
+                </button>
+                <button type="button" className="rd-btn danger" onClick={onDelete}>
+                  삭제
+                </button>
+              </>
+            )}
+          </div>
+        </header>
+
+        <section className="rd-image">
+          {!imgSrc ? (
+            <div className="rd-image-fallback">이미지가 없습니다.</div>
+          ) : imageError ? (
+            <div className="rd-image-fallback">이미지 로드 실패</div>
+          ) : (
+            <img
+              src={imgSrc}
+              alt={review.title ?? "review"}
+              className="rd-image-img"
+              onError={() => setImageError(true)}
             />
+          )}
+        </section>
 
-            <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button type="button" onClick={() => setFanLetterOpen(false)}>
-                취소
-              </button>
-              <button
-                type="button"
-                disabled={fanLetterSending}
-                onClick={() => {
-                  const v = fanLetterText.trim();
-                  if (!v) return alert("내용을 입력해주세요.");
-                  onSendFanLetter(v);
-                }}
-              >
-                {fanLetterSending ? "Sending..." : "발송"}
-              </button>
-            </div>
+        <section className="rd-body">
+          <p className="rd-content" style={{ whiteSpace: "pre-wrap" }}>
+            {review.content ?? ""}
+          </p>
+
+          <div className="rd-tags">
+            {(review.tags ?? []).map((t) => (
+              <span key={t} className="rd-tag">
+                #{t}
+              </span>
+            ))}
           </div>
-        </div>
-      )}
+        </section>
+
+        {/* Comments */}
+        <section className="rd-comments">
+          <div className="rd-comments-head">
+            <h3 className="rd-comments-title">Comments ({comments.length})</h3>
+          </div>
+
+          {commentsLoading && <div className="rd-comments-hint">Loading comments...</div>}
+          {commentsError && <div className="rd-comments-hint">{commentsError}</div>}
+
+          <div className="rd-comment-input">
+            <input
+              className="rd-comment-input-field"
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="댓글을 입력하세요..."
+            />
+            <button type="button" className="rd-btn" onClick={onSubmitComment}>
+              등록
+            </button>
+          </div>
+
+          <div className="rd-comment-list">
+            {rootComments.map((c) => (
+              <div key={c.id} className="rd-comment-item">
+                <div className="rd-comment-meta">
+                  <strong>{c.authorName ?? "User"}</strong>
+                  <span className="rd-dot">·</span>
+                  <span>{c.createdAt ? new Date(c.createdAt).toLocaleDateString() : ""}</span>
+                </div>
+
+                <div className="rd-comment-text">{c.content}</div>
+
+                <div className="rd-comment-actions">
+                  <button type="button" className="rd-link" onClick={() => onEditComment(c.id, c.content)}>
+                    수정
+                  </button>
+                  <span className="rd-dot">·</span>
+                  <button type="button" className="rd-link" onClick={() => onDeleteComment(c.id)}>
+                    삭제
+                  </button>
+                  <span className="rd-dot">·</span>
+                  <button type="button" className="rd-link" onClick={() => onReplyComment(c.id)}>
+                    답글
+                  </button>
+                </div>
+
+                {(repliesByParent.get(c.id) ?? []).length > 0 && (
+                  <div className="rd-replies">
+                    {(repliesByParent.get(c.id) ?? []).map((r) => (
+                      <div key={r.id} className="rd-reply-item">
+                        <div className="rd-comment-meta">
+                          <strong>{r.authorName ?? "User"}</strong>
+                          <span className="rd-dot">·</span>
+                          <span>{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ""}</span>
+                        </div>
+                        <div className="rd-comment-text">{r.content}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

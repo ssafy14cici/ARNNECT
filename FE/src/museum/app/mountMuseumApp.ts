@@ -64,6 +64,11 @@ export function mountMuseumApp(args: {
   canvas: HTMLCanvasElement;
   uiRoot?: HTMLElement;
   onExitToExterior?: () => void;
+  // ✅ 추가: 인트로에서 문 들어가면(hold 성공 + 진입 모션 끝) 호출
+  onEnteredToHall?: (startWaypointId: number) => void;
+
+  // ✅ 추가: true면 mountMuseumApp이 mainHallFree를 직접 실행하지 않음(라우팅으로 넘길 때)
+  introOnly?: boolean;
 }) {
   const canvas = args.canvas;
   const uiRoot = args.uiRoot ?? document.body;
@@ -139,7 +144,7 @@ export function mountMuseumApp(args: {
 
     mountIntro(canvas, {
       uiMount,
-      glbUrl: asset("museum/models/museum/intro_2.glb"),
+      glbUrl: asset("museum/models/museum/intro_53.glb"),
       prefetchUrl: asset("museum/models/museum/mh_add_5.glb"),
 
       doorName: "USA0_USA0_0",
@@ -156,7 +161,18 @@ export function mountMuseumApp(args: {
       startPose: restoredPose,
 
       onReady: (pose) => savePose(pose),
-      onEntered: () => startMainHall(DEFAULT_HALL_START_WP),
+      onEntered: () => {
+          const wp = DEFAULT_HALL_START_WP;
+
+          // ✅ 방법1: 라우팅으로 넘길 경우
+          if (args.onEnteredToHall) {
+            args.onEnteredToHall(wp);
+            return;
+          }
+
+          // ✅ 기존 방식 유지(한 페이지에서 계속 돌릴 경우)
+          if (!args.introOnly) startMainHall(wp);
+        },
     })
       .then((rt) => {
         if (disposed) {

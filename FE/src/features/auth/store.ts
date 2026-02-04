@@ -2,13 +2,10 @@
 import { create } from "zustand";
 
 export type AppRole = "general" | "artist";
-
-export type AuthUser = {
-  memberUuid: string;
-  name: string;
-};
+export type AuthUser = { memberUuid: string; name: string };
 
 type AuthState = {
+  hydrated: boolean;          // ✅ 추가
   isLoggedIn: boolean;
   token: string | null;
   role: AppRole | null;
@@ -41,6 +38,7 @@ export const useAuthStore = create<AuthState>((set) => {
   const saved = load();
 
   return {
+    hydrated: false, // ✅ 초기 false
     isLoggedIn: !!saved?.token,
     token: saved?.token ?? null,
     role: saved?.role ?? null,
@@ -49,6 +47,7 @@ export const useAuthStore = create<AuthState>((set) => {
     hydrate: () => {
       const next = load();
       set({
+        hydrated: true, // ✅ hydrate 끝
         isLoggedIn: !!next?.token,
         token: next?.token ?? null,
         role: (next?.role as AppRole) ?? null,
@@ -57,12 +56,12 @@ export const useAuthStore = create<AuthState>((set) => {
     },
 
     login: ({ token, role, user }) => {
-      set({ isLoggedIn: true, token, role, user });
+      set({ hydrated: true, isLoggedIn: true, token, role, user });
       save({ token, role, user });
     },
 
     logout: () => {
-      set({ isLoggedIn: false, token: null, role: null, user: null });
+      set({ hydrated: true, isLoggedIn: false, token: null, role: null, user: null });
       if (USE_MOCK) localStorage.removeItem(KEY);
     },
   };

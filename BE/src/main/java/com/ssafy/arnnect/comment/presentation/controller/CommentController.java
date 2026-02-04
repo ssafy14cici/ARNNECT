@@ -19,7 +19,7 @@ public class CommentController {
     private final CommentService service;
 
     @PostMapping()
-    public ResponseEntity<Void> createComment(CreateCommentRequest request){
+    public ResponseEntity<Void> createComment(@RequestBody CreateCommentRequest request){
         String memberUuid = SecurityUtil.getCurrentMemberUuid();
         service.createComment(request, memberUuid);
         return ResponseEntity.ok().build();

@@ -20,7 +20,7 @@ export type Comment = {
   authorId?: string;
   authorName?: string;
 
-  createdAt?: string; // ISO string
+  createdAt?: string; // ISO string (BE에서 안 주면 undefined)
 };
 
 /** 댓글 생성 입력(프론트 표준) */
@@ -45,17 +45,15 @@ export type CommentHandlers = {
 
 export type ProfilePathFn = (authorId: string) => string;
 
-/* ----------------- 유틸(실API 매핑용) ----------------- */
+/* ----------------- 유틸(실API 매핑/요청용) ----------------- */
+
+export function normalizeId(v: unknown): CommentId {
+  return String(v ?? "").trim();
+}
 
 /** parentId(string|null)를 BE가 기대할 수 있는 number|null로 변환 */
 export function toParentCommentId(parentId?: CommentId | null): number | null {
   if (!parentId) return null;
-  const n = parseInt(String(parentId), 10);
+  const n = Number(String(parentId));
   return Number.isFinite(n) ? n : null;
-}
-
-/** id가 number/string 섞여도 string으로 통일 */
-export function normalizeId(v: unknown): CommentId {
-  const s = String(v ?? "").trim();
-  return s;
 }
