@@ -56,4 +56,9 @@ public class ReviewController {
     public ResponseEntity<ReviewDetailResponse> getReviewDetail(@PathVariable Long reviewId){
         return ResponseEntity.ok(service.getReviewDetail(reviewId));
     }
+
+    @GetMapping("/feed")
+    public ResponseEntity<List<ReviewResponse>> getReviewFeedList(){
+        return ResponseEntity.ok(service.getReviewFeedList());
+    }
 }
