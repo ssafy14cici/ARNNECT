@@ -23,6 +23,7 @@ public class RemindQuizRequest {
 
     @Getter
     @AllArgsConstructor
+    @Builder
     public static class ReviewPayload { // static으로 선언
         private Long reviewId;
         private String title;
