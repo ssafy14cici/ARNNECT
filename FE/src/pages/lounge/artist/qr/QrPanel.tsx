@@ -1,71 +1,42 @@
-import { useEffect, useRef } from "react";
+// FE/src/pages/lounge/artist/qr/QrPanel.tsx
+import { useMemo } from "react";
 import QRCode from "react-qr-code";
-import { updateExhibitionByCode } from "../../../../features/tickets/api";
-import { downloadSvgAsPng, svgToDataUrl } from "../../../../features/tickets/qrDownload";
-import { normalizeImageToSrc } from "./useIssuedTickets";
+import { renderToStaticMarkup } from "react-dom/server";
+
+import { downloadSvgAsPng } from "../../../../features/tickets/qrDownload";
+import { resolveTicketMedia } from "../../../../features/tickets/resolveTicketMedia";
 
 type Props = {
   ticketCode: string;
-  qrValue: string;
   busy: boolean;
 
-  qrImageSrc: string;
-  setQrImageSrc: (v: string) => void;
-
-  onReloadIssued: () => Promise<void>;
+  // 서버가 준 qrImageName(예: "src/ticket/uuid") 또는 절대URL
+  qrImageName: string;
 };
 
-export default function QrPanel({
-  ticketCode,
-  qrValue,
-  busy,
-  qrImageSrc,
-  setQrImageSrc,
-  onReloadIssued,
-}: Props) {
-  const qrWrapRef = useRef<HTMLDivElement | null>(null);
+export default function QrPanel({ ticketCode, busy, qrImageName }: Props) {
+  const qrValue = useMemo(() => ticketCode, [ticketCode]);
 
   const downloadQr = async () => {
-    const wrap = qrWrapRef.current;
-    const svg = wrap?.querySelector("svg") as SVGSVGElement | null;
+    // ✅ DOM에 svg가 없더라도 ticketCode로 SVG를 생성해서 다운로드
+    const markup = renderToStaticMarkup(<QRCode value={qrValue} size={220} />);
+    const doc = new DOMParser().parseFromString(markup, "image/svg+xml");
+    const svg = doc.querySelector("svg") as SVGSVGElement | null;
     if (!svg) return;
 
     await downloadSvgAsPng(svg, `QR_${ticketCode || "ticket"}.png`);
   };
 
-  // ✅ QR SVG를 base64(data-url)로 만들어 서버(image)에 저장 (mock에서 재방문/목록용)
-  useEffect(() => {
-    if (!ticketCode) return;
-    if (busy) return;
-    if (qrImageSrc) return;
-
-    const timer = setTimeout(async () => {
-      const wrap = qrWrapRef.current;
-      const svg = wrap?.querySelector("svg") as SVGSVGElement | null;
-      if (!svg) return;
-
-      const dataUrl = svgToDataUrl(svg);
-      setQrImageSrc(dataUrl);
-
-      const base64Only = dataUrl.split(",")[1] ?? "";
-
-      try {
-        await updateExhibitionByCode(ticketCode, { image: base64Only } as any);
-        await onReloadIssued();
-      } catch (e) {
-        console.error("자동 업로드 실패", e);
-      }
-    }, 120);
-
-    return () => clearTimeout(timer);
-  }, [ticketCode, busy, qrImageSrc, setQrImageSrc, onReloadIssued]);
-
   return (
     <div className="loungeSubPanel" style={{ marginTop: 40 }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
-        <div ref={qrWrapRef} style={{ background: "#fff", padding: 20, borderRadius: 16 }}>
-          {qrImageSrc ? (
-            <img src={normalizeImageToSrc(qrImageSrc)} alt="QR" style={{ width: 220, height: 220 }} />
+        <div style={{ background: "#fff", padding: 20, borderRadius: 16 }}>
+          {qrImageName ? (
+            <img
+              src={resolveTicketMedia(qrImageName)}
+              alt="QR"
+              style={{ width: 220, height: 220 }}
+            />
           ) : (
             <QRCode value={qrValue} size={220} />
           )}
@@ -74,6 +45,7 @@ export default function QrPanel({
         <div className="loungeSubActions" style={{ gap: 12 }}>
           <button
             className="loungeSubBtn"
+            disabled={busy}
             onClick={() => {
               navigator.clipboard.writeText(ticketCode);
               alert("복사됨");
@@ -82,7 +54,7 @@ export default function QrPanel({
             코드 복사
           </button>
 
-          <button className="loungeSubBtn" onClick={downloadQr} style={{ borderColor: "#fff" }}>
+          <button className="loungeSubBtn" disabled={busy} onClick={downloadQr} style={{ borderColor: "#fff" }}>
             QR 저장
           </button>
         </div>

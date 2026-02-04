@@ -2,6 +2,9 @@
 import { http } from "../../../shared/api/http";
 import type { SearchArtwork } from "../model/types";
 
+// ✅ DEV 프록시 + /src prefix 보정 + PROD origin 붙이기
+import { resolveMediaUrl } from "../../../pages/artworks/detail/utils";
+
 type JsonObject = Record<string, unknown>;
 function isObject(v: unknown): v is JsonObject {
   return typeof v === "object" && v !== null;
@@ -72,13 +75,18 @@ function toSearchArtwork(v: unknown): SearchArtwork | null {
   const x = v as RawArtwork;
 
   const id = asString(x.artworkId, "") || asString(x.id, "");
-  const src =
+
+  // ✅ 원본 src 후보
+  const srcRaw =
     asString(x.imageUrl, "") ||
     asString(x.thumbnailUrl, "") ||
     asString(x.thumbnail, "") ||
     asString(x.src, "");
 
-  if (!id || !src) return null;
+  if (!id || !srcRaw) return null;
+
+  // ✅ 정규화 적용
+  const src = resolveMediaUrl(srcRaw);
 
   const title = asString(x.title, "") || undefined;
   const artist =
@@ -91,10 +99,18 @@ function toSearchArtwork(v: unknown): SearchArtwork | null {
 
   const createdAt = asString(x.createdAt, "") || asString(x.date, "") || undefined;
 
+  // ✅ 썸네일도 정규화 (없으면 src 사용)
+  const thumbRaw =
+    asString(x.thumbnailUrl, "") ||
+    asString(x.thumbnail, "") ||
+    srcRaw;
+
+  const thumbnail = resolveMediaUrl(thumbRaw) || src;
+
   return {
     id,
     src,
-    thumbnail: asString(x.thumbnailUrl, "") || asString(x.thumbnail, "") || src,
+    thumbnail,
     title,
     artist,
     likes: asNumber(x.likes, 0),

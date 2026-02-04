@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "../../features/auth/store";
 import "./search.css";
-
+import { resolveMediaUrl } from "../artworks/detail/utils"; 
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "@studio-freight/lenis";
@@ -418,7 +418,7 @@ export default function Search() {
       {items.map((it) => (
         <Link to={it.href} key={it.key} className="search-card">
           <div className="search-card-media">
-            <img src={it.thumb} alt={it.title} loading="lazy" />
+            <img src={resolveMediaUrl(it.thumb)} alt={it.title} loading="lazy" />
             <div className="search-card-overlay">
               <span className="view-btn">View Detail</span>
             </div>

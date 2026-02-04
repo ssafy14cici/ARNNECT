@@ -43,9 +43,11 @@ export type ReviewDetailData = {
   artistUuid: string; // 작품 작가 uuid(서버가 주면)
   artistName: string;
 
-  likeCount?: number; // 서버가 주면 흡수
-  isLiked?: boolean; // 서버가 주면 흡수
+  likeCount?: number;
+  isLiked?: boolean;
 };
+
+type UiComment = LocalComment & { isMine?: boolean };
 
 function normalizeId(raw: unknown): string {
   const s = String(raw ?? "").trim();
@@ -140,6 +142,8 @@ export default function ReviewDetail() {
   const user = useAuthStore((s) => s.user);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
 
+  const meUuid = useMemo(() => String(user?.memberUuid ?? "").trim(), [user?.memberUuid]);
+
   const normalizedReviewId = useMemo(() => normalizeId(reviewId), [reviewId]);
 
   const numericReviewId = useMemo(() => {
@@ -168,10 +172,16 @@ export default function ReviewDetail() {
   const [isFollowing, setIsFollowing] = useState(false);
 
   // 댓글
-  const [comments, setComments] = useState<LocalComment[]>([]);
+  const [comments, setComments] = useState<UiComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
+
+  // ✅ prompt 제거용(인라인)
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [replyingParentId, setReplyingParentId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
 
   const isOwner = useMemo(() => {
     const me = String(user?.memberUuid ?? "").trim();
@@ -179,15 +189,27 @@ export default function ReviewDetail() {
     return !!me && !!owner && me === owner;
   }, [user?.memberUuid, review?.memberUuid]);
 
+  const withMine = (list: LocalComment[]): UiComment[] => {
+    const me = meUuid;
+    return list.map((c) => {
+      const author = String((c as any).authorId ?? "").trim();
+      return {
+        ...c,
+        authorId: author || c.authorId,
+        isMine: !!me && !!author && author === me,
+      };
+    });
+  };
+
   const rootComments = useMemo(() => comments.filter((c) => c.parentId == null), [comments]);
 
   const repliesByParent = useMemo(() => {
-    const m = new Map<string, LocalComment[]>();
+    const m = new Map<string, UiComment[]>();
     for (const c of comments) {
       if (!c.parentId) continue;
-      const list = m.get(c.parentId) ?? [];
+      const list = m.get(String(c.parentId)) ?? [];
       list.push(c);
-      m.set(c.parentId, list);
+      m.set(String(c.parentId), list);
     }
     return m;
   }, [comments]);
@@ -205,6 +227,12 @@ export default function ReviewDetail() {
         setImageError(false);
         setImageObjectUrl(null);
         setImageFallbackTried(false);
+
+        // 댓글 UI 상태 초기화
+        setEditingId(null);
+        setEditingText("");
+        setReplyingParentId(null);
+        setReplyText("");
 
         if (!normalizedReviewId) throw new Error("리뷰 ID가 없습니다.");
 
@@ -251,7 +279,7 @@ export default function ReviewDetail() {
         const list = await fetchReviewComments(numericReviewId);
 
         if (cancelled) return;
-        setComments(list);
+        setComments(withMine(list));
       } catch (e) {
         console.error(e);
         if (cancelled) return;
@@ -265,7 +293,7 @@ export default function ReviewDetail() {
     return () => {
       cancelled = true;
     };
-  }, [numericReviewId]);
+  }, [numericReviewId, meUuid]);
 
   useEffect(() => {
     if (!loading && !review) {
@@ -348,7 +376,7 @@ export default function ReviewDetail() {
     setCommentsLoading(true);
     try {
       const list = await fetchReviewComments(numericReviewId);
-      setComments(list);
+      setComments(withMine(list));
     } catch (e) {
       console.error(e);
       setComments([]);
@@ -368,7 +396,14 @@ export default function ReviewDetail() {
     const tempId = `temp-${crypto.randomUUID()}`;
     setComments((prev) => [
       ...prev,
-      { id: tempId, parentId: null, content: trimmed, authorName: myDisplayName },
+      {
+        id: tempId,
+        parentId: null,
+        content: trimmed,
+        authorId: meUuid || undefined,
+        authorName: myDisplayName,
+        isMine: true,
+      },
     ]);
     setCommentText("");
 
@@ -378,8 +413,11 @@ export default function ReviewDetail() {
         content: trimmed,
         parentCommentId: null,
       });
+
       if (created) {
-        setComments((prev) => prev.map((c) => (c.id === tempId ? created : c)));
+        setComments((prev) =>
+          prev.map((c) => (c.id === tempId ? ({ ...(created as any), isMine: true } as UiComment) : c)),
+        );
       } else {
         await refetchComments();
       }
@@ -390,17 +428,34 @@ export default function ReviewDetail() {
     }
   };
 
-  const onEditComment = async (id: string, current: string) => {
+  // ✅ 인라인 수정
+  const onStartEdit = (c: UiComment) => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
+    if (c.isMine !== true) return; // ✅ 내 댓글만
+    setReplyingParentId(null);
+    setReplyText("");
+    setEditingId(String(c.id));
+    setEditingText(c.content ?? "");
+  };
 
-    const next = prompt("수정 내용", current);
-    if (next == null) return;
+  const onCancelEdit = () => {
+    setEditingId(null);
+    setEditingText("");
+  };
 
-    const value = next.trim();
-    if (!value) return;
+  const onSaveEdit = async () => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+    if (!editingId) return;
 
+    const value = editingText.trim();
+    if (!value) return alert("내용을 입력해주세요.");
+
+    const id = editingId;
     const prev = comments;
-    setComments((cur) => cur.map((c) => (c.id === id ? { ...c, content: value } : c)));
+
+    setComments((cur) => cur.map((c) => (String(c.id) === id ? { ...c, content: value } : c)));
+    setEditingId(null);
+    setEditingText("");
 
     try {
       await updateComment(id, value);
@@ -411,40 +466,46 @@ export default function ReviewDetail() {
     }
   };
 
-  const onDeleteComment = async (id: string) => {
+  // ✅ 인라인 답글
+  const onStartReply = (parentId: string) => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
-    if (!window.confirm("삭제하시겠습니까?")) return;
-
-    const prev = comments;
-    setComments((cur) => cur.filter((c) => c.id !== id && c.parentId !== id));
-
-    try {
-      await deleteComment(id);
-    } catch (e) {
-      console.error(e);
-      setComments(prev);
-      alert("댓글 삭제 실패");
-    }
+    setEditingId(null);
+    setEditingText("");
+    setReplyingParentId(parentId);
+    setReplyText("");
   };
 
-  const onReplyComment = async (parentId: string) => {
+  const onCancelReply = () => {
+    setReplyingParentId(null);
+    setReplyText("");
+  };
+
+  const onSubmitReply = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
     if (!numericReviewId || !Number.isFinite(numericReviewId)) return;
+    if (!replyingParentId) return;
 
-    const reply = prompt("답글 내용");
-    if (reply == null) return;
+    const trimmed = replyText.trim();
+    if (!trimmed) return alert("내용을 입력해주세요.");
 
-    const trimmed = reply.trim();
-    if (!trimmed) return;
-
-    const parentNum = safeToInt(parentId);
+    const parentNum = safeToInt(replyingParentId);
     if (parentNum == null) return alert("부모 댓글 ID 파싱 실패");
 
     const tempId = `temp-${crypto.randomUUID()}`;
     setComments((prev) => [
       ...prev,
-      { id: tempId, parentId, content: trimmed, authorName: myDisplayName },
+      {
+        id: tempId,
+        parentId: replyingParentId,
+        content: trimmed,
+        authorId: meUuid || undefined,
+        authorName: myDisplayName,
+        isMine: true,
+      },
     ]);
+
+    setReplyingParentId(null);
+    setReplyText("");
 
     try {
       const created = await createReviewComment({
@@ -454,7 +515,9 @@ export default function ReviewDetail() {
       });
 
       if (created) {
-        setComments((prev) => prev.map((c) => (c.id === tempId ? created : c)));
+        setComments((prev) =>
+          prev.map((c) => (c.id === tempId ? ({ ...(created as any), isMine: true } as UiComment) : c)),
+        );
       } else {
         await refetchComments();
       }
@@ -462,6 +525,27 @@ export default function ReviewDetail() {
       console.error(e);
       setComments((prev) => prev.filter((c) => c.id !== tempId));
       alert("답글 작성 실패");
+    }
+  };
+
+  const onDeleteComment = async (id: string) => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+
+    // ✅ 내 댓글만 삭제
+    const target = comments.find((c) => String(c.id) === String(id));
+    if (target?.isMine !== true) return;
+
+    if (!window.confirm("삭제하시겠습니까?")) return;
+
+    const prev = comments;
+    setComments((cur) => cur.filter((c) => String(c.id) !== String(id) && String(c.parentId ?? "") !== String(id)));
+
+    try {
+      await deleteComment(String(id));
+    } catch (e) {
+      console.error(e);
+      setComments(prev);
+      alert("댓글 삭제 실패");
     }
   };
 
@@ -523,6 +607,15 @@ export default function ReviewDetail() {
     );
   }
 
+  const formatDate = (v?: string) => {
+    if (!v) return "";
+    try {
+      return new Date(v).toLocaleString();
+    } catch {
+      return v;
+    }
+  };
+
   return (
     <div className="review-detail-page">
       <div className="review-detail-container">
@@ -535,7 +628,7 @@ export default function ReviewDetail() {
                 {review.nickname ?? "—"}
               </button>
               <span className="rd-dot">·</span>
-              <span>{review.createdAt ? new Date(review.createdAt).toLocaleString() : ""}</span>
+              <span>{formatDate(review.createdAt)}</span>
             </div>
 
             <div className="rd-submeta">
@@ -620,46 +713,150 @@ export default function ReviewDetail() {
           </div>
 
           <div className="rd-comment-list">
-            {rootComments.map((c) => (
-              <div key={c.id} className="rd-comment-item">
-                <div className="rd-comment-meta">
-                  <strong>{c.authorName ?? "User"}</strong>
-                  <span className="rd-dot">·</span>
-                  <span>{c.createdAt ? new Date(c.createdAt).toLocaleDateString() : ""}</span>
-                </div>
+            {rootComments.map((c) => {
+              const replies = repliesByParent.get(String(c.id)) ?? [];
+              const canEdit = c.isMine === true;
+              const canDelete = c.isMine === true;
 
-                <div className="rd-comment-text">{c.content}</div>
+              const isEditing = editingId === String(c.id);
+              const isReplying = replyingParentId === String(c.id);
 
-                <div className="rd-comment-actions">
-                  <button type="button" className="rd-link" onClick={() => onEditComment(c.id, c.content)}>
-                    수정
-                  </button>
-                  <span className="rd-dot">·</span>
-                  <button type="button" className="rd-link" onClick={() => onDeleteComment(c.id)}>
-                    삭제
-                  </button>
-                  <span className="rd-dot">·</span>
-                  <button type="button" className="rd-link" onClick={() => onReplyComment(c.id)}>
-                    답글
-                  </button>
-                </div>
-
-                {(repliesByParent.get(c.id) ?? []).length > 0 && (
-                  <div className="rd-replies">
-                    {(repliesByParent.get(c.id) ?? []).map((r) => (
-                      <div key={r.id} className="rd-reply-item">
-                        <div className="rd-comment-meta">
-                          <strong>{r.authorName ?? "User"}</strong>
-                          <span className="rd-dot">·</span>
-                          <span>{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ""}</span>
-                        </div>
-                        <div className="rd-comment-text">{r.content}</div>
-                      </div>
-                    ))}
+              return (
+                <div key={String(c.id)} className="rd-comment-item">
+                  <div className="rd-comment-meta">
+                    <strong>{c.authorName ?? "User"}</strong>
+                    <span className="rd-dot">·</span>
+                    <span>{c.createdAt ? new Date(c.createdAt).toLocaleDateString() : ""}</span>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {!isEditing ? (
+                    <div className="rd-comment-text">{c.content}</div>
+                  ) : (
+                    <div className="rd-inline-edit">
+                      <textarea
+                        className="rd-inline-textarea"
+                        rows={3}
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                      />
+                      <div className="rd-inline-actions">
+                        <button type="button" className="rd-btn" onClick={onCancelEdit}>
+                          취소
+                        </button>
+                        <button type="button" className="rd-btn" onClick={onSaveEdit}>
+                          저장
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="rd-comment-actions">
+                    <button type="button" className="rd-link" onClick={() => onStartReply(String(c.id))}>
+                      답글
+                    </button>
+
+                    {canEdit && (
+                      <>
+                        <span className="rd-dot">·</span>
+                        <button type="button" className="rd-link" onClick={() => onStartEdit(c)}>
+                          수정
+                        </button>
+                      </>
+                    )}
+
+                    {canDelete && (
+                      <>
+                        <span className="rd-dot">·</span>
+                        <button type="button" className="rd-link" onClick={() => onDeleteComment(String(c.id))}>
+                          삭제
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {isReplying && (
+                    <div className="rd-inline-reply">
+                      <textarea
+                        className="rd-inline-textarea"
+                        rows={3}
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder="답글을 입력하세요..."
+                      />
+                      <div className="rd-inline-actions">
+                        <button type="button" className="rd-btn" onClick={onCancelReply}>
+                          취소
+                        </button>
+                        <button type="button" className="rd-btn" onClick={onSubmitReply}>
+                          등록
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {replies.length > 0 && (
+                    <div className="rd-replies">
+                      {replies.map((r) => {
+                        const rCanEdit = r.isMine === true;
+                        const rCanDelete = r.isMine === true;
+                        const rIsEditing = editingId === String(r.id);
+
+                        return (
+                          <div key={String(r.id)} className="rd-reply-item">
+                            <div className="rd-comment-meta">
+                              <strong>{r.authorName ?? "User"}</strong>
+                              <span className="rd-dot">·</span>
+                              <span>{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ""}</span>
+                            </div>
+
+                            {!rIsEditing ? (
+                              <div className="rd-comment-text">{r.content}</div>
+                            ) : (
+                              <div className="rd-inline-edit">
+                                <textarea
+                                  className="rd-inline-textarea"
+                                  rows={3}
+                                  value={editingText}
+                                  onChange={(e) => setEditingText(e.target.value)}
+                                />
+                                <div className="rd-inline-actions">
+                                  <button type="button" className="rd-btn" onClick={onCancelEdit}>
+                                    취소
+                                  </button>
+                                  <button type="button" className="rd-btn" onClick={onSaveEdit}>
+                                    저장
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="rd-comment-actions">
+                              {rCanEdit && (
+                                <button type="button" className="rd-link" onClick={() => onStartEdit(r)}>
+                                  수정
+                                </button>
+                              )}
+                              {rCanDelete && (
+                                <>
+                                  <span className="rd-dot">·</span>
+                                  <button
+                                    type="button"
+                                    className="rd-link"
+                                    onClick={() => onDeleteComment(String(r.id))}
+                                  >
+                                    삭제
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
       </div>
