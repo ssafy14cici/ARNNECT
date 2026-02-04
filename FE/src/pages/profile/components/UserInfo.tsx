@@ -8,7 +8,7 @@ export default function UserInfo({ profile }: { profile: UserProfile }) {
       {profile.bio ? (
         <p className="profileInfo-intro quote">"{profile.bio}"</p>
       ) : (
-        <p className="profileInfo-intro muted">소개글이 없습니다.</p>
+        <p className="profileInfo-intro muted"></p>
       )}
     </div>
   );

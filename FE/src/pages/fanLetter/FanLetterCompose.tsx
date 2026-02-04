@@ -1,3 +1,5 @@
+//FE\src\pages\fanLetter\FanLetterCompose.tsx
+
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -156,6 +158,7 @@ export default function FanLetterCompose() {
         artistMemberUuid,
         artworkId: artworkIdNum,
         content: message,
+        artworkTitle,
       });
 
       alert("팬레터가 발송되었습니다.");

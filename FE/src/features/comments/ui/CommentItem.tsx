@@ -1,15 +1,17 @@
-import { useState } from "react";
+// FE/src/features/comments/ui/CommentItem.tsx
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 
 import { CommentForm } from "./CommentForm";
 import { ReplyList } from "./ReplyList";
 import type { Comment, CommentHandlers, ProfilePathFn } from "../model/types";
+import { useAuthStore } from "../../auth/store"; // ✅ 추가 (경로 프로젝트에 맞게)
 
 type Props = CommentHandlers & {
   comment: Comment;
   allComments: Comment[];
   profilePath: ProfilePathFn;
-  canEdit?: (comment: Comment) => boolean; // 추후 본인 댓글만 편집/삭제용
+  canEdit?: (comment: Comment) => boolean; // 있으면 이걸 우선 사용
 };
 
 export function CommentItem({
@@ -21,6 +23,8 @@ export function CommentItem({
   profilePath,
   canEdit,
 }: Props) {
+  const me = useAuthStore((s) => s.user?.memberUuid); // ✅ 내 id
+
   const [isEditing, setIsEditing] = useState(false);
   const [editInput, setEditInput] = useState(comment.content);
   const [isReplyOpen, setIsReplyOpen] = useState(false);
@@ -29,7 +33,13 @@ export function CommentItem({
   const authorName = comment.authorName ?? "Anonymous";
   const authorId = comment.authorId;
 
-  const editable = canEdit ? canEdit(comment) : true;
+  // ✅ canEdit가 없으면 "내 댓글만" 기본 로직 적용
+  const editable = useMemo(() => {
+    if (canEdit) return canEdit(comment);
+    if (!me) return false;
+    if (!authorId) return false; // authorId가 없으면 판단 불가 -> 숨김
+    return String(authorId) === String(me);
+  }, [canEdit, comment, me, authorId]);
 
   const saveEdit = () => {
     const value = String(editInput ?? "").trim();

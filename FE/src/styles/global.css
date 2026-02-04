@@ -72,7 +72,13 @@ button {
 .app-shell {
   /* ✅ 모바일 주소창 변화 대응 */
   min-height: 100dvh;
-  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.page {
+  flex: 1;
+  min-height: 0;
 }
 
 /* 일반 페이지(Feed, Lounge 등)에서 네비바와 겹치지 않게 */

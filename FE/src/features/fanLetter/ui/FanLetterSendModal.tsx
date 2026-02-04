@@ -1,3 +1,5 @@
+//FE\src\features\fanLetter\ui\FanLetterSendModal.tsx
+
 import { useEffect, useMemo, useState } from "react";
 import "./fanLetterSendModal.css";
 

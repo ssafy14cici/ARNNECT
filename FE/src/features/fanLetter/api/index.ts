@@ -1,3 +1,4 @@
+//FE\src\features\fanLetter\api\index.ts
 import type {
   FanLetter,
   FanLetterId,
@@ -7,16 +8,20 @@ import type {
 
 import * as real from "./real";
 
-/** 레거시 입력까지 받아서 최소 payload로 정규화 */
+/** 레거시 입력까지 받아서 서버 FanLetterRequest payload로 정규화 */
 function normalizeSendInput(input: FanLetterSendInput): FanLetterSendPayload {
-  const artistMemberUuid = String(input.artistMemberUuid ?? "").trim();
-  if (!artistMemberUuid) throw new Error("artistMemberUuid is required");
+  const memberUuid = String(input.artistMemberUuid ?? "").trim();
+  if (!memberUuid) throw new Error("artistMemberUuid is required");
 
   const content = String(input.content ?? "").trim();
   if (!content) throw new Error("content is required");
 
+  // ✅ BE FanLetterRequest에 title이 있음 -> 없으면 작품명/기본값
+  const title = String(input.title ?? input.artworkTitle ?? "팬레터").trim() || "팬레터";
+
   return {
-    artistMemberUuid,
+    memberUuid,
+    title,
     artworkId: input.artworkId,
     content,
   };

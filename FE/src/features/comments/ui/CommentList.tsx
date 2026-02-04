@@ -1,3 +1,5 @@
+//FE\src\features\comments\ui\CommentList.tsx
+
 import type { Comment, CommentHandlers, ProfilePathFn } from "../model/types";
 import { CommentItem } from "./CommentItem";
 

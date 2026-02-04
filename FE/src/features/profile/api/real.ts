@@ -155,8 +155,13 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!res.ok) {
-    throw new HttpError(res.status, `${init?.method ?? "GET"} ${path} failed (${res.status})`);
+    const text = await res.text().catch(() => "");
+    throw new HttpError(
+      res.status,
+      `${init?.method ?? "GET"} ${path} failed (${res.status})${text ? ` - ${text}` : ""}`,
+    );
   }
+
 
   // ✅ 204 / empty body 방어
   const ct = res.headers.get("content-type") ?? "";
@@ -311,46 +316,89 @@ function normalizeProfile(raw: unknown, opts?: { roleHint?: "USER" | "ARTIST"; i
   };
 
   if (role === "ARTIST") {
-    const genre =
-      typeof (rec as any).genre === "string"
-        ? (rec as any).genre
-        : typeof (rec as any).genreName === "string"
-          ? (rec as any).genreName
-          : typeof (rec as any).genre_name === "string"
-            ? (rec as any).genre_name
-            : undefined;
+  const genre =
+    typeof (rec as any).genre === "string"
+      ? (rec as any).genre
+      : typeof (rec as any).genreName === "string"
+        ? (rec as any).genreName
+        : typeof (rec as any).genre_name === "string"
+          ? (rec as any).genre_name
+          : undefined;
 
-    const artist: ArtistProfile = {
-      ...common,
-      role: "ARTIST",
-      genre,
-      contactEnabled: typeof (rec as any).contactEnabled === "boolean" ? (rec as any).contactEnabled : undefined,
-      contactUrl: typeof (rec as any).contactUrl === "string" ? (rec as any).contactUrl : undefined,
+  const artist: ArtistProfile = {
+    ...common,
+    role: "ARTIST",
+    genre,
+    contactEnabled: typeof (rec as any).contactEnabled === "boolean" ? (rec as any).contactEnabled : undefined,
+    contactUrl: typeof (rec as any).contactUrl === "string" ? (rec as any).contactUrl : undefined,
 
-      // optional pass-through
-      email: typeof (rec as any).email === "string" ? (rec as any).email : undefined,
-      birth: typeof (rec as any).birth === "string" ? (rec as any).birth : undefined,
-      phone: typeof (rec as any).phone === "string" ? (rec as any).phone : undefined,
-      isAgree: typeof (rec as any).isAgree === "boolean" ? (rec as any).isAgree : undefined,
+    // optional pass-through
+    email: typeof (rec as any).email === "string" ? (rec as any).email : undefined,
+    birth: typeof (rec as any).birth === "string" ? (rec as any).birth : undefined,
+    phone: typeof (rec as any).phone === "string" ? (rec as any).phone : undefined,
+    isAgree: typeof (rec as any).isAgree === "boolean" ? (rec as any).isAgree : undefined,
 
-      document: typeof (rec as any).document === "string" ? (rec as any).document : undefined,
-      field:
-        typeof (rec as any).field === "string"
-          ? (rec as any).field
-          : typeof (rec as any).fieldName === "string"
-            ? (rec as any).fieldName
-            : typeof (rec as any).field_name === "string"
-              ? (rec as any).field_name
-              : undefined,
-      debutYear: typeof (rec as any).debutYear === "number" ? (rec as any).debutYear : (typeof (rec as any).debut_year === "number" ? (rec as any).debut_year : undefined),
-      sns: typeof (rec as any).sns === "string" ? (rec as any).sns : (typeof (rec as any).snsPage === "string" ? (rec as any).snsPage : (typeof (rec as any).sns_page === "string" ? (rec as any).sns_page : undefined)),
-      affiliation: typeof (rec as any).affiliation === "string" ? (rec as any).affiliation : undefined,
-      isVerified: typeof (rec as any).isVerified === "boolean" ? (rec as any).isVerified : undefined,
-      artIntroduction: typeof (rec as any).artIntroduction === "string" ? (rec as any).artIntroduction : undefined,
-    };
+    document: typeof (rec as any).document === "string" ? (rec as any).document : undefined,
 
-    return artist;
-  }
+    // ✅ (추가1) id로 내려오는 값들: 모달에서 필요
+    fieldId:
+      typeof (rec as any).fieldId === "number"
+        ? (rec as any).fieldId
+        : Number.isFinite(Number((rec as any).fieldId))
+          ? Number((rec as any).fieldId)
+          : undefined,
+
+    genreId:
+      typeof (rec as any).genreId === "number"
+        ? (rec as any).genreId
+        : Number.isFinite(Number((rec as any).genreId))
+          ? Number((rec as any).genreId)
+          : undefined,
+
+    // 기존 field(이름 문자열) 유지
+    field:
+      typeof (rec as any).field === "string"
+        ? (rec as any).field
+        : typeof (rec as any).fieldName === "string"
+          ? (rec as any).fieldName
+          : typeof (rec as any).field_name === "string"
+            ? (rec as any).field_name
+            : undefined,
+
+    debutYear:
+      typeof (rec as any).debutYear === "number"
+        ? (rec as any).debutYear
+        : (typeof (rec as any).debut_year === "number" ? (rec as any).debut_year : undefined),
+
+    // ✅ (추가2) snsPage / introduction을 "원본 필드"로도 보관
+    snsPage:
+      typeof (rec as any).snsPage === "string"
+        ? (rec as any).snsPage
+        : typeof (rec as any).sns_page === "string"
+          ? (rec as any).sns_page
+          : undefined,
+
+    introduction:
+      typeof (rec as any).introduction === "string"
+        ? (rec as any).introduction
+        : undefined,
+
+    // 기존 sns / artIntroduction 유지 (호환)
+    sns:
+      typeof (rec as any).sns === "string"
+        ? (rec as any).sns
+        : (typeof (rec as any).snsPage === "string"
+            ? (rec as any).snsPage
+            : (typeof (rec as any).sns_page === "string" ? (rec as any).sns_page : undefined)),
+
+    affiliation: typeof (rec as any).affiliation === "string" ? (rec as any).affiliation : undefined,
+    isVerified: typeof (rec as any).isVerified === "boolean" ? (rec as any).isVerified : undefined,
+    artIntroduction: typeof (rec as any).artIntroduction === "string" ? (rec as any).artIntroduction : undefined,
+  };
+
+  return artist;
+}
+
 
   const user: UserProfile = {
     ...common,
@@ -546,12 +594,18 @@ function buildUpdateFormData(role: ProfileRole, patch: UpdateMyProfilePatch): Fo
     fd.append(k, v);
   };
 
-  const putNum = (k: string, v: unknown) => {
+  const putNum = (k: string, v: unknown, opt?: { min?: number; max?: number }) => {
     if (v === undefined || v === null) return;
-    const n = typeof v === "number" ? v : Number(v);
+
+    const n = typeof v === "number" ? v : Number(String(v).trim());
     if (!Number.isFinite(n)) return;
+
+    if (opt?.min != null && n < opt.min) return;
+    if (opt?.max != null && n > opt.max) return;
+
     fd.append(k, String(n));
   };
+
 
   const putFile = (k: string, v: unknown) => {
     if (v instanceof File) fd.append(k, v);
@@ -564,9 +618,10 @@ function buildUpdateFormData(role: ProfileRole, patch: UpdateMyProfilePatch): Fo
 
   // ✅ 아티스트(UpdateArtistRequest)
   if (isArtist) {
-    putNum("fieldId", (patch as any).fieldId);
-    putNum("genreId", (patch as any).genreId);
-    putNum("debutYear", (patch as any).debutYear);
+    putNum("fieldId", (patch as any).fieldId, { min: 1 });
+    putNum("genreId", (patch as any).genreId, { min: 1 });
+    putNum("debutYear", (patch as any).debutYear, { min: 1, max: 2026 });
+
 
     // ✅ 빈 문자열은 보내도 BE가 무시하므로 "아예 미전송"으로 통일
     putStr("snsPage", (patch as any).snsPage);
