@@ -27,6 +27,9 @@ public enum ErrorCode {
     /** REVIEW **/
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_001", "감상평이 존재하지않습니다."),
 
+    /** COMMENT **/
+    COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "COMMENT_001", "댓글이 존재하지않습니다."),
+
     /** FanLetter **/
     FANLETTER_NOT_FOUND(HttpStatus.NOT_FOUND, "FANLETTER_001", "팬레터가 존재하지않습니다.");
 
