@@ -7,7 +7,7 @@ import { router } from "./app/router/routes";
 import "./styles/global.css";
 
 import { useAuthStore } from "./features/auth/store";
-import { seedMockDB } from "./mocks";
+import { seedMockDB } from "./museum/mocks";
 import { USE_MOCK } from "./shared/config/env";
 
 // ✅ DEV에서만 디버깅 편의

@@ -11,9 +11,12 @@ type ProfileBase = {
   id: string;
   role: ProfileRole;
 
-  // 화면 표시용(공통)
+  // 화면 표시용(닉네임/활동명)
   name: string;
+
+  // ✅ 서버에서 내려오는 이미지 경로/URL
   imageUrl?: string | null;
+
   bio?: string | null;
 
   followersCount: number;
@@ -26,7 +29,6 @@ type ProfileBase = {
 
 export type UserProfile = ProfileBase & {
   role: "USER";
-
   email?: string;
   nickname?: string;
   birth?: string; // yyyy-MM-dd
@@ -36,19 +38,30 @@ export type UserProfile = ProfileBase & {
 
 export type ArtistProfile = ProfileBase & {
   role: "ARTIST";
-
   email?: string;
   birth?: string; // yyyy-MM-dd
   phone?: string;
   isAgree?: boolean;
 
+  // (있으면 편집 프리필에 유리)
+  fieldId?: number;
+  genreId?: number;
+
   document?: string;
+
   field?: string;
   debutYear?: number;
+
   genre?: string;
+
   sns?: string;
+  snsPage?: string;
+
   affiliation?: string;
+
   isVerified?: boolean;
+
+  introduction?: string;
   artIntroduction?: string;
 
   contactEnabled?: boolean;
