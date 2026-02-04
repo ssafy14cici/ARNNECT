@@ -1,3 +1,4 @@
+// FE/src/pages/artworks/ArtworkDetail.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -9,7 +10,7 @@ import "./artworkDetail.css";
 
 import ArtworkDetailView from "./ArtworkDetailView";
 import { fetchImageAsObjectUrl, normalizeArtworkId, safeToInt } from "./detail/utils";
-import type { ArtworkDetailData } from "./detail/mappers";
+import type { ArtworkDetailData, LocalComment, ReviewSummary } from "./detail/mappers";
 import {
   createCommentOnServer,
   deleteCommentOnServer,
@@ -19,7 +20,6 @@ import {
   toggleFavoriteOnServer,
   updateCommentOnServer,
 } from "./detail/api";
-import type { LocalComment, ReviewSummary } from "./detail/mappers";
 
 export default function ArtworkDetail() {
   const params = useParams() as Record<string, string | undefined>;
@@ -104,8 +104,8 @@ export default function ArtworkDetail() {
 
         if (mapped?.src) setDisplayImgSrc(mapped.src);
         if (typeof mapped?.isFavorited === "boolean") setIsLiked(mapped.isFavorited);
-        if (typeof mapped?.favoriteCount === "number" && Number.isFinite(mapped.favoriteCount)) {
-          setLikeCount(mapped.favoriteCount);
+        if (typeof mapped?.likeCount === "number" && Number.isFinite(mapped.likeCount)) {
+          setLikeCount(mapped.likeCount);
         }
       } catch (e) {
         console.error(e);
@@ -125,8 +125,7 @@ export default function ArtworkDetail() {
     let cancelled = false;
 
     (async () => {
-      const safeId =
-        numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
+      const safeId = numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
       if (!safeId || !Number.isFinite(safeId)) return;
 
       try {
@@ -156,8 +155,7 @@ export default function ArtworkDetail() {
     let cancelled = false;
 
     (async () => {
-      const safeId =
-        numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
+      const safeId = numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
       if (!safeId || !Number.isFinite(safeId)) return;
 
       try {
@@ -200,8 +198,7 @@ export default function ArtworkDetail() {
   const onToggleFavorite = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
 
-    const safeId =
-      numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
+    const safeId = numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
     if (!safeId || !Number.isFinite(safeId)) return;
 
     const prevLiked = isLiked;
@@ -214,8 +211,8 @@ export default function ArtworkDetail() {
     try {
       const result = await toggleFavoriteOnServer(safeId);
       if (typeof result.isFavorited === "boolean") setIsLiked(result.isFavorited);
-      if (typeof result.favoriteCount === "number" && Number.isFinite(result.favoriteCount)) {
-        setLikeCount(result.favoriteCount);
+      if (typeof result.likeCount === "number" && Number.isFinite(result.likeCount)) {
+        setLikeCount(result.likeCount);
       }
     } catch (e) {
       console.error(e);
@@ -226,8 +223,7 @@ export default function ArtworkDetail() {
   };
 
   const refetchComments = async () => {
-    const safeId =
-      numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
+    const safeId = numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
     if (!safeId || !Number.isFinite(safeId)) return;
 
     setCommentsLoading(true);
@@ -246,18 +242,14 @@ export default function ArtworkDetail() {
   const onSubmitComment = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
 
-    const safeId =
-      numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
+    const safeId = numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
     if (!safeId || !Number.isFinite(safeId)) return;
 
     const trimmed = commentText.trim();
     if (!trimmed) return;
 
     const tempId = `temp-${crypto.randomUUID()}`;
-    setComments((prev) => [
-      ...prev,
-      { id: tempId, parentId: null, content: trimmed, authorName: user?.name ?? "나" },
-    ]);
+    setComments((prev) => [...prev, { id: tempId, parentId: null, content: trimmed, authorName: user?.name ?? "나" }]);
     setCommentText("");
 
     try {
@@ -313,8 +305,7 @@ export default function ArtworkDetail() {
   const onReplyComment = async (parentId: string) => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
 
-    const safeId =
-      numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
+    const safeId = numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
     if (!safeId || !Number.isFinite(safeId)) return;
 
     const reply = prompt("답글 내용");
@@ -326,10 +317,7 @@ export default function ArtworkDetail() {
     if (parentNum == null) return alert("부모 댓글 ID 파싱 실패");
 
     const tempId = `temp-${crypto.randomUUID()}`;
-    setComments((prev) => [
-      ...prev,
-      { id: tempId, parentId, content: trimmed, authorName: user?.name ?? "나" },
-    ]);
+    setComments((prev) => [...prev, { id: tempId, parentId, content: trimmed, authorName: user?.name ?? "나" }]);
 
     try {
       const created = await createCommentOnServer({
@@ -399,7 +387,7 @@ export default function ArtworkDetail() {
   const onGoEdit = () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
     if (!isOwner) return alert("본인 작품만 수정할 수 있습니다.");
-    navigate(`/artworks/${normalizedArtworkId}`);
+    navigate(`/artworks/${normalizedArtworkId}/edit`);
   };
 
   const onOpenFanLetter = () => {
@@ -489,7 +477,6 @@ export default function ArtworkDetail() {
         onReplyComment={onReplyComment}
       />
 
-      {/* FanLetter Modal: 컨테이너에 남겨둠(상태가 여기 있음) */}
       {fanLetterOpen && (
         <div className="modal-overlay" onClick={() => setFanLetterOpen(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>

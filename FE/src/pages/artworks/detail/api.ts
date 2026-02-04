@@ -1,5 +1,6 @@
+// FE/src/pages/artworks/detail/api.ts
 import { http } from "../../../shared/api/http";
-import { isObject, pickEnvelopeData } from "./utils";
+import { isObject } from "./utils";
 import {
   mapArtworkDetail,
   mapCommentResponseList,
@@ -20,7 +21,7 @@ const COMMENTS_PATH = "/api/v1/comments";
 const COMMENT_TARGET_TYPE = "ARTWORK" as const;
 
 function unwrapAxiosData(res: unknown): unknown {
-  // axios는 보통 { data: ... } 형태
+  // axios response면 res.data
   return isObject(res) && "data" in res ? (res as { data: unknown }).data : res;
 }
 
@@ -43,23 +44,40 @@ export async function toggleFavoriteOnServer(artworkId: number): Promise<Favorit
 }
 
 /**
- * 댓글 목록: BE 쿼리 파라미터가 흔히 2~3가지 형태로 갈려서,
- * 후보 URL을 순차로 시도해서 “하나라도 성공”하면 그 결과를 씀.
+ * ✅ 댓글 목록: 확정 스펙
+ * GET /api/v1/comments?artworkId=3
+ *
+ * + 혹시 서버가 예전 파라미터도 유지 중이면 fallback
  */
 export async function fetchArtworkComments(artworkId: number): Promise<LocalComment[]> {
-  const tryUrls = [
-    `${COMMENTS_PATH}?target=${encodeURIComponent(COMMENT_TARGET_TYPE)}&id=${encodeURIComponent(String(artworkId))}`,
-    `${COMMENTS_PATH}?targetType=${encodeURIComponent(COMMENT_TARGET_TYPE)}&targetId=${encodeURIComponent(String(artworkId))}`,
-    `${COMMENTS_PATH}?targetType=${encodeURIComponent(COMMENT_TARGET_TYPE)}&targetId=${encodeURIComponent(String(artworkId))}&page=0&size=200`,
+  const tryCalls: Array<() => Promise<LocalComment[]>> = [
+    // ✅ 1순위: 확정 스펙
+    async () => {
+      const res = await http.get(COMMENTS_PATH, { params: { artworkId } });
+      const payload = unwrapAxiosData(res);
+      return mapCommentResponseList(payload);
+    },
+
+    // fallback (필요 없으면 지워도 됨)
+    async () => {
+      const url = `${COMMENTS_PATH}?target=${encodeURIComponent(COMMENT_TARGET_TYPE)}&id=${encodeURIComponent(String(artworkId))}`;
+      const res = await http.get(url);
+      const payload = unwrapAxiosData(res);
+      return mapCommentResponseList(payload);
+    },
+    async () => {
+      const url = `${COMMENTS_PATH}?targetType=${encodeURIComponent(COMMENT_TARGET_TYPE)}&targetId=${encodeURIComponent(String(artworkId))}`;
+      const res = await http.get(url);
+      const payload = unwrapAxiosData(res);
+      return mapCommentResponseList(payload);
+    },
   ];
 
   let lastErr: unknown = null;
 
-  for (const url of tryUrls) {
+  for (const call of tryCalls) {
     try {
-      const res = await http.get(url);
-      const payload = unwrapAxiosData(res);
-      return mapCommentResponseList(payload);
+      return await call();
     } catch (e) {
       lastErr = e;
     }

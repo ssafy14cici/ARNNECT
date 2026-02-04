@@ -1,3 +1,4 @@
+// FE/src/pages/artworks/detail/mappers.ts
 import {
   asBool,
   asNumber,
@@ -21,7 +22,7 @@ export type ArtworkDetailData = {
   artistId?: string;
   artistName?: string;
 
-  favoriteCount?: number;
+  likeCount?: number;
   isFavorited?: boolean;
 };
 
@@ -35,15 +36,14 @@ export function mapArtworkDetail(payload: unknown): ArtworkDetailData | null {
   const id: string | number = Number.isFinite(idNum) ? idNum : idStr;
 
   const title = asString(get(body, "title"), "Untitled");
-  const description =
-    asString(get(body, "description"), "") || asString(get(body, "content"), "");
+  const description = asString(get(body, "description"), "") || asString(get(body, "content"), "");
 
   const rawSrc =
     asString(get(body, "imageUrl"), "") ||
     asString(get(body, "thumbnailUrl"), "") ||
     asString(get(body, "src"), "");
-
   const src = resolveMediaUrl(rawSrc);
+
   const tags = asStringArray(get(body, "tags")) || asStringArray(get(body, "tagList")) || [];
 
   const artistMemberUuid =
@@ -59,13 +59,15 @@ export function mapArtworkDetail(payload: unknown): ArtworkDetailData | null {
     asString(get(body, "nickname"), "") ||
     "";
 
-  const artist =
-    artistName || (artistMemberUuid ? `ARTIST ${artistMemberUuid.slice(0, 4)}` : "Unknown");
+  const artist = artistName || (artistMemberUuid ? `ARTIST ${artistMemberUuid.slice(0, 4)}` : "Unknown");
 
-  const favoriteCount = asNumber(
-    get(body, "favoriteCount"),
-    asNumber(get(body, "likeCount"), asNumber(get(body, "count"), NaN)),
+  // ✅ BE: likeCount
+  const likeCount = asNumber(
+    get(body, "likeCount"),
+    asNumber(get(body, "favoriteCount"), asNumber(get(body, "count"), NaN)),
   );
+
+  // (있으면) 서버가 좋아요 여부도 내려주는 케이스 흡수
   const isFavorited = asBool(
     get(body, "isFavorited"),
     asBool(get(body, "favorited"), asBool(get(body, "isFavorite"), false)),
@@ -83,7 +85,7 @@ export function mapArtworkDetail(payload: unknown): ArtworkDetailData | null {
     artistMemberUuid: artistMemberUuid || undefined,
     artistId: artistMemberUuid || undefined,
     artistName: artistName || undefined,
-    favoriteCount: Number.isFinite(favoriteCount) ? favoriteCount : undefined,
+    likeCount: Number.isFinite(likeCount) ? likeCount : undefined,
     isFavorited: typeof isFavorited === "boolean" ? isFavorited : undefined,
   };
 }
@@ -158,7 +160,6 @@ export function mapCommentResponseList(payload: unknown): LocalComment[] {
 
       const content = asString(get(v, "content"), "").trim();
 
-      // ✅ BE는 nickName (N 대문자)
       const authorName =
         asString(get(v, "nickName"), "").trim() ||
         asString(get(v, "nickname"), "").trim() ||
@@ -191,7 +192,10 @@ export function mapSingleComment(payload: unknown): LocalComment | null {
   return { id: String(commentId), parentId, content, authorName };
 }
 
-export type FavoriteToggleResult = { isFavorited?: boolean; favoriteCount?: number };
+export type FavoriteToggleResult = {
+  isFavorited?: boolean;
+  likeCount?: number;
+};
 
 export function parseFavoriteToggleResult(payload: unknown): FavoriteToggleResult {
   const body = pickEnvelopeData(payload);
@@ -202,13 +206,14 @@ export function parseFavoriteToggleResult(payload: unknown): FavoriteToggleResul
     asBool(get(body, "favorited"), asBool(get(body, "isFavorite"), undefined as any)),
   );
 
-  const favoriteCount = asNumber(
-    get(body, "favoriteCount"),
-    asNumber(get(body, "likeCount"), asNumber(get(body, "count"), undefined as any)),
+  // ✅ BE는 likeCount 가능성이 가장 큼
+  const likeCount = asNumber(
+    get(body, "likeCount"),
+    asNumber(get(body, "favoriteCount"), asNumber(get(body, "count"), undefined as any)),
   );
 
   const out: FavoriteToggleResult = {};
   if (typeof isFavorited === "boolean") out.isFavorited = isFavorited;
-  if (typeof favoriteCount === "number" && Number.isFinite(favoriteCount)) out.favoriteCount = favoriteCount;
+  if (typeof likeCount === "number" && Number.isFinite(likeCount)) out.likeCount = likeCount;
   return out;
 }

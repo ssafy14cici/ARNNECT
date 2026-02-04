@@ -1,3 +1,4 @@
+// FE/src/pages/artworks/detail/utils.ts
 import { useAuthStore } from "../../../features/auth/store";
 
 export type JsonObject = Record<string, unknown>;
@@ -8,6 +9,7 @@ export function isObject(v: unknown): v is JsonObject {
 export function get(obj: JsonObject, key: string): unknown {
   return obj[key];
 }
+
 export function asString(v: unknown, fallback = ""): string {
   if (typeof v === "string") return v;
   if (typeof v === "number" || typeof v === "boolean") return String(v);
@@ -34,13 +36,7 @@ export function asBool(v: unknown, fallback = false): boolean {
 export function asStringArray(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
   return v
-    .map((x) =>
-      typeof x === "string"
-        ? x
-        : isObject(x)
-          ? asString(get(x, "name"), "")
-          : "",
-    )
+    .map((x) => (typeof x === "string" ? x : isObject(x) ? asString(get(x, "name"), "") : ""))
     .map((s) => s.trim())
     .filter(Boolean);
 }
@@ -64,14 +60,37 @@ export function safeToInt(v: unknown): number | null {
 }
 
 /**
- * 이미지 URL 정규화
- * - 절대 URL이면 그대로
+ * ✅ 이미지 URL 정규화 + /src 보정
+ * - 절대 URL이면 그대로(단, pathname이 /artwork/* 면 /src/artwork/* 로 보정)
  * - 상대경로면 VITE_API_BASE_URL의 origin 붙임
+ * - 상대경로가 /artwork/* 면 /src/artwork/* 로 보정
  */
 export function resolveMediaUrl(input?: string | null): string {
-  const u = String(input ?? "").trim();
-  if (!u || u === "null" || u === "undefined") return "";
-  if (/^(https?:)?\/\//i.test(u) || u.startsWith("data:") || u.startsWith("blob:")) return u;
+  const u0 = String(input ?? "").trim();
+  if (!u0 || u0 === "null" || u0 === "undefined") return "";
+  if (u0.startsWith("data:") || u0.startsWith("blob:")) return u0;
+
+  // 1) 절대 URL 처리
+  if (/^https?:\/\//i.test(u0)) {
+    try {
+      const url = new URL(u0);
+      // 서버가 실제로 /src/artwork/* 에서 서빙하는 경우 보정
+      if (url.pathname.startsWith("/artwork/")) {
+        url.pathname = `/src${url.pathname}`;
+      }
+      return url.toString();
+    } catch {
+      return u0;
+    }
+  }
+
+  // 2) 상대경로 처리
+  let path = u0.startsWith("/") ? u0 : `/${u0}`;
+
+  // ✅ 핵심 보정: /artwork/* → /src/artwork/*
+  if (path.startsWith("/artwork/")) {
+    path = `/src${path}`;
+  }
 
   const apiBase = String(import.meta.env.VITE_API_BASE_URL ?? "").trim();
   let origin = "";
@@ -81,7 +100,6 @@ export function resolveMediaUrl(input?: string | null): string {
     origin = "";
   }
 
-  const path = u.startsWith("/") ? u : `/${u}`;
   return origin ? `${origin}${path}` : path;
 }
 
