@@ -1,3 +1,4 @@
+// FE/src/pages/profile/tabs/FeedTab.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 
@@ -6,6 +7,9 @@ import { useAuthStore } from "../../../features/auth/store";
 import type { ProfileOutletContext } from "../Profile";
 import type { FeedItem } from "../../../features/profile/types";
 import "./profileTabs.css";
+
+// ✅ 공용 resolveMediaUrl 사용 (DEV 프록시 + /src prefix 보정 포함)
+import { resolveMediaUrl } from "../../artworks/detail/utils";
 
 /** 안전 파서 */
 type JsonObject = Record<string, unknown>;
@@ -19,27 +23,6 @@ function asString(v: unknown, fallback = ""): string {
   if (typeof v === "string") return v;
   if (typeof v === "number" || typeof v === "boolean") return String(v);
   return fallback;
-}
-
-/** ✅ 절대/상대 경로 모두 안전하게 */
-function resolveMediaUrl(input?: string | null): string {
-  const u = String(input ?? "").trim();
-  if (!u || u === "null" || u === "undefined") return "";
-
-  // 이미 완성된 URL이면 그대로
-  if (/^(https?:)?\/\//i.test(u) || u.startsWith("data:") || u.startsWith("blob:")) return u;
-
-  // API_BASE에서 origin만 따서 붙임 (ex. https://i14e107.p.ssafy.io:8001)
-  const apiBase = String(import.meta.env.VITE_API_BASE_URL ?? "").trim();
-  let origin = "";
-  try {
-    if (apiBase) origin = new URL(apiBase).origin;
-  } catch {
-    origin = "";
-  }
-
-  const path = u.startsWith("/") ? u : `/${u}`;
-  return origin ? `${origin}${path}` : path;
 }
 
 /** 프로필 피드 탭이 최소로 쓰는 형태로 매핑(id, imageUrl) */
@@ -58,12 +41,11 @@ function toProfileFeedItem(v: unknown): FeedItem | null {
     asString(get(v, "src"), "") ||
     asString(get(v, "fileUrl"), "");
 
-  const imageUrl = resolveMediaUrl(imageUrlRaw);
-
   return {
     ...(v as any),
     id,
-    imageUrl, // ✅ 정규화된 URL로 저장
+    // ✅ FE/src/pages/artworks/detail/utils.ts 의 resolveMediaUrl로 정규화
+    imageUrl: resolveMediaUrl(imageUrlRaw),
   } as FeedItem;
 }
 
@@ -72,9 +54,11 @@ function normalizeRole(raw: unknown) {
   if (s === "ARTIST") return "ARTIST";
   if (s === "USER") return "USER";
   if (s === "GENERAL") return "USER";
+
   const lower = String(raw ?? "").trim().toLowerCase();
   if (lower === "artist") return "ARTIST";
   if (lower === "general") return "USER";
+
   return "USER";
 }
 
@@ -94,7 +78,10 @@ export default function FeedTab() {
     return raw;
   }, [memberUuid, authUser?.memberUuid]);
 
-  const isArtist = useMemo(() => normalizeRole((profile as any)?.role) === "ARTIST", [profile]);
+  const isArtist = useMemo(
+    () => normalizeRole((profile as any)?.role) === "ARTIST",
+    [profile],
+  );
 
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -160,6 +147,7 @@ export default function FeedTab() {
     <div className="tab-container">
       <div className="tab-grid-3">
         {items.map((it) => {
+          // ✅ 이미 toProfileFeedItem에서 정규화했지만, 혹시 모를 값 대비로 한 번 더 방어
           const src = resolveMediaUrl((it as any).imageUrl);
 
           return (
@@ -174,7 +162,7 @@ export default function FeedTab() {
                   src={src}
                   alt=""
                   className="feed-img"
-                  loading="eager"   // ✅ lazy 제거/대체
+                  loading="eager" // ✅ lazy 제거/대체
                   decoding="async"
                   onError={(e) => {
                     // “아무것도 없는 것처럼” 안 보이게 확실한 fallback

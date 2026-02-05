@@ -1,6 +1,6 @@
 // FE/src/features/tickets/qrDownload.ts
 
-export async function downloadSvgAsPng(svgEl: SVGSVGElement, filename: string) {
+async function svgToPngBlob(svgEl: SVGSVGElement, size = 1024): Promise<Blob> {
   const svgData = new XMLSerializer().serializeToString(svgEl);
 
   const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
@@ -16,7 +16,6 @@ export async function downloadSvgAsPng(svgEl: SVGSVGElement, filename: string) {
   });
 
   const canvas = document.createElement("canvas");
-  const size = 1024; // 다운로드 해상도
   canvas.width = size;
   canvas.height = size;
 
@@ -27,32 +26,35 @@ export async function downloadSvgAsPng(svgEl: SVGSVGElement, filename: string) {
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, size, size);
 
-  // QR 그리기 (여백 조금)
+  // QR 그리기 (여백)
   const pad = 48;
   ctx.drawImage(img, pad, pad, size - pad * 2, size - pad * 2);
 
   URL.revokeObjectURL(url);
 
-  const pngUrl = canvas.toDataURL("image/png");
+  const blob = await new Promise<Blob>((resolve) => {
+    canvas.toBlob((b) => resolve(b as Blob), "image/png");
+  });
+
+  return blob;
+}
+
+export async function downloadSvgAsPng(svgEl: SVGSVGElement, filename: string) {
+  const blob = await svgToPngBlob(svgEl, 1024);
+  const url = URL.createObjectURL(blob);
+
   const a = document.createElement("a");
-  a.href = pngUrl;
+  a.href = url;
   a.download = filename.endsWith(".png") ? filename : `${filename}.png`;
   document.body.appendChild(a);
   a.click();
   a.remove();
+
+  URL.revokeObjectURL(url);
 }
 
-// ✅ [추가] SVG를 data:image/svg+xml;base64,... 형태로 변환 (서버에 base64만 저장할 때 사용)
-function base64EncodeUnicode(str: string) {
-  return btoa(
-    encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) =>
-      String.fromCharCode(parseInt(p1, 16))
-    )
-  );
-}
-
-export function svgToDataUrl(svgEl: SVGSVGElement) {
-  const xml = new XMLSerializer().serializeToString(svgEl);
-  const svg64 = base64EncodeUnicode(xml);
-  return `data:image/svg+xml;base64,${svg64}`;
+// ✅ 업로드용: SVG -> PNG File
+export async function svgToPngFile(svgEl: SVGSVGElement, filename = "qr.png") {
+  const blob = await svgToPngBlob(svgEl, 1024);
+  return new File([blob], filename, { type: "image/png" });
 }

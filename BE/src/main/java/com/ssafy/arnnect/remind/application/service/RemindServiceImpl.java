@@ -4,9 +4,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ssafy.arnnect.member.application.service.MemberService;
 import com.ssafy.arnnect.remind.application.dto.request.RemindQuizRequest;
 import com.ssafy.arnnect.remind.application.dto.response.ChatCompletionResponse;
 import com.ssafy.arnnect.remind.application.dto.response.RemindQuizResponse;
+import com.ssafy.arnnect.review.application.dto.response.ReviewQuizResponse;
+import com.ssafy.arnnect.review.repository.ReviewRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,41 +25,22 @@ import java.util.List;
 public class RemindServiceImpl implements RemindService {
 
     private final RestClient restClient;
+    private final ReviewRepository repository;
+    private final MemberService memberService;
 
     @Value("${remind.ai.version}")
     private String version;
 
     @Override
     public List<RemindQuizResponse> sendRemind(String memberUuid) throws JsonProcessingException {
-
         List<RemindQuizRequest.Message> messages = new ArrayList<>();
 
         // 1) system 메시지
         messages.add(new RemindQuizRequest.Message("system", prompt));
 
-        // 2) user 메시지 (여러 리뷰를 반복)
-        List<RemindQuizRequest.ReviewPayload> reviews = List.of(
-                new RemindQuizRequest.ReviewPayload(1L, "예상치 못한 반전",
-                        "처음에는 평범한 이야기인 줄 알았는데, 마지막에 등장인물이 큰 결정을 내리는 순간 반전이 있어 놀랐다."),
-                new RemindQuizRequest.ReviewPayload(2L, "감정이 몰입되는 서사",
-                        "주인공의 성장 과정이 섬세하게 그려져서 이야기 초반부터 끝까지 감정적으로 몰입할 수 있었다."),
-                new RemindQuizRequest.ReviewPayload(3L, "유머와 감동의 조화",
-                        "중간중간 웃음을 주는 장면과 진지한 감동 장면이 적절히 섞여 있어 보는 내내 지루하지 않았다."),
-                new RemindQuizRequest.ReviewPayload(4L, "주제의 깊이",
-                        "사회적 문제를 배경으로 주제를 깊이 있게 탐구하며, 여러 관점에서 생각할 거리를 주었다."),
-                new RemindQuizRequest.ReviewPayload(5L, "강렬한 캐릭터",
-                        "각 인물의 성격이 뚜렷하고, 특히 조연 캐릭터조차 기억에 남을 만큼 개성이 강하다."),
-                new RemindQuizRequest.ReviewPayload(6L, "시각적 매력",
-                        "화면 구성이 아름답고 색감과 장면 연출이 인상적이라 시청하는 즐거움이 컸다."),
-                new RemindQuizRequest.ReviewPayload(7L, "긴장감 넘치는 전개",
-                        "계속해서 사건이 이어지며 긴장감이 유지되어 마지막까지 손에 땀을 쥐고 볼 수 있었다."),
-                new RemindQuizRequest.ReviewPayload(8L, "음악과 분위기",
-                        "배경음악과 분위기가 작품의 감정을 잘 살려주어 몰입감이 훨씬 높았다."),
-                new RemindQuizRequest.ReviewPayload(9L, "생각하게 하는 결말",
-                        "마지막 장면에서 결말이 열린 느낌이라, 작품이 끝난 후에도 계속 생각하게 된다."),
-                new RemindQuizRequest.ReviewPayload(10L, "감정 표현의 섬세함",
-                        "등장인물들의 감정이 미세하게 표현되어서 작은 표정이나 말투 하나에도 의미를 느낄 수 있었다.")
-        );
+        List<RemindQuizRequest.ReviewPayload> reviews = repository.getReviewQuizList(memberService.getMemberId(memberUuid))
+                .stream().map(ReviewQuizResponse::toQuiz).toList();
+
         ObjectMapper objectMapper = new ObjectMapper();
         String reviewsJson = objectMapper.writeValueAsString(reviews);
 
@@ -125,7 +109,7 @@ public class RemindServiceImpl implements RemindService {
             2. 퀴즈에는 작품명, 작가명, 고유명사(작품을 직접 식별 가능한 명칭)가 절대 포함되면 안 된다.
             3. 감상평에 명시적으로 언급된 내용만 사용해야 하며, 추론·추가 설정·외부 지식은 사용하면 안 된다.
             4. 퀴즈 내용만 읽고도 사용자가 어떤 작품에 대한 감상평인지 유추할 수 있어야 한다.
-            5. 퀴즈는 설명형 문장 또는 질문형 문장으로 작성한다.
+            5. 퀴즈는 어떤 작품인지 물어보는 형식이어야한다.
                         
             출력은 반드시 아래 JSON 형식을 따른다.
             다른 설명 문장은 출력하지 않는다.

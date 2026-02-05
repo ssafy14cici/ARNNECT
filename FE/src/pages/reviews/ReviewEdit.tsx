@@ -1,9 +1,12 @@
 // FE/src/pages/reviews/ReviewEdit.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useAuthStore } from "../../features/auth/store";
 import { http } from "../../shared/api/http";
+
+// ✅ DEV 프록시 + /src prefix 보정 + PROD origin 붙이기
+import { resolveMediaUrl } from "../artworks/detail/utils";
 
 type JsonObject = Record<string, unknown>;
 function isObject(v: unknown): v is JsonObject {
@@ -46,7 +49,7 @@ function normalizeId(raw: unknown): string {
 }
 
 // ------------------- API PATHS -------------------
-const REVIEW_BASE = "/api/v1/reviews"; // ✅ 스샷 기준: /reviews/{id}
+const REVIEW_BASE = "/api/v1/reviews"; // GET/PUT/DELETE /api/v1/reviews/{id}
 
 // ------------------- Types -------------------
 type ReviewDetailData = {
@@ -85,7 +88,6 @@ function mapReviewDetail(payload: unknown): ReviewDetailData | null {
   const body = pickEnvelopeData(payload);
   if (!isObject(body)) return null;
 
-  // ✅ reviewId가 reviewId or id로 올 수 있게
   const reviewId = asNumber(get(body, "reviewId"), asNumber(get(body, "id"), NaN));
   const artworkId = asNumber(get(body, "artworkId"), asNumber(get(body, "artwork_id"), NaN));
   if (!Number.isFinite(reviewId) || !Number.isFinite(artworkId)) return null;
@@ -94,10 +96,8 @@ function mapReviewDetail(payload: unknown): ReviewDetailData | null {
   const content = asString(get(body, "content"), "");
   const imageUrl = asString(get(body, "imageUrl"), asString(get(body, "image"), "")).trim();
 
-  // ✅ createdAtIso / createdAt 모두 허용
   const createdAtIso = toIso(get(body, "createdAtIso") ?? get(body, "createdAt"));
 
-  // ✅ 작성자 키도 여러 케이스 허용
   const memberUuid =
     asString(get(body, "memberUuid"), "").trim() ||
     asString(get(body, "authorUuid"), "").trim() ||
@@ -109,7 +109,6 @@ function mapReviewDetail(payload: unknown): ReviewDetailData | null {
     asString(get(body, "writerName"), "").trim() ||
     "—";
 
-  // ✅ 작가 키도 여러 케이스 허용
   const artistUuid =
     asString(get(body, "artistUuid"), "").trim() ||
     asString(get(body, "artistMemberUuid"), "").trim() ||
@@ -163,14 +162,61 @@ export default function ReviewEdit() {
   // form state
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
+  const [imageUrl, setImageUrl] = useState(""); // ✅ 기존 이미지 url(서버값 유지용)
   const [tagsText, setTagsText] = useState(""); // "a,b,c"
+
+  // ✅ 파일 업로드로 이미지 교체
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string>(""); // blob url
+  const [imgHovered, setImgHovered] = useState(false);
 
   const canEdit = useMemo(() => {
     if (!isLoggedIn || !user?.memberUuid) return false;
     if (!origin?.memberUuid) return false;
     return user.memberUuid === origin.memberUuid;
   }, [isLoggedIn, user, origin]);
+
+  const parsedTags = useMemo(() => {
+    const arr = tagsText
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return Array.from(new Set(arr)); // 중복 제거
+  }, [tagsText]);
+
+  // ✅ 화면에 보여줄 이미지 src (선택한 파일 > 기존 서버 이미지)
+  const displayImageSrc = useMemo(() => {
+    if (imagePreviewUrl) return imagePreviewUrl;
+    const u = imageUrl.trim();
+    return u ? resolveMediaUrl(u) : "";
+  }, [imagePreviewUrl, imageUrl]);
+
+  // blob URL revoke (메모리 누수 방지)
+  useEffect(() => {
+    return () => {
+      if (imagePreviewUrl && imagePreviewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+    };
+  }, [imagePreviewUrl]);
+
+  const onPickImageFile = (file: File | null) => {
+    // 기존 preview revoke
+    if (imagePreviewUrl && imagePreviewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+
+    setImageFile(file);
+
+    if (!file) {
+      setImagePreviewUrl("");
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    setImagePreviewUrl(url);
+  };
 
   useEffect(() => {
     if (!normalizedReviewId) {
@@ -183,7 +229,6 @@ export default function ReviewEdit() {
       try {
         setLoading(true);
 
-        // ✅ 스샷 기준: GET /api/v1/reviews/{id}
         const res = await http.get(`${REVIEW_BASE}/${normalizedReviewId}`);
         const payload = isObject(res) && "data" in res ? (res as { data: unknown }).data : res;
 
@@ -197,6 +242,9 @@ export default function ReviewEdit() {
         setContent(mapped?.content ?? "");
         setImageUrl(mapped?.imageUrl ?? "");
         setTagsText((mapped?.tags ?? []).join(", "));
+
+        // ✅ 파일 교체 상태는 초기화
+        onPickImageFile(null);
       } catch (e) {
         console.error(e);
         if (!cancelled) setOrigin(null);
@@ -208,10 +256,10 @@ export default function ReviewEdit() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [normalizedReviewId, nav]);
 
   useEffect(() => {
-    // 로그인 안 되어 있으면 접근 제한
     if (!loading && !isLoggedIn) {
       alert("로그인이 필요합니다.");
       nav(`/reviews/${normalizedReviewId}`, { replace: true });
@@ -219,20 +267,11 @@ export default function ReviewEdit() {
   }, [loading, isLoggedIn, nav, normalizedReviewId]);
 
   useEffect(() => {
-    // 작성자 아니면 편집 제한
     if (!loading && origin && isLoggedIn && user?.memberUuid && user.memberUuid !== origin.memberUuid) {
       alert("수정 권한이 없습니다.");
       nav(`/reviews/${normalizedReviewId}`, { replace: true });
     }
   }, [loading, origin, isLoggedIn, user, nav, normalizedReviewId]);
-
-  const parsedTags = useMemo(() => {
-    const arr = tagsText
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    return Array.from(new Set(arr)); // 중복 제거
-  }, [tagsText]);
 
   const onCancel = () => {
     nav(`/reviews/${normalizedReviewId}`);
@@ -250,17 +289,20 @@ export default function ReviewEdit() {
 
     setSaving(true);
     try {
-      const body = {
-        title: nextTitle,
-        content: nextContent,
-        imageUrl: imageUrl.trim() || null, // ⚠️ BE가 파일(FormData)면 여기 바꿔야 함
-        tags: parsedTags.length ? parsedTags : [],
-        // artworkId가 수정 불가면 제거해도 됨. 일단 안전하게 유지.
-        artworkId: origin.artworkId,
-      };
+      // ✅ Create처럼 파일 기반 업로드/수정: multipart/form-data
+      const fd = new FormData();
+      fd.append("title", nextTitle);
+      fd.append("content", nextContent);
+      fd.append("artworkId", String(origin.artworkId));
 
-      // ✅ 스샷 기준: PUT /api/v1/reviews/{id}
-      await http.put(`${REVIEW_BASE}/${normalizedReviewId}`, body);
+      // tags는 BE 바인딩 방식에 따라 달라질 수 있음.
+      // - 가장 무난한 방식: JSON string으로 1개 키에 담기 (BE에서 파싱)
+      fd.append("tags", JSON.stringify(parsedTags.length ? parsedTags : []));
+
+      // ✅ 새 파일을 선택한 경우에만 전송(안 보내면 기존 이미지 유지)
+      if (imageFile) fd.append("imageFile", imageFile);
+
+      await http.put(`${REVIEW_BASE}/${normalizedReviewId}`, fd);
 
       alert("수정되었습니다.");
       nav(`/reviews/${normalizedReviewId}`);
@@ -281,11 +323,9 @@ export default function ReviewEdit() {
 
     setDeleting(true);
     try {
-      // ✅ 스샷 기준: DELETE /api/v1/reviews/{id}
       await http.delete(`${REVIEW_BASE}/${normalizedReviewId}`);
 
       alert("삭제되었습니다.");
-      // TODO: 유저 라우트 구조에 맞게 리스트/홈으로 이동 경로 조정
       nav("/reviews", { replace: true });
     } catch (e) {
       console.error(e);
@@ -367,27 +407,103 @@ export default function ReviewEdit() {
           />
         </div>
 
+        {/* ✅ 이미지: 기존 이미지 미리보기 + hover 시 파일로 교체 */}
         <div style={{ display: "grid", gap: 6 }}>
-          <label style={{ fontSize: 13, opacity: 0.85 }}>이미지 URL (선택)</label>
-          <input
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            disabled={!canEdit || saving || deleting}
-            style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: 10 }}
-            placeholder="https://..."
-          />
-          {imageUrl.trim() && (
-            <div style={{ marginTop: 6 }}>
+          <label style={{ fontSize: 13, opacity: 0.85 }}>이미지</label>
+
+          <div
+            style={{
+              position: "relative",
+              width: "100%",
+              borderRadius: 12,
+              overflow: "hidden",
+              border: displayImageSrc ? "none" : "1px solid #ddd",
+            }}
+            onMouseEnter={() => setImgHovered(true)}
+            onMouseLeave={() => setImgHovered(false)}
+          >
+            {displayImageSrc ? (
               <img
-                src={imageUrl.trim()}
+                src={displayImageSrc}
                 alt="preview"
-                style={{ width: "100%", maxHeight: 360, objectFit: "cover", borderRadius: 12 }}
+                style={{ width: "100%", maxHeight: 360, objectFit: "cover", display: "block" }}
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).style.display = "none";
                 }}
               />
+            ) : (
+              <div style={{ height: 220, display: "grid", placeItems: "center", borderRadius: 12 }}>
+                이미지 없음
+              </div>
+            )}
+
+            {/* hover overlay */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                justifyContent: "flex-end",
+                alignItems: "flex-end",
+                padding: 12,
+                background: "linear-gradient(to top, rgba(0,0,0,0.45), rgba(0,0,0,0))",
+                opacity: imgHovered ? 1 : 0,
+                transition: "opacity .15s ease",
+                pointerEvents: "none",
+              }}
+            >
+              <button
+                type="button"
+                style={{
+                  pointerEvents: "auto",
+                  background: "rgba(0,0,0,0.75)",
+                  color: "#fff",
+                  border: 0,
+                  borderRadius: 10,
+                  padding: "8px 10px",
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!canEdit || saving || deleting}
+              >
+                이미지 변경
+              </button>
+            </div>
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            disabled={!canEdit || saving || deleting}
+            onChange={(e) => {
+              const f = e.target.files?.[0] ?? null;
+              onPickImageFile(f);
+              // 같은 파일 다시 선택 가능하도록 값 초기화
+              e.currentTarget.value = "";
+            }}
+          />
+
+          {imageFile && (
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <div style={{ fontSize: 12, opacity: 0.8 }}>
+                선택됨: <b>{imageFile.name}</b>
+              </div>
+              <button
+                type="button"
+                onClick={() => onPickImageFile(null)}
+                disabled={!canEdit || saving || deleting}
+                style={{ padding: "6px 10px" }}
+              >
+                선택 취소(기존 이미지 유지)
+              </button>
             </div>
           )}
+
+          {/* 기존 imageUrl은 유지용(표시/정규화)으로만 사용 */}
+          <div style={{ fontSize: 12, opacity: 0.65 }}>
+            * 새 이미지를 선택하지 않으면 기존 이미지를 유지합니다.
+          </div>
         </div>
 
         <div style={{ display: "grid", gap: 6 }}>
@@ -412,7 +528,9 @@ export default function ReviewEdit() {
       </section>
 
       <div style={{ marginTop: 26, opacity: 0.7, fontSize: 12 }}>
-        * 이미지 업로드가 파일(FormData) 방식이면, 현재 구현(이미지 URL)은 스펙에 맞게 수정이 필요합니다.
+        * 수정 API가 multipart(FormData)로 파일을 받는다는 가정으로 구현했습니다. (키: imageFile / tags는 JSON string)
+        <br />
+        * BE가 다른 키를 쓰면(createReview와 동일 키로) fd.append(...) 부분만 맞추면 됩니다.
       </div>
     </div>
   );

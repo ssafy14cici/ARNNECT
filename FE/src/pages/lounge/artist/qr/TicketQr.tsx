@@ -1,19 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+// FE/src/pages/lounge/artist/qr/TicketQr.tsx
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { toBlob } from "html-to-image";
+import QRCode from "react-qr-code";
+import { renderToStaticMarkup } from "react-dom/server";
 import "../../lounge.css";
 
-import {
-  createExhibitionTicket,
-  updateExhibitionByCode,
-  type FeeType,
-} from "../../../../features/tickets/api";
-
+import { createTicket, updateTicket } from "../../../../features/tickets/api/realTickets";
 import TicketForm, { type FormState } from "./TicketForm";
 import QrPanel from "./QrPanel";
-import { rememberDesign, normalizeImageToSrc, type TicketItem, useIssuedTickets } from "./useIssuedTickets";
-
-// TicketDesignType import 추가
-import { TicketDesignType } from "../../../../shared/ui/tickets/TicketPreview";
+import { rememberDesign, type TicketItem, useIssuedTickets } from "./useIssuedTickets";
+import { svgToPngFile } from "../../../../features/tickets/qrDownload";
+import { resolveTicketMedia } from "../../../../features/tickets/resolveTicketMedia";
 
 type TabMode = "ISSUE" | "LIST";
 
@@ -29,7 +27,17 @@ function isHHmm(v: string) {
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(v);
 }
 
-// 초기 폼 상태 설정 함수
+function toTimeHHmmss(v: string) {
+  if (/^\d{2}:\d{2}:\d{2}$/.test(v)) return v;
+  if (/^\d{2}:\d{2}$/.test(v)) return `${v}:00`;
+  return v;
+}
+
+function makeTicketCode() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return `T_${crypto.randomUUID()}`;
+  return `T_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
 function toForm(t?: Partial<TicketItem> | null): FormState {
   return {
     title: t?.title ?? "",
@@ -37,12 +45,66 @@ function toForm(t?: Partial<TicketItem> | null): FormState {
     addressDetail: t?.addressDetail ?? "",
     startDate: t?.startDate ?? todayYYYYMMDD(),
     endDate: t?.endDate ?? todayYYYYMMDD(),
-    startTime: t?.startTime ?? "10:00",
-    endTime: t?.endTime ?? "20:00",
-    posterUrl: t?.posterUrl ?? "",
-    // 저장된 디자인이 있으면 불러오고 없으면 BASIC
-    ticketDesign: (t?.ticketDesign as TicketDesignType) ?? "BASIC",
+    startTime: (t?.startTime && isHHmm(t.startTime.slice(0, 5)) ? t.startTime.slice(0, 5) : "10:00"),
+    endTime: (t?.endTime && isHHmm(t.endTime.slice(0, 5)) ? t.endTime.slice(0, 5) : "20:00"),
+    posterUrl: "",
+    ticketDesign: t?.ticketDesign ?? "BASIC",
   };
+}
+
+// ticketCode로 QR png 파일 생성 (multipart qrImage)
+async function makeQrImageFile(ticketCode: string) {
+  const markup = renderToStaticMarkup(<QRCode value={ticketCode} size={220} />);
+  const doc = new DOMParser().parseFromString(markup, "image/svg+xml");
+  const svg = doc.querySelector("svg") as SVGSVGElement | null;
+  if (!svg) throw new Error("QR SVG 생성 실패");
+  return svgToPngFile(svg, `QR_${ticketCode}.png`);
+}
+
+// ticketImage는 필수 -> 캡처 실패 시 fallback 이미지 생성
+async function makeTicketImageFile(previewEl: HTMLElement | null, ticketCode: string, title: string) {
+  // 폰트 로딩 대기(가능한 환경)
+  // @ts-ignore
+  if (document.fonts?.ready) {
+    // @ts-ignore
+    await document.fonts.ready.catch(() => {});
+  }
+
+  if (previewEl) {
+    try {
+      const blob = await toBlob(previewEl, {
+        cacheBust: true,
+        pixelRatio: 3,
+        backgroundColor: "#000",
+      });
+      if (blob) return new File([blob], `TICKET_${ticketCode}.png`, { type: "image/png" });
+    } catch {
+      // fallthrough
+    }
+  }
+
+  // fallback
+  const canvas = document.createElement("canvas");
+  canvas.width = 900;
+  canvas.height = 1400;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("ticketImage 생성 실패");
+
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "#C8A97E";
+  ctx.font = "bold 42px sans-serif";
+  ctx.fillText("ARNNECT TICKET", 60, 120);
+
+  ctx.fillStyle = "#fff";
+  ctx.font = "28px sans-serif";
+  ctx.fillText(`CODE: ${ticketCode}`, 60, 210);
+  ctx.fillText(`TITLE: ${title.slice(0, 22)}`, 60, 270);
+
+  const blob = await new Promise<Blob>((resolve) => canvas.toBlob((b) => resolve(b as Blob), "image/png"));
+  return new File([blob], `TICKET_${ticketCode}.png`, { type: "image/png" });
 }
 
 export default function TicketQr() {
@@ -50,10 +112,15 @@ export default function TicketQr() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  const [ticketId, setTicketId] = useState<number | null>(null);
   const [ticketCode, setTicketCode] = useState<string>("");
-  const [qrImageSrc, setQrImageSrc] = useState<string>("");
-  const [editingCode, setEditingCode] = useState<string | null>(null);
+  const [qrImageName, setQrImageName] = useState<string>("");
+
+  const [editingTicketId, setEditingTicketId] = useState<number | null>(null);
+
   const [form, setForm] = useState<FormState>(() => toForm(null));
+
+  const previewRef = useRef<HTMLDivElement | null>(null);
 
   const { issued, reloadIssued, removeIssued } = useIssuedTickets();
 
@@ -70,17 +137,13 @@ export default function TicketQr() {
     return true;
   }, [form, busy]);
 
-  const qrValue = useMemo(() => {
-    if (!ticketCode) return "";
-    return JSON.stringify({ v: 1, ticket_code: ticketCode });
-  }, [ticketCode]);
-
   const resetForm = useCallback(() => {
     setError("");
     setBusy(false);
-    setEditingCode(null);
+    setEditingTicketId(null);
+    setTicketId(null);
     setTicketCode("");
-    setQrImageSrc("");
+    setQrImageName("");
     setForm(toForm(null));
   }, []);
 
@@ -91,46 +154,35 @@ export default function TicketQr() {
     setError("");
 
     try {
-      const feeType: FeeType = "free";
+      const code = ticketCode || makeTicketCode();
 
-      // API 전송 Payload
-      const payload: any = {
-        title: form.title.trim(),
-        place: form.address.trim(),
-        startDate: form.startDate,
-        endDate: form.endDate,
-        feeType,
-        // 확장 필드
-        addressDetail: form.addressDetail.trim() || undefined,
-        startTime: form.startTime,
-        endTime: form.endTime,
-        posterUrl: form.posterUrl.trim() || undefined,
-        // ticketDesign 필드도 API가 지원한다면 보낼 수 있음. 
-        // 지원하지 않는다면 로컬스토리지에만 저장 (아래 rememberDesign)
-      };
+      // ✅ multipart 필수 파일 생성
+      const qrFile = await makeQrImageFile(code);
+      const ticketFile = await makeTicketImageFile(previewRef.current, code, form.title.trim());
 
-      if (editingCode) {
-        await updateExhibitionByCode(editingCode, payload);
+      const fd = new FormData();
+      fd.append("ticketCode", code);
+      fd.append("title", form.title.trim());
+      fd.append("address", form.address.trim());
+      fd.append("addressDetail", form.addressDetail ?? "");
+      fd.append("startDate", form.startDate);
+      fd.append("endDate", form.endDate);
+      fd.append("startTime", toTimeHHmmss(form.startTime));
+      fd.append("endTime", toTimeHHmmss(form.endTime));
+      fd.append("qrImage", qrFile);
+      fd.append("ticketImage", ticketFile);
 
-        // 디자인 설정 저장
-        rememberDesign(editingCode, form.ticketDesign);
+      const res = editingTicketId ? await updateTicket(editingTicketId, fd) : await createTicket(fd);
 
-        setTicketCode(editingCode);
-        alert("수정되었습니다.");
-      } else {
-        const res = await createExhibitionTicket(payload);
-        const code = (res as any)?.ticket_code?.toString?.() ?? "";
-        setTicketCode(code);
+      // ✅ 프론트 상태 갱신
+      setTicketId(res.ticketId);
+      setTicketCode(res.ticketCode);
+      setQrImageName(res.qrImageName || "");
 
-        // 디자인 설정 저장
-        rememberDesign(code, form.ticketDesign);
+      // 디자인은 FE 로컬 저장(서버 필드 없으니)
+      rememberDesign(res.ticketCode, form.ticketDesign);
 
-        const img = (res as any)?.image ? normalizeImageToSrc((res as any).image) : "";
-        setQrImageSrc(img);
-
-        alert("QR이 발급되었습니다.");
-      }
-
+      alert(editingTicketId ? "수정되었습니다." : "QR이 발급되었습니다.");
       await reloadIssued();
     } catch (e: unknown) {
       console.error(e);
@@ -142,22 +194,23 @@ export default function TicketQr() {
 
   const startEdit = (t: TicketItem) => {
     setError("");
-    setEditingCode(t.ticketCode);
+    setEditingTicketId(t.ticketId);
+    setTicketId(t.ticketId);
     setTicketCode(t.ticketCode);
-    setQrImageSrc(normalizeImageToSrc(t.image));
+    setQrImageName(t.qrImageName ?? "");
     setForm(toForm(t));
     setActiveTab("ISSUE");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const remove = async (code: string) => {
+  const remove = async (t: TicketItem) => {
     if (!confirm("이 발급 기록을 삭제할까요?")) return;
 
     setBusy(true);
     setError("");
     try {
-      await removeIssued(code);
-      if (ticketCode === code) resetForm();
+      await removeIssued(t.ticketId, t.ticketCode);
+      if (ticketId === t.ticketId) resetForm();
     } catch (e: unknown) {
       console.error(e);
       setError(e instanceof Error ? e.message : "삭제 실패");
@@ -205,41 +258,34 @@ export default function TicketQr() {
                 }}
               >
                 <h2 className="loungeSubPanelTitle" style={{ margin: 0 }}>
-                  {editingCode ? "전시 정보 수정" : "새 전시 등록"}
+                  {editingTicketId ? "전시 정보 수정" : "새 전시 등록"}
                 </h2>
 
-                {editingCode && (
+                {editingTicketId && (
                   <button className="loungeTextBtn" onClick={resetForm}>
                     새로 만들기
                   </button>
                 )}
               </div>
 
-              {/* TicketForm에 form 상태를 전달하여 내부에서 선택 및 미리보기 가능 */}
               <TicketForm
                 form={form}
                 busy={busy}
                 onChange={(patch) => setForm((p) => ({ ...p, ...patch }))}
+                previewRef={previewRef}
               />
 
               {error && <div className="loungeNotice">{error}</div>}
 
               <div className="loungeSubActions">
                 <button className="loungeSubBtn" type="button" onClick={submit} disabled={!canSubmit}>
-                  {busy ? "처리 중..." : editingCode ? "수정 저장" : "QR 발급"}
+                  {busy ? "처리 중..." : editingTicketId ? "수정 저장" : "QR 발급"}
                 </button>
               </div>
             </div>
 
             {ticketCode && (
-              <QrPanel
-                ticketCode={ticketCode}
-                qrValue={qrValue}
-                busy={busy}
-                qrImageSrc={qrImageSrc}
-                setQrImageSrc={setQrImageSrc}
-                onReloadIssued={reloadIssued}
-              />
+              <QrPanel ticketCode={ticketCode} busy={busy} qrImageName={qrImageName} />
             )}
           </div>
         )}
@@ -253,15 +299,23 @@ export default function TicketQr() {
                 <div style={{ display: "grid", gap: 16 }}>
                   {issued.map((t) => (
                     <div
-                      key={t.ticketCode}
+                      key={t.ticketId}
                       className="tasteCard"
                       style={{ padding: 24, border: "1px solid rgba(255,255,255,0.1)" }}
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                         <div style={{ fontWeight: 700 }}>
                           {t.title}
-                          {/* 디자인 타입 표시 */}
-                          <span style={{ marginLeft: 10, fontSize: 12, opacity: 0.7, border: "1px solid #555", padding: "2px 6px", borderRadius: "4px" }}>
+                          <span
+                            style={{
+                              marginLeft: 10,
+                              fontSize: 12,
+                              opacity: 0.7,
+                              border: "1px solid #555",
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                            }}
+                          >
                             {t.ticketDesign}
                           </span>
                         </div>
@@ -271,12 +325,11 @@ export default function TicketQr() {
                       <div style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.6)", marginTop: 8 }}>
                         📍 {t.address} | 📅 {t.startDate} ~ {t.endDate}
                       </div>
-                      
-                      {/* 목록에서도 작게 미리보기를 보여줄 수 있지만, 지금은 기존대로 포스터만 유지하거나 원하면 교체 가능 */}
-                      {t.posterUrl && (
+
+                      {t.ticketImageName && (
                         <img
-                          src={t.posterUrl}
-                          alt="poster"
+                          src={resolveTicketMedia(t.ticketImageName)}
+                          alt="ticket"
                           style={{
                             width: "100%",
                             maxWidth: 520,
@@ -295,7 +348,7 @@ export default function TicketQr() {
                         <button className="loungeSubBtn" onClick={() => startEdit(t)}>
                           수정
                         </button>
-                        <button className="loungeSubBtn" onClick={() => remove(t.ticketCode)} style={{ color: "#ff6b6b" }}>
+                        <button className="loungeSubBtn" onClick={() => remove(t)} style={{ color: "#ff6b6b" }}>
                           삭제
                         </button>
                       </div>

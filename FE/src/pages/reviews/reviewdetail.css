@@ -221,13 +221,23 @@
 
 /* =============================================================================
    COMMENTS (Minimalist)
+   ✅ Fix: sticky 이미지가 비치지 않도록 "불투명 섹션" + spacing을 padding으로 처리
 ============================================================================= */
 .rd-comments {
   position: relative;
   z-index: 20;
-  margin-top: 80px;
-  padding-top: 60px;
+
+  /* ❌ margin-top으로 빈 공간 만들면 그 공간은 투명이라 sticky 이미지가 비침 */
+  margin-top: 0;
+
+  /* ✅ 간격은 padding으로(배경이 같이 칠해짐) */
+  padding: 60px 24px 0;
+
+  /* ✅ 댓글 섹션을 확실히 불투명하게 */
+  background: #050505;
+
   border-top: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 -50px 100px rgba(0,0,0,1);
 }
 
 .rd-comments-head {
@@ -252,24 +262,27 @@
   margin: 10px 0 16px;
 }
 
-/* input */
+/* input
+   ✅ Fix: 입력 영역도 최소한의 배경/보더를 줘서 "투명하게 떠보임" 방지 */
 .rd-comment-input {
   display: flex;
   gap: 12px;
   align-items: center;
-  border-bottom: 1px solid rgba(255,255,255,0.28);
-  padding-bottom: 10px;
+
+  border-bottom: none;
+  padding: 10px 0;
   margin: 18px 0 34px;
 }
 
 .rd-comment-input-field {
   flex: 1;
-  background: transparent;
-  border: none;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 12px;
   outline: none;
   color: #fff;
   font-size: 1rem;
-  padding: 10px 0;
+  padding: 12px 14px;
 }
 
 .rd-comment-input-field::placeholder {
@@ -342,6 +355,33 @@
 }
 
 /* =============================================================================
+   INLINE EDIT/REPLY (textarea UI) - ReviewDetail.tsx 인라인 수정/답글용
+============================================================================= */
+.rd-inline-edit,
+.rd-inline-reply {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.rd-inline-textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 12px;
+  color: #fff;
+  outline: none;
+}
+
+.rd-inline-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* =============================================================================
    ANIMATIONS & RESPONSIVE
 ============================================================================= */
 @keyframes rdFadeIn {
@@ -374,5 +414,9 @@
   .rd-body {
     margin-top: -70px;
     padding: 70px 16px 70px;
+  }
+
+  .rd-comments {
+    padding: 50px 16px 0;
   }
 }

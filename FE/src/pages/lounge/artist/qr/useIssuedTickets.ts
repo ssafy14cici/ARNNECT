@@ -1,31 +1,30 @@
-//FE\src\pages\lounge\artist\qr\useIssuedTickets.ts
-
+// FE/src/pages/lounge/artist/qr/useIssuedTickets.ts
 import { useCallback, useState } from "react";
+import { useAuthStore } from "../../../../features/auth/store";
 import {
-  deleteExhibitionByCode,
-  listIssuedExhibitions,
-  type ExhibitionByCodeResponse,
-} from "../../../../features/tickets/api";
+  deleteTicket,
+  listTicketsByArtist,
+  type TicketInfoResponse,
+} from "../../../../features/tickets/api/realTickets";
 
 export type TicketDesign = "BASIC" | "MODERN" | "MINIMAL";
 
 export type TicketItem = {
+  ticketId: number;
+  ticketCode: string;
+
   title: string;
-  address: string;        // = place
-  addressDetail: string;  // mock에 저장된 경우만 표시
+  address: string;
+  addressDetail: string;
 
   startDate: string;
   endDate: string;
 
-  startTime: string; // mock에 저장된 경우만 표시
+  startTime: string;
   endTime: string;
 
-  ticketCode: string;
-
-  posterUrl?: string;
-  description?: string;
-
-  image?: string;
+  qrImageName?: string;
+  ticketImageName?: string;
 
   ticketDesign: TicketDesign;
 };
@@ -65,69 +64,54 @@ export function forgetDesign(code: string) {
   saveDesignMap(map);
 }
 
-export function normalizeImageToSrc(image?: string | null) {
-  if (!image) return "";
-  if (image.startsWith("data:image/")) return image;
-  if (image.startsWith("http://") || image.startsWith("https://")) return image;
-  if (image.startsWith("PHN2Zy")) return `data:image/svg+xml;base64,${image}`;
-  return `data:image/png;base64,${image}`;
-}
-
 const toStr = (v: unknown) => (typeof v === "string" ? v : v == null ? "" : String(v));
 
 export function useIssuedTickets() {
   const [issued, setIssued] = useState<TicketItem[]>([]);
+  const me = useAuthStore((s) => s.user);
+  const artistUuid = me?.memberUuid ?? "";
 
   const reloadIssued = useCallback(async () => {
-    const designMap = loadDesignMap();
+    if (!artistUuid) {
+      setIssued([]);
+      return;
+    }
 
-    const list = await listIssuedExhibitions();
-    const arr = Array.isArray(list) ? (list as ExhibitionByCodeResponse[]) : [];
+    const designMap = loadDesignMap();
+    const list = await listTicketsByArtist(artistUuid);
+    const arr = Array.isArray(list) ? (list as TicketInfoResponse[]) : [];
 
     const normalized = arr.map((x) => {
-      const anyX = x as any; // mock에 추가 필드 들어올 수 있어서 허용
+      const code = toStr(x.ticketCode);
 
-      const code = toStr(anyX.ticket_code ?? anyX.ticketCode);
-      const address = toStr(anyX.place ?? anyX.address);
-      const addressDetail = toStr(anyX.addressDetail ?? anyX.address_detail);
-
-      const startTime = toStr(anyX.startTime);
-      const endTime = toStr(anyX.endTime);
-
-      const image = anyX.image ? toStr(anyX.image) : undefined;
-
-      const ticketDesign =
-        (anyX.ticketDesign as TicketDesign | undefined) ??
-        (anyX.ticket_design as TicketDesign | undefined) ??
-        designMap[code] ??
-        "BASIC";
+      const ticketDesign = designMap[code] ?? "BASIC";
 
       return {
-        title: toStr(anyX.title),
-        address,
-        addressDetail,
-        startDate: toStr(anyX.startDate),
-        endDate: toStr(anyX.endDate),
-        startTime,
-        endTime,
+        ticketId: Number(x.ticketId),
         ticketCode: code,
-        posterUrl: typeof anyX.posterUrl === "string" ? anyX.posterUrl : undefined,
-        description: typeof anyX.description === "string" ? anyX.description : undefined,
-        image,
+        title: toStr(x.title),
+        address: toStr(x.address),
+        addressDetail: toStr(x.addressDetail),
+        startDate: toStr(x.startDate),
+        endDate: toStr(x.endDate),
+        startTime: toStr(x.startTime),
+        endTime: toStr(x.endTime),
+        qrImageName: toStr(x.qrImageName) || undefined,
+        ticketImageName: toStr(x.ticketImageName) || undefined,
         ticketDesign,
       } satisfies TicketItem;
     });
 
     setIssued(normalized);
-  }, []);
+  }, [artistUuid]);
 
   const removeIssued = useCallback(
-    async (code: string) => {
-      await deleteExhibitionByCode(code);
-      forgetDesign(code);
+    async (ticketId: number, ticketCode?: string) => {
+      await deleteTicket(ticketId);
+      if (ticketCode) forgetDesign(ticketCode);
       await reloadIssued();
     },
-    [reloadIssued]
+    [reloadIssued],
   );
 
   return { issued, reloadIssued, removeIssued };

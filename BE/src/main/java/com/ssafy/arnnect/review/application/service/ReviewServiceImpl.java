@@ -7,6 +7,8 @@ import com.ssafy.arnnect.common.exception.BusinessException;
 import com.ssafy.arnnect.common.exception.ErrorCode;
 import com.ssafy.arnnect.common.file.FileStorageService;
 import com.ssafy.arnnect.common.file.FileType;
+import com.ssafy.arnnect.common.logs.UserLogAction;
+import com.ssafy.arnnect.common.logs.UserLoggable;
 import com.ssafy.arnnect.member.application.service.MemberService;
 import com.ssafy.arnnect.review.application.dto.request.CreateReviewRequest;
 import com.ssafy.arnnect.review.application.dto.request.UpdateReviewRequest;
@@ -41,6 +43,7 @@ public class ReviewServiceImpl implements ReviewService{
 
     @Override
     @Transactional
+    @UserLoggable(action = UserLogAction.REVIEW_WRITE)
     public void createReview(String memberUuid, CreateReviewRequest request) {
         Map<String, String> imgList = null;
         Long memberId = memberService.getMemberId(memberUuid);
@@ -53,6 +56,8 @@ public class ReviewServiceImpl implements ReviewService{
     }
 
     @Override
+    @Transactional
+    @UserLoggable(action = UserLogAction.REVIEW_WRITE)
     public void createReviewWithoutImg(String memberUuid, CreateReviewRequest request) {
         Long memberId = memberService.getMemberId(memberUuid);
         createTag(request.getTags(), repository.save(request.toEntity(memberId)).getReviewId());
