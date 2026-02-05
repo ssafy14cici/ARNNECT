@@ -19,7 +19,7 @@ public class UserLogService {
             UserLogAction action,
             Long artworkId
     ) {
-        UserLog log = UserLog.of(memberUuid, action, artworkId);
+        UserActionLog log = UserActionLog.of(memberUuid, action, artworkId);
         userLogRepository.save(log);
     }
 }

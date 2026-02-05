@@ -7,6 +7,8 @@ import com.ssafy.arnnect.comment.domain.entity.Comment;
 import com.ssafy.arnnect.comment.repository.CommentRepository;
 import com.ssafy.arnnect.common.exception.BusinessException;
 import com.ssafy.arnnect.common.exception.ErrorCode;
+import com.ssafy.arnnect.common.logs.UserLogAction;
+import com.ssafy.arnnect.common.logs.UserLoggable;
 import com.ssafy.arnnect.member.application.service.MemberService;
 import com.ssafy.arnnect.comment.domain.entity.TargetType;
 import com.ssafy.arnnect.member.domain.entity.Member;
@@ -31,6 +33,7 @@ public class CommentServiceImpl implements CommentService{
 
     @Override
     @Transactional
+    @UserLoggable(action = UserLogAction.COMMENT)
     public void createComment(CreateCommentRequest request, String memberUuid) {
         Long memberId = memberService.getMemberId(memberUuid);
         Comment comment = request.toEnity(memberId);
