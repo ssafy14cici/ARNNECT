@@ -40,8 +40,8 @@ public class CommentController {
     }
 
     @GetMapping()
-    public ResponseEntity<List<CommentResponse>> getComments(@RequestParam Integer artworkId) {
-        return ResponseEntity.ok(service.getCommentListOfArtwork(artworkId));
+    public ResponseEntity<List<CommentResponse>> getComments(@RequestParam Integer targetId, @RequestParam TargetType targetType) {
+        return ResponseEntity.ok(service.getCommentList(targetId, targetType));
     }
 
     @GetMapping("/count")

@@ -115,6 +115,65 @@ function normalizeRole(rawRole: unknown, kind?: "ARTWORK" | "REVIEW" | "UNKNOWN"
   return "USER";
 }
 
+/**
+ * ✅ Feed 전용 media url 정규화
+ * - 공용 resolveMediaUrl을 건드리지 않고, Feed에서만 안정적으로 처리
+ * - /artwork(s)/, /review(s)/ 모두 /src prefix 붙임 (DEV 프록시 환경 대응)
+ * - DEV: 절대 URL이면 pathname으로 바꿔 프록시를 타게 함
+ * - PROD: VITE_API_BASE_URL origin을 붙임
+ */
+function resolveFeedMediaUrl(input?: string | null): string {
+  const u0 = String(input ?? "").trim();
+  if (!u0 || u0 === "null" || u0 === "undefined") return "";
+  if (u0.startsWith("data:") || u0.startsWith("blob:")) return u0;
+
+  const needsSrcPrefix = (p: string) =>
+    !p.startsWith("/src/") && /^\/(artwork|artworks|review|reviews)\//i.test(p);
+
+  const isDev = !!import.meta.env.DEV;
+
+  // 1) 절대 URL 처리
+  if (/^https?:\/\//i.test(u0)) {
+    try {
+      const url = new URL(u0);
+
+      if (needsSrcPrefix(url.pathname)) {
+        url.pathname = `/src${url.pathname}`;
+      }
+
+      // ✅ DEV에서는 절대 URL을 상대경로로 바꿔서 프록시 타게
+      if (isDev) {
+        return `${url.pathname}${url.search}${url.hash}`;
+      }
+
+      return url.toString();
+    } catch {
+      return u0;
+    }
+  }
+
+  // 2) 상대 경로 처리
+  let path = u0.startsWith("/") ? u0 : `/${u0}`;
+
+  if (needsSrcPrefix(path)) {
+    path = `/src${path}`;
+  }
+
+  // ✅ DEV: 프록시
+  if (isDev) return path;
+
+  // ✅ PROD: VITE_API_BASE_URL origin 붙이기
+  const apiBase = String(import.meta.env.VITE_API_BASE_URL ?? "").trim();
+  let origin = "";
+  try {
+    if (apiBase) origin = new URL(apiBase).origin;
+  } catch {
+    origin = "";
+  }
+
+  return origin ? `${origin}${path}` : path;
+}
+
 // ---------- Raw types ----------
 type RawArtworkFeed = {
   artworkId?: string | number;
@@ -179,7 +238,9 @@ function toFeedItemFromArtwork(v: unknown): FeedItem | null {
   const artworkId = asString(x.artworkId ?? x.id, "");
   if (!artworkId) return null;
 
-  const imageUrl = asString(x.imageUrl, "") || asString(x.thumbnailUrl, "");
+  const imageUrlRaw = asString(x.imageUrl, "") || asString(x.thumbnailUrl, "");
+  const imageUrl = resolveFeedMediaUrl(imageUrlRaw);
+
   const createdAt = asString(x.createdAt, "") || asString(x.date, "");
 
   const authorId =
@@ -203,7 +264,7 @@ function toFeedItemFromArtwork(v: unknown): FeedItem | null {
     authorName,
     authorId,
     createdAt: createdAt ? toIso(createdAt) : new Date().toISOString(),
-    imageUrl: imageUrl || undefined,
+    imageUrl: imageUrl || undefined, // ✅ Feed 전용 정규화 적용
     likes: asNumber(x.likes, 0),
     views: asNumber(x.views, 0),
     category: undefined,
@@ -218,7 +279,9 @@ function toFeedItemFromReview(v: unknown): FeedItem | null {
   if (!reviewId) return null;
 
   const createdAt = asString(x.createdAt, "");
-  const imageUrl = asString(x.imageUrl, "");
+
+  const imageUrlRaw = asString(x.imageUrl, "");
+  const imageUrl = resolveFeedMediaUrl(imageUrlRaw);
 
   return {
     id: `review-${reviewId}`,
@@ -228,7 +291,7 @@ function toFeedItemFromReview(v: unknown): FeedItem | null {
     authorName: asString(x.nickname, "—"),
     authorId: asString(x.memberUuid, ""),
     createdAt: createdAt ? toIso(createdAt) : new Date().toISOString(),
-    imageUrl: imageUrl || undefined,
+    imageUrl: imageUrl || undefined, // ✅ Feed 전용 정규화 적용
     likes: 0,
     views: 0,
     category: undefined,
