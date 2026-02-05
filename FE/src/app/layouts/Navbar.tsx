@@ -1,6 +1,8 @@
+// FE/src/components/layout/Navbar.tsx
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { useNavigate, useLocation, useMatches } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
+
 import { useAuthStore } from "../../features/auth/store";
 import HoverModel from "../../shared/ui/three/HoverModel";
 import LogoutModal from "../../shared/ui/modals/LogoutModal";
@@ -19,8 +21,7 @@ type MenuItem = {
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
-  
-  // [추가] 모바일 감지 state
+
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
   const navigate = useNavigate();
@@ -33,17 +34,24 @@ export default function Navbar() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const logout = useAuthStore((s) => s.logout);
 
-  // [추가] 리사이즈 이벤트 리스너
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const handleLogoutClick = () => setModalOpen(true);
+  const handleLogoutClick = () => {
+    // ✅ 메뉴를 먼저 닫아 body lock/overlay 잔존 방지
+    setOpen(false);
+    setHoveredKey(null);
+    setModalOpen(true);
+  };
 
   const handleConfirmLogout = () => {
     logout();
+    // ✅ 혹시 open 상태가 남아있어도 확실히 닫기
+    setOpen(false);
+    setHoveredKey(null);
     setModalOpen(false);
     navigate("/");
   };
@@ -82,7 +90,6 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, [isHome]);
 
-   // ✅ 메뉴 아이템 정의 (Shape 포함)
   const items: MenuItem[] = useMemo(
     () => [
       { key: "home", label: "Home", path: "/", shape: "knot" },
@@ -108,6 +115,9 @@ export default function Navbar() {
         navigate("/login", { state: { from: location.pathname } });
         setOpen(false);
       } else {
+        // ✅ auth 클릭으로 모달 열 때도 메뉴는 닫기
+        setOpen(false);
+        setHoveredKey(null);
         handleLogoutClick();
       }
       return;
@@ -127,15 +137,11 @@ export default function Navbar() {
     .filter(Boolean)
     .join(" ");
 
-  // 홈 화면이면서 모바일일 때는 헤더 숨김 (HomeMobile 자체 헤더 사용)
   const shouldHideHeader = isHome && isMobile;
 
   return (
     <>
-      <header 
-        className={headerClassName}
-        style={shouldHideHeader ? { display: "none" } : undefined}
-      >
+      <header className={headerClassName} style={shouldHideHeader ? { display: "none" } : undefined}>
         <div className="navInner">
           <button className="navBrand" type="button" onClick={() => navigate(isLoggedIn ? "/hall" : "/")}>
             ARNNECT
@@ -190,11 +196,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      <LogoutModal
-        isOpen={isModalOpen}
-        onClose={() => setModalOpen(false)}
-        onConfirm={handleConfirmLogout}
-      />
+      <LogoutModal isOpen={isModalOpen} onClose={() => setModalOpen(false)} onConfirm={handleConfirmLogout} />
     </>
   );
 }

@@ -1141,7 +1141,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
       // ✅ 가까울 때만 모달
       if (artist && artworkTitle && artistId && distToArt < 50) {
-        showArtModal({ artist, artistId, artworkTitle, artId });
+        showArtModal({ artist, artistId, artworkTitle, artId: hit.userData?.__artId, });
       }
 
       setBackBtnVisible(true);
@@ -1344,6 +1344,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     exhibitBtn.textContent = "전시보러가기";
 
     const openExhibit = (e: Event) => {
+      console.log("[mainHallFree] openExhibit payload", payload);
       e.preventDefault();
       e.stopPropagation();
 
