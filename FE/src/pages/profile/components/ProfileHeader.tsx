@@ -11,8 +11,6 @@ import basicProfile from "../../../assets/basicprofile.png";
 import type { ArtistProfile, UserProfile, Badge } from "../../../features/profile/types";
 
 import ProfileEditModal from "./ProfileEditModal";
-
-// ✅ QnA 패널 제거, 팬레터 모달로 교체
 import FanLetterSendModal from "../../../features/fanLetter/ui/FanLetterSendModal";
 
 type ProfileModel = ArtistProfile | UserProfile;
@@ -43,14 +41,9 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
   const { setFeatured } = useBadgeStore();
 
   const [busy, setBusy] = useState(false);
-
-  // ✅ FanLetter modal open
   const [fanLetterOpen, setFanLetterOpen] = useState(false);
-
-  // Edit modal open
   const [editOpen, setEditOpen] = useState(false);
 
-  // Manage menu
   const [manageOpen, setManageOpen] = useState(false);
   const manageBtnRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -67,17 +60,13 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
     return ids.map((id) => map.get(id)).filter(Boolean) as Badge[];
   }, [profile]);
 
-  const genre = useMemo(
-    () => (isArtist ? (profile as ArtistProfile).genre : undefined),
-    [isArtist, profile],
-  );
+  const genre = useMemo(() => (isArtist ? (profile as ArtistProfile).genre : undefined), [isArtist, profile]);
 
   const contactEnabled = useMemo(() => {
     if (!isArtist) return false;
     return (profile as ArtistProfile).contactEnabled !== false;
   }, [isArtist, profile]);
 
-  // ✅ “QnA” → “팬레터”
   const canSendFanLetter = !isOwner && isArtist && contactEnabled && viewerRole === "general";
 
   const avatarSrc = useMemo(() => {
@@ -86,13 +75,11 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
     return u;
   }, [profile.imageUrl]);
 
-  // Manage menu focus
   useEffect(() => {
     if (manageOpen) firstMenuItemRef.current?.focus?.();
     else manageBtnRef.current?.focus?.();
   }, [manageOpen]);
 
-  // click outside / esc
   useEffect(() => {
     if (!manageOpen) return;
 
@@ -131,6 +118,10 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
     try {
       if (prev.isFollowing) await profileApi.unfollow(prev.id);
       else await profileApi.follow(prev.id);
+
+      // ✅ 핵심: 서버 값으로 다시 동기화(카운트/상태 확정)
+      const latest = await profileApi.getProfile(prev.id);
+      onProfileUpdated(latest as ProfileModel);
     } catch (e) {
       onProfileUpdated(prev);
       alert(e instanceof Error ? e.message : "팔로우 변경 실패");
@@ -139,7 +130,6 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
     }
   };
 
-  // ✅ 기존 QnA 전송 로직을 “팬레터 전송”으로 이름/메시지만 교체
   const submitFanLetter = async (message: string) => {
     if (!canSendFanLetter) return;
     if (!profile.id) return;
@@ -264,12 +254,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
                       로그아웃
                     </button>
 
-                    <button
-                      className="profileMenuItem"
-                      onClick={() => setManageOpen(false)}
-                      role="menuitem"
-                      type="button"
-                    >
+                    <button className="profileMenuItem" onClick={() => setManageOpen(false)} role="menuitem" type="button">
                       닫기
                     </button>
                   </div>
@@ -292,7 +277,6 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
         </div>
       </div>
 
-      {/* ✅ ProfileQnaPanel 삭제 → FanLetterSendModal 사용 */}
       <FanLetterSendModal
         open={fanLetterOpen}
         sending={busy}

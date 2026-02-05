@@ -9,7 +9,6 @@ import type {
   Badge,
 } from "../types";
 
-
 import { useAuthStore } from "../../auth/store";
 
 const BASE = String(import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -31,13 +30,37 @@ function asString(v: unknown, fallback = ""): string {
   return fallback;
 }
 
-
+// ✅ string number / boolean도 흡수
 function asNumber(v: unknown, fallback = 0): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (!s) return fallback;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
+  if (typeof v === "boolean") return v ? 1 : 0;
+
+  return fallback;
 }
 
+// ✅ 0/1, "0"/"1", "true"/"false" 흡수
 function asBool(v: unknown, fallback = false): boolean {
-  return typeof v === "boolean" ? v : fallback;
+  if (typeof v === "boolean") return v;
+
+  if (typeof v === "number") return v !== 0;
+
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (!s) return fallback;
+    if (["true", "t", "1", "y", "yes"].includes(s)) return true;
+    if (["false", "f", "0", "n", "no"].includes(s)) return false;
+    return fallback;
+  }
+
+  return fallback;
 }
 
 /**
@@ -87,7 +110,7 @@ function mergeHeaders(base: Record<string, string>, extra?: HeadersInit): Record
     return out;
   }
 
-  for (const [k, v] of Object.entries(extra)) out[k] = v;
+  for (const [k, v] of Object.entries(extra)) out[k] = v as string;
   return out;
 }
 
@@ -162,7 +185,6 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     );
   }
 
-
   // ✅ 204 / empty body 방어
   const ct = res.headers.get("content-type") ?? "";
   if (ct.includes("application/json")) {
@@ -178,8 +200,6 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     return text as unknown as T;
   }
 }
-
-
 
 /** badges: unknown -> Badge[] */
 function normalizeBadges(raw: unknown): Badge[] | undefined {
@@ -218,14 +238,14 @@ function normalizeFeaturedIds(raw: unknown): string[] | undefined {
 
 /**
  * 서버 프로필 -> 화면 프로필(공통 모델)
- * - roleHint/idHint를 받아서, 서버가 role/uuid를 안 주는 케이스(/member/my)도 안정화
- * - MyInfoResponse / MemberInfoResponse 필드명(is_artist, followers 등)도 흡수
  */
-function normalizeProfile(raw: unknown, opts?: { roleHint?: "USER" | "ARTIST"; idHint?: string | null }): ProfileModel {
+function normalizeProfile(
+  raw: unknown,
+  opts?: { roleHint?: "USER" | "ARTIST"; idHint?: string | null },
+): ProfileModel {
   const d = pickData(raw);
   const rec = isRecord(d) ? d : ({} as JsonRecord);
 
-  // role 후보: role / isArtist / is_artist
   const roleFromField =
     normalizeRole((rec as any).role) ??
     normalizeRole((rec as any).userRole) ??
@@ -249,16 +269,25 @@ function normalizeProfile(raw: unknown, opts?: { roleHint?: "USER" | "ARTIST"; i
     opts?.roleHint ??
     "USER";
 
-  // id: 서버가 안 주면 token sub 또는 호출 파라미터로 보정
+  // ✅ id 키 흡수 강화
   const id =
-    asString((rec as any).memberUuid ?? (rec as any).id ?? (rec as any).artistId ?? (rec as any).userId ?? "") ||
+    asString(
+      (rec as any).memberUuid ??
+        (rec as any).memberUUID ??
+        (rec as any).member_uuid ??
+        (rec as any).id ??
+        (rec as any).artistId ??
+        (rec as any).userId ??
+        (rec as any).memberId ??
+        "",
+    ) ||
     (opts?.idHint ?? "") ||
     "";
 
-  const name =
-    asString((rec as any).displayName ?? (rec as any).nickname ?? (rec as any).name ?? "—");
+  const name = asString((rec as any).displayName ?? (rec as any).nickname ?? (rec as any).name ?? "—");
 
-  // image: savedProfileImageName / saved_profile_image_name 같은 케이스도 수용
+  // ✅ 여기서 오타 때문에 니가 올린 TS 에러가 났음:
+  // (rec as "any") -> (rec as any) 로 수정 + 안전하게 string만 채택
   const imageUrl =
     typeof (rec as any).profileImageUrl === "string"
       ? (rec as any).profileImageUrl
@@ -281,21 +310,35 @@ function normalizeProfile(raw: unknown, opts?: { roleHint?: "USER" | "ARTIST"; i
         ? (rec as any).introduction
         : typeof (rec as any).artIntroduction === "string"
           ? (rec as any).artIntroduction
-          : typeof (rec as any).introduction === "string"
-            ? (rec as any).introduction
-            : null;
+          : null;
 
-  // followers/followings: MyInfoResponse가 followers/followings로 줄 가능성 반영
-  const followersCount = asNumber((rec as any).followersCount ?? (rec as any).followers ?? (rec as any).followerCount ?? 0);
-  const followingsCount = asNumber((rec as any).followingsCount ?? (rec as any).followings ?? (rec as any).followingCount ?? 0);
+  const followersCount = asNumber(
+    (rec as any).followersCount ??
+      (rec as any).followers ??
+      (rec as any).followerCount ??
+      (rec as any).followers_count ??
+      (rec as any).follower_cnt ??
+      0,
+  );
 
-  // isFollowing: is_follows / isFollows
-  const isFollowing =
-    asBool((rec as any).isFollowing ?? (rec as any).following ?? false) ||
-    (typeof (rec as any).isFollows === "number" ? Boolean((rec as any).isFollows) : false) ||
-    (typeof (rec as any).is_follows === "number" ? Boolean((rec as any).is_follows) : false) ||
-    (typeof (rec as any).isFollows === "boolean" ? (rec as any).isFollows : false) ||
-    (typeof (rec as any).is_follows === "boolean" ? (rec as any).is_follows : false);
+  const followingsCount = asNumber(
+    (rec as any).followingsCount ??
+      (rec as any).followings ??
+      (rec as any).followingCount ??
+      (rec as any).followings_count ??
+      (rec as any).following_cnt ??
+      0,
+  );
+
+  const isFollowing = asBool(
+    (rec as any).isFollowing ??
+      (rec as any).is_following ??
+      (rec as any).following ??
+      (rec as any).isFollows ??
+      (rec as any).is_follows ??
+      (rec as any).followed ??
+      false,
+  );
 
   const badges = normalizeBadges((rec as any).badges);
   const featuredBadgeIds =
@@ -316,95 +359,91 @@ function normalizeProfile(raw: unknown, opts?: { roleHint?: "USER" | "ARTIST"; i
   };
 
   if (role === "ARTIST") {
-  const genre =
-    typeof (rec as any).genre === "string"
-      ? (rec as any).genre
-      : typeof (rec as any).genreName === "string"
-        ? (rec as any).genreName
-        : typeof (rec as any).genre_name === "string"
-          ? (rec as any).genre_name
-          : undefined;
+    const genre =
+      typeof (rec as any).genre === "string"
+        ? (rec as any).genre
+        : typeof (rec as any).genreName === "string"
+          ? (rec as any).genreName
+          : typeof (rec as any).genre_name === "string"
+            ? (rec as any).genre_name
+            : undefined;
 
-  const artist: ArtistProfile = {
-    ...common,
-    role: "ARTIST",
-    genre,
-    contactEnabled: typeof (rec as any).contactEnabled === "boolean" ? (rec as any).contactEnabled : undefined,
-    contactUrl: typeof (rec as any).contactUrl === "string" ? (rec as any).contactUrl : undefined,
+    const artist: ArtistProfile = {
+      ...common,
+      role: "ARTIST",
+      genre,
+      contactEnabled: typeof (rec as any).contactEnabled === "boolean" ? (rec as any).contactEnabled : undefined,
+      contactUrl: typeof (rec as any).contactUrl === "string" ? (rec as any).contactUrl : undefined,
 
-    // optional pass-through
-    email: typeof (rec as any).email === "string" ? (rec as any).email : undefined,
-    birth: typeof (rec as any).birth === "string" ? (rec as any).birth : undefined,
-    phone: typeof (rec as any).phone === "string" ? (rec as any).phone : undefined,
-    isAgree: typeof (rec as any).isAgree === "boolean" ? (rec as any).isAgree : undefined,
+      email: typeof (rec as any).email === "string" ? (rec as any).email : undefined,
+      birth: typeof (rec as any).birth === "string" ? (rec as any).birth : undefined,
+      phone: typeof (rec as any).phone === "string" ? (rec as any).phone : undefined,
+      isAgree: typeof (rec as any).isAgree === "boolean" ? (rec as any).isAgree : undefined,
 
-    document: typeof (rec as any).document === "string" ? (rec as any).document : undefined,
+      document: typeof (rec as any).document === "string" ? (rec as any).document : undefined,
 
-    // ✅ (추가1) id로 내려오는 값들: 모달에서 필요
-    fieldId:
-      typeof (rec as any).fieldId === "number"
-        ? (rec as any).fieldId
-        : Number.isFinite(Number((rec as any).fieldId))
-          ? Number((rec as any).fieldId)
-          : undefined,
-
-    genreId:
-      typeof (rec as any).genreId === "number"
-        ? (rec as any).genreId
-        : Number.isFinite(Number((rec as any).genreId))
-          ? Number((rec as any).genreId)
-          : undefined,
-
-    // 기존 field(이름 문자열) 유지
-    field:
-      typeof (rec as any).field === "string"
-        ? (rec as any).field
-        : typeof (rec as any).fieldName === "string"
-          ? (rec as any).fieldName
-          : typeof (rec as any).field_name === "string"
-            ? (rec as any).field_name
+      fieldId:
+        typeof (rec as any).fieldId === "number"
+          ? (rec as any).fieldId
+          : Number.isFinite(Number((rec as any).fieldId))
+            ? Number((rec as any).fieldId)
             : undefined,
 
-    debutYear:
-      typeof (rec as any).debutYear === "number"
-        ? (rec as any).debutYear
-        : (typeof (rec as any).debut_year === "number" ? (rec as any).debut_year : undefined),
+      genreId:
+        typeof (rec as any).genreId === "number"
+          ? (rec as any).genreId
+          : Number.isFinite(Number((rec as any).genreId))
+            ? Number((rec as any).genreId)
+            : undefined,
 
-    // ✅ (추가2) snsPage / introduction을 "원본 필드"로도 보관
-    snsPage:
-      typeof (rec as any).snsPage === "string"
-        ? (rec as any).snsPage
-        : typeof (rec as any).sns_page === "string"
-          ? (rec as any).sns_page
-          : undefined,
+      field:
+        typeof (rec as any).field === "string"
+          ? (rec as any).field
+          : typeof (rec as any).fieldName === "string"
+            ? (rec as any).fieldName
+            : typeof (rec as any).field_name === "string"
+              ? (rec as any).field_name
+              : undefined,
 
-    introduction:
-      typeof (rec as any).introduction === "string"
-        ? (rec as any).introduction
-        : undefined,
+      debutYear:
+        typeof (rec as any).debutYear === "number"
+          ? (rec as any).debutYear
+          : typeof (rec as any).debut_year === "number"
+            ? (rec as any).debut_year
+            : Number.isFinite(Number((rec as any).debutYear))
+              ? Number((rec as any).debutYear)
+              : undefined,
 
-    // 기존 sns / artIntroduction 유지 (호환)
-    sns:
-      typeof (rec as any).sns === "string"
-        ? (rec as any).sns
-        : (typeof (rec as any).snsPage === "string"
+      snsPage:
+        typeof (rec as any).snsPage === "string"
+          ? (rec as any).snsPage
+          : typeof (rec as any).sns_page === "string"
+            ? (rec as any).sns_page
+            : undefined,
+
+      introduction: typeof (rec as any).introduction === "string" ? (rec as any).introduction : undefined,
+
+      sns:
+        typeof (rec as any).sns === "string"
+          ? (rec as any).sns
+          : typeof (rec as any).snsPage === "string"
             ? (rec as any).snsPage
-            : (typeof (rec as any).sns_page === "string" ? (rec as any).sns_page : undefined)),
+            : typeof (rec as any).sns_page === "string"
+              ? (rec as any).sns_page
+              : undefined,
 
-    affiliation: typeof (rec as any).affiliation === "string" ? (rec as any).affiliation : undefined,
-    isVerified: typeof (rec as any).isVerified === "boolean" ? (rec as any).isVerified : undefined,
-    artIntroduction: typeof (rec as any).artIntroduction === "string" ? (rec as any).artIntroduction : undefined,
-  };
+      affiliation: typeof (rec as any).affiliation === "string" ? (rec as any).affiliation : undefined,
+      isVerified: typeof (rec as any).isVerified === "boolean" ? (rec as any).isVerified : undefined,
+      artIntroduction: typeof (rec as any).artIntroduction === "string" ? (rec as any).artIntroduction : undefined,
+    };
 
-  return artist;
-}
-
+    return artist;
+  }
 
   const user: UserProfile = {
     ...common,
     role: "USER",
 
-    // optional pass-through
     email: typeof (rec as any).email === "string" ? (rec as any).email : undefined,
     nickname: typeof (rec as any).nickname === "string" ? (rec as any).nickname : undefined,
     birth: typeof (rec as any).birth === "string" ? (rec as any).birth : undefined,
@@ -417,27 +456,24 @@ function normalizeProfile(raw: unknown, opts?: { roleHint?: "USER" | "ARTIST"; i
 
 /** ✅ BE DTO 기준 프로필 수정 payload */
 export type UpdateMemberPatch = {
-  password?: string;        // 8~255
-  nickname?: string;        // 1~50
-  image?: File | null;      // MultipartFile
+  password?: string; // 8~255
+  nickname?: string; // 1~50
+  image?: File | null; // MultipartFile
 };
 
 export type UpdateArtistPatch = UpdateMemberPatch & {
-  fieldId?: number;         // >=1
-  genreId?: number;         // >=1
-  debutYear?: number;       // <=2100
-  snsPage?: string;         // <=500
-  affiliation?: string;     // <=50
-  introduction?: string;    // <=1000
+  fieldId?: number; // >=1
+  genreId?: number; // >=1
+  debutYear?: number; // <=2100
+  snsPage?: string; // <=500
+  affiliation?: string; // <=50
+  introduction?: string; // <=1000
 };
 
 export type UpdateMyProfilePatch = UpdateMemberPatch | UpdateArtistPatch;
 
-
-
 /**
- * ✅ 내 프로필 조회: BE 기준 /api/v1/member/my 단일
- * - role/uuid가 응답에 없을 수 있으므로 token claim(sub/role)로 보정
+ * ✅ 내 프로필 조회
  */
 export async function getMyProfile(): Promise<ProfileModel> {
   const roleHint = getRoleFromToken();
@@ -486,9 +522,15 @@ function pickNextCursor(d: unknown): string | null {
 function toFeedItemFromArtwork(x: unknown): FeedItem | null {
   if (!isRecord(x)) return null;
   const id = asString((x as any).artworkId ?? (x as any).id ?? "");
-  const imageUrl = asString((x as any).imageUrl ?? (x as any).thumbnailUrl ?? (x as any).artworkImageUrl ?? (x as any).posterUrl ?? "");
+  const imageUrl = asString(
+    (x as any).imageUrl ??
+      (x as any).thumbnailUrl ??
+      (x as any).artworkImageUrl ??
+      (x as any).posterUrl ??
+      "",
+  );
   if (!id) return null;
- 
+
   const createdAt = asString((x as any).createdAt ?? (x as any).createdDate ?? (x as any).date ?? new Date().toISOString());
   return { id, imageUrl: imageUrl || "", createdAt };
 }
@@ -503,10 +545,7 @@ function toFeedItemFromReview(x: unknown): FeedItem | null {
   return { id, imageUrl: imageUrl || "", createdAt };
 }
 
-export async function getArtistFeed(
-  artistUuid: string,
-  cursor?: string | null,
-): Promise<PageResult<FeedItem>> {
+export async function getArtistFeed(artistUuid: string, cursor?: string | null): Promise<PageResult<FeedItem>> {
   const qs = new URLSearchParams();
   qs.set("artist", artistUuid);
   if (cursor) qs.set("cursor", cursor);
@@ -521,10 +560,7 @@ export async function getArtistFeed(
   return { items, nextCursor };
 }
 
-export async function getUserFeed(
-  memberUuid: string,
-  cursor?: string | null,
-): Promise<PageResult<FeedItem>> {
+export async function getUserFeed(memberUuid: string, cursor?: string | null): Promise<PageResult<FeedItem>> {
   const s = useAuthStore.getState() as unknown as AuthStateLike;
   const myUuid = s.user?.memberUuid ?? null;
 
@@ -587,10 +623,7 @@ function buildUpdateFormData(role: ProfileRole, patch: UpdateMyProfilePatch): Fo
   const putStr = (k: string, v: unknown) => {
     if (v === undefined || v === null) return;
     if (typeof v !== "string") return;
-
-    // ✅ 빈 값은 미전송(= BE updateArtist 정책과 정합)
     if (!v.trim()) return;
-
     fd.append(k, v);
   };
 
@@ -606,7 +639,6 @@ function buildUpdateFormData(role: ProfileRole, patch: UpdateMyProfilePatch): Fo
     fd.append(k, String(n));
   };
 
-
   const putFile = (k: string, v: unknown) => {
     if (v instanceof File) fd.append(k, v);
   };
@@ -620,10 +652,8 @@ function buildUpdateFormData(role: ProfileRole, patch: UpdateMyProfilePatch): Fo
   if (isArtist) {
     putNum("fieldId", (patch as any).fieldId, { min: 1 });
     putNum("genreId", (patch as any).genreId, { min: 1 });
-    putNum("debutYear", (patch as any).debutYear, { min: 1, max: 2026 });
+    putNum("debutYear", (patch as any).debutYear, { min: 1, max: 2026 }); // 필요하면 2100으로 조정
 
-
-    // ✅ 빈 문자열은 보내도 BE가 무시하므로 "아예 미전송"으로 통일
     putStr("snsPage", (patch as any).snsPage);
     putStr("affiliation", (patch as any).affiliation);
     putStr("introduction", (patch as any).introduction);
@@ -632,16 +662,12 @@ function buildUpdateFormData(role: ProfileRole, patch: UpdateMyProfilePatch): Fo
   return fd;
 }
 
-
 /**
  * ✅ 내 프로필 수정
  * - USER:   /api/v1/member/users/my
  * - ARTIST: /api/v1/member/artists/my (우선) -> 404면 /api/v1/member/artist/my fallback
  */
-export async function updateMyProfile(
-  role: ProfileRole,
-  patch: UpdateMyProfilePatch,
-): Promise<ProfileModel> {
+export async function updateMyProfile(role: ProfileRole, patch: UpdateMyProfilePatch): Promise<ProfileModel> {
   const isArtist = isArtistRoleLike(role);
 
   const paths = isArtist
@@ -657,8 +683,7 @@ export async function updateMyProfile(
       await req<unknown>(path, {
         method: "PUT",
         body: fd,
-        // ✅ FormData는 Content-Type 직접 세팅 X (boundary 자동)
-        headers: {},
+        headers: {}, // FormData는 Content-Type 직접 세팅 X
       });
 
       return getMyProfile();
@@ -672,16 +697,10 @@ export async function updateMyProfile(
   throw lastErr instanceof Error ? lastErr : new Error("프로필 수정 실패");
 }
 
-
-
 /**
  * 대표뱃지 엔드포인트 확정 전: no-op
  */
-export async function updateFeaturedBadges(
-  role: ProfileRole,
-  profileId: string,
-  badgeIds: string[],
-): Promise<void> {
+export async function updateFeaturedBadges(role: ProfileRole, profileId: string, badgeIds: string[]): Promise<void> {
   void role;
   void profileId;
   void badgeIds;

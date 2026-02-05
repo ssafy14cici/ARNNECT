@@ -11,7 +11,51 @@
   width: 100%;
   min-height: 100vh;
   position: relative;
+
+  /* 상단 fixed 헤더 공간 */
+  padding-top: 70px;
 }
+
+/* 상단 고정 헤더(기존 JSX에 맞게 추가) */
+.artwork-detail-top {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  z-index: 2000;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.top-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* 버튼 공통 */
+.btn-icon {
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  backdrop-filter: blur(6px);
+}
+.btn-icon:hover { background: rgba(255,255,255,0.08); border-color: #fff; }
+.btn-icon.active { color: #ff5f5f; border-color: #ff5f5f; }
+.btn-icon.gold { color: #C8A97E; border-color: #C8A97E; }
+.btn-icon.danger { color: #ff6b6b; border-color: rgba(255,107,107,0.7); }
+.btn-icon.danger:hover { background: rgba(255,107,107,0.12); border-color: #ff6b6b; }
 
 /* ==========================================================================
    1. HERO SECTION (Parallax)
@@ -22,13 +66,13 @@
   position: sticky; /* 스크롤 시 뒤에 고정됨 */
   top: 0;
   z-index: 1;
-  
+
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   padding: 0 20px;
-  
+
   background: radial-gradient(circle at center, #1a1a1a 0%, #050505 90%);
   overflow: hidden;
 }
@@ -45,7 +89,7 @@
 /* Title & Artist */
 .hero-title {
   font-family: 'Playfair Display', serif;
-  font-size: clamp(2.5rem, 6vw, 5rem);
+  font-size: clamp(2.2rem, 6vw, 5rem);
   font-weight: 400;
   margin: 0 0 10px 0;
   line-height: 1.1;
@@ -56,9 +100,9 @@
 .hero-artist {
   font-family: 'Playfair Display', serif;
   font-size: 1.2rem;
-  color: #C8A97E; /* Gold Accent */
+  color: #C8A97E;
   font-style: italic;
-  margin-bottom: 40px;
+  margin-bottom: 28px;
 }
 
 /* Main Image Frame */
@@ -68,6 +112,9 @@
   box-shadow: 0 40px 80px rgba(0,0,0,0.7);
   border: 1px solid rgba(255,255,255,0.05);
   background: #000;
+
+  border-radius: 18px;
+  overflow: hidden;
 }
 
 .hero-img {
@@ -76,6 +123,17 @@
   width: auto;
   display: block;
   object-fit: contain;
+}
+
+/* 이미지 fallback */
+.hero-fallback {
+  width: min(900px, 92vw);
+  height: min(60vh, 520px);
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 18px;
+  opacity: 0.85;
 }
 
 /* Scroll Indicator */
@@ -140,22 +198,18 @@
   align-items: center;
 }
 
-.btn-icon {
-  background: none;
-  border: 1px solid rgba(255,255,255,0.2);
-  color: #fff;
-  padding: 8px 16px;
-  border-radius: 50px;
-  cursor: pointer;
-  transition: all 0.3s;
-  display: flex;
+/* 본인 작품일 때 좋아요 카운트만 */
+.like-count-only {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.9rem;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 999px;
+  opacity: 0.9;
 }
-.btn-icon:hover { background: rgba(255,255,255,0.1); border-color: #fff; }
-.btn-icon.active { color: #ff5f5f; border-color: #ff5f5f; }
-.btn-icon.gold { color: #C8A97E; border-color: #C8A97E; }
+.like-count-only span { opacity: 0.85; }
+.like-count-only strong { font-weight: 700; }
 
 /* Description & Tags */
 .info-section { margin-bottom: 100px; }
@@ -178,11 +232,9 @@
 }
 
 /* ==========================================================================
-   3. DISCOVERY GRID (Similar & Recommend)
+   3. SECTION TITLES / REVIEWS
 ========================================================================== */
-.discovery-section {
-  margin-top: 80px;
-}
+.discovery-section { margin-top: 80px; }
 
 .section-title {
   font-family: 'Playfair Display', serif;
@@ -193,47 +245,21 @@
   padding-left: 16px;
 }
 
-.artwork-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr); /* 4열 그리드 */
-  gap: 20px;
-}
-
-.grid-card {
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
+/* 리뷰 카드 */
+.review-card {
   text-align: left;
-  group: hover;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: transparent;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease;
 }
-
-.card-thumb {
-  width: 100%;
-  aspect-ratio: 3 / 4; /* 세로형 비율 */
-  background: #111;
-  overflow: hidden;
-  position: relative;
-  border-radius: 4px;
-  margin-bottom: 12px;
+.review-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(200,169,126,0.55);
 }
-
-.card-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.6s ease, filter 0.6s ease;
-  filter: grayscale(40%);
-}
-
-.grid-card:hover .card-thumb img {
-  transform: scale(1.05);
-  filter: grayscale(0%);
-}
-
-.card-info { font-size: 0.9rem; opacity: 0.8; transition: color 0.3s; }
-.grid-card:hover .card-info { color: #C8A97E; }
-
+.review-title { font-weight: 600; opacity: 0.9; }
 
 /* ==========================================================================
    4. COMMENTS (Minimalist)
@@ -248,10 +274,12 @@
 .comment-input-wrap {
   display: flex;
   gap: 12px;
+  align-items: flex-start;
   border-bottom: 1px solid rgba(255,255,255,0.3);
-  padding-bottom: 8px;
+  padding-bottom: 12px;
   margin-bottom: 40px;
 }
+
 .input-minimal {
   flex: 1;
   background: transparent;
@@ -259,46 +287,110 @@
   color: #fff;
   font-size: 1rem;
   padding: 8px 0;
+  resize: vertical;
 }
 .input-minimal:focus { outline: none; }
+
+.input-minimal.textarea {
+  width: 100%;
+  border-bottom: 1px solid rgba(255,255,255,0.18);
+  padding: 10px 0;
+}
+
+/* 등록 버튼 */
 .btn-submit {
   background: transparent;
   color: #fff;
   border: 1px solid rgba(255,255,255,0.4);
-  padding: 6px 16px;
+  padding: 8px 16px;
   border-radius: 20px;
   cursor: pointer;
   font-size: 0.85rem;
+  height: fit-content;
 }
 .btn-submit:hover { background: #fff; color: #000; }
 
+.btn-submit.secondary {
+  opacity: 0.75;
+  border-color: rgba(255,255,255,0.25);
+}
+.btn-submit.secondary:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
 /* 리스트 */
-.comment-list { display: flex; flexDirection: column; gap: 30px; }
+.comment-list {
+  display: flex;
+  flex-direction: column; /* ✅ 오타 수정 */
+  gap: 30px;
+}
+
 .comment-item { animation: fadeIn 0.5s ease; }
+
 .comment-meta {
   font-size: 0.8rem;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.45);
   margin-bottom: 6px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
 }
-.comment-meta strong { color: #fff; font-weight: 600; margin-right: 6px; }
-.comment-text { font-size: 0.95rem; line-height: 1.5; color: rgba(255,255,255,0.9); }
-.comment-actions { margin-top: 8px; display: flex; gap: 10px; }
+.comment-meta strong {
+  color: #fff;
+  font-weight: 600;
+  margin-right: 4px;
+}
+.comment-mine { opacity: 0.7; }
+
+.comment-text {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: rgba(255,255,255,0.9);
+  white-space: pre-wrap;
+}
+
+.comment-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* 텍스트 버튼 */
 .text-btn {
   background: none;
   border: none;
-  color: rgba(255,255,255,0.4);
-  font-size: 0.75rem;
+  color: rgba(255,255,255,0.45);
+  font-size: 0.8rem;
   cursor: pointer;
   padding: 0;
 }
 .text-btn:hover { color: #fff; text-decoration: underline; }
+.text-btn.danger { color: rgba(255,107,107,0.85); }
+.text-btn.danger:hover { color: #ff6b6b; }
+
+/* edit/reply 박스 */
+.comment-editbox,
+.comment-replybox {
+  margin-top: 12px;
+  padding-top: 8px;
+}
+
+.inline-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
 
 /* 대댓글 */
-.replies { margin-top: 12px; padding-left: 16px; border-left: 1px solid rgba(255,255,255,0.1); }
-.reply-item { margin-top: 12px; }
+.replies {
+  margin-top: 14px;
+  padding-left: 16px;
+  border-left: 1px solid rgba(255,255,255,0.12);
+}
 
 /* ==========================================================================
-   5. MODAL & UTILS
+   5. MODAL & UTILS (기존 유지)
 ========================================================================== */
 .modal-overlay {
   position: fixed; inset: 0;
@@ -312,12 +404,16 @@
   background: #111;
   border: 1px solid rgba(255,255,255,0.1);
   padding: 30px;
-  border-radius: 0; /* 각진 엣지 */
+  border-radius: 0;
 }
 .modal-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
 .modal-textarea {
-  width: 100%; background: #000; border: 1px solid #333;
-  color: #fff; padding: 12px; font-size: 0.95rem;
+  width: 100%;
+  background: #000;
+  border: 1px solid #333;
+  color: #fff;
+  padding: 12px;
+  font-size: 0.95rem;
 }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 
@@ -328,16 +424,18 @@
 
 /* Responsive */
 @media (max-width: 768px) {
-  .artwork-grid { grid-template-columns: repeat(2, 1fr); }
   .hero-title { font-size: 3rem; }
   .artwork-hero { height: 80vh; }
   .action-bar { flex-direction: column; align-items: flex-start; gap: 20px; }
+  .comment-input-wrap { flex-direction: column; }
 }
 
+/* 링크 */
 .hero-artist-link,
 .comment-author-link {
   cursor: pointer;
   text-decoration: underline;
+  color: inherit;
 }
 .hero-artist-link:hover,
 .comment-author-link:hover {

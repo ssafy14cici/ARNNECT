@@ -1,5 +1,5 @@
 // FE/src/pages/lounge/artist/FanLetter.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import "./fanLetter.css";
 
 import { useAuthStore } from "../../../features/auth/store";
@@ -41,14 +41,31 @@ export default function FanLetter() {
   const [answerText, setAnswerText] = useState("");
   const [sending, setSending] = useState(false);
 
-  // ✅ FIX
+  // ✅ canUse 조건
   const canUse = roleNorm === "artist" && Boolean(artistMemberUuid);
 
-  const refetch = async () => {
-    if (!artistMemberUuid) return;
+  // ✅ 상태 확인 로그 (컴포넌트 내부에서만)
+  useEffect(() => {
+    console.log("[FanLetter] state", {
+      roleRaw,
+      roleNorm,
+      artistMemberUuid,
+      canUse,
+      user,
+    });
+  }, [roleRaw, roleNorm, artistMemberUuid, canUse, user]);
+
+  const refetch = useCallback(async () => {
+    if (!artistMemberUuid) {
+      console.log("[FanLetter] refetch skipped: empty artistMemberUuid");
+      return;
+    }
+
     setLoading(true);
     try {
+      console.log("[FanLetter] fetching fanletters...", { artistMemberUuid });
       const data = await fetchArtistFanLetters(artistMemberUuid);
+      console.log("[FanLetter] fetched fanletters:", data);
       setItems(data);
     } catch (e) {
       console.error(e);
@@ -57,13 +74,15 @@ export default function FanLetter() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [artistMemberUuid]);
 
   useEffect(() => {
-    if (!canUse) return;
-    refetch();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [artistMemberUuid, canUse]);
+    if (!canUse) {
+      console.log("[FanLetter] useEffect: canUse=false, skip refetch");
+      return;
+    }
+    void refetch();
+  }, [canUse, refetch]);
 
   const filtered = useMemo(() => {
     const base =

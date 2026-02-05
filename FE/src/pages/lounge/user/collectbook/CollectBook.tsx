@@ -1,6 +1,5 @@
-// FE/src/pages/lounge/user/CollectBook.tsx
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "../../lounge.css";
 
 import TicketCardModern from "./TicketCardModern";
@@ -24,39 +23,30 @@ function formatDateRange(start?: string, end?: string) {
   return `${s} – ${e}`;
 }
 
-function resolveMaybeRelativeUrl(url?: string) {
-  if (!url) return undefined;
-  if (/^https?:\/\//i.test(url)) return url;
-
-  const base = String(import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-  if (!base) return url;
-
-  return url.startsWith("/") ? `${base}${url}` : `${base}/${url}`;
+function formatKST(iso?: string) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 }
 
 export default function CollectBook() {
   const nav = useNavigate();
-  const loc = useLocation();
 
   const ownerUuid = useAuthStore((s) => s.user?.memberUuid ?? "");
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
-
-  const focusCode = useMemo(() => {
-    const st = (loc.state ?? {}) as Record<string, unknown>;
-    return typeof st.focusCode === "string" ? st.focusCode : "";
-  }, [loc.state]);
 
   const [items, setItems] = useState<CollectBookResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const canLoad = useMemo(() => isLoggedIn && !!ownerUuid, [isLoggedIn, ownerUuid]);
+
   useEffect(() => {
-    if (!isLoggedIn || !ownerUuid) {
-      setItems([]);
-      return;
-    }
+    if (!canLoad) return;
 
     let alive = true;
+
     (async () => {
       setLoading(true);
       setError("");
@@ -66,8 +56,7 @@ export default function CollectBook() {
         setItems(Array.isArray(list) ? list : []);
       } catch (e: any) {
         if (!alive) return;
-        setItems([]);
-        setError(e?.message ?? "콜렉트북 목록을 불러오지 못했습니다.");
+        setError(e?.message ?? "콜렉트북을 불러오지 못했습니다.");
       } finally {
         if (alive) setLoading(false);
       }
@@ -76,7 +65,7 @@ export default function CollectBook() {
     return () => {
       alive = false;
     };
-  }, [isLoggedIn, ownerUuid]);
+  }, [canLoad, ownerUuid]);
 
   return (
     <main className="loungePage">
@@ -105,31 +94,23 @@ export default function CollectBook() {
           </button>
         </div>
 
-        {!isLoggedIn && (
+        {!isLoggedIn || !ownerUuid ? (
           <div className="loungeSubPanel">
-            <p className="loungeSubHint">로그인 후 이용할 수 있습니다.</p>
+            <p className="loungeSubHint">로그인 후 이용해주세요.</p>
           </div>
-        )}
-
-        {isLoggedIn && focusCode && (
-          <div className="loungeNotice">최근 스캔한 티켓: {focusCode}</div>
-        )}
-
-        {isLoggedIn && error && <div className="loungeNotice">{error}</div>}
-
-        {isLoggedIn && loading && (
+        ) : loading ? (
           <div className="loungeSubPanel">
             <p className="loungeSubHint">불러오는 중...</p>
           </div>
-        )}
-
-        {isLoggedIn && !loading && items.length === 0 ? (
+        ) : error ? (
+          <div className="loungeSubPanel">
+            <p className="loungeSubHint">{error}</p>
+          </div>
+        ) : items.length === 0 ? (
           <div className="loungeSubPanel">
             <p className="loungeSubHint">아직 등록된 티켓이 없습니다. “티켓 스캔”으로 추가해보세요.</p>
           </div>
-        ) : null}
-
-        {isLoggedIn && !loading && items.length > 0 && (
+        ) : (
           <div style={{ display: "grid", gap: 14 }}>
             {items.map((it) => (
               <TicketCardModern
@@ -137,11 +118,12 @@ export default function CollectBook() {
                 title={(it.title ?? "EXHIBITION").toUpperCase()}
                 ticketCode={it.ticketCode}
                 dateRangeText={formatDateRange(it.startDate, it.endDate)}
-                priceText={typeof it.collectRank === "number" ? `RANK : ${it.collectRank}` : "RANK : -"}
+                priceText={`RANK : ${it.collectRank ?? "-"}`}
                 stubColor={pickColor(it.ticketCode)}
-                heroImageUrl={resolveMaybeRelativeUrl(it.ticketImageUrl)}
+                // ✅ 여기 핵심: 선택한 디자인 결과 이미지
+                heroImageUrl={it.ticketImageUrl}
                 metaLeft={it.addressDetail ? `${it.address} (${it.addressDetail})` : it.address}
-                metaRight={"COLLECTED"}
+                metaRight={`등록일: ${formatKST(it.createdAt)}`}
                 onClick={() => nav(`/lounge/collectbook/${encodeURIComponent(it.ticketCode)}`)}
               />
             ))}

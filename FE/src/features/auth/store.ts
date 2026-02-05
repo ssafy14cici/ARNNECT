@@ -252,3 +252,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
 // ✅ http 인터셉터가 store 토큰을 가져가게 주입(순환 의존성 방지)
 bindAuthTokenGetter(() => useAuthStore.getState().token);
+// ✅ DEV에서 콘솔 디버깅용 (배포에선 자동으로 안 뜸)
+if (import.meta.env.DEV) {
+  (window as any).__AUTH = useAuthStore;
+}

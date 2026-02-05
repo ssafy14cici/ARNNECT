@@ -27,18 +27,32 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const matches = useMatches();
-  const isHome = matches.some((m) => (m.handle as any)?.navVariant === "home");
+
+  // ✅ 홈 판별: handle.navVariant가 없을 수도 있으니 pathname도 같이 fallback
+  const isHome =
+    location.pathname === "/" ||
+    matches.some((m) => (m.handle as any)?.navVariant === "home");
+
   const [isTop, setIsTop] = useState(true);
   const [isModalOpen, setModalOpen] = useState(false);
 
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const logout = useAuthStore((s) => s.logout);
 
+  // ✅ 홈에서는 open이 true여도 오버레이/바디락이 절대 걸리지 않게
+  const effectiveOpen = open && !isHome;
+
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // ✅ 라우트 바뀌면(특히 홈으로 갈 때) 열린 메뉴/hover 상태 정리
+  useEffect(() => {
+    setOpen(false);
+    setHoveredKey(null);
+  }, [location.pathname]);
 
   const handleLogoutClick = () => {
     // ✅ 메뉴를 먼저 닫아 body lock/overlay 잔존 방지
@@ -49,7 +63,6 @@ export default function Navbar() {
 
   const handleConfirmLogout = () => {
     logout();
-    // ✅ 혹시 open 상태가 남아있어도 확실히 닫기
     setOpen(false);
     setHoveredKey(null);
     setModalOpen(false);
@@ -61,7 +74,7 @@ export default function Navbar() {
       if (e.key === "Escape") setOpen(false);
     };
 
-    if (open) {
+    if (effectiveOpen) {
       document.addEventListener("keydown", onKeyDown);
       document.body.style.overflow = "hidden";
       document.body.classList.add("nav-menu-open");
@@ -75,7 +88,7 @@ export default function Navbar() {
       document.body.style.overflow = "";
       document.body.classList.remove("nav-menu-open");
     };
-  }, [open]);
+  }, [effectiveOpen]);
 
   useEffect(() => {
     if (!isHome) {
@@ -115,7 +128,6 @@ export default function Navbar() {
         navigate("/login", { state: { from: location.pathname } });
         setOpen(false);
       } else {
-        // ✅ auth 클릭으로 모달 열 때도 메뉴는 닫기
         setOpen(false);
         setHoveredKey(null);
         handleLogoutClick();
@@ -137,11 +149,12 @@ export default function Navbar() {
     .filter(Boolean)
     .join(" ");
 
-  const shouldHideHeader = isHome && isMobile;
+  // ✅ 핵심: 홈에서는 Navbar 자체를 렌더링하지 않음
+  if (isHome) return null;
 
   return (
     <>
-      <header className={headerClassName} style={shouldHideHeader ? { display: "none" } : undefined}>
+      <header className={headerClassName}>
         <div className="navInner">
           <button className="navBrand" type="button" onClick={() => navigate(isLoggedIn ? "/hall" : "/")}>
             ARNNECT
@@ -150,7 +163,7 @@ export default function Navbar() {
           <button
             id="menu4"
             type="button"
-            className={`menu-trigger ${open ? "active" : ""}`}
+            className={`menu-trigger ${effectiveOpen ? "active" : ""}`}
             onClick={() => setOpen(true)}
             aria-label="Open menu"
           >
@@ -161,7 +174,7 @@ export default function Navbar() {
         </div>
       </header>
 
-      <div className={`refMenu ${open ? "open" : ""}`} aria-hidden={!open}>
+      <div className={`refMenu ${effectiveOpen ? "open" : ""}`} aria-hidden={!effectiveOpen}>
         <div className="refMenuGrid">
           {items.map((it) => (
             <button
