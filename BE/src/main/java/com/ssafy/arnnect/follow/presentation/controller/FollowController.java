@@ -26,11 +26,13 @@ public class FollowController {
         return ResponseEntity.ok(followService.toggleFollow(sourceMemberUuid, targetMemberUuid));
     }
 
+    // memberUuid가 팔로우하는 이티스트
     @GetMapping("/{memberUuid}/artist")
     public ResponseEntity<List<FollowArtistResponse>> getFollowArtistList(@PathVariable String memberUuid) {
         return ResponseEntity.ok(followService.followArtistList(memberUuid));
     }
 
+    // memberUuid가 팔로우하는 user
     @GetMapping("/{memberUuid}/user")
     public ResponseEntity<List<FollowMemberResponse>> getFollowMemberList(@PathVariable String memberUuid) {
         return ResponseEntity.ok(followService.followMemberList(memberUuid));
