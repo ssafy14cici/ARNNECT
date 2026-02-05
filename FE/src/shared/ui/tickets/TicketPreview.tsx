@@ -1,20 +1,21 @@
-// tickets/TicketPreview.tsx
+// FE/src/shared/ui/tickets/TicketPreview.tsx
 import React from "react";
 
 import BasicTicket from "./designs/BasicTicket";
 import ModernTicket from "./designs/ModernTicket";
 import MinimalTicket from "./designs/MinimalTicket";
-import HoloAbstractTicket from "./designs/HoloTicket";
+import HoloTicket from "./designs/HoloTicket";
 import SimpleTicket from "./designs/SimpleTicket";
 import PurpleTicket from "./designs/PurpleTicket";
 import PinkTicket from "./designs/PinkTicket";
 import RedTicket from "./designs/RedTicket";
 
+// ✅ TicketDesignType export
 export type TicketDesignType =
   | "BASIC"
   | "MODERN"
   | "MINIMAL"
-  | "HOLO_ABSTRACT"
+  | "HOLO"
   | "SIMPLE"
   | "PURPLE"
   | "PINK"
@@ -34,21 +35,24 @@ interface TicketPreviewProps {
   };
 }
 
-export default function TicketPreview({ designType, data }: TicketPreviewProps) {
-  const isHorizontal = ["MINIMAL", "HOLO_ABSTRACT", "SIMPLE", "PURPLE", "PINK", "RED"].includes(designType);
+const HORIZONTAL_TYPES: TicketDesignType[] = ["MINIMAL", "HOLO", "SIMPLE", "PURPLE", "PINK", "RED"];
 
+export default function TicketPreview({ designType, data }: TicketPreviewProps) {
+  const isHorizontal = HORIZONTAL_TYPES.includes(designType);
+
+  /**
+   * ✅ 중요
+   * - TicketPreview는 "프레임" 역할만 하고, 디자인(배경/그림자/모서리/클리핑)은 각 티켓 컴포넌트가 담당.
+   * - 가로형은 maxWidth 고정값 금지 (부모 폭에 맞춰야 잘림/축소 문제 없음)
+   */
   const containerStyle: React.CSSProperties = {
     width: "100%",
-    maxWidth: isHorizontal ? "100%" : "280px",   // ✅ 600px 금지
+    maxWidth: isHorizontal ? "100%" : "280px",
     aspectRatio: isHorizontal ? "2.5 / 1" : "1 / 2.2",
     margin: "0 auto",
     transition: "all 0.25s ease",
     position: "relative",
-    // ✅ 프레임 스타일 제거 (디자인 컴포넌트가 책임)
-    background: "transparent",
-    boxShadow: "none",
-    borderRadius: 0,
-    overflow: "visible",
+    overflow: "visible", // ✅ hidden 금지 (가로 티켓 잘림 원인)
   };
 
   const renderContent = () => {
@@ -57,8 +61,8 @@ export default function TicketPreview({ designType, data }: TicketPreviewProps) 
         return <ModernTicket data={data} />;
       case "MINIMAL":
         return <MinimalTicket data={data} />;
-      case "HOLO_ABSTRACT":
-        return <HoloAbstractTicket data={data} />;
+      case "HOLO":
+        return <HoloTicket data={data} />;
       case "SIMPLE":
         return <SimpleTicket data={data} />;
       case "PURPLE":
