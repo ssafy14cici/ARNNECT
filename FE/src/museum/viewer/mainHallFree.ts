@@ -653,17 +653,13 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     return null;
   }
 
+  // ✅ 토큰 제거 버전
   async function loadNewArtistItems(): Promise<ArtworkItem[]> {
-    const token = resolveAccessToken();
-    if (!token) {
-      console.warn("[mainHallFree] token 없음 → DEFAULT_ART_ITEMS 사용");
-      return DEFAULT_ART_ITEMS;
-    }
-
     try {
-      console.log("[mainHallFree] fetchNewArtists 호출 시작...");
-      const rows = await fetchNewArtists({ accessToken: token });
+      console.log("[mainHallFree] fetchNewArtists 호출 시작...(public)");
+      const rows = await fetchNewArtists(); // ✅ 토큰 없이
       console.log("[mainHallFree] fetchNewArtists 결과:", rows?.length ?? 0, "건");
+
       if (!rows?.length) return DEFAULT_ART_ITEMS;
 
       const picked = shuffle(rows);
@@ -671,6 +667,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
       for (let i = 0; i < ANCHORS.length; i++) {
         const r = picked[i % picked.length] as NewArtistArtwork;
+
         items.push({
           id: r.artworkId,
           artistId: r.memberUuid,
@@ -678,8 +675,13 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
           artworkTitle: (r.title ?? "").trim() || "작품",
           imageUrl: (() => {
             const url = buildNewArtistImageUrl(r.savedImageName);
-            if (!url) console.warn(`[mainHallFree] ⚠️ imageUrl 비어있음: savedImageName="${r.savedImageName}"`);
-            else console.log(`[mainHallFree] ART_${i + 1} imageUrl:`, url);
+            if (!url) {
+              console.warn(
+                `[mainHallFree] ⚠️ imageUrl 비어있음: savedImageName="${r.savedImageName}"`
+              );
+            } else {
+              console.log(`[mainHallFree] ART_${i + 1} imageUrl:`, url);
+            }
             return url || `${import.meta.env.BASE_URL}art/a${(i % 6) + 1}.jpg`;
           })(),
           anchorName: ANCHORS[i].anchorName,
@@ -693,6 +695,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       return DEFAULT_ART_ITEMS;
     }
   }
+
 
   // Preload textures (items 결정 후 실행)
   let preloadedTextures = new Map<string, THREE.Texture>();
