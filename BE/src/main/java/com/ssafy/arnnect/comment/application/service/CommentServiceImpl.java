@@ -17,6 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -60,16 +62,28 @@ public class CommentServiceImpl implements CommentService{
     }
 
     @Override
-    public List<CommentResponse> getCommentListOfArtwork(Integer artworkId) {
-        List<Comment> comments = repository.findByTargetTypeAndTargetIdAndIsDeletedFalseOrderByCommentIdAsc(
-                TargetType.ARTWORK, artworkId);
-        log.info(comments.toString());
-        return comments.stream().map(comment -> {
-            String nickName = memberRepository.findById(comment.getMemberId())
-                    .map(Member::getNickname)
-                    .orElse("알 수 없음");
-            return CommentResponse.from(comment, nickName);
-        }).toList();
+    public List<CommentResponse> getCommentList(Integer targetId, TargetType targetType) {
+        List<Comment> comments = repository.findByTargetTypeAndTargetIdAndIsDeletedFalseOrderByCommentIdAsc(targetType, targetId);
+
+        if(comments == null || comments.isEmpty()){
+            return List.of();
+        }
+
+        log.info("코멘트 리스트 개수 => {}", comments.size());
+
+        List<Long> memberIds = comments.stream()
+                .map(Comment::getMemberId)
+                .distinct()
+                .toList();
+
+        Map<Long, String> memberNicknameMap = memberRepository.findAllById(memberIds).stream()
+                .collect(Collectors.toMap(Member::getMemberId, Member::getNickname));
+
+        return comments.stream()
+                .map(comment -> CommentResponse.from(
+                        comment,
+                        memberNicknameMap.getOrDefault(comment.getMemberId(), "알 수 없음")))
+                .toList();
     }
 
     @Override
