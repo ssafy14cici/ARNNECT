@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { mountMuseumApp } from "../../museum/app/mountMuseumApp";
+import { bgmIsOn, bgmToggle, bgmForcePlayOnInteraction } from "../../shared/audio/bgm";
 
 function asset(path: string) {
   const p = path.replace(/^\/+/, "");
@@ -16,56 +17,14 @@ export default function HomePC() {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // BGM 토글 상태 (false: off, true: on)
-  const [bgmOn, setBgmOn] = useState(true);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // UI 토글 상태 (전역 BGM 매니저와 동기화)
+  const [bgmOn, setBgmOn] = useState(() => bgmIsOn());
 
-  // BGM Audio 초기화 + 첫 인터랙션에서 강제 재생
+  // 전역 BGM: 마운트 시 재생 시도 + 첫 인터랙션 강제 재생
   useEffect(() => {
-    const audio = new Audio(asset("bgm/fake_intro.mp3"));
-    audio.loop = true;
-    audio.volume = 0.4;
-    audioRef.current = audio;
-
-    // 즉시 재생 시도
-    const tryPlay = () => {
-      if (audioRef.current && bgmOn) {
-        audioRef.current.play().catch(() => {});
-      }
-    };
-    tryPlay();
-
-    // 브라우저 정책으로 막힌 경우: 첫 인터랙션에서 재생
-    const forcePlay = () => {
-      tryPlay();
-      window.removeEventListener("click", forcePlay);
-      window.removeEventListener("touchstart", forcePlay);
-      window.removeEventListener("keydown", forcePlay);
-    };
-    window.addEventListener("click", forcePlay, { once: true });
-    window.addEventListener("touchstart", forcePlay, { once: true });
-    window.addEventListener("keydown", forcePlay, { once: true });
-
-    return () => {
-      audio.pause();
-      audio.src = "";
-      audioRef.current = null;
-      window.removeEventListener("click", forcePlay);
-      window.removeEventListener("touchstart", forcePlay);
-      window.removeEventListener("keydown", forcePlay);
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // bgmOn 상태에 따라 재생/정지
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (bgmOn) {
-      audio.play().catch(() => {});
-    } else {
-      audio.pause();
-    }
-  }, [bgmOn]);
+    const cleanup = bgmForcePlayOnInteraction();
+    return cleanup; // unmount 시 리스너 정리만 (오디오는 끊지 않음!)
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -86,9 +45,6 @@ export default function HomePC() {
 
       // ✅ 이 페이지에서는 인트로까지만 수행하고, 홀은 /hall에서 실행
       introOnly: true,
-
-      // (선택) 외부로 나가기 동작을 라우팅으로 바꾸고 싶으면 여기서 처리
-      // onExitToExterior: () => nav("/", { replace: true }),
     });
 
     return () => {
@@ -117,7 +73,10 @@ export default function HomePC() {
       <img
         src={asset(bgmOn ? "bgm/bgm_on.png" : "bgm/bgm_off.png")}
         alt={bgmOn ? "BGM ON" : "BGM OFF"}
-        onClick={() => setBgmOn((prev) => !prev)}
+        onClick={() => {
+          const next = bgmToggle();
+          setBgmOn(next);
+        }}
         style={{
           position: "fixed",
           bottom: "24px",

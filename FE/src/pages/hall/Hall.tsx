@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { mountMainHallFree } from "../../museum/viewer/mainHallFree";
 import { useAuthStore } from "../../features/auth/store";
+import { bgmIsOn, bgmToggle, bgmForcePlayOnInteraction } from "../../shared/audio/bgm";
 
 function asset(path: string) {
   // public 경로처럼 쓰기 위해 앞 슬래시 정리
@@ -22,11 +23,20 @@ export default function Hall() {
   // 가이드 토글 상태 (false: info.png, true: how.png)
   const [showGuide, setShowGuide] = useState(false);
 
+  // ✅ 전역 BGM 상태와 동기화
+  const [bgmOn, setBgmOn] = useState(() => bgmIsOn());
+
   // ✅ Zustand에서 토큰 가져오기
   const token = useAuthStore((s) => s.token);
 
   // 다른 페이지에서 Hall로 돌아올 때 startWaypointId를 state로 넘길 수 있음
   const startWaypointId = (location.state as any)?.startWaypointId ?? 0;
+
+  // 전역 BGM: 마운트 시 재생 시도 (인트로에서 이미 재생 중이면 그대로 이어짐)
+  useEffect(() => {
+    const cleanup = bgmForcePlayOnInteraction();
+    return cleanup;
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -110,7 +120,7 @@ export default function Hall() {
           style={{
             position: "fixed",
             bottom: "24px",
-            right: "24px",
+            right: "72px",
             opacity: 0.5,
             cursor: "pointer",
             zIndex: 9980,
@@ -122,6 +132,29 @@ export default function Hall() {
           onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.5")}
         />
       )}
+
+      {/* BGM ON/OFF 토글 버튼 */}
+      <img
+        src={asset(bgmOn ? "bgm/bgm_on.png" : "bgm/bgm_off.png")}
+        alt={bgmOn ? "BGM ON" : "BGM OFF"}
+        onClick={() => {
+          const next = bgmToggle();
+          setBgmOn(next);
+        }}
+        style={{
+          position: "fixed",
+          bottom: "24px",
+          right: "24px",
+          opacity: 0.5,
+          cursor: "pointer",
+          zIndex: 9980,
+          width: "40px",
+          height: "auto",
+          transition: "opacity 0.2s",
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
+        onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.5")}
+      />
 
       {/* 조작 가이드 오버레이 */}
       {showGuide && (

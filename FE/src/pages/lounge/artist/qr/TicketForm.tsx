@@ -43,6 +43,7 @@ export default function TicketForm({ form, busy, onChange, previewRef, qrValue }
     { value: "BASIC", label: "Basic (기본)" },
     { value: "MODERN", label: "Modern (모던)" },
     { value: "MINIMAL", label: "Minimal (미니멀)" },
+    { value: "HOLO_ABSTRACT", label: "Holo (홀로)" },
   ];
 
   const onPickPoster = useCallback(
@@ -80,7 +81,8 @@ export default function TicketForm({ form, busy, onChange, previewRef, qrValue }
         {/* 1. 디자인 선택 */}
         <div className="loungeInputGroup">
           <label className="loungeLabel">티켓 디자인 선택</label>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+          {/* <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}> */}
             {designOptions.map((opt) => {
               const active = form.ticketDesign === opt.value;
               return (
