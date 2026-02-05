@@ -1,4 +1,5 @@
 // FE/src/features/artworks/api/newArtists.ts
+import { API_BASE_URL } from "../../../shared/config/env";
 
 export type NewArtistArtwork = {
   memberUuid: string;
@@ -7,25 +8,8 @@ export type NewArtistArtwork = {
   title: string;
   description?: string;
   productionDate?: string; // yyyy-MM-dd
-  savedImageName: string;  // "/artwork/dd.png" or "artwork....png" (명세)
+  savedImageName: string;  // "/artwork/dd.png" or "artwork....jpg"
 };
-
-function getApiBaseUrl(): string {
-  const raw =
-    (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
-    (import.meta.env.VITE_API_BASE as string | undefined) ??
-    (import.meta.env.VITE_SERVER_URL as string | undefined) ??
-    "";
-
-  return String(raw || "").replace(/\/+$/, "");
-}
-
-// ✅ base가 없으면 same-origin 상대경로로 호출
-function apiUrl(path: string): string {
-  const base = getApiBaseUrl();
-  const p = path.startsWith("/") ? path : `/${path}`;
-  return base ? `${base}${p}` : p;
-}
 
 function ensureOk(res: Response, bodyText: string) {
   if (res.ok) return;
@@ -33,19 +17,18 @@ function ensureOk(res: Response, bodyText: string) {
 }
 
 /**
+ * 신진예술인 6명 조회
  * GET /api/v1/artwork/new (Auth=O)
- * 응답: 배열
  */
 export async function fetchNewArtists(accessToken: string): Promise<NewArtistArtwork[]> {
-  const url = apiUrl("/api/v1/artwork/new");
-
-  // 디버깅용: 네트워크에 안 찍힐 때 “호출 시도” 자체를 확인
-  if (import.meta.env.DEV) console.log("[newArtists] GET", url, "hasToken=", Boolean(accessToken));
+  // ✅ API_BASE_URL 없으면 같은 오리진 상대경로로 호출
+  const url = API_BASE_URL ? `${API_BASE_URL}/api/v1/artwork/new` : `/api/v1/artwork/new`;
 
   const res = await fetch(url, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
     },
   });
 
@@ -70,15 +53,19 @@ export async function fetchNewArtists(accessToken: string): Promise<NewArtistArt
 
 /**
  * savedImageName -> 실제 이미지 URL
- * - "/artwork/dd.png" => "/artwork/dd.png" (same-origin) 또는 "BASE/artwork/dd.png"
- * - "artwork....png"  => "/artwork/<encoded>"
+ * - "/artwork/dd.png" (경로) 또는
+ * - "artwork ...jpg" (파일명) 모두 대응
  */
 export function buildNewArtistImageUrl(savedImageName: string): string {
   if (!savedImageName) return "";
 
+  // 절대 URL이면 그대로
   if (/^https?:\/\//i.test(savedImageName)) return savedImageName;
 
-  if (savedImageName.startsWith("/")) return apiUrl(savedImageName);
+  // "/artwork/xxx.png" 같이 경로면 base만 붙이기 (base 없으면 상대경로 그대로)
+  if (savedImageName.startsWith("/")) return API_BASE_URL ? `${API_BASE_URL}${savedImageName}` : savedImageName;
 
-  return apiUrl(`/artwork/${encodeURIComponent(savedImageName)}`);
+  // 파일명만 오면 /artwork/ 밑으로 가정
+  const tail = `/artwork/${encodeURIComponent(savedImageName)}`;
+  return API_BASE_URL ? `${API_BASE_URL}${tail}` : tail;
 }
