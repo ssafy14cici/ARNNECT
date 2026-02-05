@@ -26,8 +26,8 @@ public interface TicketRepository extends JpaRepository<TicketInfo, Long> {
         	ti.start_time,
         	ti.end_time,
         	cb.created_at,
-        	concat('qrcode', ti.qr_image_name) as qr_image_url,
-        	concat('ticket',ti.ticket_image_name) as ticket_image_url
+        	concat('/qrcode/', ti.qr_image_name) as qr_image_url,
+        	concat('/ticket/',ti.ticket_image_name) as ticket_image_url
         from ticket_info ti\s
         left join collect_book cb on cb.ticket_id = ti.ticket_id\s
         left join member m on m.member_id = ti.member_id\s

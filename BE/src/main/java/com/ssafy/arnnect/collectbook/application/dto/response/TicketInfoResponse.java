@@ -36,8 +36,8 @@ public class TicketInfoResponse {
                 .endDate(entity.getEndDate())
                 .startTime(entity.getStartTime())
                 .endTime(entity.getEndTime())
-                .qrImageName(entity.getQrImageName())
-                .ticketImageName(entity.getTicketImageName())
+                .qrImageName("/qrcode/"+entity.getQrImageName())
+                .ticketImageName("/ticket/"+entity.getTicketImageName())
                 .build();
     }
 }
