@@ -5,7 +5,7 @@ import com.ssafy.arnnect.fanletter.application.dto.request.FanLetterRequest;
 import com.ssafy.arnnect.fanletter.application.dto.response.FanLetterResponse;
 import com.ssafy.arnnect.fanletter.application.service.FanLetterService;
 import com.ssafy.arnnect.security.SecurityUtil;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import org.springframework.web.bind.annotation.RequestBody;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
