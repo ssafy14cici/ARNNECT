@@ -4,6 +4,7 @@ import com.ssafy.arnnect.follow.application.dto.response.FollowArtistResponse;
 import com.ssafy.arnnect.follow.application.dto.response.FollowMemberResponse;
 import com.ssafy.arnnect.follow.application.dto.response.ToggleFollowResponse;
 import com.ssafy.arnnect.follow.application.service.FollowService;
+import com.ssafy.arnnect.member.application.service.MemberService;
 import com.ssafy.arnnect.security.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ import java.util.List;
 public class FollowController {
 
     private final FollowService followService;
+    private final MemberService memberService;
 
     @PostMapping("/{targetMemberUuid}")
     public ResponseEntity<ToggleFollowResponse> toggleFollow(@PathVariable String targetMemberUuid) {
@@ -36,5 +38,12 @@ public class FollowController {
     @GetMapping("/{memberUuid}/user")
     public ResponseEntity<List<FollowMemberResponse>> getFollowMemberList(@PathVariable String memberUuid) {
         return ResponseEntity.ok(followService.followMemberList(memberUuid));
+    }
+
+    // memberUuid를 팔로우 하는 사람의 수
+    @GetMapping("/{memberUuid}/follower")
+    public ResponseEntity<Integer> getFollowerCount(@PathVariable String memberUuid) {
+        Long memberId = memberService.getMemberId(memberUuid);
+        return ResponseEntity.ok(followService.followerCount(memberId));
     }
 }
