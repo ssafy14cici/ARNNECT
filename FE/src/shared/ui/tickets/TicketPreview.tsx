@@ -34,39 +34,27 @@ interface TicketPreviewProps {
   };
 }
 
+// ✅ “가로 디자인” 목록
 const HORIZONTAL_TYPES: TicketDesignType[] = ["MINIMAL", "HOLO", "SIMPLE", "PURPLE", "PINK", "RED"];
 
-// ✅ 티켓 “원본” 기준 캔버스 크기 (디자인들이 픽셀 기반이라 넉넉히 잡는 게 안전)
-const BASE_VERTICAL = { w: 300, h: 660 };   // 1 : 2.2
-const BASE_HORIZONTAL = { w: 660, h: 300 }; // 2.2 : 1
+// ✅ 디자인들이 픽셀/비율 기반이라 “원본 캔버스”를 고정해두고 scale로 줄이는 게 안정적
+// 세로 티켓(예: Basic)은 300x660 정도면 무난
+const BASE_VERTICAL = { w: 300, h: 660 };
+// 가로 티켓은 660x300 정도(2.2:1)
+const BASE_HORIZONTAL = { w: 660, h: 300 };
+
+// ✅ 프리뷰(우측)에서 “보여주는 틀”은 항상 세로 비율로 고정 (네가 원한 UX)
+const PREVIEW_ASPECT = 1 / 2.2; // width : height
+// 예: width가 280이면 height는 280 / (1/2.2) = 616 근처
 
 export default function TicketPreview({ designType, data }: TicketPreviewProps) {
   const isHorizontal = HORIZONTAL_TYPES.includes(designType);
-
   const base = isHorizontal ? BASE_HORIZONTAL : BASE_VERTICAL;
-
-  // ✅ 미리보기 프레임(우측 패널 안에서의 티켓 표시 영역)
-  // - 세로/가로 모두 같은 “최대 폭” 정책 유지
-  // - 높이는 aspect-ratio로 자동
-  const containerStyle: React.CSSProperties = useMemo(
-    () => ({
-      width: "100%",
-      maxWidth: "280px",
-      aspectRatio: isHorizontal ? "2.2 / 1" : "1 / 2.2",
-      margin: "0 auto",
-      position: "relative",
-      overflow: "visible",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-    }),
-    [isHorizontal],
-  );
 
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(1);
 
-  // ✅ ResizeObserver로 실제 프레임 크기에 맞게 scale 계산
+  // ✅ 프리뷰 틀 실제 크기에 맞춰 scale 계산
   useLayoutEffect(() => {
     const el = frameRef.current;
     if (!el) return;
@@ -75,19 +63,24 @@ export default function TicketPreview({ designType, data }: TicketPreviewProps) 
       const rect = entries[0]?.contentRect;
       if (!rect) return;
 
-      const sx = rect.width / base.w;
-      const sy = rect.height / base.h;
+      // 가로 티켓은 rotate(-90deg) 해서 들어가므로 “회전 후 크기”로 fit 계산해야 함
+      // rotate(-90)하면 (w,h) -> (h,w)
+      const rotatedW = isHorizontal ? base.h : base.w;
+      const rotatedH = isHorizontal ? base.w : base.h;
 
-      // 살짝 여백(1~2%) 주면 border/padding 환경에서도 끼임 방지
+      const sx = rect.width / rotatedW;
+      const sy = rect.height / rotatedH;
+
+      // 살짝 여유(2%) 줘서 border/padding 환경에서도 끼임/잘림 방지
       const next = Math.min(sx, sy) * 0.98;
 
-      // 너무 커지면(원본보다 확대) 텍스트 계단/번짐 가능 → 1로 캡
+      // 프리뷰는 확대보다 축소가 안전 (텍스트 번짐 방지)
       setScale(Math.min(1, next));
     });
 
     ro.observe(el);
     return () => ro.disconnect();
-  }, [base.w, base.h]);
+  }, [isHorizontal, base.w, base.h]);
 
   const renderContent = () => {
     switch (designType) {
@@ -111,19 +104,41 @@ export default function TicketPreview({ designType, data }: TicketPreviewProps) 
     }
   };
 
+  // ✅ 프리뷰 틀: “항상 세로 티켓처럼” 보이도록 고정
+  // - width는 부모(우측 박스) 안에서 최대한
+  // - height는 aspect-ratio로 자동
+  const frameStyle: React.CSSProperties = useMemo(
+    () => ({
+      width: "100%",
+      maxWidth: 280,
+      aspectRatio: `${1} / ${2.2}`, // ✅ 세로 틀 고정
+      position: "relative",
+      overflow: "hidden",
+      borderRadius: 18,
+      background: "transparent",
+    }),
+    [],
+  );
+
   return (
-    <div ref={frameRef} style={containerStyle}>
-      {/* ✅ “원본 캔버스”를 만든 뒤 transform scale로 통째로 축소 */}
+    <div ref={frameRef} style={frameStyle}>
+      {/* ✅ 가운데 정렬된 “stage” */}
       <div
         style={{
-          width: `${base.w}px`,
-          height: `${base.h}px`,
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
+          position: "absolute",
+          left: "50%",
+          top: "50%",
+          transform: isHorizontal
+            ? `translate(-50%, -50%) rotate(-90deg) scale(${scale})`
+            : `translate(-50%, -50%) scale(${scale})`,
+          transformOrigin: "center",
           willChange: "transform",
         }}
       >
-        {renderContent()}
+        {/* ✅ 원본 캔버스 */}
+        <div style={{ width: base.w, height: base.h }}>
+          {renderContent()}
+        </div>
       </div>
     </div>
   );
