@@ -45,6 +45,10 @@ export default function TicketForm({ form, busy, onChange, previewRef, qrValue }
     { value: "MINIMAL", label: "Minimal (미니멀)" },
     { value: "HOLO_ABSTRACT", label: "Holo (홀로)" },
     { value: "SIMPLE", label: "Simple (심플)" },
+    { value: "PURPLE", label: "Purple (퍼플)" },
+    { value: "PINK", label: "Pink (핑크)" },
+    { value: "RED", label: "Red (레드)" },
+    
   ];
 
   const onPickPoster = useCallback(

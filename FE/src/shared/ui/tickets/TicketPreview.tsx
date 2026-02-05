@@ -5,9 +5,14 @@ import BasicTicket from "./designs/BasicTicket";
 import ModernTicket from "./designs/ModernTicket";
 import MinimalTicket from "./designs/MinimalTicket";
 import HoloAbstractTicket from "./designs/HoloAbstractTicket";
+import SimpleTicket from "./designs/SimpleTicket";
+import PurpleTicket from "./designs/PurpleTicket";
+import PinkTicket from "./designs/PinkTicket";
+import Redticket from "./designs/RedTicket";
+
 
 // ✅ TicketDesignType export
-export type TicketDesignType = "BASIC" | "MODERN" | "MINIMAL" | "HOLO_ABSTRACT";
+export type TicketDesignType = "BASIC" | "MODERN" | "MINIMAL" | "HOLO_ABSTRACT" | "SIMPLE" | "PURPLE" | "PINK" | "RED";
 
 interface TicketPreviewProps {
   designType: TicketDesignType;
@@ -43,6 +48,14 @@ export default function TicketPreview({ designType, data }: TicketPreviewProps) 
         return <MinimalTicket data={data} />;
       case "HOLO_ABSTRACT":
         return <HoloAbstractTicket data={data} />;
+      case "SIMPLE":
+        return <SimpleTicket data={data} />;
+      case "PURPLE":
+        return <PurpleTicket data={data} />;
+      case "PINK":
+        return <PinkTicket data={data} />;
+      case "RED":
+        return <Redticket data={data} />;
       case "BASIC":
       default:
         return <BasicTicket data={data} />;
