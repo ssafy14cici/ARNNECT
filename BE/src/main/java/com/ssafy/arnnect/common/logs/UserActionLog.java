@@ -9,11 +9,11 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "user_log")
+@Table(name = "user_action_log")
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class UserLog {
+public class UserActionLog {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -32,14 +32,14 @@ public class UserLog {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    private UserLog(String memberUuid, UserLogAction action, Long artworkId) {
+    private UserActionLog(String memberUuid, UserLogAction action, Long artworkId) {
         this.memberUuid = memberUuid;
         this.action = action;
         this.artworkId = artworkId;
         this.createdAt = LocalDateTime.now();
     }
 
-    public static UserLog of(String memberUuid, UserLogAction action, Long artworkId) {
-        return new UserLog(memberUuid, action, artworkId);
+    public static UserActionLog of(String memberUuid, UserLogAction action, Long artworkId) {
+        return new UserActionLog(memberUuid, action, artworkId);
     }
 }
