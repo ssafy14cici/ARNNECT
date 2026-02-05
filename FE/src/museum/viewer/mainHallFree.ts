@@ -662,7 +662,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
     try {
       console.log("[mainHallFree] fetchNewArtists 호출 시작...");
-      const rows = await fetchNewArtists(token);
+      const rows = await fetchNewArtists({ accessToken: token });
       console.log("[mainHallFree] fetchNewArtists 결과:", rows?.length ?? 0, "건");
       if (!rows?.length) return DEFAULT_ART_ITEMS;
 

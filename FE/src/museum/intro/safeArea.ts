@@ -1,6 +1,6 @@
 // src/intro/safeArea.ts
 import * as THREE from "three";
-import type { CameraPose } from "../types";
+import type { CameraPose } from "./types";
 import type { IntroUI } from "./ui";
 import { clamp } from "./utils";
 
