@@ -1,6 +1,12 @@
 // FE/src/features/fanLetter/api/real.ts
 import { http } from "../../../shared/api/http";
-import type { ApiEnvelope, FanLetter, FanLetterId, FanLetterRaw, FanLetterSendPayload } from "../types";
+import type {
+  ApiEnvelope,
+  FanLetter,
+  FanLetterId,
+  FanLetterRaw,
+  FanLetterSendPayload,
+} from "../types";
 
 type JsonObject = Record<string, unknown>;
 const isObject = (v: unknown): v is JsonObject => typeof v === "object" && v !== null;
@@ -72,17 +78,27 @@ function extractArray(raw: unknown): unknown[] {
       "results",
       "content",
     ];
+
     for (const k of candidates) {
       const v = get(raw, k);
+
+      // direct list
       if (Array.isArray(v)) return v;
 
-      // pagination: { content: [...] }
+      // pagination wrapper: { content: [...] } or { data: [...] }
       if (isObject(v)) {
-        const inner = get(v, "content");
-        if (Array.isArray(inner)) return inner;
+        const innerContent = get(v, "content");
+        if (Array.isArray(innerContent)) return innerContent;
+
+        const innerList = get(v, "list");
+        if (Array.isArray(innerList)) return innerList;
+
+        const innerItems = get(v, "items");
+        if (Array.isArray(innerItems)) return innerItems;
       }
     }
   }
+
   return [];
 }
 
@@ -170,20 +186,31 @@ export async function fetchArtistFanLetters(artistMemberUuid: string): Promise<F
     params: { artist: artistMemberUuid },
   });
 
+  // axios면 res.data가 body
   const body = (res as any)?.data ?? res;
+
+  // envelope이면 1번 unwrap
   const unwrapped = unwrapEnvelope<unknown>(body);
 
+  // 배열 추출(직접 배열 or 객체에 감싸진 배열)
   const list = extractArray(unwrapped);
+
   return list.map(mapRawToFanLetter);
 }
 
 /** ✅ 작가: 답장 등록 */
-export async function createFanLetterAnswer(fanLetterId: FanLetterId, answer: string): Promise<void> {
+export async function createFanLetterAnswer(
+  fanLetterId: FanLetterId,
+  answer: string
+): Promise<void> {
   await http.post(apiPath(`/fanletters/${fanLetterId}/answer`), { answer });
 }
 
 /** ✅ 작가: 답장 수정 */
-export async function updateFanLetterAnswer(fanLetterId: FanLetterId, answer: string): Promise<void> {
+export async function updateFanLetterAnswer(
+  fanLetterId: FanLetterId,
+  answer: string
+): Promise<void> {
   await http.put(apiPath(`/fanletters/${fanLetterId}/answer`), { answer });
 }
 

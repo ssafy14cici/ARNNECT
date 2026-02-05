@@ -1,6 +1,6 @@
 // FE/src/features/auth/store.ts
 import { create } from "zustand";
-import { http, bindAuthTokenGetter } from "../../shared/api/http";
+import { http } from "../../shared/api/http";
 
 export type AppRole = "general" | "artist";
 export type AuthUser = { memberUuid: string; name: string };
@@ -12,11 +12,8 @@ type AuthState = {
   role: AppRole | null;
   user: AuthUser | null;
 
-  // 기존 시그니처 유지(호출부 깨짐 방지)
   login: (p: { token: string; role: AppRole; remember?: boolean; user: AuthUser }) => void;
   logout: () => void;
-
-  // 서버 세션 부트스트랩
   hydrate: () => void;
 };
 
@@ -47,7 +44,6 @@ function roleFromToken(token: string | null): AppRole | null {
     const padded = b64.padEnd(Math.ceil(b64.length / 4) * 4, "=");
     const payload = JSON.parse(atob(padded)) as any;
 
-    // BE claim("role", role.name()) 이므로 보통 payload.role 존재
     return normalizeRole(payload?.role);
   } catch {
     return null;
@@ -67,7 +63,7 @@ function pickToken(respData: any): string | null {
 function pickUser(meData: any): AuthUser | null {
   const d = meData?.data ?? meData ?? {};
   const memberUuid = d.memberUuid ?? d.memberUUID ?? d.uuid ?? d.id;
-  const name = d.name ?? d.nickname ?? d.nickName ?? d.email; // ✅ fallback
+  const name = d.name ?? d.nickname ?? d.nickName ?? d.email;
 
   if (!memberUuid) return null;
   return { memberUuid: String(memberUuid), name: name ? String(name) : "" };
@@ -104,7 +100,7 @@ function parseStored(raw: string | null): StoredAuth | null {
     const u = obj?.user;
 
     const user: AuthUser | null =
-      u && typeof u === "object" && (typeof u.memberUuid === "string" || typeof u.memberUUID === "string")
+      u && typeof u === "object" && typeof (u.memberUuid ?? u.memberUUID) === "string"
         ? {
             memberUuid: String(u.memberUuid ?? u.memberUUID ?? ""),
             name: typeof u.name === "string" ? u.name : "",
@@ -132,6 +128,13 @@ function overwriteSamePlace(place: "local" | "session" | null, data: StoredAuth)
   const raw = JSON.stringify(data);
   if (place === "local") localStorage.setItem(LS_KEY, raw);
   else sessionStorage.setItem(SS_KEY, raw);
+}
+
+// ✅ 핵심: 토큰을 “직접” Authorization에 넣어서 /member/my를 호출
+async function fetchMyWithToken(token: string) {
+  return http.get("/api/v1/member/my", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 }
 
 let hydrateInFlight = false;
@@ -180,30 +183,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           });
         }
 
-        // 1) token 있으면 my로 확정
-        if (get().token) {
+        const token = get().token;
+
+        // 1) ✅ token 있으면 my를 “직접 Bearer”로 확정 (여기서 성공하면 refresh로 절대 안 감)
+        if (token) {
           try {
-            const me = await http.get("/api/v1/member/my");
+            const me = await fetchMyWithToken(token);
             const user = pickUser(me.data);
             const roleFromMy = pickRole(me.data);
 
             if (!user) throw new Error("my 응답에서 memberUuid 없음");
 
-            // ✅ 핵심: my에 role 없으면 토큰 claim or 기존 role 유지
             const role =
-              roleFromMy ?? roleFromToken(get().token) ?? get().role ?? stored?.data.role ?? null;
+              roleFromMy ?? roleFromToken(token) ?? get().role ?? stored?.data.role ?? null;
 
             set({ hydrated: true, user, role, isLoggedIn: true });
-
-            overwriteSamePlace(storedPlace, { token: get().token!, role, user });
+            overwriteSamePlace(storedPlace, { token, role, user });
             return;
           } catch (e: any) {
             const status = e?.response?.status;
             if (status !== 401 && status !== 403) throw e;
+            // 401/403이면 refresh 시도(있다면)
           }
         }
 
-        // 2) refresh 후보
+        // 2) refresh 후보 (현재 유저 스샷에서는 403이라 여기서 죽고 catch로 감)
         const refreshCandidates = ["/api/v1/auth/refresh", "/api/v1/auth/reissue", "/api/v1/auth/renew"];
         let newToken: string | null = null;
 
@@ -219,10 +223,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         if (!newToken) throw new Error("refresh 실패");
 
-        set({ token: newToken });
+        set({ token: newToken, isLoggedIn: true });
 
-        // 3) refresh 후 my
-        const me2 = await http.get("/api/v1/member/my");
+        // 3) refresh 후 my도 “직접 Bearer”
+        const me2 = await fetchMyWithToken(newToken);
         const user2 = pickUser(me2.data);
         const roleFromMy2 = pickRole(me2.data);
 
@@ -232,9 +236,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           roleFromMy2 ?? roleFromToken(newToken) ?? get().role ?? stored?.data.role ?? null;
 
         set({ hydrated: true, user: user2, role: role2, isLoggedIn: true });
-
         overwriteSamePlace(storedPlace ?? "session", { token: newToken, role: role2, user: user2 });
       } catch {
+        // ✅ 여기서 바로 storage를 지워버리니까 “로그인 풀림”처럼 보임
+        // refresh가 403인 상태면 결국 여기로 오게 되어 있음
         clearStorage();
         set({
           hydrated: true,
@@ -249,10 +254,3 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     })();
   },
 }));
-
-// ✅ http 인터셉터가 store 토큰을 가져가게 주입(순환 의존성 방지)
-bindAuthTokenGetter(() => useAuthStore.getState().token);
-// ✅ DEV에서 콘솔 디버깅용 (배포에선 자동으로 안 뜸)
-if (import.meta.env.DEV) {
-  (window as any).__AUTH = useAuthStore;
-}

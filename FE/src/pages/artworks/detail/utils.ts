@@ -3,9 +3,11 @@ import { useAuthStore } from "../../../features/auth/store";
 
 export type JsonObject = Record<string, unknown>;
 
+/** ✅ 배열 제외한 "레코드 객체"만 true */
 export function isObject(v: unknown): v is JsonObject {
-  return typeof v === "object" && v !== null;
+  return typeof v === "object" && v !== null && !Array.isArray(v);
 }
+
 export function get(obj: JsonObject, key: string): unknown {
   return obj[key];
 }
@@ -15,6 +17,7 @@ export function asString(v: unknown, fallback = ""): string {
   if (typeof v === "number" || typeof v === "boolean") return String(v);
   return fallback;
 }
+
 export function asNumber(v: unknown, fallback = 0): number {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string") {
@@ -23,6 +26,7 @@ export function asNumber(v: unknown, fallback = 0): number {
   }
   return fallback;
 }
+
 export function asBool(v: unknown, fallback = false): boolean {
   if (typeof v === "boolean") return v;
   if (typeof v === "number") return v !== 0;
@@ -33,12 +37,64 @@ export function asBool(v: unknown, fallback = false): boolean {
   }
   return fallback;
 }
+
+/**
+ * ✅ tags 파싱 유틸 (절대 안 터지게)
+ * - 배열: ["a", {name:"b"}, 1] → ["a","b","1"]
+ * - 문자열: "#a #b", "a,b", "a b" → ["a","b"]
+ * - 객체: {tags:[...]} / {items:[...]} / {content:[...]} 등 래핑도 흡수
+ */
 export function asStringArray(v: unknown): string[] {
-  if (!Array.isArray(v)) return [];
-  return v
-    .map((x) => (typeof x === "string" ? x : isObject(x) ? asString(get(x, "name"), "") : ""))
-    .map((s) => s.trim())
-    .filter(Boolean);
+  if (v == null) return [];
+
+  // 1) 문자열 케이스
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (!s) return [];
+    return s
+      .replaceAll("#", " ")
+      .split(/[,\s]+/g)
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+
+  // 2) 배열 케이스
+  if (Array.isArray(v)) {
+    return v
+      .map((x) => {
+        if (typeof x === "string") return x;
+        if (typeof x === "number" || typeof x === "boolean") return String(x);
+
+        // 객체 요소면 name/label/value/title 등 최대한 흡수
+        if (isObject(x)) {
+          const cand =
+            asString(get(x, "name"), "").trim() ||
+            asString(get(x, "label"), "").trim() ||
+            asString(get(x, "value"), "").trim() ||
+            asString(get(x, "title"), "").trim() ||
+            asString(get(x, "tagName"), "").trim();
+
+          return cand;
+        }
+        return "";
+      })
+      .map((s) => String(s ?? "").trim())
+      .filter(Boolean);
+  }
+
+  // 3) 객체 래핑 케이스: {tags:[...]} / {tagList:[...]} / {items:[...]} ...
+  if (isObject(v)) {
+    const inner =
+      get(v, "tags") ??
+      get(v, "tagList") ??
+      get(v, "items") ??
+      get(v, "content") ??
+      get(v, "list");
+
+    return asStringArray(inner);
+  }
+
+  return [];
 }
 
 /** 공통 응답 봉투 { data: ... } 흡수 */
