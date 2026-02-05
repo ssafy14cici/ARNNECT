@@ -48,4 +48,10 @@ public class CommentController {
     public ResponseEntity<Integer> countComments(@RequestParam TargetType target, @RequestParam Integer id) {
         return ResponseEntity.ok(service.getCommentCount(target, id));
     }
+
+    @GetMapping("/my/count")
+    public ResponseEntity<Integer> countMyComments() {
+        String memberUuid = SecurityUtil.getCurrentMemberUuid();
+        return ResponseEntity.ok(service.getMyCommentCount(memberUuid));
+    }
 }

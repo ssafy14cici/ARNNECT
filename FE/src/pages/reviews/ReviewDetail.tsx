@@ -17,6 +17,15 @@ function normalizeId(raw: unknown): string {
   return s.replace(/^review-/, "").replace(/^artwork-/, "");
 }
 
+function toSafeNumber(v: unknown, fallback = 0): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return fallback;
+}
+
 export default function ReviewDetail() {
   const { reviewId = "" } = useParams<{ reviewId: string }>();
   const nav = useNavigate();
@@ -55,6 +64,24 @@ export default function ReviewDetail() {
     return !!me && !!owner && me === owner;
   }, [user?.memberUuid, review?.memberUuid]);
 
+  // ✅ 좋아요 카운트(필드명 흔들림 대비)
+  const likeCount = useMemo(() => {
+    const r: any = review as any;
+    if (!r) return 0;
+
+    const raw =
+      r.likeCount ??
+      r.likesCount ??
+      r.favoriteCount ??
+      r.favoritesCount ??
+      r.count ??
+      r.like_count ??
+      r.likes_count ??
+      0;
+
+    return toSafeNumber(raw, 0);
+  }, [review]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -88,9 +115,7 @@ export default function ReviewDetail() {
 
   useEffect(() => {
     return () => {
-      if (imageObjectUrl && imageObjectUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(imageObjectUrl);
-      }
+      if (imageObjectUrl && imageObjectUrl.startsWith("blob:")) URL.revokeObjectURL(imageObjectUrl);
     };
   }, [imageObjectUrl]);
 
@@ -127,6 +152,7 @@ export default function ReviewDetail() {
 
   const onToggleFollow = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
+    if (isOwner) return; // ✅ 방어: 본인 글엔 팔로우 의미 없음(버튼도 숨김)
 
     const target = String(review?.artistUuid || review?.memberUuid || "").trim();
     if (!target) return;
@@ -234,9 +260,30 @@ export default function ReviewDetail() {
           </div>
 
           <div className="rd-actions">
-            <button type="button" className="rd-btn" onClick={onToggleFollow}>
-              {isFollowing ? "Following" : "Follow"}
-            </button>
+            {/* ✅ 본인 글에는 Follow 버튼 숨김 */}
+            {!isOwner && (
+              <button type="button" className="rd-btn" onClick={onToggleFollow}>
+                {isFollowing ? "Following" : "Follow"}
+              </button>
+            )}
+
+            {/* ✅ 좋아요는 “수만” 표시(버튼/토글 없음) */}
+            <div
+              className="rd-like-count"
+              aria-label={`좋아요 ${likeCount}개`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "10px 12px",
+                border: "1px solid rgba(255,255,255,0.18)",
+                borderRadius: 12,
+                opacity: 0.9,
+              }}
+            >
+              <span style={{ opacity: 0.85 }}>좋아요</span>
+              <strong>{likeCount}</strong>
+            </div>
 
             {isOwner && (
               <>
@@ -275,8 +322,12 @@ export default function ReviewDetail() {
           </div>
         </section>
 
-        {/* ✅ 댓글은 분리 컴포넌트 */}
-        <CommentThread reviewId={numericReviewId} isLoggedIn={isLoggedIn} meUuid={meUuid} myDisplayName={myDisplayName} />
+        <CommentThread
+          reviewId={numericReviewId}
+          isLoggedIn={isLoggedIn}
+          meUuid={meUuid}
+          myDisplayName={myDisplayName}
+        />
       </div>
     </div>
   );

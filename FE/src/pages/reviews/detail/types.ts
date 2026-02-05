@@ -25,4 +25,4 @@ export type ReviewDetailData = {
   artistName: string;
 };
 
-export type UiComment = LocalComment & { authorId?: string; isMine?: boolean };
+export type UiComment = LocalComment & { isMine?: boolean };

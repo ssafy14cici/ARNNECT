@@ -8,8 +8,6 @@ import "../../lounge.css";
 
 import { useAuthStore } from "../../../../features/auth/store";
 import { apiTicketScan, apiCollectBookList } from "../../../../features/collectbook/api/real";
-import { getTicketByCode , type TicketInfoResponse } from "../../../../features/tickets/api/realTickets";
-import { resolveTicketMedia } from "../../../../features/tickets/resolveTicketMedia";
 
 type Step = "scan" | "preview";
 
@@ -56,8 +54,6 @@ function getErrorMessage(e: unknown, fallback: string) {
   return fallback;
 }
 
-const hhmm = (t?: string) => (t ? String(t).slice(0, 5) : "-");
-
 export default function CollectBookScan() {
   const nav = useNavigate();
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -71,13 +67,13 @@ export default function CollectBookScan() {
   const [error, setError] = useState("");
 
   const [ticketCode, setTicketCode] = useState("");
-  const [ticketInfo, setTicketInfo] = useState<TicketInfoResponse | null>(null);
-
   const [busy, setBusy] = useState(false);
   const [scannerReady, setScannerReady] = useState(false);
-  const [loadingTicket, setLoadingTicket] = useState(false);
 
-  const canRegister = useMemo(() => !!ticketCode && !!ownerUuid && !busy, [ticketCode, ownerUuid, busy]);
+  const canRegister = useMemo(
+    () => !!ticketCode && !!ownerUuid && !busy,
+    [ticketCode, ownerUuid, busy]
+  );
 
   useEffect(() => {
     if (step !== "scan") return;
@@ -103,7 +99,11 @@ export default function CollectBookScan() {
       if (videoEl) videoEl.srcObject = null;
     };
 
-    const onDecode = async (result: Result | undefined, err: unknown, controls: IScannerControls) => {
+    const onDecode = async (
+      result: Result | undefined,
+      err: unknown,
+      controls: IScannerControls
+    ) => {
       if (!alive) return;
       if (err && !(err instanceof NotFoundException)) {}
 
@@ -125,19 +125,8 @@ export default function CollectBookScan() {
       setTicketCode(code);
       setStep("preview");
 
-      // ✅ 미리보기: 티켓코드로 티켓 정보 조회
-      setLoadingTicket(true);
-      try {
-        const info = await getTicketByCode (code);
-        if (!alive) return;
-        setTicketInfo(info);
-      } catch (e: unknown) {
-        if (!alive) return;
-        setTicketInfo(null);
-        setError(getErrorMessage(e, "티켓 정보를 불러오지 못했습니다. (등록은 시도할 수 있습니다)"));
-      } finally {
-        if (alive) setLoadingTicket(false);
-      }
+      // ✅ BE 스펙상 ticketCode로 '조회' API가 없음.
+      // 미리보기는 ticketCode만 보여주고, 등록(apiTicketScan)만 수행.
     };
 
     (async () => {
@@ -147,7 +136,11 @@ export default function CollectBookScan() {
         const videoEl = videoRef.current;
         if (!videoEl) return;
 
-        const controls = await codeReader.decodeFromVideoDevice(undefined, videoEl, onDecode);
+        const controls = await codeReader.decodeFromVideoDevice(
+          undefined,
+          videoEl,
+          onDecode
+        );
         controlsRef.current = controls;
 
         setScannerReady(true);
@@ -167,9 +160,7 @@ export default function CollectBookScan() {
   const reset = () => {
     setError("");
     setTicketCode("");
-    setTicketInfo(null);
     setBusy(false);
-    setLoadingTicket(false);
     lockedRef.current = false;
     setStep("scan");
   };
@@ -185,29 +176,24 @@ export default function CollectBookScan() {
     setError("");
 
     try {
-      // ✅ 서버 등록
-      const scanRes = await apiTicketScan(ticketCode);
+      // ✅ 서버 등록: GET /api/v1/tickets/ticket-scan?ticket=...
+      await apiTicketScan(ticketCode);
 
-      // 1) scanRes가 ticketId를 직접 주는 경우 우선 처리
-      const directTicketId =
-        scanRes && typeof scanRes === "object" && "ticketId" in scanRes ? Number((scanRes as any).ticketId) : NaN;
+      // 등록 후 리스트 재조회해서 방금 코드가 보이면 상세로 이동
+      try {
+        const list = await apiCollectBookList(ownerUuid);
+        const found = Array.isArray(list) ? list.find((x: any) => x.ticketCode === ticketCode) : undefined;
 
-      if (Number.isFinite(directTicketId)) {
-        nav(`/lounge/collectbook/${directTicketId}`, { replace: true });
-        return;
+        if (found?.ticketCode) {
+          nav(`/lounge/collectbook/${encodeURIComponent(ticketCode)}`, { replace: true });
+          return;
+        }
+      } catch {
+        // 리스트 재조회 실패해도 등록 자체는 성공했을 수 있으니 아래로 폴백
       }
 
-      // 2) 아니면 리스트에서 코드 매칭해서 상세로 이동
-      const list = await apiCollectBookList(ownerUuid);
-      const found = Array.isArray(list) ? list.find((x) => x.ticketCode === ticketCode) : undefined;
-
-      if (found?.ticketId) {
-        nav(`/lounge/collectbook/${found.ticketId}`, { replace: true });
-        return;
-      }
-
-      // 3) 최후: 리스트로
-      nav(`/lounge/collectbook`, { replace: true });
+      // 폴백: 리스트로 이동 + 최근 등록 코드 표시
+      nav(`/lounge/collectbook`, { replace: true, state: { focusCode: ticketCode } });
     } catch (e: unknown) {
       setError(getErrorMessage(e, "등록 실패"));
     } finally {
@@ -225,7 +211,13 @@ export default function CollectBookScan() {
           </Link>
         </div>
 
-        {step === "scan" && (
+        {!isLoggedIn && (
+          <div className="loungeSubPanel">
+            <p className="loungeSubHint">로그인 후 이용할 수 있습니다.</p>
+          </div>
+        )}
+
+        {isLoggedIn && step === "scan" && (
           <div className="loungeSubPanel">
             <h2 className="loungeSubPanelTitle">QR을 스캔하세요</h2>
 
@@ -253,60 +245,15 @@ export default function CollectBookScan() {
           </div>
         )}
 
-        {step === "preview" && (
+        {isLoggedIn && step === "preview" && (
           <div className="loungeSubPanel">
             <h2 className="loungeSubPanelTitle">티켓 확인</h2>
 
             <p className="loungeSubHint">
               <strong>ticketCode</strong>: {ticketCode}
               <br />
-              {loadingTicket ? (
-                <>티켓 정보 불러오는 중...</>
-              ) : ticketInfo ? (
-                <>
-                  <strong>제목</strong>: {ticketInfo.title}
-                  <br />
-                  <strong>장소</strong>: {ticketInfo.address} {ticketInfo.addressDetail ? `(${ticketInfo.addressDetail})` : ""}
-                  <br />
-                  <strong>기간</strong>: {ticketInfo.startDate} ~ {ticketInfo.endDate}
-                  <br />
-                  <strong>시간</strong>: {hhmm(ticketInfo.startTime)} ~ {hhmm(ticketInfo.endTime)}
-                </>
-              ) : (
-                <>티켓 정보를 못 가져왔습니다. (등록은 시도 가능)</>
-              )}
+              (현재 백엔드 스펙에서는 ticketCode로 조회 API가 없어 미리보기 상세는 생략됩니다.)
             </p>
-
-            {!loadingTicket && ticketInfo?.ticketImageName && (
-              <img
-                src={resolveTicketMedia(ticketInfo.ticketImageName)}
-                alt="ticket"
-                style={{
-                  width: "100%",
-                  maxWidth: 520,
-                  borderRadius: 14,
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  display: "block",
-                  marginTop: 12,
-                }}
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = "none";
-                }}
-              />
-            )}
-
-            {!loadingTicket && ticketInfo?.qrImageName && (
-              <div style={{ marginTop: 12, background: "#fff", padding: 12, borderRadius: 12, display: "inline-block" }}>
-                <img
-                  src={resolveTicketMedia(ticketInfo.qrImageName)}
-                  alt="qr"
-                  style={{ width: 220, height: 220 }}
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).style.display = "none";
-                  }}
-                />
-              </div>
-            )}
 
             {error && <div className="loungeNotice">{error}</div>}
 

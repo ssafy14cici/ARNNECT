@@ -10,4 +10,5 @@ public interface FollowService {
     ToggleFollowResponse toggleFollow(String sourceMemberUuid, String targetMemberUuid);
     List<FollowArtistResponse> followArtistList(String memberUuid);
     List<FollowMemberResponse> followMemberList(String memberUuid);
+    Integer followerCount(Long memberId);
 }

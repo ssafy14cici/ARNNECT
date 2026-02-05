@@ -19,15 +19,12 @@ function unwrapAxiosData(res: unknown): unknown {
 /**
  * ✅ 리뷰 댓글 목록(확정 스펙)
  * GET /api/v1/comments?targetId={targetId}&targetType=REVIEW
- *
- * + 혹시 서버가 예전 파라미터도 유지 중이면 fallback
  */
 export async function fetchReviewComments(reviewId: number): Promise<LocalComment[]> {
   const tryUrls = [
-    // ✅ 1순위: 확정 스펙
     `${COMMENTS_PATH}?targetId=${encodeURIComponent(String(reviewId))}&targetType=REVIEW`,
 
-    // fallback (필요 없으면 지워도 됨)
+    // fallback(서버 레거시가 남아있을 때만)
     `${COMMENTS_PATH}?reviewId=${encodeURIComponent(String(reviewId))}`,
     `${COMMENTS_PATH}?target=${encodeURIComponent("REVIEW")}&id=${encodeURIComponent(String(reviewId))}`,
     `${COMMENTS_PATH}?targetType=${encodeURIComponent("REVIEW")}&targetId=${encodeURIComponent(String(reviewId))}`,
@@ -49,7 +46,8 @@ export async function fetchReviewComments(reviewId: number): Promise<LocalCommen
   throw lastErr;
 }
 
-export async function createReviewCommentOnServer(args: {
+/** ✅ 댓글 생성 */
+export async function createReviewComment(args: {
   reviewId: number;
   content: string;
   parentCommentId?: number | null;
@@ -65,19 +63,18 @@ export async function createReviewCommentOnServer(args: {
   return mapSingleComment(payload);
 }
 
-export async function updateCommentOnServer(commentId: string, content: string): Promise<void> {
+/** ✅ 댓글 수정 */
+export async function updateComment(commentId: string, content: string): Promise<void> {
   await http.put(`${COMMENTS_PATH}/${encodeURIComponent(commentId)}`, { content });
 }
 
-export async function deleteCommentOnServer(commentId: string): Promise<void> {
+/** ✅ 댓글 삭제 */
+export async function deleteComment(commentId: string): Promise<void> {
   await http.delete(`${COMMENTS_PATH}/${encodeURIComponent(commentId)}`);
 }
 
-/**
- * ✅ 팔로우 토글: /api/v1/follow/{memberUuid}
- */
-export async function toggleFollowOnServer(targetMemberUuid: string): Promise<FollowToggleResult> {
-  // 서버가 POST/PUT 중 뭘 쓰는지 모를 수 있어서 후보 처리
+/** ✅ 팔로우 토글 */
+export async function toggleFollow(targetMemberUuid: string): Promise<FollowToggleResult> {
   const tryCalls = [
     () => http.post(`${FOLLOW_TOGGLE_PATH}/${encodeURIComponent(targetMemberUuid)}`),
     () => http.put(`${FOLLOW_TOGGLE_PATH}/${encodeURIComponent(targetMemberUuid)}`),
@@ -97,11 +94,3 @@ export async function toggleFollowOnServer(targetMemberUuid: string): Promise<Fo
 
   throw lastErr;
 }
-
-/* ============================================================================
-   ✅ 호환(alias) export: 기존 컴포넌트 코드(import) 안 깨지게 유지
-============================================================================ */
-export const createReviewComment = createReviewCommentOnServer;
-export const updateComment = updateCommentOnServer;
-export const deleteComment = deleteCommentOnServer;
-export const toggleFollow = toggleFollowOnServer;

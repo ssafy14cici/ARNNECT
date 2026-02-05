@@ -23,7 +23,10 @@ function formatDate(s: string) {
 
 export default function FanLetter() {
   const user = useAuthStore((s) => s.user);
-  const role = useAuthStore((s) => s.role); // "general" | "artist" | null
+
+  // ✅ role이 "ARTIST"/"artist" 등으로 흔들려도 커버
+  const roleRaw = useAuthStore((s) => s.role);
+  const roleNorm = String(roleRaw ?? "").toLowerCase(); // "ARTIST" -> "artist"
 
   const artistMemberUuid = user?.memberUuid ?? "";
 
@@ -38,7 +41,8 @@ export default function FanLetter() {
   const [answerText, setAnswerText] = useState("");
   const [sending, setSending] = useState(false);
 
-  const canUse = role === "artist" && Boolean(artistMemberUuid);
+  // ✅ FIX
+  const canUse = roleNorm === "artist" && Boolean(artistMemberUuid);
 
   const refetch = async () => {
     if (!artistMemberUuid) return;
@@ -229,13 +233,10 @@ export default function FanLetter() {
                   </button>
                 ) : (
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <button
-                      type="button"
-                      className="flBtn"
-                      onClick={() => openEdit(fl.id, fl.answer)}
-                    >
+                    <button type="button" className="flBtn" onClick={() => openEdit(fl.id, fl.answer)}>
                       Edit
                     </button>
+
                     <button
                       type="button"
                       className="flBtn danger"
@@ -257,6 +258,7 @@ export default function FanLetter() {
                     >
                       Delete
                     </button>
+
                     <span className="flBadge">Answered</span>
                   </div>
                 )}
@@ -293,12 +295,7 @@ export default function FanLetter() {
               </button>
 
               {replyMode === "edit" && (
-                <button
-                  type="button"
-                  className="replyBtn ghost"
-                  onClick={removeAnswer}
-                  disabled={sending}
-                >
+                <button type="button" className="replyBtn ghost" onClick={removeAnswer} disabled={sending}>
                   Delete
                 </button>
               )}

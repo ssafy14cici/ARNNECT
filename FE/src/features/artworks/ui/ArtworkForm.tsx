@@ -1,5 +1,5 @@
 // FE/src/features/artworks/ui/ArtworkForm.tsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import type { ArtworkCreateReq } from "../model/types";
 import { FIXED_FIELD_ID, GENRE_OPTIONS } from "../model/constants";
 
@@ -34,6 +34,27 @@ function splitSize(raw?: string) {
   return { w: w ?? "", h: h ?? "" };
 }
 
+// ✅ 숫자만 + 최대 4자리(연도)
+function sanitizeYearInput(v: string) {
+  return v.replace(/\D/g, "").slice(0, 4);
+}
+
+// ✅ 서버가 productionDate(YYYY-MM-DD)를 기대하는 경우를 대비해, 연도만 입력받고 내부적으로 01-01로 보정
+function yearToProductionDate(year: string) {
+  const y = sanitizeYearInput(year).trim();
+  if (!y) return "";
+  return `${y}-01-01`;
+}
+
+// ✅ initial.productionDate가 "YYYY-MM-DD" 또는 "YYYY"로 올 수 있으니 연도만 뽑기
+function dateLikeToYear(raw?: string) {
+  const s = String(raw ?? "").trim();
+  if (!s) return "";
+  // "2024-01-01" -> "2024"
+  const m = s.match(/^(\d{1,4})/);
+  return m ? sanitizeYearInput(m[1]) : "";
+}
+
 export default function ArtworkForm(props: Props) {
   const mode: Mode = props.mode ?? "create";
   const initial = props.initial;
@@ -57,8 +78,9 @@ export default function ArtworkForm(props: Props) {
   // ✅ genreId: 토글 단일 선택
   const [genreId, setGenreId] = useState<number>((initial as any)?.genreId ?? 1);
 
-  // ✅ LocalDate: YYYY-MM-DD
-  const [productionDate, setProductionDate] = useState<string>((initial as any)?.productionDate ?? "");
+  // ✅ 연도만 입력(최대 4자리) — 기존 productionDate(type="date") 제거
+  // initial.productionDate가 "YYYY-MM-DD"여도 연도만 추출해서 넣음
+  const [productionYear, setProductionYear] = useState<string>(dateLikeToYear((initial as any)?.productionDate));
 
   // ✅ size: 가로/세로 입력 → 전송 시 "w*h"
   const initSize = useMemo(() => splitSize((initial as any)?.size), [(initial as any)?.size]);
@@ -97,7 +119,7 @@ export default function ArtworkForm(props: Props) {
     };
   }, []);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -118,7 +140,11 @@ export default function ArtworkForm(props: Props) {
     if (mode === "create" && !image) return "이미지를 선택해주세요.";
     if (!title.trim()) return "작품 제목을 입력해주세요.";
     if (!genreId) return "장르를 선택해주세요.";
-    if (!productionDate.trim()) return "제작일을 선택해주세요.";
+
+    // ✅ 연도만 필수(숫자만, 최대 4자리)
+    const y = productionYear.trim();
+    if (!y) return "제작 연도를 입력해주세요.";
+    if (!/^\d{1,4}$/.test(y)) return "제작 연도는 숫자만, 최대 4자리까지 입력해주세요.";
 
     if (!sizeW.trim() || !sizeH.trim()) return "사이즈(가로/세로)를 입력해주세요.";
     if (Number.isNaN(Number(sizeW)) || Number.isNaN(Number(sizeH))) return "사이즈는 숫자만 입력해주세요.";
@@ -132,6 +158,9 @@ export default function ArtworkForm(props: Props) {
 
     const size = `${sizeW.trim()}*${sizeH.trim()}`;
 
+    // ✅ 연도 입력 -> 서버 전송용 productionDate로 보정(YYYY-01-01)
+    const productionDate = yearToProductionDate(productionYear.trim());
+
     // ✅ create는 image 필수
     if (mode === "create") {
       if (!image) return alert("이미지를 선택해주세요.");
@@ -141,7 +170,7 @@ export default function ArtworkForm(props: Props) {
         description: description.trim() || undefined,
         fieldId,
         genreId,
-        productionDate: productionDate.trim(),
+        productionDate, // ✅ 연도만 입력받고 내부적으로 YYYY-01-01로 전송
         size,
         tags: parsedTags,
         image,
@@ -157,7 +186,7 @@ export default function ArtworkForm(props: Props) {
       description: description.trim() || undefined,
       fieldId,
       genreId,
-      productionDate: productionDate.trim(),
+      productionDate, // ✅ 연도만 입력받고 내부적으로 YYYY-01-01로 전송
       size,
       tags: parsedTags,
       image: image ?? undefined,
@@ -227,15 +256,20 @@ export default function ArtworkForm(props: Props) {
           <div className="pc-row-2">
             <div className="pc-input-group">
               <label className="pc-label">
-                Production Date <span className="req">*</span>
+                Production Year <span className="req">*</span>
               </label>
               <input
                 className="pc-input"
-                value={productionDate}
-                onChange={(e) => setProductionDate(e.target.value)}
-                type="date"
+                value={productionYear}
+                onChange={(e) => setProductionYear(sanitizeYearInput(e.target.value))}
+                type="text"
+                inputMode="numeric"
+                pattern="\d*"
+                maxLength={4}
+                placeholder="예: 2026"
                 disabled={!!submitting}
               />
+              <div className="pc-size-hint">숫자만 입력 가능 (최대 4자리)</div>
             </div>
 
             <div className="pc-input-group">

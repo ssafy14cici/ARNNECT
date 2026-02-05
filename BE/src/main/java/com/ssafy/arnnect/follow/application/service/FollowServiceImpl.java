@@ -85,4 +85,9 @@ public class FollowServiceImpl implements FollowService{
                 ))
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public Integer followerCount(Long memberId) {
+         return followRepository.countByTargetId(memberId);
+    }
 }

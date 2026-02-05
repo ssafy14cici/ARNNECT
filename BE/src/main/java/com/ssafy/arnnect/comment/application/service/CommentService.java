@@ -8,9 +8,10 @@ import com.ssafy.arnnect.comment.domain.entity.TargetType;
 import java.util.List;
 
 public interface CommentService {
-    void createComment(CreateCommentRequest request, String membeUuid);
+    void createComment(CreateCommentRequest request, String memberUuid);
     void updateComment(UpdateCommentRequest request, Long reviewId, String memberUuid);
     void deleteComment(String memberUuid, Long commentId);
     List<CommentResponse> getCommentList(Integer artWorkId, TargetType targetType);
     Integer getCommentCount(TargetType targetType, Integer targetId);
+    Integer getMyCommentCount(String memberUuid);
 }

@@ -1,10 +1,6 @@
 // FE/src/pages/lounge/artist/qr/useIssuedTickets.ts
 import { useCallback, useState } from "react";
-import {
-  deleteTicket,
-  listTicketsByArtist,
-  type TicketInfoResponse,
-} from "../../../../features/tickets/api/realTickets";
+import { deleteTicket, listTicketsByArtist, type TicketInfoResponse } from "../../../../features/tickets/api/realTickets";
 
 export type TicketDesign = "BASIC" | "MODERN" | "MINIMAL";
 
@@ -24,7 +20,7 @@ export type TicketItem = {
   qrImageName: string;
   ticketImageName: string;
 
-  ticketDesign: TicketDesign; // 서버 미지원이면 로컬 유지
+  ticketDesign: TicketDesign;
 };
 
 const KEY_DESIGN_MAP = "arnnect_ticket_design_v1";
@@ -61,48 +57,53 @@ export function forgetDesign(code: string) {
 
 const hhmm = (t?: string) => (t ? String(t).slice(0, 5) : "");
 
-/**
- * removeIssued 오버로드:
- * - removeIssued(ticketItem)
- * - removeIssued(ticketId)
- * - removeIssued(ticketId, ticketCode)
- */
-type RemoveIssuedFn = {
-  (t: TicketItem): Promise<void>;
-  (ticketId: number, ticketCode?: string): Promise<void>;
-};
+function pickString(obj: any, keys: string[], fallback = ""): string {
+  for (const k of keys) {
+    const v = obj?.[k];
+    if (typeof v === "string" && v) return v;
+  }
+  return fallback;
+}
 
-export function useIssuedTickets(artistUuid: string) {
+// ✅ artistUuid를 optional로 받고, 없으면 절대 크래시 안 나게 가드
+export function useIssuedTickets(artistUuid?: string) {
   const [issued, setIssued] = useState<TicketItem[]>([]);
 
   const reloadIssued = useCallback(async () => {
-    // ✅ artistUuid 없으면 호출 스킵(로그인 전/하이드레이션 전)
     if (!artistUuid) {
+      // artistUuid 없으면 그냥 빈 배열로
       setIssued([]);
       return;
     }
 
     const designMap = loadDesignMap();
+
     const list = await listTicketsByArtist(artistUuid);
     const arr = Array.isArray(list) ? (list as TicketInfoResponse[]) : [];
 
     const normalized = arr
       .slice()
-      .sort((a, b) => Number(b.ticketId) - Number(a.ticketId))
-      .map((x) => {
-        const ticketDesign = designMap[x.ticketCode] ?? "BASIC";
+      .sort((a, b) => Number((b as any).ticketId) - Number((a as any).ticketId))
+      .map((x: any) => {
+        const ticketCode = pickString(x, ["ticketCode", "code"], "");
+        const ticketDesign = designMap[ticketCode] ?? "BASIC";
+
         return {
-          ticketId: x.ticketId,
-          ticketCode: x.ticketCode,
-          title: x.title,
-          address: x.address,
-          addressDetail: x.addressDetail,
-          startDate: x.startDate,
-          endDate: x.endDate,
-          startTime: hhmm(x.startTime),
-          endTime: hhmm(x.endTime),
-          qrImageName: x.qrImageName,
-          ticketImageName: x.ticketImageName,
+          ticketId: Number(x.ticketId),
+          ticketCode,
+          title: pickString(x, ["title"], ""),
+          address: pickString(x, ["address"], ""),
+          addressDetail: pickString(x, ["addressDetail"], ""),
+
+          startDate: pickString(x, ["startDate"], ""),
+          endDate: pickString(x, ["endDate"], ""),
+          startTime: hhmm(pickString(x, ["startTime"], "")),
+          endTime: hhmm(pickString(x, ["endTime"], "")),
+
+          // ✅ BE 필드명이 다른 경우도 대비(없으면 "")
+          qrImageName: pickString(x, ["qrImageName", "qrImgName", "qrImage"], ""),
+          ticketImageName: pickString(x, ["ticketImageName", "ticketImgName", "ticketImage"], ""),
+
           ticketDesign,
         } satisfies TicketItem;
       });
@@ -111,28 +112,12 @@ export function useIssuedTickets(artistUuid: string) {
   }, [artistUuid]);
 
   const removeIssued = useCallback(
-    (async (arg1: TicketItem | number, arg2?: string) => {
-      // ✅ artistUuid 없으면 삭제도 막는게 안전
-      if (!artistUuid) return;
-
-      let ticketId: number;
-      let ticketCode = "";
-
-      if (typeof arg1 === "number") {
-        ticketId = arg1;
-        ticketCode = arg2 ?? issued.find((it) => it.ticketId === ticketId)?.ticketCode ?? "";
-      } else {
-        ticketId = arg1.ticketId;
-        ticketCode = arg1.ticketCode;
-      }
-
-      await deleteTicket(ticketId);
-
-      if (ticketCode) forgetDesign(ticketCode);
-
+    async (t: TicketItem) => {
+      await deleteTicket(t.ticketId);
+      forgetDesign(t.ticketCode);
       await reloadIssued();
-    }) as RemoveIssuedFn,
-    [artistUuid, issued, reloadIssued],
+    },
+    [reloadIssued],
   );
 
   return { issued, reloadIssued, removeIssued };

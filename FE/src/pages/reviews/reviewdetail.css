@@ -2,9 +2,6 @@
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap');
 
-/* =============================================================================
-   BASE
-============================================================================= */
 .review-detail-page {
   background-color: #050505;
   color: #fff;
@@ -27,9 +24,7 @@
   font-weight: 300;
 }
 
-/* =============================================================================
-   HEADER (Title / Meta / Actions)
-============================================================================= */
+/* header */
 .rd-header {
   position: relative;
   z-index: 20;
@@ -43,9 +38,7 @@
   justify-content: space-between;
 }
 
-.rd-title-block {
-  min-width: 0;
-}
+.rd-title-block { min-width: 0; }
 
 .rd-title {
   font-family: 'Playfair Display', serif;
@@ -57,8 +50,7 @@
   text-shadow: 0 20px 40px rgba(0,0,0,0.8);
 }
 
-.rd-meta,
-.rd-submeta {
+.rd-meta, .rd-submeta {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -67,14 +59,9 @@
   font-size: 0.92rem;
 }
 
-.rd-submeta {
-  margin-top: 8px;
-  opacity: 0.7;
-}
+.rd-submeta { margin-top: 8px; opacity: 0.7; }
 
-.rd-dot {
-  opacity: 0.45;
-}
+.rd-dot { opacity: 0.45; }
 
 .rd-link {
   background: none;
@@ -124,9 +111,7 @@
   border-color: rgba(255,255,255,0.45);
 }
 
-.rd-btn:active {
-  transform: translateY(1px);
-}
+.rd-btn:active { transform: translateY(1px); }
 
 .rd-btn.danger {
   border-color: rgba(255,95,95,0.55);
@@ -138,10 +123,7 @@
   border-color: rgba(255,95,95,0.9);
 }
 
-/* =============================================================================
-   HERO IMAGE (Parallax-ish with current markup)
-   - rd-image를 sticky로 만들어 "작품 디테일" 같은 느낌을 냄
-============================================================================= */
+/* hero image */
 .rd-image {
   position: sticky;
   top: 0;
@@ -183,13 +165,11 @@
   border: 1px solid rgba(255,255,255,0.08);
 }
 
-/* =============================================================================
-   BODY (Overlays Image)
-============================================================================= */
+/* body */
 .rd-body {
   position: relative;
   z-index: 20;
-  margin-top: -120px; /* ✅ 이미지 위로 살짝 겹치게 */
+  margin-top: -120px;
   padding: 90px 24px 90px;
   background: #050505;
   box-shadow: 0 -50px 100px rgba(0,0,0,1);
@@ -219,180 +199,8 @@
   color: rgba(255,255,255,0.6);
 }
 
-/* =============================================================================
-   COMMENTS (Minimalist)
-   ✅ Fix: sticky 이미지가 비치지 않도록 "불투명 섹션" + spacing을 padding으로 처리
-============================================================================= */
-.rd-comments {
-  position: relative;
-  z-index: 20;
-
-  /* ❌ margin-top으로 빈 공간 만들면 그 공간은 투명이라 sticky 이미지가 비침 */
-  margin-top: 0;
-
-  /* ✅ 간격은 padding으로(배경이 같이 칠해짐) */
-  padding: 60px 24px 0;
-
-  /* ✅ 댓글 섹션을 확실히 불투명하게 */
-  background: #050505;
-
-  border-top: 1px solid rgba(255,255,255,0.1);
-  box-shadow: 0 -50px 100px rgba(0,0,0,1);
-}
-
-.rd-comments-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 24px;
-}
-
-.rd-comments-title {
-  font-family: 'Playfair Display', serif;
-  font-size: 1.8rem;
-  font-weight: 400;
-  margin: 0;
-  border-left: 3px solid #C8A97E;
-  padding-left: 14px;
-}
-
-.rd-comments-hint {
-  opacity: 0.7;
-  font-weight: 300;
-  margin: 10px 0 16px;
-}
-
-/* input
-   ✅ Fix: 입력 영역도 최소한의 배경/보더를 줘서 "투명하게 떠보임" 방지 */
-.rd-comment-input {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-
-  border-bottom: none;
-  padding: 10px 0;
-  margin: 18px 0 34px;
-}
-
-.rd-comment-input-field {
-  flex: 1;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 12px;
-  outline: none;
-  color: #fff;
-  font-size: 1rem;
-  padding: 12px 14px;
-}
-
-.rd-comment-input-field::placeholder {
-  color: rgba(255,255,255,0.35);
-}
-
-/* list */
-.rd-comment-list {
-  display: flex;
-  flex-direction: column;
-  gap: 26px;
-}
-
-.rd-comment-item {
-  animation: rdFadeIn 0.5s ease;
-}
-
-.rd-comment-meta {
-  font-size: 0.82rem;
-  color: rgba(255,255,255,0.45);
-  margin-bottom: 7px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.rd-comment-meta strong {
-  color: #fff;
-  font-weight: 600;
-}
-
-.rd-comment-text {
-  font-size: 0.98rem;
-  line-height: 1.6;
-  color: rgba(255,255,255,0.9);
-  white-space: pre-wrap;
-}
-
-.rd-comment-actions {
-  margin-top: 10px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.rd-comment-actions .rd-link {
-  color: rgba(255,255,255,0.45);
-  font-size: 0.8rem;
-}
-
-.rd-comment-actions .rd-link:hover {
-  color: #fff;
-  text-decoration: underline;
-}
-
-/* replies */
-.rd-replies {
-  margin-top: 14px;
-  padding-left: 16px;
-  border-left: 1px solid rgba(255,255,255,0.1);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.rd-reply-item {
-  opacity: 0.95;
-}
-
-/* =============================================================================
-   INLINE EDIT/REPLY (textarea UI) - ReviewDetail.tsx 인라인 수정/답글용
-============================================================================= */
-.rd-inline-edit,
-.rd-inline-reply {
-  margin-top: 12px;
-  display: grid;
-  gap: 10px;
-}
-
-.rd-inline-textarea {
-  width: 100%;
-  resize: vertical;
-  padding: 12px 14px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 12px;
-  color: #fff;
-  outline: none;
-}
-
-.rd-inline-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-/* =============================================================================
-   ANIMATIONS & RESPONSIVE
-============================================================================= */
-@keyframes rdFadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 @media (max-width: 768px) {
-  .review-detail-container {
-    padding: 0 16px 110px;
-  }
+  .review-detail-container { padding: 0 16px 110px; }
 
   .rd-header {
     flex-direction: column;
@@ -401,77 +209,9 @@
     padding-top: 30px;
   }
 
-  .rd-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
+  .rd-actions { width: 100%; justify-content: flex-start; }
 
-  .rd-image {
-    height: 76vh;
-    padding: 22px 0 10px;
-  }
+  .rd-image { height: 76vh; padding: 22px 0 10px; }
 
-  .rd-body {
-    margin-top: -70px;
-    padding: 70px 16px 70px;
-  }
-
-  .rd-comments {
-    padding: 50px 16px 0;
-  }
-}
-/* =============================================================================
-   COMMENTS - 강화(하얀 박스/가독성/카드 UI)
-   -> specificity 올려서 글로벌 CSS 덮어쓰기
-============================================================================= */
-
-.rd-comments .rd-comment-list {
-  gap: 16px;
-}
-
-.rd-comments .rd-comment-item {
-  padding: 16px 18px;
-  border-radius: 18px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.10);
-  box-shadow: 0 18px 40px rgba(0,0,0,0.45);
-}
-
-.rd-comments .rd-comment-text {
-  margin-top: 6px;
-  font-size: 0.98rem;
-  line-height: 1.7;
-  color: rgba(255,255,255,0.88);
-}
-
-.rd-comments .rd-replies {
-  margin-top: 14px;
-  padding-left: 14px;
-  border-left: 1px solid rgba(255,255,255,0.10);
-}
-
-.rd-comments .rd-reply-item {
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: rgba(255,255,255,0.02);
-  border: 1px solid rgba(255,255,255,0.08);
-}
-
-.rd-comments .rd-comment-meta {
-  color: rgba(255,255,255,0.55);
-}
-
-.rd-comments .rd-comment-actions .rd-link {
-  color: rgba(255,255,255,0.55);
-}
-
-.rd-comments .rd-inline-textarea {
-  background: rgba(0,0,0,0.35);
-  border: 1px solid rgba(255,255,255,0.16);
-  color: rgba(255,255,255,0.92);
-}
-
-.rd-comments .rd-comment-input-field {
-  background: rgba(0,0,0,0.35);
-  border: 1px solid rgba(255,255,255,0.16);
+  .rd-body { margin-top: -70px; padding: 70px 16px 70px; }
 }

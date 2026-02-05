@@ -1,12 +1,6 @@
 // FE/src/features/fanLetter/api/real.ts
 import { http } from "../../../shared/api/http";
-import type {
-  ApiEnvelope,
-  FanLetter,
-  FanLetterId,
-  FanLetterRaw,
-  FanLetterSendPayload,
-} from "../types";
+import type { ApiEnvelope, FanLetter, FanLetterId, FanLetterRaw, FanLetterSendPayload } from "../types";
 
 type JsonObject = Record<string, unknown>;
 const isObject = (v: unknown): v is JsonObject => typeof v === "object" && v !== null;
@@ -26,17 +20,6 @@ function asNumber(v: unknown, fallback = NaN): number {
   if (typeof v === "string") {
     const n = Number(v);
     if (Number.isFinite(n)) return n;
-  }
-  return fallback;
-}
-
-function asBool(v: unknown, fallback = false): boolean {
-  if (typeof v === "boolean") return v;
-  if (typeof v === "number") return v !== 0;
-  if (typeof v === "string") {
-    const s = v.trim().toLowerCase();
-    if (["true", "1", "y", "yes"].includes(s)) return true;
-    if (["false", "0", "n", "no"].includes(s)) return false;
   }
   return fallback;
 }
@@ -72,16 +55,32 @@ function apiPath(path: string): string {
  * 서버가 리스트를 다양한 키로 감싸서 내려주는 케이스 대응
  * - data: FanLetter[]
  * - data: { fanLetters: FanLetter[] }
- * - data: { items: FanLetter[] } 등
+ * - data: { fanLetterList: FanLetter[] }
+ * - data: { content: FanLetter[] } 등
  */
 function extractArray(raw: unknown): unknown[] {
   if (Array.isArray(raw)) return raw;
 
   if (isObject(raw)) {
-    const candidates = ["fanLetters", "fanletters", "items", "list", "content", "results"];
+    const candidates = [
+      "fanLetters",
+      "fanletters",
+      "fanLetterList",
+      "fanletterList",
+      "items",
+      "list",
+      "results",
+      "content",
+    ];
     for (const k of candidates) {
       const v = get(raw, k);
       if (Array.isArray(v)) return v;
+
+      // pagination: { content: [...] }
+      if (isObject(v)) {
+        const inner = get(v, "content");
+        if (Array.isArray(inner)) return inner;
+      }
     }
   }
   return [];
@@ -90,35 +89,35 @@ function extractArray(raw: unknown): unknown[] {
 function mapRawToFanLetter(raw: FanLetterRaw | unknown): FanLetter {
   const o: JsonObject = isObject(raw) ? raw : {};
 
-  // id
+  // ✅ BE 응답: fanLetterId
   const id =
     asNumber(get(o, "fanLetterId")) ||
     asNumber(get(o, "fanletterId")) ||
     asNumber(get(o, "id")) ||
     0;
 
-  // from nickname (BE/FE 흔들림 대응)
+  // ✅ BE 응답: nickname
   const fromNickname =
     asString(get(o, "fromNickname")) ||
     asString(get(o, "nickname")) ||
     asString(get(o, "from_nickname")) ||
     "User";
 
-  // question/content
+  // ✅ BE 응답: content (질문/본문)
   const question =
-    asString(get(o, "question")) ||
     asString(get(o, "content")) ||
+    asString(get(o, "question")) ||
     asString(get(o, "message")) ||
     "";
 
-  // createdAt/date
+  // ✅ createdAt
   const createdAt =
     asString(get(o, "createdAt")) ||
     asString(get(o, "created_at")) ||
     asString(get(o, "date")) ||
     "";
 
-  // artwork
+  // ✅ artworkId / artworkName
   const artworkId = (() => {
     const v = get(o, "artworkId");
     const n = asNumber(v, NaN);
@@ -131,23 +130,14 @@ function mapRawToFanLetter(raw: FanLetterRaw | unknown): FanLetter {
     asString(get(o, "artwork_name")) ||
     undefined;
 
-  // answer / answered
-  const answerRaw = get(o, "answer") ?? get(o, "reply") ?? get(o, "response");
+  // ✅ answer: string | null
+  const answerRaw = get(o, "answer");
   const answer = (() => {
     const s = asString(answerRaw, "").trim();
     return s ? s : undefined;
   })();
 
-  // ✅ FIX: "??" 와 "||"를 한 표현식에서 섞지 않도록 분리
-  const answeredV = get(o, "answered");
-  const isAnsweredV = get(o, "isAnswered");
-
-  const answeredBool =
-    (typeof answeredV === "boolean" ? answeredV : undefined) ??
-    (typeof isAnsweredV === "boolean" ? isAnsweredV : undefined) ??
-    asBool(get(o, "is_answered"), false);
-
-  const isAnswered = answeredBool || Boolean(answer);
+  const isAnswered = Boolean(answer);
 
   return {
     id: Number(id),
@@ -161,11 +151,11 @@ function mapRawToFanLetter(raw: FanLetterRaw | unknown): FanLetter {
   };
 }
 
-/** ✅ 팬레터 발송 (BE: FanLetterRequest) */
+/** ✅ 팬레터 발송 */
 export async function sendFanLetter(payload: FanLetterSendPayload): Promise<void> {
   await http.post(apiPath("/fanletters"), {
-    memberUuid: payload.memberUuid, // ✅ BE 키
-    title: payload.title, // ✅ BE 키
+    memberUuid: payload.memberUuid,
+    title: payload.title,
     content: payload.content,
     artworkId: payload.artworkId,
   });
@@ -173,22 +163,17 @@ export async function sendFanLetter(payload: FanLetterSendPayload): Promise<void
 
 /**
  * ✅ 작가: 받은 팬레터 전체 조회
- * GET /api/v1/fanletters/all?artist={memberId}
+ * GET /api/v1/fanletters/all?artist={memberUuid}
  */
 export async function fetchArtistFanLetters(artistMemberUuid: string): Promise<FanLetter[]> {
   const res = await http.get(apiPath("/fanletters/all"), {
     params: { artist: artistMemberUuid },
   });
 
-  // axios면 res.data가 body
   const body = (res as any)?.data ?? res;
-
-  // envelope이면 1번만 unwrap
   const unwrapped = unwrapEnvelope<unknown>(body);
 
-  // 배열이거나, 객체 안에 배열이 들어있거나 케이스 모두 커버
   const list = extractArray(unwrapped);
-
   return list.map(mapRawToFanLetter);
 }
 

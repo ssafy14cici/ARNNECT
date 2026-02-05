@@ -1,0 +1,164 @@
+/* FE/src/pages/reviews/detail/commentThread.css */
+
+/* ✅ 댓글 섹션은 무조건 불투명 배경 */
+.rd-comments {
+  position: relative;
+  z-index: 30;
+  padding: 60px 24px 0;
+  background: #050505;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 -50px 100px rgba(0, 0, 0, 1);
+}
+
+.rd-comments-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.rd-comments-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem;
+  font-weight: 400;
+  margin: 0;
+  border-left: 3px solid #C8A97E;
+  padding-left: 14px;
+}
+
+.rd-comments-hint {
+  opacity: 0.75;
+  font-weight: 300;
+  margin: 10px 0 16px;
+}
+
+/* input */
+.rd-comment-input {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  margin: 18px 0 28px;
+}
+
+.rd-comment-input-field {
+  flex: 1;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 12px;
+  outline: none;
+  color: rgba(255,255,255,0.92);
+  font-size: 1rem;
+  padding: 12px 14px;
+}
+
+.rd-comment-input-field::placeholder {
+  color: rgba(255,255,255,0.35);
+}
+
+/* ✅ 댓글 카드: "흰 배경"을 없애고 다크 카드로 고정(드래그해야 보이던 문제 해결) */
+.rd-comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rd-comment-item {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 18px;
+  padding: 16px 16px 14px;
+  color: rgba(255,255,255,0.92);
+}
+
+.rd-comment-meta {
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.55);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rd-comment-meta strong {
+  color: rgba(255,255,255,0.95);
+  font-weight: 600;
+}
+
+.rd-comment-text {
+  font-size: 0.98rem;
+  line-height: 1.6;
+  color: rgba(255,255,255,0.92);
+  white-space: pre-wrap;
+}
+
+.rd-comment-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.rd-comment-actions .rd-link {
+  color: rgba(255,255,255,0.6);
+  font-size: 0.82rem;
+}
+
+.rd-comment-actions .rd-link:hover {
+  color: rgba(255,255,255,0.95);
+  text-decoration: underline;
+}
+
+/* replies */
+.rd-replies {
+  margin-top: 14px;
+  padding-left: 14px;
+  border-left: 1px solid rgba(255,255,255,0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rd-reply-item {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 16px;
+  padding: 14px;
+}
+
+/* inline edit/reply */
+.rd-inline-edit,
+.rd-inline-reply {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.rd-inline-textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 12px;
+  color: rgba(255,255,255,0.92);
+  outline: none;
+}
+
+.rd-inline-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* mobile */
+@media (max-width: 768px) {
+  .rd-comments {
+    padding: 50px 16px 0;
+  }
+  .rd-comment-item {
+    padding: 14px;
+  }
+}
