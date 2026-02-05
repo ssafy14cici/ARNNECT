@@ -1,5 +1,6 @@
+// FE/src/pages/artworks/ArtworkDetailView.tsx
 import { useMemo } from "react";
-import { Link } from "react-router-dom"; // ✅ 추가
+import { Link } from "react-router-dom";
 import { resolveMediaUrl } from "./detail/utils";
 import type { ArtworkDetailData, ReviewSummary, LocalComment } from "./detail/mappers";
 
@@ -30,38 +31,62 @@ type Props = {
   comments: LocalComment[];
   commentsLoading: boolean;
   commentsError: string | null;
+
   commentText: string;
   onChangeCommentText: (v: string) => void;
   onSubmitComment: () => void;
+
+  // (레거시) 안 쓰면 부모에서 no-op 가능
   onEditComment: (id: string, current: string) => void;
   onDeleteComment: (id: string) => void;
   onReplyComment: (parentId: string) => void;
 
-  /** ✅ 추가: 작가 프로필 경로 (없으면 링크 비활성) */
+  // ✅ 인라인 편집
+  editingId?: string | null;
+  editingText?: string;
+  onStartEdit?: (id: string, current: string) => void;
+  onChangeEditingText?: (v: string) => void;
+  onCancelEdit?: () => void;
+  onSaveEdit?: () => void;
+
+  // ✅ 답글
+  replyingParentId?: string | null;
+  replyText?: string;
+  onStartReply?: (parentId: string) => void;
+  onChangeReplyText?: (v: string) => void;
+  onCancelReply?: () => void;
+  onSubmitReply?: () => void;
+
+  // ✅ 작가 프로필 경로
   artistProfilePath?: string;
 
-  /**
-   * ✅ 추가: 댓글 작성자 프로필 경로 만들기
-   * - LocalComment에 authorId가 있을 때만 링크로 보여주기 위해 사용
-   */
+  // ✅ 댓글 작성자 프로필 경로 만들기
   commentAuthorProfilePath?: (authorId: string) => string;
 };
 
 export default function ArtworkDetailView(p: Props) {
-  const rootComments = useMemo(() => p.comments.filter((c) => c.parentId == null), [p.comments]);
+  const rootComments = useMemo(
+    () => p.comments.filter((c) => (c as any).parentId == null),
+    [p.comments],
+  );
 
   const repliesByParent = useMemo(() => {
     const m = new Map<string, LocalComment[]>();
+
     for (const c of p.comments) {
-      if (!c.parentId) continue;
-      const list = m.get(c.parentId) ?? [];
+      const parent = (c as any).parentId;
+      if (parent == null) continue;
+
+      const key = String(parent);
+      const list = m.get(key) ?? [];
       list.push(c);
-      m.set(c.parentId, list);
+      m.set(key, list);
     }
     return m;
   }, [p.comments]);
 
   const ArtistName = () => {
+    // ✅ artistProfilePath가 없으면 span으로만 (undefined Link 방지)
     if (p.artistProfilePath) {
       return (
         <Link className="hero-artist-link" to={p.artistProfilePath}>
@@ -84,6 +109,18 @@ export default function ArtworkDetailView(p: Props) {
     return <span className="comment-author-link">{name}</span>;
   };
 
+  const startEdit = (id: string, current: string) => {
+    // ✅ 새 인라인 편집 우선
+    if (p.onStartEdit) return p.onStartEdit(id, current);
+    // fallback
+    return p.onEditComment(id, current);
+  };
+
+  const startReply = (parentId: string) => {
+    if (p.onStartReply) return p.onStartReply(parentId);
+    return p.onReplyComment(parentId);
+  };
+
   return (
     <div className="artwork-detail-page">
       {/* Hero */}
@@ -91,7 +128,6 @@ export default function ArtworkDetailView(p: Props) {
         <div className="hero-content">
           <h1 className="hero-title">{p.artwork.title}</h1>
 
-          {/* ✅ 작가 클릭 */}
           <div className="hero-artist">
             by <ArtistName />
           </div>
@@ -103,7 +139,7 @@ export default function ArtworkDetailView(p: Props) {
               </div>
             ) : (
               <img
-                src={p.displayImgSrc || p.artwork.src}
+                src={p.displayImgSrc || (p.artwork as any).src}
                 alt={p.artwork.title}
                 className="hero-img"
                 onError={p.onHeroImgError}
@@ -155,7 +191,7 @@ export default function ArtworkDetailView(p: Props) {
           <section className="info-section">
             <p className="description">{p.artwork.description}</p>
             <div className="tags-row">
-              {p.artwork.tags.map((t) => (
+              {(p.artwork.tags ?? []).map((t) => (
                 <span key={t} className="tag-pill">
                   #{t}
                 </span>
@@ -230,44 +266,94 @@ export default function ArtworkDetailView(p: Props) {
             </div>
 
             <div className="comment-list">
-              {rootComments.map((c) => (
-                <div key={c.id} className="comment-item">
-                  <div className="comment-meta">
-                    <strong>
-                      <AuthorName name={c.authorName ?? "User"} authorId={(c as any).authorId} />
-                    </strong>
-                  </div>
+              {rootComments.map((c) => {
+                const id = String((c as any).id);
+                const replies = repliesByParent.get(id) ?? [];
 
-                  <div className="comment-text">{c.content}</div>
+                const isEditing = p.editingId != null && String(p.editingId) === id;
+                const isReplying = p.replyingParentId != null && String(p.replyingParentId) === id;
 
-                  <div className="comment-actions">
-                    <button className="text-btn" onClick={() => p.onEditComment(c.id, c.content)}>
-                      Edit
-                    </button>
-                    <button className="text-btn" onClick={() => p.onDeleteComment(c.id)}>
-                      Delete
-                    </button>
-                    <button className="text-btn" onClick={() => p.onReplyComment(c.id)}>
-                      Reply
-                    </button>
-                  </div>
-
-                  {(repliesByParent.get(c.id) ?? []).length > 0 && (
-                    <div className="replies">
-                      {(repliesByParent.get(c.id) ?? []).map((r) => (
-                        <div key={r.id} className="reply-item">
-                          <div className="comment-meta">
-                            <strong>
-                              <AuthorName name={r.authorName ?? "User"} authorId={(r as any).authorId} />
-                            </strong>
-                          </div>
-                          <div className="comment-text">{r.content}</div>
-                        </div>
-                      ))}
+                return (
+                  <div key={id} className="comment-item">
+                    <div className="comment-meta">
+                      <strong>
+                        <AuthorName name={(c as any).authorName ?? "User"} authorId={(c as any).authorId} />
+                      </strong>
                     </div>
-                  )}
-                </div>
-              ))}
+
+                    {/* ✅ 인라인 편집 */}
+                    {!isEditing ? (
+                      <div className="comment-text">{(c as any).content}</div>
+                    ) : (
+                      <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                        <textarea
+                          className="rd-inline-textarea"
+                          rows={3}
+                          value={p.editingText ?? ""}
+                          onChange={(e) => p.onChangeEditingText?.(e.target.value)}
+                        />
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button className="text-btn" onClick={p.onCancelEdit}>
+                            취소
+                          </button>
+                          <button className="text-btn" onClick={p.onSaveEdit}>
+                            저장
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="comment-actions">
+                      <button className="text-btn" onClick={() => startEdit(id, String((c as any).content ?? ""))}>
+                        Edit
+                      </button>
+                      <button className="text-btn" onClick={() => p.onDeleteComment(id)}>
+                        Delete
+                      </button>
+                      <button className="text-btn" onClick={() => startReply(id)}>
+                        Reply
+                      </button>
+                    </div>
+
+                    {/* ✅ 답글 입력 */}
+                    {isReplying && (
+                      <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+                        <textarea
+                          className="rd-inline-textarea"
+                          rows={3}
+                          value={p.replyText ?? ""}
+                          onChange={(e) => p.onChangeReplyText?.(e.target.value)}
+                          placeholder="답글을 입력하세요..."
+                        />
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button className="text-btn" onClick={p.onCancelReply}>
+                            취소
+                          </button>
+                          <button className="text-btn" onClick={p.onSubmitReply}>
+                            등록
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Replies */}
+                    {replies.length > 0 && (
+                      <div className="replies">
+                        {replies.map((r) => (
+                          <div key={String((r as any).id)} className="reply-item">
+                            <div className="comment-meta">
+                              <strong>
+                                <AuthorName name={(r as any).authorName ?? "User"} authorId={(r as any).authorId} />
+                              </strong>
+                            </div>
+                            <div className="comment-text">{(r as any).content}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <button className="btn-icon" style={{ marginTop: 12 }} onClick={p.onGoHome}>

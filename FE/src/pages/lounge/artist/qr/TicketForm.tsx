@@ -21,8 +21,8 @@ type Props = {
   busy: boolean;
   onChange: (patch: Partial<FormState>) => void;
 
-  // ✅ ticketImage 캡처용
-  previewRef: RefObject<HTMLDivElement>;
+  // ✅ ticketImage 캡처용 (null 허용으로 타입 정합성 해결)
+  previewRef: RefObject<HTMLDivElement | null>;
 };
 
 export default function TicketForm({ form, busy, onChange, previewRef }: Props) {

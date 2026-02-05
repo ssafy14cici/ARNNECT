@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "../../features/auth/store";
 import "./search.css";
-import { resolveMediaUrl } from "../artworks/detail/utils"; 
+import { resolveMediaUrl } from "../artworks/detail/utils";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "@studio-freight/lenis";
@@ -54,6 +54,9 @@ type Agg = {
   latestIso?: string;
   oldestIso?: string;
   thumb: string;
+
+  // ✅ 추가: 그룹 대표 작품 id (보통 최신 작품)
+  representativeArtworkId: string | null;
 };
 
 // --- Helper Functions ---
@@ -128,10 +131,7 @@ export default function Search() {
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const isLocked = useCallback(
-    (t: Tab) => (t === "tag" || t === "user") && !isLoggedIn,
-    [isLoggedIn],
-  );
+  const isLocked = useCallback((t: Tab) => (t === "tag" || t === "user") && !isLoggedIn, [isLoggedIn]);
 
   const onChangeTab = (t: Tab) => {
     if (isLocked(t)) return;
@@ -144,6 +144,7 @@ export default function Search() {
     setPage(1);
   };
 
+  // (fallback용) artwork 검색 URL 만들기
   const makeHrefToArtworkSearch = useCallback(
     (term: string) => {
       const p = new URLSearchParams();
@@ -209,7 +210,7 @@ export default function Search() {
         // SearchArtwork -> Artwork 호환
         setArtworks(
           list.map((x) => ({
-            id: x.id,
+            id: String(x.id),
             src: x.src,
             thumbnail: x.thumbnail ?? x.src,
             title: x.title,
@@ -272,7 +273,7 @@ export default function Search() {
       }));
     }
 
-    // artist / tag / user 탭은 작품 리스트를 집계해서 링크는 "artwork 검색"으로 유도
+    // ✅ artist / tag / user 탭: 집계하되, 대표 작품(최신) 디테일로 이동
     const map = new Map<string, Agg>();
     for (const a of artworks) {
       const createdMs = toMs(a.createdAt);
@@ -284,12 +285,15 @@ export default function Search() {
         tab === "artist"
           ? [a.artist ?? "Unknown"]
           : tab === "tag"
-            ? getTags(a).map((t) => t.trim()).filter(Boolean)
+            ? getTags(a)
+                .map((t) => t.trim())
+                .filter(Boolean)
             : [getUploader(a)];
 
       for (const key of keys) {
         if (!key) continue;
         const prev = map.get(key);
+
         if (!prev) {
           map.set(key, {
             name: key,
@@ -301,18 +305,22 @@ export default function Search() {
             latestIso: a.createdAt,
             oldestIso: a.createdAt,
             thumb,
+            representativeArtworkId: String(a.id), // ✅ 첫 작품을 대표로
           });
           continue;
         }
+
         prev.count += 1;
         prev.totalViews += views;
         prev.totalLikes += likes;
 
         if (createdMs != null) {
+          // ✅ 최신 갱신 시 대표작도 교체
           if (prev.latestAtMs == null || createdMs > prev.latestAtMs) {
             prev.latestAtMs = createdMs;
             prev.latestIso = a.createdAt;
             prev.thumb = thumb;
+            prev.representativeArtworkId = String(a.id);
           }
           if (prev.oldestAtMs == null || createdMs < prev.oldestAtMs) {
             prev.oldestAtMs = createdMs;
@@ -328,7 +336,7 @@ export default function Search() {
 
     return aggs.map((x) => ({
       key: `${tab}:${x.name}`,
-      href: makeHrefToArtworkSearch(x.name),
+      href: x.representativeArtworkId ? DETAIL_PATH(x.representativeArtworkId) : makeHrefToArtworkSearch(x.name),
       thumb: x.thumb,
       title: tab === "tag" ? `#${x.name}` : x.name,
       metaLeft: `${x.count} works`,

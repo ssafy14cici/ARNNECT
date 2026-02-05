@@ -8,19 +8,18 @@ export const http = axios.create({
 });
 
 http.interceptors.request.use((config) => {
+  config.headers = config.headers ?? {};
+
+  // ✅ 특정 요청에서 Authorization 주입을 스킵하고 싶을 때
+  const skip = (config.headers as any)["x-skip-auth"];
+  if (skip === "1" || skip === 1 || skip === true) {
+    delete (config.headers as any)["x-skip-auth"]; // 서버로 보내지 않음
+    return config;
+  }
+
   const token = useAuthStore.getState().token;
-
-  // axios v1에서 headers 타입이 케이스별로 달라 any로 처리
-  config.headers = (config.headers ?? {}) as any;
-
-  // ✅ refresh 등 토큰 없이 호출해야 하는 요청은 스킵 플래그 허용
-  const skipAuth = (config.headers as any)["x-skip-auth"] === "1";
-
-  if (!skipAuth && token) {
+  if (token) {
     (config.headers as any).Authorization = `Bearer ${token}`;
-  } else {
-    // ✅ token 없거나 스킵이면 과거 Authorization 잔존 방지
-    delete (config.headers as any).Authorization;
   }
 
   return config;

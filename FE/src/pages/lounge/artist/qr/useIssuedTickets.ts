@@ -1,6 +1,10 @@
 // FE/src/pages/lounge/artist/qr/useIssuedTickets.ts
 import { useCallback, useState } from "react";
-import { deleteTicket, listTicketsByArtist, type TicketInfoResponse } from "../../../../features/tickets/api/realTickets";
+import {
+  deleteTicket,
+  listTicketsByArtist,
+  type TicketInfoResponse,
+} from "../../../../features/tickets/api/realTickets";
 
 export type TicketDesign = "BASIC" | "MODERN" | "MINIMAL";
 
@@ -57,10 +61,27 @@ export function forgetDesign(code: string) {
 
 const hhmm = (t?: string) => (t ? String(t).slice(0, 5) : "");
 
+/**
+ * removeIssued 오버로드:
+ * - removeIssued(ticketItem)
+ * - removeIssued(ticketId)
+ * - removeIssued(ticketId, ticketCode)
+ */
+type RemoveIssuedFn = {
+  (t: TicketItem): Promise<void>;
+  (ticketId: number, ticketCode?: string): Promise<void>;
+};
+
 export function useIssuedTickets(artistUuid: string) {
   const [issued, setIssued] = useState<TicketItem[]>([]);
 
   const reloadIssued = useCallback(async () => {
+    // ✅ artistUuid 없으면 호출 스킵(로그인 전/하이드레이션 전)
+    if (!artistUuid) {
+      setIssued([]);
+      return;
+    }
+
     const designMap = loadDesignMap();
     const list = await listTicketsByArtist(artistUuid);
     const arr = Array.isArray(list) ? (list as TicketInfoResponse[]) : [];
@@ -90,12 +111,28 @@ export function useIssuedTickets(artistUuid: string) {
   }, [artistUuid]);
 
   const removeIssued = useCallback(
-    async (t: TicketItem) => {
-      await deleteTicket(t.ticketId);
-      forgetDesign(t.ticketCode);
+    (async (arg1: TicketItem | number, arg2?: string) => {
+      // ✅ artistUuid 없으면 삭제도 막는게 안전
+      if (!artistUuid) return;
+
+      let ticketId: number;
+      let ticketCode = "";
+
+      if (typeof arg1 === "number") {
+        ticketId = arg1;
+        ticketCode = arg2 ?? issued.find((it) => it.ticketId === ticketId)?.ticketCode ?? "";
+      } else {
+        ticketId = arg1.ticketId;
+        ticketCode = arg1.ticketCode;
+      }
+
+      await deleteTicket(ticketId);
+
+      if (ticketCode) forgetDesign(ticketCode);
+
       await reloadIssued();
-    },
-    [reloadIssued],
+    }) as RemoveIssuedFn,
+    [artistUuid, issued, reloadIssued],
   );
 
   return { issued, reloadIssued, removeIssued };

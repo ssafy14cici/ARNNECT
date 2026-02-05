@@ -245,10 +245,6 @@ export default function YourPreference() {
           ))}
         </div>
 
-        <div className="result-recommend">
-          <p>당신에게 추천하는 신진 예술가</p>
-          <strong>{resultData?.recommendArtist}</strong>
-        </div>
       </div>
 
       <div className="result-actions">
@@ -261,8 +257,8 @@ export default function YourPreference() {
           </Link>
         )}
         {isLoggedIn && (
-          <Link to="/lounge/taste" className="pref-btn-primary">
-            내 취향 라운지로 이동
+          <Link to="/feed" className="pref-btn-primary">
+            취향결과알아보기(피드페이지)
           </Link>
         )}
       </div>

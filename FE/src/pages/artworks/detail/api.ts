@@ -44,8 +44,8 @@ export async function toggleFavoriteOnServer(artworkId: number): Promise<Favorit
 }
 
 /**
- * ✅ 댓글 목록: 확정 스펙
- * GET /api/v1/comments?artworkId=3
+ * ✅ 댓글 목록(확정 스펙)
+ * GET /api/v1/comments?targetId={targetId}&targetType=ARTWORK
  *
  * + 혹시 서버가 예전 파라미터도 유지 중이면 fallback
  */
@@ -53,20 +53,29 @@ export async function fetchArtworkComments(artworkId: number): Promise<LocalComm
   const tryCalls: Array<() => Promise<LocalComment[]>> = [
     // ✅ 1순위: 확정 스펙
     async () => {
-      const res = await http.get(COMMENTS_PATH, { params: { artworkId } });
+      const res = await http.get(COMMENTS_PATH, {
+        params: {
+          targetId: artworkId,
+          targetType: COMMENT_TARGET_TYPE,
+        },
+      });
       const payload = unwrapAxiosData(res);
       return mapCommentResponseList(payload);
     },
 
     // fallback (필요 없으면 지워도 됨)
     async () => {
-      const url = `${COMMENTS_PATH}?target=${encodeURIComponent(COMMENT_TARGET_TYPE)}&id=${encodeURIComponent(String(artworkId))}`;
+      const url = `${COMMENTS_PATH}?target=${encodeURIComponent(COMMENT_TARGET_TYPE)}&id=${encodeURIComponent(
+        String(artworkId),
+      )}`;
       const res = await http.get(url);
       const payload = unwrapAxiosData(res);
       return mapCommentResponseList(payload);
     },
     async () => {
-      const url = `${COMMENTS_PATH}?targetType=${encodeURIComponent(COMMENT_TARGET_TYPE)}&targetId=${encodeURIComponent(String(artworkId))}`;
+      const url = `${COMMENTS_PATH}?targetType=${encodeURIComponent(COMMENT_TARGET_TYPE)}&targetId=${encodeURIComponent(
+        String(artworkId),
+      )}`;
       const res = await http.get(url);
       const payload = unwrapAxiosData(res);
       return mapCommentResponseList(payload);
