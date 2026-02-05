@@ -16,7 +16,6 @@ export default function DancePinkTicket({ data }: TicketDesignProps) {
     <div
       style={{
         width: "100%",
-x
         height: "100%",
         backgroundColor: "#FF7EB3",
         color: "#000",
