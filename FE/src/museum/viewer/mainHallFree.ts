@@ -155,6 +155,10 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     overlayTimer = window.setTimeout(() => (overlay.style.opacity = "0"), 750);
   }
 
+  function showSpeedIndicator() {
+    flashOverlay(`SPEED ${freeSpeed.toFixed(1)}`);
+  }
+
   /* ===== "원점(=0번)으로" 버튼 ===== */
   const backBtn = document.createElement("button");
   backBtn.type = "button";
@@ -345,8 +349,13 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   /* ===== FREE movement ===== */
   const keys = new Set<string>();
   let lastT = performance.now();
-  const FREE_MOVE = 9.5;
-  const FREE_MOVE_SLOW = 3.2;
+
+  // 속도 조절 (-/+ 키로 조절 가능)
+  const SPEED_MIN = 3.0;
+  const SPEED_MAX = 25.0;
+  const SPEED_STEP = 2.0;
+  let freeSpeed = 9.5;
+  const FREE_MOVE_SLOW_RATIO = 0.35;  // Ctrl 누르면 35% 속도
 
   const collisionRay = new THREE.Raycaster();
   const COLLISION_MARGIN = 1.5;
@@ -362,7 +371,9 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   }
 
   function tickFree(dt: number) {
-    const speed = keys.has("ControlLeft") || keys.has("ControlRight") ? FREE_MOVE_SLOW : FREE_MOVE;
+    const speed = keys.has("ControlLeft") || keys.has("ControlRight")
+      ? freeSpeed * FREE_MOVE_SLOW_RATIO
+      : freeSpeed;
 
     const yaw = new THREE.Euler().setFromQuaternion(camera.quaternion, "YXZ").y;
     const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, yaw, 0, "YXZ")).normalize();
@@ -1189,6 +1200,20 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     if (e.code === "KeyH" || e.code === "Digit0") {
       e.preventDefault();
       returnToOrigin();
+      return;
+    }
+
+    // 자유이동 속도 조절 (-/+ 키)
+    if (e.code === "Minus" || e.code === "NumpadSubtract") {
+      e.preventDefault();
+      freeSpeed = Math.max(SPEED_MIN, freeSpeed - SPEED_STEP);
+      showSpeedIndicator();
+      return;
+    }
+    if (e.code === "Equal" || e.code === "NumpadAdd") {
+      e.preventDefault();
+      freeSpeed = Math.min(SPEED_MAX, freeSpeed + SPEED_STEP);
+      showSpeedIndicator();
       return;
     }
 
