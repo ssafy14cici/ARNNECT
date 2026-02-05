@@ -1,6 +1,26 @@
 // FE/src/features/tickets/api/realTickets.ts
 import { http } from "../../../shared/api/http";
 
+export type CollectBookResponse = {
+  artistUuid: string;
+  ticketCode: string;
+  collectRank: number;
+  title: string;
+  address: string;
+  addressDetail?: string;
+
+  // JSON 직렬화 결과는 보통 string으로 옴
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string;   // "YYYY-MM-DD"
+  startTime: string; // "HH:mm:ss"
+  endTime: string;   // "HH:mm:ss"
+  createdAt: string; // ISO or "YYYY-MM-DDTHH:mm:ss..."
+
+  qrImageUrl: string;     // ✅ URL
+  ticketImageUrl: string; // ✅ URL
+};
+
+
 export type TicketInfoResponse = {
   ticketId: number;
   ticketCode: string;
@@ -52,10 +72,9 @@ export async function scanTicket(ticketCode: string) {
   return unwrap<any>(res.data);
 }
 
-/** ✅ (추가) 콜렉트북 리스트: GET /api/v1/tickets/list/{memberUuid} */
 export async function listCollectBook(memberUuid: string) {
   const res = await http.get(`/api/v1/tickets/list/${encodeURIComponent(memberUuid)}`);
-  return unwrap<TicketInfoResponse[]>(res.data);
+  return unwrap<CollectBookResponse[]>(res.data);
 }
 
 /** ✅ (추가) 티켓 수: GET /api/v1/tickets/{memberUuid}/count */

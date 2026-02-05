@@ -37,6 +37,23 @@ function normalizeRole(raw: unknown): AppRole | null {
   return null;
 }
 
+function roleFromToken(token: string | null): AppRole | null {
+  if (!token) return null;
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64.padEnd(Math.ceil(b64.length / 4) * 4, "=");
+    const payload = JSON.parse(atob(padded)) as any;
+
+    // BE claim("role", role.name()) 이므로 보통 payload.role 존재
+    return normalizeRole(payload?.role);
+  } catch {
+    return null;
+  }
+}
+
 function pickToken(respData: any): string | null {
   return (
     respData?.data?.accessToken ??
@@ -47,7 +64,6 @@ function pickToken(respData: any): string | null {
   );
 }
 
-// ⚠️ name이 안 오면 user를 null로 만들면 “로그인 풀림처럼” 보임 → fallback 필수
 function pickUser(meData: any): AuthUser | null {
   const d = meData?.data ?? meData ?? {};
   const memberUuid = d.memberUuid ?? d.memberUUID ?? d.uuid ?? d.id;
@@ -70,7 +86,6 @@ function clearStorage() {
 function saveStorage(data: StoredAuth, remember: boolean) {
   const raw = JSON.stringify(data);
 
-  // 한 군데만 남기기
   localStorage.removeItem(LS_KEY);
   sessionStorage.removeItem(SS_KEY);
 
@@ -119,7 +134,6 @@ function overwriteSamePlace(place: "local" | "session" | null, data: StoredAuth)
   else sessionStorage.setItem(SS_KEY, raw);
 }
 
-// ✅ StrictMode / 다중 호출 중복 방지
 let hydrateInFlight = false;
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -131,16 +145,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: ({ token, role, remember = false, user }) => {
     set({ hydrated: true, isLoggedIn: true, token, role, user });
-    // ✅ 새로고침 유지 핵심
     saveStorage({ token, role, user }, remember);
   },
 
   logout: () => {
-    // (지금은 인터셉터가 getToken으로 붙이니까 defaults 삭제는 필수 아님. 있어도 무방)
-    delete (http.defaults.headers.common as any).Authorization;
-
     clearStorage();
-
     set({
       hydrated: true,
       isLoggedIn: false,
@@ -159,11 +168,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       let storedPlace: "local" | "session" | null = null;
 
       try {
-        // 0) ✅ 새로고침 직후: storage에서 먼저 복구
+        // 0) storage 복구
         const stored = loadStorage();
         if (stored?.data?.token) {
           storedPlace = stored.place;
-
           set({
             token: stored.data.token,
             role: stored.data.role,
@@ -172,21 +180,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           });
         }
 
-        // 1) ✅ token이 있으면 그걸로 /member/my 먼저 확정
+        // 1) token 있으면 my로 확정
         if (get().token) {
           try {
             const me = await http.get("/api/v1/member/my");
             const user = pickUser(me.data);
-            const role = pickRole(me.data);
+            const roleFromMy = pickRole(me.data);
 
-            if (!user) throw new Error("my 응답에서 memberUuid를 못 찾음");
+            if (!user) throw new Error("my 응답에서 memberUuid 없음");
 
-            set({
-              hydrated: true,
-              user,
-              role,
-              isLoggedIn: true,
-            });
+            // ✅ 핵심: my에 role 없으면 토큰 claim or 기존 role 유지
+            const role =
+              roleFromMy ?? roleFromToken(get().token) ?? get().role ?? stored?.data.role ?? null;
+
+            set({ hydrated: true, user, role, isLoggedIn: true });
 
             overwriteSamePlace(storedPlace, { token: get().token!, role, user });
             return;
@@ -196,10 +203,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           }
         }
 
-        // 2) refresh 후보 (BE에 실제로 있으면 여기서 살아남)
+        // 2) refresh 후보
         const refreshCandidates = ["/api/v1/auth/refresh", "/api/v1/auth/reissue", "/api/v1/auth/renew"];
-
         let newToken: string | null = null;
+
         for (const url of refreshCandidates) {
           try {
             const rr = await http.post(url, null, { headers: { "x-skip-auth": "1" } });
@@ -214,25 +221,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         set({ token: newToken });
 
-        // 3) refresh 후 my 재시도
+        // 3) refresh 후 my
         const me2 = await http.get("/api/v1/member/my");
         const user2 = pickUser(me2.data);
-        const role2 = pickRole(me2.data);
+        const roleFromMy2 = pickRole(me2.data);
 
-        if (!user2) throw new Error("my 응답에서 memberUuid를 못 찾음(2)");
+        if (!user2) throw new Error("my 응답에서 memberUuid 없음(2)");
 
-        set({
-          hydrated: true,
-          user: user2,
-          role: role2,
-          isLoggedIn: true,
-        });
+        const role2 =
+          roleFromMy2 ?? roleFromToken(newToken) ?? get().role ?? stored?.data.role ?? null;
+
+        set({ hydrated: true, user: user2, role: role2, isLoggedIn: true });
 
         overwriteSamePlace(storedPlace ?? "session", { token: newToken, role: role2, user: user2 });
       } catch {
-        delete (http.defaults.headers.common as any).Authorization;
         clearStorage();
-
         set({
           hydrated: true,
           isLoggedIn: false,
@@ -247,5 +250,5 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 }));
 
-// ✅ 순환 의존성 끊기: http 인터셉터가 토큰을 store에서 가져가도록 “주입”
+// ✅ http 인터셉터가 store 토큰을 가져가게 주입(순환 의존성 방지)
 bindAuthTokenGetter(() => useAuthStore.getState().token);

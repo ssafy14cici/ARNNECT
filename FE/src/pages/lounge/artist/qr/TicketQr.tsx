@@ -45,8 +45,8 @@ function toForm(t?: Partial<TicketItem> | null): FormState {
     addressDetail: t?.addressDetail ?? "",
     startDate: t?.startDate ?? todayYYYYMMDD(),
     endDate: t?.endDate ?? todayYYYYMMDD(),
-    startTime: t?.startTime && isHHmm(t.startTime.slice(0, 5)) ? t.startTime.slice(0, 5) : "10:00",
-    endTime: t?.endTime && isHHmm(t.endTime.slice(0, 5)) ? t.endTime.slice(0, 5) : "20:00",
+    startTime: t?.startTime && isHHmm(String(t.startTime).slice(0, 5)) ? String(t.startTime).slice(0, 5) : "10:00",
+    endTime: t?.endTime && isHHmm(String(t.endTime).slice(0, 5)) ? String(t.endTime).slice(0, 5) : "20:00",
     posterFile: null,
     posterPreviewUrl: "",
     ticketDesign: t?.ticketDesign ?? "BASIC",
@@ -136,16 +136,19 @@ export default function TicketQr() {
   // ✅ 코드(state)로 고정: 미리보기/캡처/업로드 동일 값 사용
   const [code, setCode] = useState<string>(() => makeTicketCode());
 
-  const [qrImageName, setQrImageName] = useState<string>("");
   const [editingTicketId, setEditingTicketId] = useState<number | null>(null);
 
   const [form, setForm] = useState<FormState>(() => toForm(null));
   const previewRef = useRef<HTMLDivElement | null>(null);
 
+  // ✅ artistUuid는 쿼리스트링 말고 AuthStore에서 가져오는 게 안전
   const artistUuid = useAuthStore((s) => s.user?.memberUuid ?? "");
+
+  // ✅ useIssuedTickets는 artistUuid 없으면 내부에서 빈 배열 처리하는 버전(가드) 권장
   const { issued, reloadIssued, removeIssued } = useIssuedTickets(artistUuid);
 
   useEffect(() => {
+    // artistUuid 없으면 호출 안 함(크래시/불필요 호출 방지)
     if (!artistUuid) return;
     reloadIssued().catch((e) => console.error("목록 로드 실패", e));
   }, [artistUuid, reloadIssued]);
@@ -165,7 +168,6 @@ export default function TicketQr() {
     setEditingTicketId(null);
     setTicketId(null);
     setCode(makeTicketCode()); // ✅ 새 코드로 갱신
-    setQrImageName("");
     setForm(toForm(null));
   }, []);
 
@@ -176,6 +178,7 @@ export default function TicketQr() {
     setError("");
 
     try {
+      // code는 state 고정
       const qrFile = await makeQrImageFile(code);
       const ticketFile = await makeTicketImageFile(previewRef.current, code, form.title.trim());
 
@@ -191,19 +194,21 @@ export default function TicketQr() {
       fd.append("qrImage", qrFile);
       fd.append("ticketImage", ticketFile);
 
-      // ✅ 포스터를 서버에 "파일로" 보내야 하는 명세라면 여기도 필요
-      // - BE 필드명이 다르면 "poster"/"posterImage" 등으로 키만 바꿔줘
+      // ✅ 포스터 파일 업로드 (BE 키명이 다르면 여기 key만 변경)
       if (form.posterFile) {
         fd.append("poster", form.posterFile);
       }
 
       const res = editingTicketId ? await updateTicket(editingTicketId, fd) : await createTicket(fd);
 
-      setTicketId(res.ticketId);
-      setCode(res.ticketCode); // ✅ 서버가 동일 code 반환하는 구조면 그대로
-      setQrImageName(res.qrImageName || "");
+      // 응답 방어
+      const nextId = typeof (res as any)?.ticketId === "number" ? (res as any).ticketId : ticketId;
+      const nextCode = typeof (res as any)?.ticketCode === "string" && (res as any).ticketCode ? (res as any).ticketCode : code;
 
-      rememberDesign(res.ticketCode, form.ticketDesign);
+      setTicketId(nextId ?? null);
+      setCode(nextCode);
+
+      rememberDesign(nextCode, form.ticketDesign);
 
       alert(editingTicketId ? "수정되었습니다." : "QR이 발급되었습니다.");
       await reloadIssued();
@@ -219,8 +224,10 @@ export default function TicketQr() {
     setError("");
     setEditingTicketId(t.ticketId);
     setTicketId(t.ticketId);
-    setCode(t.ticketCode); // ✅ 수정 시에도 코드 고정
-    setQrImageName(t.qrImageName ?? "");
+
+    // ✅ 수정 시에도 code를 ticketCode로 고정 → QrPanel/미리보기 QR이 즉시 바뀜
+    setCode(t.ticketCode);
+
     setForm(toForm(t));
     setActiveTab("ISSUE");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -308,8 +315,8 @@ export default function TicketQr() {
               </div>
             </div>
 
-            {/* ✅ react-qr-code 표시 + QR만 저장 버튼 */}
-            {code && <QrPanel ticketCode={code} busy={busy} qrImageName={qrImageName} />}
+            {/* ✅ 서버 qrImageName이 깨져도 상관없게: ticketCode로 직접 렌더 */}
+            {code && <QrPanel ticketCode={code} busy={busy} />}
           </div>
         )}
 

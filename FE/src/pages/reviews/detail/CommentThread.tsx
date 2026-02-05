@@ -1,9 +1,10 @@
 // FE/src/pages/reviews/detail/CommentThread.tsx
 import { useEffect, useMemo, useState } from "react";
 import { safeToInt } from "../../artworks/detail/utils";
-import type { LocalComment } from "./mappers";
 import type { UiComment } from "./types";
+import type { LocalComment } from "./mappers";
 import { createReviewComment, deleteComment, fetchReviewComments, updateComment } from "./api";
+import "./commentThread.css";
 
 type Props = {
   reviewId?: number;
@@ -25,20 +26,22 @@ export default function CommentThread({ reviewId, isLoggedIn, meUuid, myDisplayN
   const [replyingParentId, setReplyingParentId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
 
+  /** ✅ uuid가 안 내려오는 서버도 있어서 "이름 매칭" fallback을 추가(서버가 최종 권한 검증) */
   const withMine = (list: LocalComment[]): UiComment[] => {
     const me = String(meUuid ?? "").trim();
+    const myName = String(myDisplayName ?? "").trim();
 
     return list.map((c) => {
-      const author =
-        String((c as any).authorId ?? "").trim() ||
-        String(c.authorUuid ?? "").trim() ||
-        String((c as any).memberUuid ?? "").trim();
+      const authorUuid = String(c.authorUuid ?? "").trim();
+      const authorName = String(c.authorName ?? "").trim();
+
+      const mineByUuid = !!me && !!authorUuid && authorUuid === me;
+      const mineByName = !authorUuid && !!myName && !!authorName && authorName === myName;
 
       return {
-        ...(c as any),
-        ...(author ? { authorId: author } : {}),
-        isMine: !!me && !!author && author === me,
-      } satisfies UiComment;
+        ...c,
+        isMine: mineByUuid || mineByName,
+      };
     });
   };
 
@@ -83,7 +86,7 @@ export default function CommentThread({ reviewId, isLoggedIn, meUuid, myDisplayN
     if (!reviewId || !Number.isFinite(reviewId)) return;
     refetchComments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reviewId, meUuid]);
+  }, [reviewId, meUuid, myDisplayName]);
 
   const onSubmitComment = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
@@ -100,8 +103,9 @@ export default function CommentThread({ reviewId, isLoggedIn, meUuid, myDisplayN
         id: tempId,
         parentId: null,
         content: trimmed,
-        authorId: meUuid || undefined,
+        authorUuid: meUuid || undefined,
         authorName: myDisplayName,
+        createdAt: new Date().toISOString(),
         isMine: true,
       },
     ]);
@@ -115,9 +119,7 @@ export default function CommentThread({ reviewId, isLoggedIn, meUuid, myDisplayN
       });
 
       if (created) {
-        setComments((prev) =>
-          prev.map((c) => (String(c.id) === tempId ? ({ ...(created as any), isMine: true } as UiComment) : c)),
-        );
+        setComments((prev) => prev.map((c) => (String(c.id) === tempId ? { ...created, isMine: true } : c)));
       } else {
         await refetchComments();
       }
@@ -192,14 +194,16 @@ export default function CommentThread({ reviewId, isLoggedIn, meUuid, myDisplayN
     if (parentNum == null) return alert("부모 댓글 ID 파싱 실패");
 
     const tempId = `temp-${crypto.randomUUID()}`;
+
     setComments((prev) => [
       ...prev,
       {
         id: tempId,
         parentId: replyingParentId,
         content: trimmed,
-        authorId: meUuid || undefined,
+        authorUuid: meUuid || undefined,
         authorName: myDisplayName,
+        createdAt: new Date().toISOString(),
         isMine: true,
       },
     ]);
@@ -215,9 +219,7 @@ export default function CommentThread({ reviewId, isLoggedIn, meUuid, myDisplayN
       });
 
       if (created) {
-        setComments((prev) =>
-          prev.map((c) => (String(c.id) === tempId ? ({ ...(created as any), isMine: true } as UiComment) : c)),
-        );
+        setComments((prev) => prev.map((c) => (String(c.id) === tempId ? { ...created, isMine: true } : c)));
       } else {
         await refetchComments();
       }
