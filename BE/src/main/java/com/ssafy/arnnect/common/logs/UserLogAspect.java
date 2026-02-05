@@ -1,6 +1,8 @@
 package com.ssafy.arnnect.common.logs;
 
 
+import com.ssafy.arnnect.comment.application.dto.request.CreateCommentRequest;
+import com.ssafy.arnnect.comment.domain.entity.TargetType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
@@ -27,11 +29,18 @@ public class UserLogAspect {
             UserLoggable userLoggable,
             Object result
     ) {
+
+
         String memberUuid = extractMemberUuid(joinPoint.getArgs());
         Long artworkId = extractArtworkId(joinPoint.getArgs());
 
+        if(userLoggable.action() == UserLogAction.COMMENT) {
+            CreateCommentRequest request = (CreateCommentRequest) joinPoint.getArgs()[0];
+            if(request.getTargetType() == TargetType.ARTWORK) artworkId = request.getTargetId().longValue();
+        }
+
         if (memberUuid == null || artworkId == null) {
-            return; // 로그 불가 → 조용히 종료
+            return; // 로그 불가 → 종료
         }
 
         if (userLoggable.action() == UserLogAction.LIKE) {
@@ -79,5 +88,7 @@ public class UserLogAspect {
         }
         return null;
     }
+
+
 
 }
