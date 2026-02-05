@@ -11,6 +11,6 @@ public interface CommentService {
     void createComment(CreateCommentRequest request, String membeUuid);
     void updateComment(UpdateCommentRequest request, Long reviewId, String memberUuid);
     void deleteComment(String memberUuid, Long commentId);
-    List<CommentResponse> getCommentListOfArtwork(Integer artWorkId);
+    List<CommentResponse> getCommentList(Integer artWorkId, TargetType targetType);
     Integer getCommentCount(TargetType targetType, Integer targetId);
 }
