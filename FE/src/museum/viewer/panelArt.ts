@@ -2,28 +2,21 @@
 import * as THREE from "three";
 
 export type PanelArtItem = {
-  panelName: string; // ex) "EX_PANEL_1"
-  imageUrl: string;  // ex) /art/b1.jpg 또는 /artwork/xxx.png
-  title: string;     // ex) "작품명"
+  panelName: string; // ex) "ART_1"
+  imageUrl: string;  // ex) "/artwork/xxx.jpg" or dataURL
+  title: string;     // ex) "최수원"
 };
 
 export type AttachPanelArtArgs = {
   sceneRoot: THREE.Object3D;
   items: PanelArtItem[];
 
-  /** 패널 표면에서 띄우기 (깜빡임/관통 방지) */
   epsilon?: number;
-
-  /** 패널 대비 이미지 채우기 비율(1=꽉, 1.02=조금 크게) */
   fill?: number;
 
-  /** 카메라에서 패널 중심으로 레이캐스트해서 정면 face 노말로 붙임 */
   faceCamera?: boolean;
-
-  /** faceCamera=true면 필수 */
   camera?: THREE.Camera;
 
-  /** 이미지 상하 뒤집힘 보정 (기본 true) */
   fixFlipY?: boolean;
 };
 
@@ -66,7 +59,6 @@ function getFirstMesh(obj: THREE.Object3D): THREE.Mesh | null {
   return found;
 }
 
-/** 월드 노말 n을 plane의 +Z가 바라보도록 quaternion 생성 */
 function quatFromNormal(nWorld: THREE.Vector3): THREE.Quaternion {
   const n = nWorld.clone().normalize();
 
@@ -82,7 +74,6 @@ function quatFromNormal(nWorld: THREE.Vector3): THREE.Quaternion {
   return new THREE.Quaternion().setFromRotationMatrix(m);
 }
 
-/** 카메라에서 패널 중심으로 레이캐스트: hit point + world normal(카메라 향하도록 보정) */
 function raycastFacing(panelMesh: THREE.Mesh, camera: THREE.Camera) {
   panelMesh.updateMatrixWorld(true);
 
@@ -114,7 +105,6 @@ function raycastFacing(panelMesh: THREE.Mesh, camera: THREE.Camera) {
   return { hitPoint, nWorld };
 }
 
-/** 패널(ART plane)의 가로/세로 추정 */
 function estimatePanelWH(mesh: THREE.Mesh) {
   const geo = mesh.geometry as THREE.BufferGeometry | undefined;
   if (geo?.attributes?.position) {
@@ -144,7 +134,6 @@ function estimatePanelWH(mesh: THREE.Mesh) {
   return { w: axes[0], h: axes[1] };
 }
 
-/** 텍스처 세팅 */
 function tuneTexture(tex: THREE.Texture) {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = THREE.ClampToEdgeWrapping;
@@ -158,56 +147,40 @@ function tuneTexture(tex: THREE.Texture) {
   tex.needsUpdate = true;
 }
 
-/** ✅ 실패 대비 placeholder 텍스처 */
-function makePlaceholderTexture(label: string, w = 512, h = 512) {
+function makeFallbackTexture(label: string, w = 512, h = 512) {
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
   const ctx = c.getContext("2d")!;
-
   ctx.fillStyle = "#111318";
   ctx.fillRect(0, 0, w, h);
-
   ctx.strokeStyle = "rgba(255,255,255,0.18)";
-  ctx.lineWidth = Math.max(8, Math.floor(w * 0.02));
-  ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, w - ctx.lineWidth, h - ctx.lineWidth);
+  ctx.lineWidth = 10;
+  ctx.strokeRect(5, 5, w - 10, h - 10);
 
-  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = `700 ${Math.floor(w * 0.08)}px ui-sans-serif, system-ui, -apple-system`;
-  ctx.fillText(label || "NO IMAGE", w / 2, h / 2);
-
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.font = `500 ${Math.floor(w * 0.035)}px ui-sans-serif, system-ui, -apple-system`;
-  ctx.fillText("ARNNECT", w / 2, h / 2 + Math.floor(h * 0.14));
+  ctx.font = "700 42px ui-sans-serif,system-ui";
+  ctx.fillText(label, w / 2, h / 2);
 
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.needsUpdate = true;
+  tuneTexture(tex);
   return tex;
 }
 
-/** ✅ 텍스처 로드: 실패해도 placeholder로 resolve */
-async function safeLoadTexture(
-  loader: THREE.TextureLoader,
-  url: string,
-  label: string,
-  fixFlipY: boolean
-): Promise<THREE.Texture> {
+async function loadTextureSafe(loader: THREE.TextureLoader, url: string, labelForFallback: string) {
   try {
-    const tex = await loader.loadAsync(url);
+    const tex = await new Promise<THREE.Texture>((resolve, reject) => {
+      loader.load(url, (t) => resolve(t), undefined, reject);
+    });
     tuneTexture(tex);
-    tex.flipY = fixFlipY ? true : false;
-    tex.needsUpdate = true;
     return tex;
   } catch (e) {
-    console.warn("[panelArt] texture load failed -> placeholder:", url, e);
-    const tex = makePlaceholderTexture(label);
-    tuneTexture(tex);
-    tex.flipY = fixFlipY ? true : false;
-    tex.needsUpdate = true;
-    return tex;
+    console.warn("[panelArt] texture load failed:", url, e);
+    return makeFallbackTexture(labelForFallback);
   }
 }
 
@@ -222,14 +195,12 @@ export async function attachPanelArt(args: AttachPanelArtArgs): Promise<AttachPa
   const missing: string[] = [];
 
   const texLoader = new THREE.TextureLoader();
-  // 교차 도메인 이미지일 가능성 대비(안 열려있으면 anyway placeholder로 감)
-  try {
-    (texLoader as any).setCrossOrigin?.("anonymous");
-  } catch {}
+  // crossOrigin은 같은 오리진이면 영향 거의 없지만, 혹시 몰라 안전하게
+  texLoader.setCrossOrigin("anonymous");
 
-  // ✅ 핵심: 1장 실패로 전체가 죽지 않게 "개별 안전 로드"
+  // ✅ 한 장 실패해도 전체가 죽지 않게 “개별 safe 로드”
   const textures = await Promise.all(
-    args.items.map((it) => safeLoadTexture(texLoader, it.imageUrl, it.title, fixFlipY))
+    args.items.map((it) => loadTextureSafe(texLoader, it.imageUrl, it.title || it.panelName))
   );
 
   for (let i = 0; i < args.items.length; i++) {
@@ -270,6 +241,10 @@ export async function attachPanelArt(args: AttachPanelArtArgs): Promise<AttachPa
       normalWorld = new THREE.Vector3(0, 0, 1);
     }
 
+    // ✅ flipY 보정
+    tex.flipY = fixFlipY ? true : false;
+    tex.needsUpdate = true;
+
     const planeW = panelW * fill;
     const planeH = panelH * fill;
 
@@ -293,6 +268,7 @@ export async function attachPanelArt(args: AttachPanelArtArgs): Promise<AttachPa
 
     art.quaternion.copy(quatFromNormal(normalWorld));
     art.position.copy(placePoint).addScaledVector(normalWorld, epsilon);
+
     art.renderOrder = 10;
 
     args.sceneRoot.add(art);

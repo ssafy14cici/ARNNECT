@@ -27,44 +27,42 @@ import {
   updateCommentOnServer,
 } from "./detail/api";
 
-// ✅ LocalComment에 authorId/authorName이 없을 수 있어서 UiComment로 확장
 type UiComment = LocalComment & {
   authorId?: string;
   authorName?: string;
   isMine?: boolean;
 };
 
-function extractErrorMessage(e: unknown): string {
-  // 1) Error 인스턴스
-  if (e instanceof Error) return e.message || "요청 중 오류가 발생했습니다.";
-
-  // 2) axios-like error: e.response.data.message
+function extractErrorInfo(e: unknown): { message: string; status: number | null } {
+  // axios-like
   if (isObj(e)) {
-    const msg0 = getObj(e, "message");
-    if (typeof msg0 === "string" && msg0.trim()) return msg0;
-
     const resp = getObj(e, "response");
     if (isObj(resp)) {
-      const data = getObj(resp, "data");
+      const st = getObj(resp, "status");
+      const status = typeof st === "number" ? st : null;
 
-      // 서버 envelope { success:false, code, message, data:null }
+      const data = getObj(resp, "data");
+      // 서버 envelope {success:false, code, message}
       if (isObj(data)) {
         const code = getObj(data, "code");
         const msg = getObj(data, "message");
         const codeStr = typeof code === "string" ? code : "";
         const msgStr = typeof msg === "string" ? msg : "";
-
-        if (msgStr.trim()) return codeStr ? `${codeStr}: ${msgStr}` : msgStr;
+        if (msgStr.trim()) return { status, message: codeStr ? `${codeStr}: ${msgStr}` : msgStr };
       }
 
-      if (typeof data === "string" && data.trim()) return data;
+      const msg0 = getObj(e, "message");
+      if (typeof msg0 === "string" && msg0.trim()) return { status, message: msg0 };
 
-      const status = getObj(resp, "status");
-      if (typeof status === "number") return `요청 실패 (HTTP ${status})`;
+      if (status) return { status, message: `요청 실패 (HTTP ${status})` };
     }
+
+    const msg1 = getObj(e, "message");
+    if (typeof msg1 === "string" && msg1.trim()) return { status: null, message: msg1 };
   }
 
-  return "요청 중 오류가 발생했습니다.";
+  if (e instanceof Error) return { status: null, message: e.message || "요청 중 오류가 발생했습니다." };
+  return { status: null, message: "요청 중 오류가 발생했습니다." };
 }
 
 export default function ArtworkDetail() {
@@ -78,48 +76,40 @@ export default function ArtworkDetail() {
 
   const meUuid = useMemo(() => String(user?.memberUuid ?? "").trim(), [user?.memberUuid]);
 
-  // ✅ 프로필 경로 통일
   const profilePath = (uuid: string) => `/members/${encodeURIComponent(uuid)}`;
 
-  // Data
   const [artwork, setArtwork] = useState<ArtworkDetailData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // ✅ 상세 에러(500 포함) 표시용
+  // ✅ 상세 에러 + 상태코드
   const [detailError, setDetailError] = useState<string | null>(null);
-  const [retryKey, setRetryKey] = useState(0); // 다시시도 트리거
+  const [detailStatus, setDetailStatus] = useState<number | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
-  // Reviews
   const [reviews, setReviews] = useState<ReviewSummary[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
 
-  // Comments
   const [comments, setComments] = useState<UiComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsError, setCommentsError] = useState<string | null>(null);
 
-  // UI
   const [imageError, setImageError] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
 
-  // Inputs
   const [commentText, setCommentText] = useState("");
   const [fanLetterText, setFanLetterText] = useState("");
 
-  // Inline edit/reply
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [replyingParentId, setReplyingParentId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
 
-  // Modal
   const [fanLetterOpen, setFanLetterOpen] = useState(false);
   const [fanLetterSending, setFanLetterSending] = useState(false);
 
-  // hero image fallback
   const [displayImgSrc, setDisplayImgSrc] = useState("");
   const blobUrlRef = useRef<string | null>(null);
   const [triedAuthBlob, setTriedAuthBlob] = useState(false);
@@ -139,14 +129,11 @@ export default function ArtworkDetail() {
     window.scrollTo(0, 0);
   }, [normalizedArtworkId]);
 
-  // ✅ LocalComment에 authorId가 없을 수 있으므로 any로 읽고 UiComment로 확장
   const withMine = (list: LocalComment[]): UiComment[] => {
     const me = meUuid;
-
     return list.map((c) => {
       const rawAuthorId = String((c as any).authorId ?? (c as any).memberUuid ?? "").trim();
       const rawAuthorName = String((c as any).authorName ?? (c as any).nickname ?? "").trim();
-
       return {
         ...(c as any),
         authorId: rawAuthorId || undefined,
@@ -156,9 +143,7 @@ export default function ArtworkDetail() {
     });
   };
 
-  // -----------------------------
   // 상세
-  // -----------------------------
   useEffect(() => {
     let cancelled = false;
 
@@ -166,12 +151,12 @@ export default function ArtworkDetail() {
       try {
         setIsLoading(true);
         setDetailError(null);
+        setDetailStatus(null);
 
         setImageError(false);
         setTriedAuthBlob(false);
         setArtwork(null);
 
-        // 인라인 상태 초기화
         setEditingId(null);
         setEditingText("");
         setReplyingParentId(null);
@@ -189,9 +174,9 @@ export default function ArtworkDetail() {
         if (cancelled) return;
 
         if (!mapped) {
-          // 매핑 실패/응답 이상
           setArtwork(null);
           setDetailError("작품 정보를 불러오지 못했습니다.");
+          setDetailStatus(500);
           return;
         }
 
@@ -205,8 +190,10 @@ export default function ArtworkDetail() {
       } catch (e) {
         console.error(e);
         if (!cancelled) {
+          const info = extractErrorInfo(e);
           setArtwork(null);
-          setDetailError(extractErrorMessage(e));
+          setDetailError(info.message);
+          setDetailStatus(info.status);
         }
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -218,14 +205,11 @@ export default function ArtworkDetail() {
     };
   }, [normalizedArtworkId, retryKey]);
 
-  // -----------------------------
   // 리뷰
-  // -----------------------------
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      // ✅ 상세가 에러면 리뷰/댓글 추가 호출로 더럽히지 않음
       if (detailError) return;
 
       const safeId =
@@ -255,9 +239,7 @@ export default function ArtworkDetail() {
     };
   }, [numericArtworkId, artwork, detailError]);
 
-  // -----------------------------
   // 댓글
-  // -----------------------------
   useEffect(() => {
     let cancelled = false;
 
@@ -298,9 +280,6 @@ export default function ArtworkDetail() {
       blobUrlRef.current = null;
     };
   }, []);
-
-  // ❌ 기존: !artwork면 1.2초 후 홈으로 튕기던 로직 제거
-  // (서버 500도 "작품 없음"으로 오해해서 UX가 깨짐)
 
   // handlers
   const onToggleFavorite = async () => {
@@ -601,9 +580,7 @@ export default function ArtworkDetail() {
     }
   };
 
-  // -----------------------------
   // Render
-  // -----------------------------
   if (isLoading) {
     return (
       <div className="artwork-detail-page" style={{ display: "grid", placeItems: "center" }}>
@@ -612,8 +589,9 @@ export default function ArtworkDetail() {
     );
   }
 
-  // ✅ 서버 500 등 에러는 여기서 보여줌 (더 이상 홈으로 튕기지 않음)
   if (detailError) {
+    const isAuthError = detailStatus === 401 || detailStatus === 403;
+
     return (
       <div className="artwork-detail-page" style={{ display: "grid", placeItems: "center" }}>
         <div style={{ textAlign: "center", maxWidth: 520 }}>
@@ -621,9 +599,15 @@ export default function ArtworkDetail() {
           <p style={{ opacity: 0.85, wordBreak: "break-word" }}>{detailError}</p>
 
           <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 18 }}>
-            <button className="btn-icon" onClick={() => setRetryKey((k) => k + 1)}>
-              다시 시도
-            </button>
+            {isAuthError ? (
+              <button className="btn-icon" onClick={() => navigate("/login")}>
+                로그인
+              </button>
+            ) : (
+              <button className="btn-icon" onClick={() => setRetryKey((k) => k + 1)}>
+                다시 시도
+              </button>
+            )}
             <button className="btn-icon" onClick={() => navigate("/")}>
               홈으로
             </button>
@@ -674,14 +658,12 @@ export default function ArtworkDetail() {
         onChangeCommentText={setCommentText}
         onSubmitComment={onSubmitComment}
         onDeleteComment={onDeleteComment}
-        // 타입 호환용(사용 안 하면 빈 함수 유지)
         onEditComment={() => {}}
         onReplyComment={() => {}}
         artistProfilePath={
           artwork && (artwork as any).artistMemberUuid ? profilePath((artwork as any).artistMemberUuid) : undefined
         }
         commentAuthorProfilePath={(authorId) => profilePath(authorId)}
-        // ✅ 인라인 편집/답글 props
         editingId={editingId}
         editingText={editingText}
         onStartEdit={onStartEdit}

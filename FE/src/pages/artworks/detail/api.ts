@@ -45,6 +45,13 @@ function toStr(v: unknown, fallback = ""): string {
   return fallback;
 }
 
+function getHttpStatus(e: unknown): number | null {
+  if (!isObject(e)) return null;
+  const resp = (e as any).response;
+  const status = resp?.status;
+  return typeof status === "number" ? status : null;
+}
+
 /**
  * ✅ 서버가 envelope({success,data,message})로 주는 경우:
  * - success=false면 여기서 throw 해서 "null(작품없음)"로 오해하지 않게 함
@@ -86,7 +93,16 @@ export async function fetchArtworkDetail(artworkId: string): Promise<ArtworkDeta
       const payload = unwrapApiPayload(res);
       return mapArtworkDetail(payload);
     } catch (e) {
-      lastErr = e;
+      const status = getHttpStatus(e);
+
+      // ✅ fallback은 "경로가 틀렸을 가능성(404/405)"일 때만 시도
+      if (status === 404 || status === 405) {
+        lastErr = e;
+        continue;
+      }
+
+      // ✅ 401/403/500/네트워크 등은 즉시 종료(다른 후보 URL로 덮어쓰지 않게)
+      throw e;
     }
   }
 
@@ -97,9 +113,7 @@ export async function fetchArtworkDetail(artworkId: string): Promise<ArtworkDeta
 // Reviews
 // -----------------------------
 export async function fetchReviewsByArtworkId(artworkId: number): Promise<ReviewSummary[]> {
-  const res = await http.get(
-    `${REVIEWS_BY_ARTWORK_PATH}?artworkId=${encodeURIComponent(String(artworkId))}`,
-  );
+  const res = await http.get(`${REVIEWS_BY_ARTWORK_PATH}?artworkId=${encodeURIComponent(String(artworkId))}`);
   const payload = unwrapApiPayload(res);
   return mapReviewList(payload);
 }
@@ -133,7 +147,7 @@ export async function fetchArtworkComments(artworkId: number): Promise<LocalComm
       return mapCommentResponseList(payload);
     },
 
-    // fallback (필요 없으면 지워도 됨)
+    // fallback
     async () => {
       const url = `${COMMENTS_PATH}?target=${encodeURIComponent(COMMENT_TARGET_TYPE)}&id=${encodeURIComponent(
         String(artworkId),
@@ -158,6 +172,12 @@ export async function fetchArtworkComments(artworkId: number): Promise<LocalComm
     try {
       return await call();
     } catch (e) {
+      const status = getHttpStatus(e);
+
+      // ✅ 401/403은 fallback 의미 없으니 즉시 throw
+      if (status === 401 || status === 403) throw e;
+
+      // ✅ 400/404 같은 "파라미터/경로 불일치"만 fallback 대상
       lastErr = e;
     }
   }
@@ -182,8 +202,6 @@ export async function createCommentOnServer(args: {
 }
 
 export async function updateCommentOnServer(commentId: string, content: string): Promise<void> {
-  // 서버가 envelope로 응답해도, 에러면 throw되게 처리하려면 unwrapApiPayload를 적용하려면
-  // res를 받아서 unwrapApiPayload(res) 호출하면 됨. (PUT이 바디 없이 끝나면 지금처럼 둬도 OK)
   const res = await http.put(`${COMMENTS_PATH}/${encodeURIComponent(commentId)}`, { content });
   unwrapApiPayload(res);
 }

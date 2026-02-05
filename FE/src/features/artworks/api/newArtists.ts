@@ -1,126 +1,103 @@
 // FE/src/features/artworks/api/newArtists.ts
-import { API_BASE_URL } from "../../../shared/config/env";
 
 export type NewArtistArtwork = {
   memberUuid: string;
   nickname: string;
   artworkId: number;
   title: string;
-  description?: string;
-  productionDate?: string;
-  savedImageName: string; // ex) "artworkxxxx.png" or "/artwork/xxx.png" or absolute URL
+  description: string;
+  productionDate: string;
+  savedImageName: string;
 };
 
-function ensureOk(res: Response, bodyText: string) {
-  if (res.ok) return;
-  throw new Error(
-    `[newArtists] HTTP ${res.status} ${res.statusText} - ${bodyText.slice(0, 300)}`
-  );
+type JsonRecord = Record<string, unknown>;
+function isRecord(v: unknown): v is JsonRecord {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+function asString(v: unknown, fallback = ""): string {
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return fallback;
+}
+function asNumber(v: unknown, fallback = NaN): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return fallback;
 }
 
-/**
- * ✅ 신진예술인 6명 조회 (PUBLIC)
- * - 이 엔드포인트는 "공개" 전제로: Authorization/쿠키 없이 호출
- * - DEV에서는 Vite proxy(/api/v1 → target)를 타도록 "상대경로"로 호출
- * - PROD에서는 API_BASE_URL이 있으면 붙여서 호출
- *
- * 사용 예)
- *  - fetchNewArtists()                               // /api/v1/artwork/new
- *  - fetchNewArtists({ memberUuid: "..." })          // /api/v1/artwork/new/{memberUuid}
- */
-export async function fetchNewArtists(args?: {
-  memberUuid?: string | null;
-}): Promise<NewArtistArtwork[]> {
-  const memberUuid = args?.memberUuid?.trim() ?? "";
+function parseList(raw: unknown): NewArtistArtwork[] {
+  // ✅ 서버가 배열로 주는 케이스(지금 네 스샷)
+  if (Array.isArray(raw)) {
+    return raw
+      .map((it) => {
+        if (!isRecord(it)) return null;
 
-  const isDev = !!import.meta.env.DEV;
+        const artworkId = asNumber(it.artworkId, NaN);
+        const memberUuid = asString(it.memberUuid, "").trim();
+        const nickname = asString(it.nickname, "").trim();
+        const title = asString(it.title, "").trim();
+        const description = asString(it.description, "").trim();
+        const productionDate = asString(it.productionDate, "").trim();
+        const savedImageName = asString(it.savedImageName, "").trim();
 
-  // ✅ DEV: 프록시 타게 상대경로, PROD: API_BASE_URL(있으면) 사용
-  const base = isDev ? "" : (API_BASE_URL ? `${API_BASE_URL}` : "");
+        if (!Number.isFinite(artworkId)) return null;
+        if (!memberUuid) return null;
 
-  const suffix = memberUuid
-    ? `/api/v1/artworks/new/${encodeURIComponent(memberUuid)}`
-    : `/api/v1/artworks/new`;
-
-  const url = `${base}${suffix}`;
-
-  const res = await fetch(url, {
-    method: "GET",
-    // ✅ 공개 페이지: 쿠키/세션도 안 씀(크로스도메인 이슈 최소화)
-    credentials: "omit",
-    headers: {
-      Accept: "application/json",
-    },
-  });
-
-  const text = await res.text();
-  ensureOk(res, text);
-
-  let json: unknown;
-  try {
-    json = text ? JSON.parse(text) : [];
-  } catch {
-    return [];
+        return {
+          artworkId,
+          memberUuid,
+          nickname,
+          title,
+          description,
+          productionDate,
+          savedImageName,
+        } as NewArtistArtwork;
+      })
+      .filter(Boolean) as NewArtistArtwork[];
   }
 
-  // 명세 예시가 배열 형태인 경우가 많음
-  if (Array.isArray(json)) return json as NewArtistArtwork[];
-
-  // 혹시 { data: [...] } 봉투 형태면 흡수
-  const any = json as any;
-  if (Array.isArray(any?.data)) return any.data as NewArtistArtwork[];
-  if (Array.isArray(any?.data?.data)) return any.data.data as NewArtistArtwork[];
+  // ✅ 혹시 envelope({data:[]}) 형태로 바뀌어도 깨지지 않게
+  if (isRecord(raw)) {
+    const data = (raw.data ?? raw.result ?? raw.items) as unknown;
+    if (Array.isArray(data)) return parseList(data);
+  }
 
   return [];
 }
 
 /**
- * ✅ mainHallFree.ts에서 import하던 함수 (빌드 깨짐 방지용)
- *
- * savedImageName -> 화면에 사용할 URL(또는 DEV에선 프록시 경로)
- * - 절대 URL이면 그대로 반환
- * - "/artwork/..." 같은 경로면:
- *   - DEV: 그대로(프록시)
- *   - PROD: API_BASE_URL이 있으면 origin 붙임
- * - 파일명만 오면: "/artwork/{파일명}"으로 변환
- *
- * ⚠️ 주의:
- * - 지금 BE 쿼리에서 saved_image_name을 concat('artwork', a.saved_image_name) 형태로 내려줌
- *   예) "artwork빛나는 순간_2.jpg", "artwork0165....png"
- *   이런 경우 "/artwork/{파일명}"로 만들면 "/artwork/artwork빛나는 순간_2.jpg"가 됨.
- * - 따라서 아래는 "artwork" prefix를 한 번 정규화해서 제거/보정해줌.
- * - 그래도 403이면, 정적 리소스(/artwork/**)가 Security permitAll에 안 열려있을 가능성이 큼.
+ * ✅ savedImageName -> 실제 이미지 URL
+ * - savedImageName: "artworkxxxx.jpg"
+ * - 실제 접근: "/artwork/artworkxxxx.jpg"  (기존 imageUrl 패턴과 동일)
  */
 export function buildNewArtistImageUrl(savedImageName: string): string {
-  let u0 = String(savedImageName ?? "").trim();
-  if (!u0 || u0 === "null" || u0 === "undefined") return "";
-  if (u0.startsWith("data:") || u0.startsWith("blob:")) return u0;
+  const raw = String(savedImageName ?? "").trim();
+  if (!raw) return "";
 
-  const isDev = !!import.meta.env.DEV;
+  // 이미 완성된 URL/경로면 그대로
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith("data:")) return raw;
+  if (raw.startsWith("/")) return raw;
 
-  // 0) 절대 URL이면 그대로
-  if (/^https?:\/\//i.test(u0)) return u0;
+  return `/artwork/${encodeURIComponent(raw)}`;
+}
 
-  // 0-1) BE가 "artwork{파일명}" 형태로 내려주는 케이스 정규화
-  // - "artwork/xxx.png" (슬래시 포함)
-  // - "artworkxxx.png"  (슬래시 없음)
-  // - 대소문자 혼재 방어
-  const lower = u0.toLowerCase();
-  if (lower.startsWith("artwork/")) u0 = u0.slice("artwork/".length);
-  else if (lower.startsWith("artwork")) u0 = u0.slice("artwork".length);
+export async function fetchNewArtists(): Promise<NewArtistArtwork[]> {
+  const res = await fetch(`/api/v1/artworks/new`, {
+    method: "GET",
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+    // ✅ 쿠키 세션이면 켜도 됨 (같은 오리진이면 큰 차이 없음)
+    // credentials: "include",
+  });
 
-  u0 = u0.trim();
-
-  // 1) 경로 형태면 그대로 사용(필요 시 PROD에서는 base 붙임)
-  //    (정규화 후에도 "/artwork/..." 같은 값이면 이 분기 타게 됨)
-  if (u0.startsWith("/")) {
-    if (isDev) return u0; // 프록시
-    return API_BASE_URL ? `${API_BASE_URL}${u0}` : u0;
+  if (!res.ok) {
+    throw new Error(`fetchNewArtists failed: ${res.status}`);
   }
 
-  // 2) 파일명만 오면 /artwork/{name}
-  //    (한글/공백/특수문자 있을 수 있어 encodeURIComponent)
-  const path = `/artwork/${encodeURIComponent(u0)}`;
-  if (isDev) return path;
-  return API_BASE_URL ? `${API_BASE_URL}${path}` : path;
+  const json = (await res.json()) as unknown;
+  return parseList(json);
 }

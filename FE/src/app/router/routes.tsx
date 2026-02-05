@@ -26,7 +26,7 @@ import LoungeIndex from "../../pages/lounge/LoungeIndex";
 import CollectBook from "../../pages/lounge/user/collectbook/CollectBook";
 import CollectBookScan from "../../pages/lounge/user/collectbook/CollectBookScan";
 import CollectBookDetail from "../../pages/lounge/user/collectbook/CollectBookDetail";
-import Taste from "../../pages/lounge/user/Taste";
+import Taste from "../../pages/lounge/user/Analysis";
 import RemindQuiz from "../../pages/lounge/user/RemindQuiz";
 
 import QrEntry from "../../pages/lounge/artist/qr/QrEntry";
