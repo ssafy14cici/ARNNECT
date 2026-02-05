@@ -20,3 +20,17 @@ export function resolveTicketMedia(pathOrName?: string | null) {
   // 파일명만 오는 경우 fallback
   return `${BASE_URL}/src/ticket/${v}`;
 }
+
+
+// // FE/src/features/tickets/resolveTicketMedia.ts
+// export function resolveTicketMedia(nameOrUrl: string) {
+//   if (!nameOrUrl) return "";
+
+//   // already absolute / data
+//   if (nameOrUrl.startsWith("data:image/")) return nameOrUrl;
+//   if (nameOrUrl.startsWith("http://") || nameOrUrl.startsWith("https://")) return nameOrUrl;
+
+//   // proxy 환경: 프론트 origin으로 요청 → dev proxy가 BE로 전달
+//   if (nameOrUrl.startsWith("/")) return nameOrUrl;
+//   return `/${nameOrUrl}`;
+// }
