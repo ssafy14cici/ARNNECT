@@ -934,20 +934,17 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     const logoGeo = new THREE.PlaneGeometry(LOGO.widthM, LOGO.heightM);
     trackGeometry(logoGeo);
 
-    const logoMat = new THREE.MeshStandardMaterial({
+    const logoMat = new THREE.MeshBasicMaterial({
       map: tex,
       transparent: true,
-      roughness: 0.95,
-      metalness: 0.0,
       side: THREE.DoubleSide,
+      depthWrite: false,  // 깊이 버퍼에 쓰지 않음 (z-fighting 방지)
+      alphaTest: 0.1,     // 투명 부분 렌더링 제외
     });
     trackMaterial(logoMat);
 
-    logoMat.polygonOffset = true;
-    logoMat.polygonOffsetFactor = -3;
-    logoMat.polygonOffsetUnits = -3;
-
     const logo = new THREE.Mesh(logoGeo, logoMat);
+    logo.renderOrder = 999;  // 마지막에 렌더링 (다른 오브젝트 위에)
 
     const wallPos = new THREE.Vector3();
     wallMesh.getWorldPosition(wallPos);
@@ -955,12 +952,20 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     const wallQuat = new THREE.Quaternion();
     wallMesh.getWorldQuaternion(wallQuat);
 
+    // 벽 노멀 방향 계산 (카메라 위치와 무관하게 고정)
     const n = new THREE.Vector3(0, 0, 1).applyQuaternion(wallQuat).normalize();
-    const toCam = new THREE.Vector3().subVectors(camera.position, wallPos).normalize();
-    const nn = n.dot(toCam) < 0 ? n.clone().multiplyScalar(-1) : n;
+
+    // 시작 waypoint(0번) 위치 기준으로 방향 결정
+    const originWp = WAYPOINTS.find(w => w.id === ORIGIN_ID);
+    const originPos = originWp
+      ? new THREE.Vector3(...originWp.pose.pos)
+      : new THREE.Vector3(0, 0, 0);
+    const toOrigin = new THREE.Vector3().subVectors(originPos, wallPos).normalize();
+    const nn = n.dot(toOrigin) < 0 ? n.clone().multiplyScalar(-1) : n;
 
     logo.quaternion.copy(wallQuat);
-    logo.position.copy(wallPos).addScaledVector(nn, LOGO.offsetM);
+    // 벽에서 더 멀리 띄워서 z-fighting 완전 방지
+    logo.position.copy(wallPos).addScaledVector(nn, LOGO.offsetM + 0.5);
 
     scene.add(logo);
     logoMesh = logo;
