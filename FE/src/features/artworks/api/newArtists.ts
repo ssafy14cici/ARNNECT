@@ -39,8 +39,8 @@ export async function fetchNewArtists(args?: {
   const base = isDev ? "" : (API_BASE_URL ? `${API_BASE_URL}` : "");
 
   const suffix = memberUuid
-    ? `/api/v1/artwork/new/${encodeURIComponent(memberUuid)}`
-    : `/api/v1/artwork/new`;
+    ? `/api/v1/artworks/new/${encodeURIComponent(memberUuid)}`
+    : `/api/v1/artworks/new`;
 
   const url = `${base}${suffix}`;
 
