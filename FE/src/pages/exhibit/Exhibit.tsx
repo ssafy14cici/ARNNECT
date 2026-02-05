@@ -29,7 +29,7 @@ function buildMockPanels(): PanelArtItem[] {
   return PANEL_NAMES.map((panelName, idx) => ({
     panelName,
     title: `Artwork ${idx + 1}`,
-    imageUrl: asset(`art/b${idx + 1}.jpg`),
+    imageUrl: asset(`art/a${idx + 1}.jpg`),
     // (중요) 나중에 작품 상세로 보내려면 여기 artworkId 같은 것도 같이 실어두면 좋음
     // artworkId: idx + 1,  // <- PanelArtItem 타입에 없으면 일단 빼도 됨
   }));
