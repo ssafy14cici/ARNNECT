@@ -94,4 +94,10 @@ public class CommentServiceImpl implements CommentService{
             return (int) repository.countByTargetTypeAndTargetIdAndIsDeletedFalse(TargetType.REVIEW, targetId);
         }
     }
+
+    @Override
+    public Integer getMyCommentCount(String memberUuid) {
+        Long memberId = memberService.getMemberId(memberUuid);
+        return (int) repository.countByMemberIdAndIsDeletedFalse(memberId);
+    }
 }
