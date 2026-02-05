@@ -24,7 +24,7 @@ public interface PreferenceRepository extends JpaRepository<Artwork, Long> {
         JOIN artwork aw ON g.genre_id = aw.genre_id AND aw.is_deleted = 0
         LEFT JOIN artwork_tag at ON aw.artwork_id = at.artwork_id
         LEFT JOIN tag t ON at.tag_id = t.tag_id
-        WHERE g.genre_id IN (1,2,3,4)
+        WHERE g.genre_id IN (:genreIds)
           AND aw.artwork_id IN (
             SELECT artwork_id FROM (
               SELECT artwork_id,
