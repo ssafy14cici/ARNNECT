@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 import { useAuthStore } from "../../features/auth/store";
+import { bgmPause } from "../../shared/audio/bgm";
 
 export default function AppLayout() {
   const hydrate = useAuthStore((s) => s.hydrate);
@@ -12,6 +13,20 @@ export default function AppLayout() {
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  // BGM 허용 페이지가 아니면 자동 정지
+  useEffect(() => {
+    const isBgmPage =
+      pathname === "/" ||
+      pathname === "/home/pc" ||
+      pathname === "/main-hall" ||
+      pathname === "/hall" ||
+      pathname.startsWith("/exhibit");
+
+    if (!isBgmPage) {
+      bgmPause();
+    }
+  }, [pathname]);
 
   // 풀스크린 3D 페이지 (풋터 숨김 + 스크롤 막기)
   const isFullscreen3D = pathname === "/" || pathname === "/hall" || pathname.startsWith("/exhibit");

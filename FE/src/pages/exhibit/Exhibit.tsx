@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { mountExhibitRoom } from "../../museum/viewer/exhibitRoom";
 import type { PanelArtItem } from "../../museum/viewer/panelArt";
+import { bgmIsOn, bgmToggle, bgmForcePlayOnInteraction } from "../../shared/audio/bgm";
 
 function asset(path: string) {
   const p = path.replace(/^\/+/, "");
@@ -46,8 +47,17 @@ export default function Exhibit() {
   // 가이드 토글 상태 (false: info.png, true: how_ex.png)
   const [showGuide, setShowGuide] = useState(false);
 
+  // ✅ 전역 BGM 상태와 동기화
+  const [bgmOn, setBgmOn] = useState(() => bgmIsOn());
+
   // ✅ URL params에서 artistId 가져오기 (/exhibit/:artistId)
   const artistId = params.artistId ?? null;
+
+  // 전역 BGM: 마운트 시 재생 시도
+  useEffect(() => {
+    const cleanup = bgmForcePlayOnInteraction();
+    return cleanup;
+  }, []);
 
   console.log("[Exhibit] 🔍 params.artistId:", artistId);
   console.log("[Exhibit] 🔍 location.state:", JSON.stringify(location.state));
@@ -143,7 +153,7 @@ export default function Exhibit() {
           style={{
             position: "fixed",
             bottom: "24px",
-            right: "24px",
+            right: "72px",
             opacity: 0.5,
             cursor: "pointer",
             zIndex: 9980,
@@ -155,6 +165,29 @@ export default function Exhibit() {
           onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.5")}
         />
       )}
+
+      {/* BGM ON/OFF 토글 버튼 */}
+      <img
+        src={asset(bgmOn ? "bgm/bgm_on.png" : "bgm/bgm_off.png")}
+        alt={bgmOn ? "BGM ON" : "BGM OFF"}
+        onClick={() => {
+          const next = bgmToggle();
+          setBgmOn(next);
+        }}
+        style={{
+          position: "fixed",
+          bottom: "24px",
+          right: "24px",
+          opacity: 0.5,
+          cursor: "pointer",
+          zIndex: 9980,
+          width: "40px",
+          height: "auto",
+          transition: "opacity 0.2s",
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
+        onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.5")}
+      />
 
       {/* 조작 가이드 오버레이 */}
       {showGuide && (
