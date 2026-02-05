@@ -10,7 +10,7 @@
   transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
 
   /* 폰트 설정 (전역에 import 되어 있다고 가정) */
-  font-family: "Pretendard", sans-serif;
+  font-family: var(--font-stack);
   color: #fff;
 }
 
@@ -84,7 +84,7 @@
 }
 
 .card-title {
-  font-family: "Playfair Display", serif; /* 제목은 명조 계열 */
+  font-family: "MuseumClassic", serif; /* 제목은 명조 계열 */
   font-size: 1.35rem;
   font-weight: 400;
   margin: 0 0 8px 0;

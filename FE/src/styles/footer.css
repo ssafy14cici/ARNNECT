@@ -12,7 +12,7 @@
   padding: 80px 20px 60px; /* 여백을 넉넉하게 주어 답답하지 않게 */
   width: 100%;
   box-sizing: border-box;
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
   
   /* 맨 아래에 위치하도록 z-index 관리 (필요 시) */
   position: relative;
@@ -75,7 +75,7 @@
 
 /* 브랜드명만 우아한 폰트로 포인트 */
 .footer-brand-text {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-weight: 400;
   font-style: italic;
   color: rgba(255, 255, 255, 0.5);

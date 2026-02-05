@@ -7,7 +7,7 @@
   padding: 140px 4vw 100px; /* Navbar 높이 고려 */
   background-color: #050505; /* Deep Black */
   color: #ffffff;
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
 }
 
 /* --- Header Typography --- */
@@ -30,7 +30,7 @@
 }
 
 .italic-serif {
-  font-family: 'Playfair Display', serif; /* 명조체 */
+  font-family: "MuseumClassic", serif;
   font-style: italic;
   font-weight: 400;
   margin-right: 0.2em;

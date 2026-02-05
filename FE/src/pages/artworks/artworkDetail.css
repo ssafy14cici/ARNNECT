@@ -1,5 +1,4 @@
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap');
+/* fonts loaded globally via global.css */
 
 /* ==========================================================================
    RESET & LAYOUT
@@ -7,7 +6,7 @@
 .artwork-detail-page {
   background-color: #050505;
   color: #fff;
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
   width: 100%;
   min-height: 100vh;
   position: relative;
@@ -58,20 +57,19 @@
 .btn-icon.danger:hover { background: rgba(255,107,107,0.12); border-color: #ff6b6b; }
 
 /* ==========================================================================
-   1. HERO SECTION (Parallax)
+   1. HERO SECTION
 ========================================================================== */
 .artwork-hero {
-  height: 100vh;
+  min-height: 80vh;
   width: 100%;
-  position: sticky; /* 스크롤 시 뒤에 고정됨 */
-  top: 0;
+  position: relative;
   z-index: 1;
 
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 0 20px;
+  padding: 40px 20px;
 
   background: radial-gradient(circle at center, #1a1a1a 0%, #050505 90%);
   overflow: hidden;
@@ -88,7 +86,7 @@
 
 /* Title & Artist */
 .hero-title {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: clamp(2.2rem, 6vw, 5rem);
   font-weight: 400;
   margin: 0 0 10px 0;
@@ -98,7 +96,7 @@
 }
 
 .hero-artist {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 1.2rem;
   color: #C8A97E;
   font-style: italic;
@@ -163,15 +161,14 @@
 }
 
 /* ==========================================================================
-   2. BODY CONTENT (Overlays the Hero)
+   2. BODY CONTENT
 ========================================================================== */
 .artwork-body {
   position: relative;
-  z-index: 10; /* Hero 위에 올라옴 */
+  z-index: 2;
   background-color: #050505;
-  box-shadow: 0 -50px 100px rgba(0,0,0,1);
-  padding: 100px 24px 150px;
-  min-height: 100vh;
+  padding: 80px 24px 150px;
+  min-height: 50vh;
 }
 
 .content-wrapper {
@@ -237,7 +234,7 @@
 .discovery-section { margin-top: 80px; }
 
 .section-title {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 2rem;
   margin-bottom: 30px;
   color: #fff;
@@ -425,7 +422,7 @@
 /* Responsive */
 @media (max-width: 768px) {
   .hero-title { font-size: 3rem; }
-  .artwork-hero { height: 80vh; }
+  .artwork-hero { min-height: 60vh; }
   .action-bar { flex-direction: column; align-items: flex-start; gap: 20px; }
   .comment-input-wrap { flex-direction: column; }
 }

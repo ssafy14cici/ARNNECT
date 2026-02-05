@@ -8,7 +8,7 @@
   min-height: 100vh;
   background-color: #050505; /* Deep Black */
   color: #fff;
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
   overflow: hidden;
 }
 
@@ -95,7 +95,7 @@
 
 .form-header { margin-bottom: 60px; }
 .form-title {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 4rem;
   margin: 0 0 16px;
   color: #fff; /* User Title White */
@@ -158,7 +158,7 @@
   border-bottom: 2px solid rgba(255,255,255,0.15);
   padding: 16px 0;
   color: #fff;
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
   font-size: 1.8rem; /* Large Font */
   font-weight: 500;
   border-radius: 0;

@@ -1,11 +1,10 @@
 /* FE/src/pages/reviews/reviewdetail.css */
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap');
+/* fonts loaded globally via global.css */
 
 .review-detail-page {
   background-color: #050505;
   color: #fff;
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
   width: 100%;
   min-height: 100vh;
 }
@@ -41,7 +40,7 @@
 .rd-title-block { min-width: 0; }
 
 .rd-title {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: clamp(2.0rem, 4.8vw, 3.6rem);
   font-weight: 400;
   margin: 0 0 14px;
@@ -125,10 +124,9 @@
 
 /* hero image */
 .rd-image {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 5;
-  height: min(100vh, 860px);
+  min-height: min(80vh, 700px);
   display: grid;
   place-items: center;
   padding: 34px 0 10px;
@@ -168,11 +166,9 @@
 /* body */
 .rd-body {
   position: relative;
-  z-index: 20;
-  margin-top: -120px;
-  padding: 90px 24px 90px;
+  z-index: 10;
+  padding: 60px 24px 90px;
   background: #050505;
-  box-shadow: 0 -50px 100px rgba(0,0,0,1);
   border-top: 1px solid rgba(255,255,255,0.08);
 }
 
@@ -211,7 +207,7 @@
 
   .rd-actions { width: 100%; justify-content: flex-start; }
 
-  .rd-image { height: 76vh; padding: 22px 0 10px; }
+  .rd-image { min-height: 60vh; padding: 22px 0 10px; }
 
-  .rd-body { margin-top: -70px; padding: 70px 16px 70px; }
+  .rd-body { padding: 50px 16px 70px; }
 }

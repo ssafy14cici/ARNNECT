@@ -143,9 +143,7 @@ export default function Navbar() {
     .filter(Boolean)
     .join(" ");
 
-  // ✅ 홈에서는 Navbar “보이기만” 숨김
-  // ⚠️ 조건부 렌더링으로 header를 없애면 #menu4가 사라져 HomeMobile 트리거가 깨짐
-  const shouldHideHeader = isHome; // 필요하면: isHome && isMobile 로 바꿔도 됨
+  const shouldHideHeader = false;
 
   return (
     <>

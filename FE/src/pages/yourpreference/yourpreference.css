@@ -6,7 +6,7 @@
   min-height: 100vh;
   background-color: #050505;
   color: #fff;
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -43,7 +43,7 @@
 }
 
 .pref-title {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 4rem;
   line-height: 1.1;
   margin: 0;
@@ -105,7 +105,7 @@
 }
 
 .battle-round {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   color: #C8A97E;
   font-size: 1.2rem;
   letter-spacing: 0.1em;
@@ -277,7 +277,7 @@
 }
 
 .result-type {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 4rem;
   margin: 0;
   line-height: 1;

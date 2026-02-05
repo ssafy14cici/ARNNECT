@@ -7,7 +7,7 @@
   inset: 0;
   background-color: #050505;
   color: #fff;
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -59,7 +59,7 @@
 }
 
 .error-code {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: clamp(8rem, 25vw, 18rem); /* 화면 크기에 따라 거대하게 */
   font-weight: 700;
   line-height: 0.8;
@@ -108,7 +108,7 @@
 }
 
 .error-title {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 2.5rem;
   font-weight: 400;
   margin: 0 0 16px;

@@ -254,8 +254,8 @@ export default function TicketQr() {
       <section className="loungeWrap">
         <div className="loungeSubTop">
           <h1 className="loungeSubTitle">전시 QR 관리</h1>
-          <Link className="loungeBackLink" to="/lounge/qr">
-            ← QR 메뉴로
+          <Link className="loungeBackLink" to="/lounge">
+            ← 라운지로
           </Link>
         </div>
 
