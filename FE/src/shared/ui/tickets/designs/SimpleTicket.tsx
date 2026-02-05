@@ -1,6 +1,7 @@
 // tickets/designs/MuseumClassicTicket.tsx
 import React from "react";
 import type { TicketDesignProps } from "../../../../features/tickets/types";
+import TicketQR from "./_parts/TicketQR"; // QR 컴포넌트 경로 확인 필요
 
 export default function MuseumClassicTicket({ data }: TicketDesignProps) {
   const title = (data.title || "ART MUSEUM\nNEW EXPOSITION").toUpperCase();
@@ -9,18 +10,17 @@ export default function MuseumClassicTicket({ data }: TicketDesignProps) {
     <div style={{
       width: "100%", 
       height: "100%", 
-      backgroundColor: "#F9F8FF", // 아주 연한 보라빛 백그라운드
-      color: "#4A4EB2", // 메인 보라색 텍스트
+      backgroundColor: "#F9F8FF", 
+      color: "#4A4EB2", 
       display: "flex", 
-      fontFamily: "'Times New Roman', serif", // 고전적인 느낌을 위해 세리프체 권장
+      fontFamily: "'Times New Roman', serif", 
       position: "relative",
       overflow: "hidden",
-      boxShadow: "0 10px 30px rgba(0,0,0,0.05)"
     }}>
-      {/* 왼쪽 메인 영역 (75%) */}
+      {/* 1. 왼쪽 메인 영역 (75%) */}
       <div style={{ 
         flex: 3, 
-        padding: "40px", 
+        padding: "30px 40px", 
         display: "flex", 
         flexDirection: "column", 
         justifyContent: "space-between",
@@ -29,7 +29,7 @@ export default function MuseumClassicTicket({ data }: TicketDesignProps) {
         {/* 타이틀 영역 */}
         <div style={{ zIndex: 2 }}>
           <h1 style={{ 
-            fontSize: "42px", 
+            fontSize: "38px", 
             margin: 0, 
             lineHeight: 1.1, 
             fontWeight: "normal",
@@ -40,115 +40,119 @@ export default function MuseumClassicTicket({ data }: TicketDesignProps) {
           </h1>
         </div>
 
-        {/* 중단 배지 영역 (가격 & 날짜) */}
+        {/* 중단 배지 영역 (날짜 정보 교체) */}
         <div style={{ display: "flex", gap: "10px", zIndex: 2 }}>
+          {/* 시작 날짜 박스 */}
           <div style={{ 
             backgroundColor: "#5D5FBB", 
             color: "#fff", 
-            padding: "15px 30px",
-            fontSize: "20px",
-            minWidth: "120px",
-            textAlign: "center"
+            padding: "12px 20px",
+            fontSize: "18px",
+            minWidth: "130px",
+            textAlign: "center",
+            fontWeight: "bold"
           }}>
-            TICKET: $10
+            {data.startDate || "START DATE"}
           </div>
+          {/* 종료 날짜 박스 (기존 Ticket:$10 위치) */}
           <div style={{ 
             backgroundColor: "#5D5FBB", 
             color: "#fff", 
-            padding: "15px 30px",
-            fontSize: "20px",
+            padding: "12px 20px",
+            fontSize: "18px",
             flex: 1,
-            textAlign: "center"
+            textAlign: "center",
+            fontWeight: "bold"
           }}>
-            {data.startDate ? data.startDate.toUpperCase() : "22TH JULY"}
+            {data.endDate ? `UNTIL ${data.endDate}` : "END DATE"}
           </div>
         </div>
 
-        {/* 하단 웹사이트 & 시간 */}
+        {/* 하단 장소 & 시간 (웹사이트 주소 대신 장소 입력) */}
         <div style={{ 
           display: "flex", 
           justifyContent: "space-between", 
-          fontSize: "14px", 
+          alignItems: "flex-end",
+          fontSize: "13px", 
           fontWeight: "bold",
-          zIndex: 2 
+          zIndex: 2,
+          borderTop: "1px solid rgba(74, 78, 178, 0.2)",
+          paddingTop: "10px"
         }}>
-          <span>www.artmuseum.com</span>
-          <span>From {data.startTime || "12:00 pm"} to {data.endTime || "6:00 pm"}</span>
+          <div style={{ flex: 1 }}>
+            <span style={{ display: "block", fontSize: "10px", opacity: 0.7 }}>LOCATION</span>
+            <span>{data.address} {data.addressDetail}</span>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <span style={{ display: "block", fontSize: "10px", opacity: 0.7 }}>TIME</span>
+            <span>{data.startTime} - {data.endTime}</span>
+          </div>
         </div>
 
-        {/* 중앙 조각상 일러스트 (배경 요소) */}
+        {/* 중앙 조각상 배경 (디자인 요소) */}
         <div style={{
           position: "absolute",
-          right: "20px",
-          top: "50%",
+          right: "10%",
+          top: "45%",
           transform: "translateY(-50%)",
-          width: "200px",
-          height: "240px",
-          opacity: 0.8,
+          width: "180px",
+          height: "220px",
+          opacity: 0.6,
           zIndex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center"
         }}>
-          {/* 실제 이미지가 있다면 img 태그로 교체, 없다면 아이콘/도형으로 대체 */}
-          <div style={{ position: 'relative' }}>
-             {/* 조각상 대신 원형과 선으로 느낌만 구현 */}
+          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
              <div style={{ 
-               width: "120px", height: "160px", 
+               width: "110px", height: "150px", 
                borderRadius: "60px 60px 0 0", 
-               border: "2px solid #D1D1F5",
+               border: "1px solid #D1D1F5",
                background: "linear-gradient(to bottom, #EFEEFF, #D1D1F5)"
              }} />
-             <div style={{ position: 'absolute', top: -10, right: -20, color: '#5D5FBB', fontSize: '24px' }}>✦</div>
-             <div style={{ position: 'absolute', bottom: 40, left: -20, color: '#5D5FBB', fontSize: '18px' }}>✦</div>
+             <div style={{ position: 'absolute', top: 0, right: 40, color: '#5D5FBB', fontSize: '20px' }}>✦</div>
+             <div style={{ position: 'absolute', bottom: 60, left: -10, color: '#5D5FBB', fontSize: '14px' }}>✦</div>
           </div>
         </div>
       </div>
 
-      {/* 우측 절취선 */}
+      {/* 2. 중앙 절취선 영역 */}
       <div style={{ 
-        width: "2px", 
-        borderLeft: "2px dashed #5D5FBB", 
-        margin: "20px 0",
-        opacity: 0.3
-      }} />
+        width: "20px", 
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center"
+      }}>
+        <div style={{ height: "90%", borderLeft: "1.5px dashed rgba(93, 95, 187, 0.4)" }} />
+      </div>
 
-      {/* 오른쪽 스텁 영역 (25%) */}
+      {/* 3. 오른쪽 스텁 영역 (QR 코드 배치) */}
       <div style={{ 
-        flex: 1, 
+        flex: 0.8, 
         display: "flex", 
         flexDirection: "column", 
         alignItems: "center", 
-        justifyContent: "center",
-        padding: "20px"
+        justifyContent: "space-between",
+        padding: "25px 15px",
+        background: "rgba(93, 95, 187, 0.03)"
       }}>
-        {/* 바코드 디자인 */}
+        {/* QR 코드 영역 (절취선 오른쪽 상단/중앙) */}
         <div style={{ 
-          display: "flex", 
-          gap: "4px", 
-          height: "100%", 
-          alignItems: "center",
-          position: "relative"
+          background: "#fff", 
+          padding: "8px", 
+          borderRadius: "8px", 
+          boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
+          border: "1px solid #EEE" 
         }}>
-           {/* 가로형 텍스트 (바코드 옆 문구) */}
-           <div style={{ 
-             writingMode: "vertical-rl", 
-             fontSize: "10px", 
-             color: "#5D5FBB",
-             marginRight: "10px",
-             lineHeight: 1.5,
-             opacity: 0.8
-           }}>
-             Lorem ipsum dolor sit amet, consectetur<br/>
-             adipiscing elit, sed do eiusmod tempor
-           </div>
+          <TicketQR size={90} variant="dark" />
+        </div>
 
-           {/* 바코드 막대들 */}
-           <div style={{ display: 'flex', gap: '2px', height: '180px' }}>
-              {[2, 5, 2, 8, 3, 6, 2, 4, 7, 2].map((w, i) => (
-                <div key={i} style={{ width: `${w}px`, height: '100%', backgroundColor: '#5D5FBB' }} />
-              ))}
-           </div>
+        {/* 하단 바코드 및 텍스트 */}
+        <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+          <div style={{ display: 'flex', gap: '2px', height: '40px' }}>
+            {[1, 3, 1, 5, 2, 4, 1, 2, 6, 1, 3].map((w, i) => (
+              <div key={i} style={{ width: `${w}px`, height: '100%', backgroundColor: '#5D5FBB' }} />
+            ))}
+          </div>
+          <span style={{ fontSize: "9px", letterSpacing: "1px", opacity: 0.7 }}>STUB ONLY</span>
         </div>
       </div>
     </div>
