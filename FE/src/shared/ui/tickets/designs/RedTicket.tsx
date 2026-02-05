@@ -1,9 +1,10 @@
 // tickets/designs/MilesToGoTicket.tsx
 import React from "react";
 import type { TicketDesignProps } from "../../../../features/tickets/types";
+import TicketQR from "./_parts/TicketQR";
 
 export default function MilesToGoTicket({ data }: TicketDesignProps) {
-  const title = (data.title || "MILES TO GO").toUpperCase();
+  const title = (data.title || "RED EXHIBITION").toUpperCase();
 
   return (
     <div
@@ -18,43 +19,40 @@ export default function MilesToGoTicket({ data }: TicketDesignProps) {
         overflow: "hidden",
       }}
     >
-      {/* 1. 좌측 레드 스텁 (Stub) */}
+      {/* 1. 좌측 레드 스텁 (Stub) - QR 코드 배치 */}
       <div style={{ 
-        width: "100px", 
+        width: "120px", 
         backgroundColor: "#FF3B30", 
         color: "#FFF",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
-        padding: "15px",
+        justifyContent: "space-between",
+        padding: "20px 10px",
         position: "relative"
       }}>
-        {/* 바코드와 수직 텍스트 */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", height: "100%" }}>
-           {/* 수직 텍스트 (TICKET NO) */}
-           <div style={{ 
-            writingMode: "vertical-rl", 
-            fontSize: "12px", 
-            fontWeight: "bold",
-            letterSpacing: "1px"
-          }}>
-            TICKET NO.1234/A/25-ABC
-          </div>
+        <div style={{ 
+          writingMode: "vertical-rl", 
+          fontSize: "12px", 
+          fontWeight: "bold",
+          letterSpacing: "2px",
+          opacity: 0.9
+        }}>
+          ENTRY PASS / RED EXH
+        </div>
 
-          {/* 화이트 바코드 영역 */}
-          <div style={{ 
-            width: "50px", 
-            height: "180px", 
-            backgroundColor: "#FFF",
-            display: "flex",
-            padding: "0 4px",
-            gap: "1px"
-          }}>
-            {[1, 3, 1, 2, 4, 1, 3, 2, 1, 1, 4, 2].map((w, i) => (
-              <div key={i} style={{ flex: w, height: "100%", backgroundColor: "#FF3B30" }} />
-            ))}
-          </div>
+        {/* [수정] 바코드 자리에 QR 코드 생성 */}
+        <div style={{ 
+          backgroundColor: "#FFF", 
+          padding: "6px", 
+          borderRadius: "4px",
+          boxShadow: "0 4px 10px rgba(0,0,0,0.1)"
+        }}>
+          <TicketQR size={75} variant="dark" />
+        </div>
+
+        <div style={{ fontSize: "14px", fontWeight: "900", letterSpacing: "1px" }}>
+          A-25-VOID
         </div>
       </div>
 
@@ -63,90 +61,101 @@ export default function MilesToGoTicket({ data }: TicketDesignProps) {
         flex: 1, 
         display: "flex", 
         flexDirection: "column",
-        position: "relative"
+        position: "relative",
+        padding: "25px 30px"
       }}>
-        {/* 상단 텍스트 영역 */}
-        <div style={{ padding: "20px 30px 10px 30px" }}>
-          {/* 메인 타이틀 (MILES TO GO) */}
-          <h1 style={{ 
-            fontSize: "85px", 
-            lineHeight: 0.8, 
-            margin: 0, 
-            fontWeight: "900", 
-            letterSpacing: "-4px",
-            textAlign: "left"
-          }}>
-            {title}
-          </h1>
-
-          {/* 서브 정보 바 */}
-          <div style={{ 
-            display: "flex", 
-            alignItems: "center", 
-            gap: "15px", 
-            marginTop: "15px",
-            fontSize: "14px",
-            fontWeight: "800",
-            textTransform: "uppercase"
-          }}>
-            <span>{data.address || "YOUR ADDRESS HERE"}</span>
-            <span style={{ fontSize: "20px" }}>✳</span>
-            <span>START {data.startTime || "5AM"} - FINISH</span>
-            <span style={{ fontSize: "20px" }}>✳</span>
-            <span>{data.startDate || "17TH MAY"}</span>
-          </div>
-        </div>
-
-        {/* 하단 이미지 섹션 (포스터 이미지) */}
+        {/* [상단] 이미지 섹션 (포스터가 가장 잘 보이게 배치) */}
         <div style={{ 
-          flex: 1, 
-          margin: "0 30px 20px 30px", 
-          position: "relative",
+          flex: 1,
+          width: "100%",
+          backgroundColor: "#D1CDC4",
+          borderRadius: "4px",
           overflow: "hidden",
-          backgroundColor: "#ccc"
+          border: "2px solid #FF3B30",
+          position: "relative"
         }}>
           {data.posterUrl ? (
             <img 
               src={data.posterUrl} 
-              alt="marathon" 
-              style={{ width: "100%", height: "100%", objectFit: "cover", filter: "grayscale(100%)" }} 
+              alt="poster" 
+              style={{ width: "100%", height: "100%", objectFit: "cover" }} 
             />
           ) : (
-            <div style={{ width: "100%", height: "100%", background: "#555" }} />
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "900", opacity: 0.3 }}>
+              NO IMAGE
+            </div>
           )}
+          
+          {/* 이미지 위 그래픽 포인트 */}
+          <div style={{ position: "absolute", top: "10px", left: "10px", display: "flex", gap: "5px" }}>
+            {[1, 2, 3].map(i => (
+              <div key={i} style={{ width: "8px", height: "8px", backgroundColor: "#FF3B30", borderRadius: "50%" }} />
+            ))}
+          </div>
+        </div>
 
-          {/* 이미지 위 그래픽 요소 (원형 링) */}
+        {/* [하단] 타이틀 및 상세 정보 섹션 */}
+        <div style={{ marginTop: "20px" }}>
+          <h1 style={{ 
+            fontSize: "42px", 
+            lineHeight: 1, 
+            margin: "0 0 15px 0", 
+            fontWeight: "900", 
+            letterSpacing: "-2px",
+            textTransform: "uppercase"
+          }}>
+            {title}
+          </h1>
+
           <div style={{ 
-            position: "absolute", 
-            left: "20px", 
-            bottom: "20px", 
             display: "flex", 
-            gap: "-10px" 
+            flexDirection: "column", 
+            gap: "5px",
+            borderTop: "3px solid #FF3B30",
+            paddingTop: "15px"
           }}>
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} style={{ 
-                width: "40px", 
-                height: "40px", 
-                border: "1px solid #fff", 
-                borderRadius: "50%",
-                marginLeft: "-15px"
-              }} />
-            ))}
+            {/* 전시장소 정보 */}
+            <div style={{ fontSize: "16px", fontWeight: "900" }}>
+              📍 {data.address} {data.addressDetail}
+            </div>
+            
+            {/* 날짜 정보 (시작일/종료일 강조) */}
+            <div style={{ 
+              display: "flex", 
+              alignItems: "center", 
+              gap: "10px",
+              fontSize: "18px", 
+              fontWeight: "900",
+              color: "#FFF",
+              backgroundColor: "#FF3B30",
+              width: "fit-content",
+              padding: "4px 10px",
+              marginTop: "5px"
+            }}>
+              <span>{data.startDate}</span>
+              {data.endDate && (
+                <>
+                  <span style={{ fontSize: "12px" }}>▶</span>
+                  <span>{data.endDate}</span>
+                </>
+              )}
+            </div>
           </div>
+        </div>
 
-          {/* 우하단 점 패턴 */}
-          <div style={{ 
-            position: "absolute", 
-            right: "20px", 
-            bottom: "20px",
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 10px)",
-            gap: "5px"
-          }}>
-            {Array.from({ length: 16 }).map((_, i) => (
-              <div key={i} style={{ width: "10px", height: "10px", backgroundColor: "#FF3B30", borderRadius: "50%" }} />
-            ))}
-          </div>
+        {/* 장식용 우하단 점 패턴 */}
+        <div style={{ 
+          position: "absolute", 
+          right: "20px", 
+          bottom: "20px",
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 6px)",
+          gap: "4px",
+          opacity: 0.5
+        }}>
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} style={{ width: "6px", height: "6px", backgroundColor: "#FF3B30", borderRadius: "50%" }} />
+          ))}
         </div>
       </div>
     </div>

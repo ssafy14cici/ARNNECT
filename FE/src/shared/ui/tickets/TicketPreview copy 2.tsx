@@ -4,7 +4,7 @@ import React from "react";
 import BasicTicket from "./designs/BasicTicket";
 import ModernTicket from "./designs/ModernTicket";
 import MinimalTicket from "./designs/MinimalTicket";
-import HoloAbstractTicket from "./designs/HoloAbstractTicket";
+import HoloAbstractTicket from "./designs/HoloTicket";
 import SimpleTicket from "./designs/SimpleTicket";
 
 // ✅ TicketDesignType export
