@@ -29,15 +29,34 @@ interface TicketPreviewProps {
 }
 
 export default function TicketPreview({ designType, data }: TicketPreviewProps) {
-  // ✅ 가로형 디자인
-  const isHorizontal = designType === "MINIMAL" || designType === "HOLO_ABSTRACT";
+  // ✅ 가로형 디자인 (SIMPLE, PURPLE, PINK, RED 포함)
+  const isHorizontal =
+    designType === "MINIMAL" ||
+    designType === "HOLO_ABSTRACT" ||
+    designType === "SIMPLE" ||
+    designType === "PURPLE" ||
+    designType === "PINK" ||
+    designType === "RED";
 
+  // 가로 티켓: 세로 컨테이너 안에서 -90° 회전하여 잘리지 않게 표시
   const containerStyle: React.CSSProperties = {
     width: "100%",
-    maxWidth: isHorizontal ? "420px" : "240px",
-    aspectRatio: isHorizontal ? "2.6 / 1" : "1 / 2.2",
+    maxWidth: "240px",
+    aspectRatio: isHorizontal ? "1 / 1.6" : "1 / 2.2",
     margin: "0 auto",
     transition: "all 0.3s ease",
+    position: "relative",
+    overflow: "hidden",
+  };
+
+  // 가로 티켓 회전 래퍼: 컨테이너(W × 1.6W) 안에서 가로 비율(1.6W × W) → -90° 회전
+  const horizontalInnerStyle: React.CSSProperties = {
+    position: "absolute",
+    width: "160%",
+    height: "62.5%",
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%) rotate(-90deg)",
   };
 
   const renderContent = () => {
@@ -62,5 +81,13 @@ export default function TicketPreview({ designType, data }: TicketPreviewProps) 
     }
   };
 
-  return <div style={containerStyle}>{renderContent()}</div>;
+  return (
+    <div style={containerStyle}>
+      {isHorizontal ? (
+        <div style={horizontalInnerStyle}>{renderContent()}</div>
+      ) : (
+        renderContent()
+      )}
+    </div>
+  );
 }
