@@ -1,5 +1,5 @@
 // FE/src/features/artworks/api/newArtists.ts
-import { API_BASE_URL } from "@/config/api";
+import { API_BASE_URL } from "../../../config/api";
 
 export type NewArtistArtwork = {
   memberUuid: string;

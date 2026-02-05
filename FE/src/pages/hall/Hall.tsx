@@ -58,15 +58,15 @@ export default function Hall() {
        * 여기서 React Router로 페이지 이동을 처리해주세요야 함.
        */
       onOpenExhibit: ({ artId, artist, artworkTitle, fromWaypointId }) => {
-        console.log("[Hall] onOpenExhibit:", {
-          artId,
-          artist,
-          artworkTitle,
-          fromWaypointId,
-        });
+        // console.log("[Hall] onOpenExhibit:", {
+        //   artId,
+        //   artist,
+        //   artworkTitle,
+        //   fromWaypointId,
+        // });
 
         // ✅ 관람(전시장) 페이지로 이동
-        nav("/exhibit", {
+        nav("/exhibit/${artistId}}", {
           state: {
             artId,
             artist,

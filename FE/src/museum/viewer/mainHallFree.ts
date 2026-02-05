@@ -8,7 +8,7 @@ import { applyGalleryLighting } from "./lighting";
 import { createWaypointNavigator } from "./navigator";
 
 // ✅ NEW: 신진예술인 6명 API
-import { fetchNewArtists, buildNewArtistImageUrl, type NewArtistArtwork } from "../api/newArtists"
+import { fetchNewArtists, buildNewArtistImageUrl, type NewArtistArtwork } from "../../features/artworks/api/newArtists"
 
 type ExhibitPayload = {
   artId?: number;
