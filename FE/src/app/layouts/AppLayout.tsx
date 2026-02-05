@@ -41,9 +41,12 @@ export default function AppLayout() {
           WebkitOverflowScrolling: "touch",
         }}
       >
-        <Outlet />
+        {/* ✅ 콘텐츠 영역: 최소 100% 높이로 Footer를 스크롤 아래로 밀어냄 */}
+        <div style={{ minHeight: "100%" }}>
+          <Outlet />
+        </div>
 
-        {/* ✅ Footer를 main 안으로 넣어야 스크롤 끝에서 등장 */}
+        {/* ✅ Footer: 스크롤 끝에서만 나타남 */}
         {showFooter && <Footer />}
       </main>
     </div>

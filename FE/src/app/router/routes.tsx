@@ -9,7 +9,7 @@ import AppLayout from "../layouts/AppLayout";
 import Home from "../../pages/home/Home";
 import HomePC from "../../pages/home/HomePC";
 import HomeMobile from "../../pages/home/HomeMobile";
-import Hall from "../../pages/hall/Hall";
+import Hall from "../../pages/hall";
 
 import Search from "../../pages/search/Search";
 import Guide from "../../pages/guide/Guide";
