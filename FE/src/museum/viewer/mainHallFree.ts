@@ -625,24 +625,45 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   }
 
   function resolveAccessToken(): string | null {
-    if (opts.accessToken) return opts.accessToken;
-    if (typeof opts.getAccessToken === "function") return opts.getAccessToken() ?? null;
+    // 1) opts에서 직접 주입된 토큰
+    if (opts.accessToken) {
+      console.log("[mainHallFree] ✅ accessToken from opts (직접 주입)");
+      return opts.accessToken;
+    }
+    // 2) getter 함수
+    if (typeof opts.getAccessToken === "function") {
+      const t = opts.getAccessToken() ?? null;
+      console.log("[mainHallFree] accessToken from getter:", t ? "있음" : "없음");
+      return t;
+    }
 
-    // 마지막 fallback: 로컬스토리지 키가 프로젝트마다 달라서 “있으면 쓰기”
-    return (
-      localStorage.getItem("accessToken") ||
-      localStorage.getItem("ACCESS_TOKEN") ||
-      localStorage.getItem("arnnect_access_token") ||
-      null
-    );
+    // 3) fallback: zustand storage 키에서 직접 꺼내기
+    try {
+      const raw = localStorage.getItem("arnnect_auth") || sessionStorage.getItem("arnnect_auth_ss");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.token) {
+          console.log("[mainHallFree] ✅ accessToken from storage fallback (arnnect_auth)");
+          return parsed.token;
+        }
+      }
+    } catch {}
+
+    console.warn("[mainHallFree] ⚠️ accessToken을 찾을 수 없음! → DEFAULT_ART_ITEMS 사용됨");
+    return null;
   }
 
   async function loadNewArtistItems(): Promise<ArtworkItem[]> {
     const token = resolveAccessToken();
-    if (!token) return DEFAULT_ART_ITEMS;
+    if (!token) {
+      console.warn("[mainHallFree] token 없음 → DEFAULT_ART_ITEMS 사용");
+      return DEFAULT_ART_ITEMS;
+    }
 
     try {
+      console.log("[mainHallFree] fetchNewArtists 호출 시작...");
       const rows = await fetchNewArtists(token);
+      console.log("[mainHallFree] fetchNewArtists 결과:", rows?.length ?? 0, "건");
       if (!rows?.length) return DEFAULT_ART_ITEMS;
 
       const picked = shuffle(rows);
@@ -655,7 +676,12 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
           artistId: r.memberUuid,
           artist: (r.nickname ?? "").trim() || "작가",
           artworkTitle: (r.title ?? "").trim() || "작품",
-          imageUrl: buildNewArtistImageUrl(r.savedImageName),
+          imageUrl: (() => {
+            const url = buildNewArtistImageUrl(r.savedImageName);
+            if (!url) console.warn(`[mainHallFree] ⚠️ imageUrl 비어있음: savedImageName="${r.savedImageName}"`);
+            else console.log(`[mainHallFree] ART_${i + 1} imageUrl:`, url);
+            return url || `${import.meta.env.BASE_URL}art/a${(i % 6) + 1}.jpg`;
+          })(),
           anchorName: ANCHORS[i].anchorName,
           nameAnchor: ANCHORS[i].nameAnchor,
         });
@@ -1165,10 +1191,39 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   }
 
   function onPointerDown(e: PointerEvent) {
+    // ✅ FREE 모드: 첫 클릭은 pointer lock, 이미 lock 된 상태에서는 raycast 허용
     if (mode === "FREE") {
-      if (!controls.isLocked) controls.lock();
+      if (!controls.isLocked) {
+        controls.lock();
+        return;
+      }
+      // ✅ 이미 locked → 화면 중앙으로 raycast (FREE 모드에서도 작품 클릭 가능)
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      console.log("[mainHallFree] FREE mode click (locked) → raycast at center");
+
+      if (raycastGuide(cx, cy)) {
+        showTutorialOverlay();
+        return;
+      }
+
+      const hit = raycastArtwork(cx, cy);
+      if (hit) {
+        console.log("[mainHallFree] FREE mode → artwork hit:", hit.userData);
+        const artist = hit.userData?.__artist as string | undefined;
+        const artistId = hit.userData?.__artistId as string | undefined;
+        const artworkTitle = hit.userData?.__artworkTitle as string | undefined;
+        const artId = hit.userData?.__artId as number | undefined;
+
+        if (artist && artworkTitle && artistId) {
+          showArtModal({ artist, artistId, artworkTitle, artId });
+        }
+      }
       return;
     }
+
+    // ✅ NAV 모드: 기존 로직
+    console.log("[mainHallFree] NAV mode click at", e.clientX, e.clientY);
 
     if (raycastGuide(e.clientX, e.clientY)) {
       showTutorialOverlay();
@@ -1177,6 +1232,8 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
     const hit = raycastArtwork(e.clientX, e.clientY);
     if (!hit) return;
+
+    console.log("[mainHallFree] NAV mode → artwork hit:", hit.userData);
 
     const wpId = hit.userData?.__wpId as number | undefined;
     const artist = hit.userData?.__artist as string | undefined;
@@ -1190,7 +1247,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
       // ✅ 가까울 때만 모달
       if (artist && artworkTitle && artistId && distToArt < 50) {
-        showArtModal({ artist, artistId, artworkTitle, artId: hit.userData?.__artId, });
+        showArtModal({ artist, artistId, artworkTitle, artId });
       }
 
       setBackBtnVisible(true);
@@ -1407,7 +1464,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     exhibitBtn.textContent = "전시보러가기";
 
     const openExhibit = (e: Event) => {
-      console.log("[mainHallFree] openExhibit payload", payload);
+      console.log("[mainHallFree] 전시보러가기 클릭 → openExhibit payload:", JSON.stringify(payload));
       e.preventDefault();
       e.stopPropagation();
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { mountMainHallFree } from "../../museum/viewer/mainHallFree";
+import { useAuthStore } from "../../features/auth/store";
 
 function asset(path: string) {
   // public 경로처럼 쓰기 위해 앞 슬래시 정리
@@ -20,6 +21,9 @@ export default function Hall() {
 
   // 가이드 토글 상태 (false: info.png, true: how.png)
   const [showGuide, setShowGuide] = useState(false);
+
+  // ✅ Zustand에서 토큰 가져오기
+  const token = useAuthStore((s) => s.token);
 
   // 다른 페이지에서 Hall로 돌아올 때 startWaypointId를 state로 넘길 수 있음
   const startWaypointId = (location.state as any)?.startWaypointId ?? 0;
@@ -42,45 +46,34 @@ export default function Hall() {
       "z-index:9990;pointer-events:none;"; // 기본은 none, 버튼들은 내부에서 pointer-events 켤 수 있음
     uiRoot.appendChild(uiLayer);
 
+    console.log("[Hall] mount with token:", token ? "있음" : "없음(null)");
+
     // ✅ 3D 메인홀 마운트
     const rt = mountMainHallFree(canvas, {
       glbUrl: asset("museum/models/museum/mh.glb"),
       startWaypointId,
       uiMount: uiLayer,
 
+      // ✅ Zustand에서 가져온 accessToken 직접 주입
+      accessToken: token ?? undefined,
+
       onReady: () => {
-        // 인트로 페이드 제거 트리거(프로젝트 기존 이벤트)
         window.dispatchEvent(new Event("intro:clear-fade"));
       },
 
-      /**
-       * ✅ "전시보러가기" 버튼을 눌렀을 때 mainHallFree.ts가 이 콜백을 호출한다.
-       * 여기서 React Router로 페이지 이동을 처리해주세요야 함.
-       */
-      // onOpenExhibit: ({ artId, artist, artworkTitle, fromWaypointId }) => {
-        // console.log("[Hall] onOpenExhibit:", {
-        //   artId,
-        //   artist,
-        //   artworkTitle,
-        //   fromWaypointId,
-        // });
-
-        // ✅ 관람(전시장) 페이지로 이동
-        // nav(`/exhibit/${artistId}`, {
-        //   state: {
-        //     artId,
-        //     artist,
-        //     artworkTitle,
-        //     fromWaypointId,
-        //     from: "hall",
-        //   },
-        // });
-      // },
-      onOpenExhibit: ({ artistId }) => {
-        console.log("[Hall] nav to", artistId);
-        nav(`/exhibit/${artistId}`);
-      }
-
+      // ✅ "전시보러가기" → Exhibit 페이지로 이동 (full state 전달)
+      onOpenExhibit: ({ artId, artistId, artist, artworkTitle, fromWaypointId }) => {
+        console.log("[Hall] onOpenExhibit →", { artId, artistId, artist, artworkTitle, fromWaypointId });
+        nav(`/exhibit/${artistId}`, {
+          state: {
+            artId,
+            artist,
+            artworkTitle,
+            fromWaypointId,
+            from: "hall",
+          },
+        });
+      },
     });
 
     // 언마운트(페이지 이동/새로고침 등)
@@ -89,7 +82,7 @@ export default function Hall() {
       uiLayer.remove();
       document.body.style.overflow = prevOverflow;
     };
-  }, [startWaypointId, nav]);
+  }, [startWaypointId, nav, token]);
 
   return (
     <div
@@ -144,7 +137,7 @@ export default function Hall() {
             opacity: 0.85,
             cursor: "pointer",
             zIndex: 9980,
-            width: "45%",
+            width: "60%",
             height: "auto",
           }}
         />

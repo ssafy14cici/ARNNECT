@@ -1,5 +1,4 @@
 // FE/src/features/artworks/api/newArtists.ts
-import { API_BASE_URL } from "../../../config/api";
 
 export type NewArtistArtwork = {
   memberUuid: string;
@@ -7,54 +6,79 @@ export type NewArtistArtwork = {
   artworkId: number;
   title: string;
   description?: string;
-  productionDate?: string;
-  savedImageName: string; // "/artwork/dd.png" 또는 파일명일 수도 있음
+  productionDate?: string; // yyyy-MM-dd
+  savedImageName: string;  // "/artwork/dd.png" or "artwork....png" (명세)
 };
 
-type Wrapped<T> = { code: string; message: string; data?: T };
+function getApiBaseUrl(): string {
+  const raw =
+    (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
+    (import.meta.env.VITE_API_BASE as string | undefined) ??
+    (import.meta.env.VITE_SERVER_URL as string | undefined) ??
+    "";
 
-function isObject(x: unknown): x is Record<string, unknown> {
-  return typeof x === "object" && x !== null;
-}
-function isWrapped<T>(x: unknown): x is Wrapped<T> {
-  return isObject(x) && typeof (x as any).code === "string" && typeof (x as any).message === "string";
-}
-
-function joinUrl(base: string, path: string) {
-  const b = (base ?? "").replace(/\/+$/, "");
-  const p = (path ?? "").startsWith("/") ? path : `/${path}`;
-  return `${b}${p}`;
+  return String(raw || "").replace(/\/+$/, "");
 }
 
-export function buildNewArtistImageUrl(savedImageName: string, baseUrl: string = API_BASE_URL) {
-  const s = (savedImageName ?? "").trim();
-  if (!s) return "";
-  if (/^https?:\/\//i.test(s)) return s;
-  if (s.startsWith("/")) return joinUrl(baseUrl, s);
-  return joinUrl(baseUrl, `/artwork/${encodeURIComponent(s)}`);
+// ✅ base가 없으면 same-origin 상대경로로 호출
+function apiUrl(path: string): string {
+  const base = getApiBaseUrl();
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return base ? `${base}${p}` : p;
 }
 
-export async function fetchNewArtists(accessToken: string, baseUrl: string = API_BASE_URL): Promise<NewArtistArtwork[]> {
-  const url = joinUrl(baseUrl, "/api/v1/artwork/new");
+function ensureOk(res: Response, bodyText: string) {
+  if (res.ok) return;
+  throw new Error(`[newArtists] HTTP ${res.status} ${res.statusText} - ${bodyText.slice(0, 300)}`);
+}
+
+/**
+ * GET /api/v1/artwork/new (Auth=O)
+ * 응답: 배열
+ */
+export async function fetchNewArtists(accessToken: string): Promise<NewArtistArtwork[]> {
+  const url = apiUrl("/api/v1/artwork/new");
+
+  // 디버깅용: 네트워크에 안 찍힐 때 “호출 시도” 자체를 확인
+  if (import.meta.env.DEV) console.log("[newArtists] GET", url, "hasToken=", Boolean(accessToken));
 
   const res = await fetch(url, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      Accept: "application/json",
     },
   });
 
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`fetchNewArtists failed: HTTP ${res.status}\n${txt}`);
+  const text = await res.text();
+  ensureOk(res, text);
+
+  let json: unknown;
+  try {
+    json = text ? JSON.parse(text) : [];
+  } catch {
+    return [];
   }
 
-  const json = (await res.json()) as unknown;
-
-  // 배열 직접 or 공통 wrapper(data) 둘 다 허용
   if (Array.isArray(json)) return json as NewArtistArtwork[];
-  if (isWrapped<NewArtistArtwork[]>(json) && Array.isArray(json.data)) return json.data;
+
+  const any = json as any;
+  if (Array.isArray(any?.data)) return any.data as NewArtistArtwork[];
+  if (Array.isArray(any?.data?.data)) return any.data.data as NewArtistArtwork[];
 
   return [];
+}
+
+/**
+ * savedImageName -> 실제 이미지 URL
+ * - "/artwork/dd.png" => "/artwork/dd.png" (same-origin) 또는 "BASE/artwork/dd.png"
+ * - "artwork....png"  => "/artwork/<encoded>"
+ */
+export function buildNewArtistImageUrl(savedImageName: string): string {
+  if (!savedImageName) return "";
+
+  if (/^https?:\/\//i.test(savedImageName)) return savedImageName;
+
+  if (savedImageName.startsWith("/")) return apiUrl(savedImageName);
+
+  return apiUrl(`/artwork/${encodeURIComponent(savedImageName)}`);
 }

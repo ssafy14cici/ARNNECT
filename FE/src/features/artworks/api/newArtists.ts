@@ -36,6 +36,9 @@ export async function fetchNewArtists(accessToken: string): Promise<NewArtistArt
   // ✅ base가 없으면 같은 오리진으로 상대경로 호출 (config/api.ts 없이도 동작)
   const url = base ? `${base}/api/v1/artwork/new` : `/api/v1/artwork/new`;
 
+  console.log("[newArtists] 🔍 API 요청:", url);
+  console.log("[newArtists] 🔍 token:", accessToken ? `Bearer ${accessToken.slice(0, 12)}...` : "없음");
+
   const res = await fetch(url, {
     method: "GET",
     headers: {
@@ -45,21 +48,35 @@ export async function fetchNewArtists(accessToken: string): Promise<NewArtistArt
   });
 
   const text = await res.text();
+  console.log("[newArtists] 🔍 응답 status:", res.status, res.statusText);
+  console.log("[newArtists] 🔍 body head:", text.slice(0, 200));
+
   ensureOk(res, text);
 
   let json: unknown;
   try {
     json = text ? JSON.parse(text) : [];
   } catch {
+    console.warn("[newArtists] ⚠️ JSON 파싱 실패");
     return [];
   }
 
-  if (Array.isArray(json)) return json as NewArtistArtwork[];
+  if (Array.isArray(json)) {
+    console.log("[newArtists] ✅ 결과(배열):", (json as any[]).length, "건");
+    return json as NewArtistArtwork[];
+  }
 
   const any = json as any;
-  if (Array.isArray(any?.data)) return any.data as NewArtistArtwork[];
-  if (Array.isArray(any?.data?.data)) return any.data.data as NewArtistArtwork[];
+  if (Array.isArray(any?.data)) {
+    console.log("[newArtists] ✅ 결과(data 배열):", any.data.length, "건");
+    return any.data as NewArtistArtwork[];
+  }
+  if (Array.isArray(any?.data?.data)) {
+    console.log("[newArtists] ✅ 결과(data.data 배열):", any.data.data.length, "건");
+    return any.data.data as NewArtistArtwork[];
+  }
 
+  console.warn("[newArtists] ⚠️ 알 수 없는 응답 구조 → 빈 배열 반환");
   return [];
 }
 
@@ -69,7 +86,10 @@ export async function fetchNewArtists(accessToken: string): Promise<NewArtistArt
  * - "artwork....jpg" (파일명) 모두 대응
  */
 export function buildNewArtistImageUrl(savedImageName: string): string {
-  if (!savedImageName) return "";
+  if (!savedImageName) {
+    console.warn("[newArtists] ⚠️ savedImageName 비어있음 → 빈 URL 반환");
+    return "";
+  }
 
   const base = getApiBaseUrl();
 

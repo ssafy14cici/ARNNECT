@@ -1,6 +1,6 @@
 import "../../styles/home.css";
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { mountExhibitRoom } from "../../museum/viewer/exhibitRoom";
 import type { PanelArtItem } from "../../museum/viewer/panelArt";
@@ -38,6 +38,7 @@ function buildMockPanels(): PanelArtItem[] {
 export default function Exhibit() {
   const nav = useNavigate();
   const location = useLocation();
+  const params = useParams<{ artistId: string }>();
 
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -45,10 +46,22 @@ export default function Exhibit() {
   // 가이드 토글 상태 (false: info.png, true: how_ex.png)
   const [showGuide, setShowGuide] = useState(false);
 
+  // ✅ URL params에서 artistId 가져오기 (/exhibit/:artistId)
+  const artistId = params.artistId ?? null;
+
+  console.log("[Exhibit] 🔍 params.artistId:", artistId);
+  console.log("[Exhibit] 🔍 location.state:", JSON.stringify(location.state));
+
   useEffect(() => {
     const canvas = canvasRef.current;
     const uiRoot = wrapRef.current;
     if (!canvas || !uiRoot) return;
+
+    console.log("[Exhibit] mount → artistId:", artistId);
+
+    if (!artistId) {
+      console.warn("[Exhibit] ⚠️ artistId가 없음! URL을 확인하세요 (/exhibit/:artistId)");
+    }
 
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -68,6 +81,8 @@ export default function Exhibit() {
     const artist = st.artist ?? "";
     const artworkTitle = st.artworkTitle ?? "";
 
+    console.log("[Exhibit] 🔍 state:", { fromWaypointId, artist, artworkTitle, artId: st.artId });
+
     const titleText =
       artist && artworkTitle ? `${artist} · ${artworkTitle}` : artist ? artist : "EXHIBIT";
 
@@ -76,14 +91,17 @@ export default function Exhibit() {
 
     (async () => {
       try {
+        console.log("[Exhibit] mountExhibitRoom 호출 →", { artistId, titleText });
+
         const rt = await mountExhibitRoom(canvas, {
-          glbUrl: asset("museum/models/gallery/gallery5.glb"), // ✅ 너 프로젝트 전시장 glb 경로로 바꿔
+          glbUrl: asset("museum/models/gallery/gallery5.glb"),
           uiMount: uiLayer,
           titleText,
           panelItems: buildMockPanels(),
 
           // ✅ 홀로 돌아가기
           onExitToHall: () => {
+            console.log("[Exhibit] onExitToHall → /hall, fromWaypointId:", fromWaypointId);
             nav("/hall", { state: { startWaypointId: fromWaypointId } });
           },
         });
@@ -93,6 +111,7 @@ export default function Exhibit() {
           return;
         }
         runtime = rt;
+        console.log("[Exhibit] ✅ mountExhibitRoom 완료");
       } catch (e) {
         console.error("[Exhibit] mount failed", e);
       }
@@ -104,7 +123,7 @@ export default function Exhibit() {
       uiLayer.remove();
       document.body.style.overflow = prevOverflow;
     };
-  }, [nav, location.state]);
+  }, [nav, location.state, artistId]);
 
   return (
     <div
