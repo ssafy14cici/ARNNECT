@@ -624,34 +624,6 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     return a;
   }
 
-  function resolveAccessToken(): string | null {
-    // 1) opts에서 직접 주입된 토큰
-    if (opts.accessToken) {
-      console.log("[mainHallFree] ✅ accessToken from opts (직접 주입)");
-      return opts.accessToken;
-    }
-    // 2) getter 함수
-    if (typeof opts.getAccessToken === "function") {
-      const t = opts.getAccessToken() ?? null;
-      console.log("[mainHallFree] accessToken from getter:", t ? "있음" : "없음");
-      return t;
-    }
-
-    // 3) fallback: zustand storage 키에서 직접 꺼내기
-    try {
-      const raw = localStorage.getItem("arnnect_auth") || sessionStorage.getItem("arnnect_auth_ss");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.token) {
-          console.log("[mainHallFree] ✅ accessToken from storage fallback (arnnect_auth)");
-          return parsed.token;
-        }
-      }
-    } catch {}
-
-    console.warn("[mainHallFree] ⚠️ accessToken을 찾을 수 없음! → DEFAULT_ART_ITEMS 사용됨");
-    return null;
-  }
 
   // ✅ 토큰 제거 버전
   async function loadNewArtistItems(): Promise<ArtworkItem[]> {
