@@ -7,12 +7,8 @@ import { WAYPOINTS } from "./waypoints";
 import { applyGalleryLighting } from "./lighting";
 import { createWaypointNavigator } from "./navigator";
 
-// ✅ NEW: 신진예술인 6명 API
-import { fetchNewArtists, buildNewArtistImageUrl, type NewArtistArtwork } from "../api/newArtists"
-
 type ExhibitPayload = {
   artId?: number;
-  artistId: string; // ✅ memberUuid
   artist: string;
   artworkTitle: string;
   fromWaypointId: number; // 복귀할 waypoint
@@ -31,21 +27,14 @@ type Options = {
 
   /** ✅ UI 붙일 위치 (기본 document.body) */
   uiMount?: HTMLElement;
-
-  /** ✅ (선택) accessToken 직접 주입 (가장 확실) */
-  accessToken?: string;
-
-  /** ✅ (선택) 토큰 getter 주입 */
-  getAccessToken?: () => string | null | undefined;
 };
 
 type Mode = "NAV" | "FREE";
 
 type ArtworkItem = {
-  id: number; // artworkId
-  artistId: string; // memberUuid
-  artist: string; // nickname
-  artworkTitle: string; // title
+  id: number;
+  artist: string;
+  artworkTitle: string;
   imageUrl: string;
   anchorName: string; // ART_1 ~ ART_6
   nameAnchor?: string; // ART_1_NAME etc.
@@ -265,6 +254,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
     mountEl(btn, true);
 
+    // destroy에서 제거할 수 있게 핸들러를 붙여둠
     (btn as any).__onEnter = onEnter;
     (btn as any).__onLeave = onLeave;
     (btn as any).__onPtr = onPtr;
@@ -552,81 +542,18 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     });
   }
 
-  // ========= NEW: 신진예술인 6명 → ART_1~ART_6 랜덤 배치 =========
-  const ANCHORS = [
-    { anchorName: "ART_1", nameAnchor: "ART_1_NAME" },
-    { anchorName: "ART_2", nameAnchor: "ART_2_NAME" },
-    { anchorName: "ART_3", nameAnchor: "ART_3_NAME" },
-    { anchorName: "ART_4", nameAnchor: "ART_4_NAME" },
-    { anchorName: "ART_5", nameAnchor: "ART_5_NAME" },
-    { anchorName: "ART_6", nameAnchor: "ART_6_NAME" },
-  ] as const;
+  // Preload all art textures immediately
+  const preloadedTextures = new Map<string, THREE.Texture>();
+  const artTexturePromises: Promise<void>[] = [];
 
-  const DEFAULT_ART_ITEMS: ArtworkItem[] = [
-    { id: 1, artistId: "1", anchorName: "ART_1", nameAnchor: "ART_1_NAME", artist: "최수원", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a1.jpg` },
-    { id: 2, artistId: "2", anchorName: "ART_2", nameAnchor: "ART_2_NAME", artist: "김민성", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a2.jpg` },
-    { id: 3, artistId: "3", anchorName: "ART_3", nameAnchor: "ART_3_NAME", artist: "이수진", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a3.jpg` },
-    { id: 4, artistId: "4", anchorName: "ART_4", nameAnchor: "ART_4_NAME", artist: "김지윤", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a4.jpg` },
-    { id: 5, artistId: "5", anchorName: "ART_5", nameAnchor: "ART_5_NAME", artist: "김채아", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a5.jpg` },
-    { id: 6, artistId: "6", anchorName: "ART_6", nameAnchor: "ART_6_NAME", artist: "김혜령", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a6.jpg` },
+  const ART_ITEMS: ArtworkItem[] = [
+    { id: 1, anchorName: "ART_1", nameAnchor: "ART_1_NAME", artist: "최수원", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a1.jpg` },
+    { id: 2, anchorName: "ART_2", nameAnchor: "ART_2_NAME", artist: "김민성", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a2.jpg` },
+    { id: 3, anchorName: "ART_3", nameAnchor: "ART_3_NAME", artist: "이수진", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a3.jpg` },
+    { id: 4, anchorName: "ART_4", nameAnchor: "ART_4_NAME", artist: "김지윤", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a4.jpg` },
+    { id: 5, anchorName: "ART_5", nameAnchor: "ART_5_NAME", artist: "김채아", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a5.jpg` },
+    { id: 6, anchorName: "ART_6", nameAnchor: "ART_6_NAME", artist: "김혜령", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a6.jpg` },
   ];
-
-  function shuffle<T>(arr: T[]) {
-    const a = arr.slice();
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = (Math.random() * (i + 1)) | 0;
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }
-
-  function resolveAccessToken(): string | null {
-    if (opts.accessToken) return opts.accessToken;
-    if (typeof opts.getAccessToken === "function") return opts.getAccessToken() ?? null;
-
-    // 마지막 fallback: 로컬스토리지 키가 프로젝트마다 달라서 “있으면 쓰기”
-    return (
-      localStorage.getItem("accessToken") ||
-      localStorage.getItem("ACCESS_TOKEN") ||
-      localStorage.getItem("arnnect_access_token") ||
-      null
-    );
-  }
-
-  async function loadNewArtistItems(): Promise<ArtworkItem[]> {
-    const token = resolveAccessToken();
-    if (!token) return DEFAULT_ART_ITEMS;
-
-    try {
-      const rows = await fetchNewArtists(token);
-      if (!rows?.length) return DEFAULT_ART_ITEMS;
-
-      const picked = shuffle(rows);
-      const items: ArtworkItem[] = [];
-
-      for (let i = 0; i < ANCHORS.length; i++) {
-        const r = picked[i % picked.length] as NewArtistArtwork;
-        items.push({
-          id: r.artworkId,
-          artistId: r.memberUuid,
-          artist: (r.nickname ?? "").trim() || "작가",
-          artworkTitle: (r.title ?? "").trim() || "작품",
-          imageUrl: buildNewArtistImageUrl(r.savedImageName),
-          anchorName: ANCHORS[i].anchorName,
-          nameAnchor: ANCHORS[i].nameAnchor,
-        });
-      }
-
-      return items;
-    } catch (e) {
-      console.warn("[newArtists] fetch failed -> fallback to local images", e);
-      return DEFAULT_ART_ITEMS;
-    }
-  }
-
-  // Preload textures (items 결정 후 실행)
-  let preloadedTextures = new Map<string, THREE.Texture>();
-  let artTexturePromises: Promise<void>[] = [];
 
   const texLoader = new THREE.TextureLoader();
   async function loadTexture(url: string, flipV = true) {
@@ -651,16 +578,14 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     return tex;
   }
 
-  function startPreload(items: ArtworkItem[]) {
-    preloadedTextures.clear();
-    artTexturePromises = items.map((item) =>
-      loadTexture(item.imageUrl, true)
-        .then((tex) => {
-          if (!alive) return;
-          preloadedTextures.set(item.imageUrl, tex);
-        })
-        .catch(() => {})
-    );
+  for (const item of ART_ITEMS) {
+    const p = loadTexture(item.imageUrl, true)
+      .then((tex) => {
+        if (!alive) return;
+        preloadedTextures.set(item.imageUrl, tex);
+      })
+      .catch(() => {});
+    artTexturePromises.push(p);
   }
 
   const LOGO: LogoAttachOptions = {
@@ -794,8 +719,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     const artPos = computeWorldPos(planeMesh);
 
     // ✅ 클릭용 데이터
-    planeMesh.userData.__artId = item.id; // artworkId
-    planeMesh.userData.__artistId = item.artistId; // memberUuid
+    planeMesh.userData.__artId = item.id;
     planeMesh.userData.__artist = item.artist;
     planeMesh.userData.__artworkTitle = item.artworkTitle;
 
@@ -827,10 +751,10 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     }
   }
 
-  async function attachArtToPlanes(root: THREE.Object3D, items: ArtworkItem[]) {
+  async function attachArtToPlanes(root: THREE.Object3D) {
     const missing: string[] = [];
 
-    for (const item of items) {
+    for (const item of ART_ITEMS) {
       if (!alive) return;
 
       const obj = findObjectByName(root, item.anchorName);
@@ -992,13 +916,11 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   const GUIDE_OBJECT_NAMES = ["reception_desk", "doent_Cat"];
   const guideClickMeshes: THREE.Mesh[] = [];
 
-  // ✅ NEW: items를 먼저 promise로 준비
-  const itemsPromise = loadNewArtistItems();
-
   loader.load(
     glbUrl,
     async (gltf) => {
       if (!alive) {
+        // 로드가 늦게 끝난 경우: 바로 dispose하고 무시
         collectFromObject3D(gltf.scene);
         return;
       }
@@ -1027,15 +949,10 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
         onArrive,
       });
 
-      // ✅ NEW: 여기서 신진예술인 items 결정 → preload → attach
-      const items = await itemsPromise;
-      if (!alive) return;
-
-      startPreload(items);
       await Promise.all(artTexturePromises);
       if (!alive) return;
 
-      await attachArtToPlanes(gltf.scene, items);
+      await attachArtToPlanes(gltf.scene);
       if (!alive) return;
 
       await attachLogoToWall(gltf.scene);
@@ -1067,6 +984,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
         createGuidePointer(artMesh, { mini: true });
       }
 
+      // GLB 내부 리소스 추적(한 번만)
       collectFromObject3D(gltf.scene);
 
       opts.onReady?.();
@@ -1131,17 +1049,15 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
     const wpId = hit.userData?.__wpId as number | undefined;
     const artist = hit.userData?.__artist as string | undefined;
-    const artistId = hit.userData?.__artistId as string | undefined;
     const artworkTitle = hit.userData?.__artworkTitle as string | undefined;
-    const artId = hit.userData?.__artId as number | undefined;
 
     if (typeof wpId === "number") {
       const hitPos = computeWorldPos(hit);
       const distToArt = camera.position.distanceTo(hitPos);
 
       // ✅ 가까울 때만 모달
-      if (artist && artworkTitle && artistId && distToArt < 50) {
-        showArtModal({ artist, artistId, artworkTitle, artId });
+      if (artist && artworkTitle && distToArt < 50) {
+        showArtModal({ artist, artworkTitle, artId: hit.userData?.__artId });
       }
 
       setBackBtnVisible(true);
@@ -1312,9 +1228,11 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   }
 
   /* ===== Art modal ===== */
-  function showArtModal(payload: { artist: string; artistId: string; artworkTitle: string; artId?: number }) {
+  function showArtModal(payload: { artist: string; artworkTitle: string; artId?: number }) {
+    // ✅ uiMount 기준으로 중복 방지
     if (uiMount.querySelector("#art-modal")) return;
 
+    // ✅ pointer lock이 남아있으면 버튼 클릭이 씹힐 수 있어서 강제 해제
     if (controls.isLocked) controls.unlock();
     (document as any).exitPointerLock?.();
 
@@ -1327,6 +1245,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     box.style.cssText =
       "background:#fff;border-radius:12px;padding:40px 48px;text-align:center;font-family:'MuseumClassic','Noto Sans KR',system-ui,sans-serif;min-width:280px;pointer-events:auto;";
 
+    // ✅ 캔버스/다른 레이어로 이벤트 새는 거 방지
     overlay2.addEventListener("pointerdown", (e) => e.stopPropagation());
     box.addEventListener("pointerdown", (e) => e.stopPropagation());
 
@@ -1339,32 +1258,66 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
     const exhibitBtn = document.createElement("button");
     exhibitBtn.type = "button";
-    exhibitBtn.style.cssText =
-      "background:#333;color:#fff;border:none;border-radius:8px;padding:10px 32px;font-size:15px;cursor:pointer;font-family:inherit;";
+    exhibitBtn.style.cssText = "background:#333;color:#fff;border:none;border-radius:8px;padding:10px 32px;font-size:15px;cursor:pointer;font-family:inherit;";
     exhibitBtn.textContent = "전시보러가기";
 
+    // const openExhibit = (e: Event) => {
+    //   e.preventDefault();
+    //   e.stopPropagation();
+
+    //   overlay2.remove();
+
+    //   opts.onOpenExhibit?.({
+    //     artId: payload.artId,
+    //     artist: payload.artist,
+    //     artworkTitle: payload.artworkTitle,
+    //     fromWaypointId: currentId,
+    //   });
+    // };
     const openExhibit = (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
 
-      overlay2.remove();
-
-      opts.onOpenExhibit?.({
+      console.log("[openExhibit] fired", {
         artId: payload.artId,
-        artistId: payload.artistId, // ✅ 핵심
         artist: payload.artist,
         artworkTitle: payload.artworkTitle,
         fromWaypointId: currentId,
+        hasCallback: typeof opts.onOpenExhibit === "function",
       });
+
+      try {
+        overlay2.remove();
+
+        // ✅ 콜백이 없으면 여기서 바로 알 수 있게
+        if (typeof opts.onOpenExhibit !== "function") {
+          console.warn("[openExhibit] opts.onOpenExhibit is missing");
+          return;
+        }
+
+        opts.onOpenExhibit({
+          artId: payload.artId,
+          artist: payload.artist,
+          artworkTitle: payload.artworkTitle,
+          fromWaypointId: currentId,
+        });
+
+        console.log("[openExhibit] callback called");
+      } catch (err) {
+        console.error("[openExhibit] error", err);
+      }
     };
 
+
+
+
+    // ✅ click이 씹히는 케이스 대비
     exhibitBtn.addEventListener("pointerup", openExhibit);
     exhibitBtn.addEventListener("click", openExhibit);
 
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
-    closeBtn.style.cssText =
-      "background:transparent;color:#666;border:1px solid #ccc;border-radius:8px;padding:10px 32px;font-size:15px;cursor:pointer;font-family:inherit;";
+    closeBtn.style.cssText = "background:transparent;color:#666;border:1px solid #ccc;border-radius:8px;padding:10px 32px;font-size:15px;cursor:pointer;font-family:inherit;";
     closeBtn.textContent = "닫기";
     closeBtn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -1442,6 +1395,7 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       navLeft.removeEventListener("click", onNavLeftClick);
       navRight.removeEventListener("click", onNavRightClick);
 
+      // nav hover/pointerdown handlers
       const nl: any = navLeft as any;
       const nr: any = navRight as any;
       if (nl.__onEnter) navLeft.removeEventListener("mouseenter", nl.__onEnter);
@@ -1453,32 +1407,40 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
       if (overlayTimer) window.clearTimeout(overlayTimer);
 
+      // tutorial/modal 남아있으면 제거 (uiMount 기준)
       uiMount.querySelector("#art-modal")?.remove();
       uiMount.querySelector("#tutorial-overlay")?.remove();
 
+      // guide pointer stop
       guidePointersAlive = false;
       for (const el of guidePointerEls) el.remove();
 
+      // logo 제거
       if (logoMesh) {
         scene.remove(logoMesh);
         logoMesh = null;
       }
 
+      // spotlights 제거
       for (const s of spotlights) {
         scene.remove(s);
         if (s.target) scene.remove(s.target);
       }
 
+      // GLB root 제거
       if (glbRoot) {
         scene.remove(glbRoot);
       }
 
+      // head style 제거
       for (const s of mountedStyleEls) s.remove();
       mountedStyleEls.length = 0;
 
+      // 스코프 표식 기반 UI 싹 정리 (uiMount + head)
       uiMount.querySelectorAll(`[data-museum-ui="1"][data-museum-ui-scope="${UI_SCOPE}"]`).forEach((n) => n.remove());
       document.head.querySelectorAll(`[data-museum-ui="1"][data-museum-ui-scope="${UI_SCOPE}"]`).forEach((n) => n.remove());
 
+      // 리소스 dispose (중복 방지 Set 기반)
       for (const tex of createdTextures) tex.dispose();
       createdTextures.clear();
 

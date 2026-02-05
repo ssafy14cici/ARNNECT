@@ -53,6 +53,7 @@ import ReviewDetail from "../../pages/reviews/ReviewDetail";
 import NotFound from "../../pages/notfound/NotFound";
 import PrivacyPolicy from "../../pages/legal/PrivacyPolicy";
 import TermsOfService from "../../pages/legal/TermsOfService";
+import { path } from "framer-motion/client";
 
 const KEY_PREF_USED = "arnnect_pref_used_v1";
 const USE_MOCK = String(import.meta.env.VITE_USE_MOCK) === "true";
@@ -82,8 +83,10 @@ export const routes: RouteObject[] = [
 
       { path: "main-hall", element: <HomePC />},
       { path: "hall", element: <Hall />},
+      // 임시 전시장
       { path: "exhibit", element: <Exhibit /> },
-
+      // 작가 전시장
+      { path: "exhibit/:artistId", element: <Exhibit /> },
       // 로그인하면 회원가입을 막기
       {
         element: <Guard guestOnly redirectTo="/hall" />,
