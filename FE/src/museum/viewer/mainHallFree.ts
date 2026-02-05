@@ -357,6 +357,13 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   let freeSpeed = 9.5;
   const FREE_MOVE_SLOW_RATIO = 0.35;  // Ctrl 누르면 35% 속도
 
+  // 점프 관련
+  const JUMP_FORCE = 8.0;
+  const GRAVITY = 20.0;
+  let verticalVelocity = 0;
+  let groundY = 0;  // 바닥 높이 (시작 시 설정됨)
+  let isGrounded = true;
+
   const collisionRay = new THREE.Raycaster();
   const COLLISION_MARGIN = 1.5;
 
@@ -379,28 +386,54 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, yaw, 0, "YXZ")).normalize();
     const right = new THREE.Vector3(1, 0, 0).applyEuler(new THREE.Euler(0, yaw, 0, "YXZ")).normalize();
 
+    // 수평 이동 (WASD)
     const move = new THREE.Vector3();
     if (keys.has("KeyW")) move.add(forward);
     if (keys.has("KeyS")) move.addScaledVector(forward, -1);
     if (keys.has("KeyD")) move.add(right);
     if (keys.has("KeyA")) move.addScaledVector(right, -1);
-    if (keys.has("Space")) move.y += 1;
-    if (keys.has("ShiftLeft") || keys.has("ShiftRight")) move.y -= 1;
 
     if (move.lengthSq() > 0) {
       move.normalize().multiplyScalar(speed * dt);
       const dir = move.clone().normalize();
       if (canMove(camera.position, dir, move.length())) {
         camera.position.add(move);
-        camera.updateMatrixWorld(true);
       }
     }
+
+    // 점프 (Space)
+    if (keys.has("Space") && isGrounded) {
+      verticalVelocity = JUMP_FORCE;
+      isGrounded = false;
+    }
+
+    // 중력 적용
+    if (!isGrounded) {
+      verticalVelocity -= GRAVITY * dt;
+      camera.position.y += verticalVelocity * dt;
+
+      // 바닥에 착지
+      if (camera.position.y <= groundY) {
+        camera.position.y = groundY;
+        verticalVelocity = 0;
+        isGrounded = true;
+      }
+    }
+
+    camera.updateMatrixWorld(true);
   }
 
   function toggleMode() {
     mode = mode === "NAV" ? "FREE" : "NAV";
     setNavUiVisible(mode === "NAV");
     flashOverlay(mode === "NAV" ? `NAV ${currentId}` : "FREE");
+
+    // 자유이동 모드 진입 시 바닥 높이 설정
+    if (mode === "FREE") {
+      groundY = camera.position.y;
+      isGrounded = true;
+      verticalVelocity = 0;
+    }
 
     if (mode === "NAV" && controls.isLocked) controls.unlock();
     if (currentId === ORIGIN_ID) setBackBtnVisible(false);
