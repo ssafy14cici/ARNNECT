@@ -3,10 +3,6 @@ import React from "react";
 import type { TicketDesignProps } from "../../../../features/tickets/types";
 import TicketQR from "./_parts/TicketQR";
 
-/**
- * HOLO_ABSTRACT (가로형 + 우측 스텁 + 홀로 그라디언트 + QR placeholder)
- * - QR은 공통 placeholder(TicketQR)만 사용 (실제 QR은 나중에 TicketQR 내부만 교체)
- */
 export default function HoloAbstractTicket({ data }: TicketDesignProps) {
   const title = (data.title || "ABSTRACT").toUpperCase();
 
@@ -15,265 +11,110 @@ export default function HoloAbstractTicket({ data }: TicketDesignProps) {
       style={{
         width: "100%",
         height: "100%",
-        borderRadius: 6,
+        borderRadius: 10,
         overflow: "hidden",
         position: "relative",
         color: "#fff",
-        fontFamily: "'Helvetica Neue', Arial, sans-serif",
-        boxShadow: "0 10px 26px rgba(0,0,0,0.22)",
-        background:
-          "linear-gradient(135deg, rgba(255,60,190,0.95), rgba(90,60,255,0.95) 35%, rgba(55,110,255,0.95) 70%, rgba(80,215,255,0.85))",
+        fontFamily: "'Inter', 'Apple SD Gothic Neo', sans-serif",
+        boxShadow: "0 15px 35px rgba(0,0,0,0.3)",
+        background: "linear-gradient(135deg, #4f46e5 0%, #3b82f6 50%, #06b6d4 100%)",
       }}
     >
-      {/* 배경 하이라이트 */}
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          opacity: 0.95,
-          mixBlendMode: "screen",
-          filter: "saturate(1.25)",
-          background:
-            "radial-gradient(600px 240px at 15% 10%, rgba(255,255,255,0.42), rgba(255,255,255,0) 60%)," +
-            "radial-gradient(480px 260px at 20% 80%, rgba(255,170,240,0.55), rgba(255,255,255,0) 60%)," +
-            "radial-gradient(520px 260px at 85% 15%, rgba(160,255,190,0.55), rgba(255,255,255,0) 60%)," +
-            "radial-gradient(520px 320px at 78% 80%, rgba(255,220,140,0.45), rgba(255,255,255,0) 60%)",
-        }}
-      />
+      {/* 유동적인 홀로그램 배경 배경 */}
+      <div style={{
+        position: "absolute",
+        inset: 0,
+        background: `
+          radial-gradient(circle at 10% 10%, rgba(255, 0, 120, 0.4), transparent 40%),
+          radial-gradient(circle at 80% 80%, rgba(253, 224, 71, 0.3), transparent 50%)
+        `,
+        filter: "blur(20px)",
+      }} />
 
-      {/* 리본 느낌(도안 느낌) */}
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          left: "35%",
-          top: "18%",
-          width: "50%",
-          height: "60%",
-          transform: "rotate(-8deg)",
-          borderRadius: 999,
-          background:
-            "linear-gradient(90deg, rgba(255,180,120,0.0), rgba(255,230,160,0.75), rgba(120,240,255,0.65), rgba(255,120,220,0.75), rgba(255,180,120,0.0))",
-          maskImage: "radial-gradient(70% 60% at 50% 50%, #000 65%, rgba(0,0,0,0) 66%)",
-          opacity: 0.9,
-          pointerEvents: "none",
-        }}
-      />
+      <div style={{ display: "flex", width: "100%", height: "100%", position: "relative", zIndex: 1 }}>
+        {/* 왼쪽 메인 컨텐츠 */}
+        <div style={{ flex: 1, padding: "28px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            {/* 타이틀 (테두리 제거) */}
+            <h1 style={{ 
+              fontSize: "48px", 
+              margin: 0, 
+              fontWeight: 900, 
+              letterSpacing: "-1px",
+              lineHeight: 0.9 
+            }}>
+              {title}
+            </h1>
 
-      {/* 스피어 */}
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          right: "22%",
-          top: "44%",
-          width: "13%",
-          aspectRatio: "1 / 1",
-          borderRadius: "50%",
-          background:
-            "radial-gradient(circle at 35% 30%, rgba(255,255,255,0.9), rgba(255,255,255,0) 45%)," +
-            "radial-gradient(circle at 65% 70%, rgba(255,80,210,0.9), rgba(255,80,210,0) 55%)," +
-            "linear-gradient(135deg, rgba(255,235,170,0.85), rgba(90,220,255,0.85), rgba(240,80,220,0.85))",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
-          opacity: 0.95,
-          pointerEvents: "none",
-        }}
-      />
-
-      {/* 메인 + 스텁 */}
-      <div style={{ display: "flex", width: "100%", height: "100%" }}>
-        {/* 좌측 메인 */}
-        <div style={{ flex: 1, padding: "18px 18px 14px 18px", boxSizing: "border-box", position: "relative" }}>
-          {/* 큰 타이틀 */}
-          <div
-            style={{
-              fontSize: "44px",
-              fontWeight: 300,
-              letterSpacing: "2px",
-              lineHeight: 1,
-              marginTop: 6,
-              textTransform: "uppercase",
-              opacity: 0.97,
-              textShadow: "0 2px 16px rgba(0,0,0,0.25)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-            title={title}
-          >
-            {title}
+            {/* 서브 문구 */}
+            <div style={{ fontSize: "12px", fontWeight: 700, textAlign: "right", opacity: 0.9 }}>
+              ABSTRACT ART<br />EXHIBITION
+            </div>
           </div>
 
-          {/* 우상단 서브타이틀 */}
-          <div
-            style={{
-              position: "absolute",
-              right: 18,
-              top: 18,
-              textAlign: "right",
-              fontSize: "14px",
-              fontWeight: 500,
-              letterSpacing: "2px",
-              opacity: 0.9,
-              textTransform: "uppercase",
-              lineHeight: 1.35,
-            }}
-          >
-            <div>ABSTRACT ART</div>
-            <div>EXHIBITION</div>
-          </div>
-
-          {/* 날짜/장소 */}
-          <div style={{ marginTop: 74 }}>
-            <div style={{ fontSize: "16px", fontWeight: 800, letterSpacing: "0.5px", opacity: 0.95 }}>
+          {/* 하단 정보 섹션 */}
+          <div style={{ marginBottom: "10px" }}>
+            <div style={{ 
+              display: "inline-block",
+              padding: "4px 12px",
+              background: "rgba(255, 255, 255, 0.2)",
+              backdropFilter: "blur(5px)",
+              borderRadius: "4px",
+              fontSize: "16px",
+              fontWeight: 700,
+              marginBottom: "8px"
+            }}>
               {data.startDate} - {data.endDate}
             </div>
-
-            <div style={{ marginTop: 10, fontSize: "13px", lineHeight: 1.35, opacity: 0.92 }}>
-              <div style={{ fontWeight: 700, opacity: 0.95 }}>Location:</div>
-              <div style={{ opacity: 0.9 }}>
-                {data.address}
-                {data.addressDetail ? `, ${data.addressDetail}` : ""}
-              </div>
+            <div style={{ fontSize: "13px", fontWeight: 500, opacity: 0.9 }}>
+              <strong>Location:</strong> {data.address} {data.addressDetail}
             </div>
           </div>
 
-          {/* 하단 라인 */}
-          <div
-            aria-hidden
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 44,
-              height: 1,
-              background: "rgba(255,255,255,0.45)",
-            }}
-          />
-
-          {/* 바코드 느낌 */}
-          <div
-            aria-hidden
-            style={{
-              position: "absolute",
-              left: 18,
-              right: 18,
-              bottom: 12,
-              height: 22,
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              opacity: 0.95,
-            }}
-          >
-            <div
-              style={{
-                height: "100%",
-                width: 160,
-                borderRadius: 2,
-                background:
-                  "repeating-linear-gradient(90deg," +
-                  "rgba(255,255,255,0.0) 0px," +
-                  "rgba(255,255,255,0.0) 2px," +
-                  "rgba(255,255,255,0.95) 2px," +
-                  "rgba(255,255,255,0.95) 4px," +
-                  "rgba(255,255,255,0.2) 4px," +
-                  "rgba(255,255,255,0.2) 7px)",
-                boxShadow: "0 2px 10px rgba(0,0,0,0.18)",
-              }}
-            />
-          </div>
+          {/* 바코드 장식 */}
+          <div style={{ 
+            height: "20px", 
+            width: "160px", 
+            background: "repeating-linear-gradient(90deg, #fff 0px, #fff 2px, transparent 2px, transparent 4px, #fff 4px, #fff 5px)" 
+          }} />
         </div>
 
-        {/* 우측 스텁 */}
-        <div
-          style={{
-            width: 132,
-            position: "relative",
-            background: "rgba(255,255,255,0.10)",
-            backdropFilter: "blur(6px)",
-            boxSizing: "border-box",
-          }}
-        >
-          {/* 점선 절취선 */}
-          <div
-            aria-hidden
-            style={{
-              position: "absolute",
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: 0,
-              borderLeft: "2px dotted rgba(255,255,255,0.55)",
-            }}
-          />
-
-          {/* QR placeholder */}
-          <div style={{ margin: "14px auto 0", width: 82, height: 82, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <TicketQR size={72} variant="light" label="QR" radius={8} />
+        {/* 오른쪽 스텁 (Stub) */}
+        <div style={{ 
+          width: "130px", 
+          borderLeft: "2px dotted rgba(255,255,255,0.3)", 
+          display: "flex", 
+          flexDirection: "column", 
+          alignItems: "center",
+          padding: "20px 0",
+          background: "rgba(255,255,255,0.05)"
+        }}>
+          {/* QR 박스 */}
+          <div style={{ background: "#fff", padding: "5px", borderRadius: "6px", marginBottom: "auto" }}>
+            <TicketQR size={70} variant="dark" />
           </div>
 
-          {/* 스텁 세로 텍스트 */}
-          <div
-            style={{
-              position: "absolute",
-              left: 12,
-              bottom: 12,
-              top: 112,
-              display: "flex",
-              gap: 10,
-              alignItems: "flex-end",
-              justifyContent: "flex-end",
-            }}
-          >
-            <div
-              style={{
-                writingMode: "vertical-rl",
-                textOrientation: "mixed",
-                fontWeight: 700,
-                letterSpacing: "2px",
-                opacity: 0.92,
-                textTransform: "uppercase",
-                fontSize: 16,
-              }}
-            >
-              ABSTRACT
-            </div>
-
-            <div aria-hidden style={{ width: 1, height: 90, background: "rgba(255,255,255,0.7)", opacity: 0.8 }} />
-
-            <div
-              style={{
-                writingMode: "vertical-rl",
-                textOrientation: "mixed",
-                fontWeight: 600,
-                letterSpacing: "2px",
-                opacity: 0.88,
-                textTransform: "uppercase",
-                fontSize: 14,
-              }}
-            >
-              ART
-            </div>
-
-            <div
-              style={{
-                writingMode: "vertical-rl",
-                textOrientation: "mixed",
-                fontWeight: 600,
-                letterSpacing: "2px",
-                opacity: 0.88,
-                textTransform: "uppercase",
-                fontSize: 14,
-              }}
-            >
-              EXHIBITION
-            </div>
+          {/* 세로 텍스트 */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", transform: "rotate(0deg)" }}>
+            <span style={{ writingMode: "vertical-rl", fontSize: "16px", fontWeight: 800 }}>{title}</span>
+            <div style={{ width: "1px", height: "50px", background: "#fff", opacity: 0.5 }} />
+            <span style={{ writingMode: "vertical-rl", fontSize: "11px", fontWeight: 500 }}>ART EXHIBITION</span>
           </div>
         </div>
       </div>
+
+      {/* 포인트 구체 오브젝트 */}
+      <div style={{
+        position: "absolute",
+        right: "100px",
+        top: "40%",
+        width: "55px",
+        height: "55px",
+        borderRadius: "50%",
+        background: "radial-gradient(circle at 30% 30%, #ff99cc, #ff3399)",
+        boxShadow: "0 10px 20px rgba(0,0,0,0.2)",
+      }} />
     </div>
   );
 }
