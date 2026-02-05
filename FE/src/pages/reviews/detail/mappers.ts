@@ -151,23 +151,8 @@ export function mapSingleComment(payload: unknown): LocalComment | null {
   };
 }
 
-export type LikeToggleResult = { isLiked?: boolean; likeCount?: number };
-export function parseLikeToggleResult(payload: unknown): LikeToggleResult {
-  const body = pickEnvelopeData(payload);
-  if (!isObject(body)) return {};
-
-  const o = body as JsonObject;
-
-  const isLiked = asBool(get(o, "isLiked"), asBool(get(o, "liked"), asBool(get(o, "isLike"))));
-  const likeCount = asNumber(get(o, "likeCount"), asNumber(get(o, "count"), asNumber(get(o, "likes"))));
-
-  const out: LikeToggleResult = {};
-  if (typeof isLiked === "boolean") out.isLiked = isLiked;
-  if (Number.isFinite(likeCount)) out.likeCount = likeCount;
-  return out;
-}
-
 export type FollowToggleResult = { isFollowing?: boolean };
+
 export function parseFollowToggleResult(payload: unknown): FollowToggleResult {
   const body = pickEnvelopeData(payload);
   if (!isObject(body)) return {};

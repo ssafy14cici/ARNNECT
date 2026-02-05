@@ -2,18 +2,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toBlob } from "html-to-image";
-import QRCode from "react-qr-code";
-import { renderToStaticMarkup } from "react-dom/server";
 import "../../lounge.css";
+
+import QRCodeLib from "qrcode";
 
 import { createTicket, updateTicket } from "../../../../features/tickets/api/realTickets";
 import TicketForm, { type FormState } from "./TicketForm";
 import QrPanel from "./QrPanel";
 import { rememberDesign, type TicketItem, useIssuedTickets } from "./useIssuedTickets";
-import { svgToPngFile } from "../../../../features/tickets/qrDownload";
 import { resolveTicketMedia } from "../../../../features/tickets/resolveTicketMedia";
-
-// ✅ 추가 (artistUuid 전달용)
 import { useAuthStore } from "../../../../features/auth/store";
 
 type TabMode = "ISSUE" | "LIST";
@@ -50,23 +47,42 @@ function toForm(t?: Partial<TicketItem> | null): FormState {
     endDate: t?.endDate ?? todayYYYYMMDD(),
     startTime: t?.startTime && isHHmm(t.startTime.slice(0, 5)) ? t.startTime.slice(0, 5) : "10:00",
     endTime: t?.endTime && isHHmm(t.endTime.slice(0, 5)) ? t.endTime.slice(0, 5) : "20:00",
-    posterUrl: "",
+    posterFile: null,
+    posterPreviewUrl: "",
     ticketDesign: t?.ticketDesign ?? "BASIC",
   };
 }
 
-// ticketCode로 QR png 파일 생성 (multipart qrImage)
+// ✅ 업로드용 QR png 파일 생성 (DOM 없이 qrcode로 바로 생성)
 async function makeQrImageFile(ticketCode: string) {
-  const markup = renderToStaticMarkup(<QRCode value={ticketCode} size={220} />);
-  const doc = new DOMParser().parseFromString(markup, "image/svg+xml");
-  const svg = doc.querySelector("svg") as SVGSVGElement | null;
-  if (!svg) throw new Error("QR SVG 생성 실패");
-  return svgToPngFile(svg, `QR_${ticketCode}.png`);
+  const dataUrl = await QRCodeLib.toDataURL(ticketCode, {
+    width: 220,
+    margin: 1,
+    errorCorrectionLevel: "M",
+  });
+
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+
+  return new File([blob], `QR_${ticketCode}.png`, { type: blob.type || "image/png" });
+}
+
+async function waitImagesLoaded(el: HTMLElement) {
+  const imgs = Array.from(el.querySelectorAll("img"));
+  await Promise.all(
+    imgs.map((img) => {
+      if (img.complete) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        const done = () => resolve();
+        img.addEventListener("load", done, { once: true });
+        img.addEventListener("error", done, { once: true });
+      });
+    }),
+  );
 }
 
 // ticketImage는 필수 -> 캡처 실패 시 fallback 이미지 생성
 async function makeTicketImageFile(previewEl: HTMLElement | null, ticketCode: string, title: string) {
-  // 폰트 로딩 대기(가능한 환경)
   // @ts-ignore
   if (document.fonts?.ready) {
     // @ts-ignore
@@ -75,6 +91,7 @@ async function makeTicketImageFile(previewEl: HTMLElement | null, ticketCode: st
 
   if (previewEl) {
     try {
+      await waitImagesLoaded(previewEl); // ✅ 포스터 이미지 로딩 대기
       const blob = await toBlob(previewEl, {
         cacheBust: true,
         pixelRatio: 3,
@@ -86,7 +103,6 @@ async function makeTicketImageFile(previewEl: HTMLElement | null, ticketCode: st
     }
   }
 
-  // fallback
   const canvas = document.createElement("canvas");
   canvas.width = 900;
   canvas.height = 1400;
@@ -116,23 +132,20 @@ export default function TicketQr() {
   const [error, setError] = useState("");
 
   const [ticketId, setTicketId] = useState<number | null>(null);
-  const [ticketCode, setTicketCode] = useState<string>("");
-  const [qrImageName, setQrImageName] = useState<string>("");
 
+  // ✅ 코드(state)로 고정: 미리보기/캡처/업로드 동일 값 사용
+  const [code, setCode] = useState<string>(() => makeTicketCode());
+
+  const [qrImageName, setQrImageName] = useState<string>("");
   const [editingTicketId, setEditingTicketId] = useState<number | null>(null);
 
   const [form, setForm] = useState<FormState>(() => toForm(null));
-
   const previewRef = useRef<HTMLDivElement | null>(null);
 
-  // ✅ artistUuid(=memberUuid) 확보
   const artistUuid = useAuthStore((s) => s.user?.memberUuid ?? "");
-
-  // ✅ useIssuedTickets는 artistUuid 1개 인자 필수
   const { issued, reloadIssued, removeIssued } = useIssuedTickets(artistUuid);
 
   useEffect(() => {
-    // ✅ artistUuid 없으면 호출 스킵
     if (!artistUuid) return;
     reloadIssued().catch((e) => console.error("목록 로드 실패", e));
   }, [artistUuid, reloadIssued]);
@@ -151,7 +164,7 @@ export default function TicketQr() {
     setBusy(false);
     setEditingTicketId(null);
     setTicketId(null);
-    setTicketCode("");
+    setCode(makeTicketCode()); // ✅ 새 코드로 갱신
     setQrImageName("");
     setForm(toForm(null));
   }, []);
@@ -163,9 +176,6 @@ export default function TicketQr() {
     setError("");
 
     try {
-      const code = ticketCode || makeTicketCode();
-
-      // ✅ multipart 필수 파일 생성
       const qrFile = await makeQrImageFile(code);
       const ticketFile = await makeTicketImageFile(previewRef.current, code, form.title.trim());
 
@@ -181,14 +191,18 @@ export default function TicketQr() {
       fd.append("qrImage", qrFile);
       fd.append("ticketImage", ticketFile);
 
+      // ✅ 포스터를 서버에 "파일로" 보내야 하는 명세라면 여기도 필요
+      // - BE 필드명이 다르면 "poster"/"posterImage" 등으로 키만 바꿔줘
+      if (form.posterFile) {
+        fd.append("poster", form.posterFile);
+      }
+
       const res = editingTicketId ? await updateTicket(editingTicketId, fd) : await createTicket(fd);
 
-      // ✅ 프론트 상태 갱신
       setTicketId(res.ticketId);
-      setTicketCode(res.ticketCode);
+      setCode(res.ticketCode); // ✅ 서버가 동일 code 반환하는 구조면 그대로
       setQrImageName(res.qrImageName || "");
 
-      // ✅ 디자인은 FE 로컬 저장(서버 필드 없으니)
       rememberDesign(res.ticketCode, form.ticketDesign);
 
       alert(editingTicketId ? "수정되었습니다." : "QR이 발급되었습니다.");
@@ -205,7 +219,7 @@ export default function TicketQr() {
     setError("");
     setEditingTicketId(t.ticketId);
     setTicketId(t.ticketId);
-    setTicketCode(t.ticketCode);
+    setCode(t.ticketCode); // ✅ 수정 시에도 코드 고정
     setQrImageName(t.qrImageName ?? "");
     setForm(toForm(t));
     setActiveTab("ISSUE");
@@ -218,9 +232,7 @@ export default function TicketQr() {
     setBusy(true);
     setError("");
     try {
-      // ✅ 2개 인자 전달 금지(에러 원인). 1개만 전달.
       await removeIssued(t);
-
       if (ticketId === t.ticketId) resetForm();
     } catch (e: unknown) {
       console.error(e);
@@ -284,6 +296,7 @@ export default function TicketQr() {
                 busy={busy}
                 onChange={(patch) => setForm((p) => ({ ...p, ...patch }))}
                 previewRef={previewRef}
+                qrValue={code}
               />
 
               {error && <div className="loungeNotice">{error}</div>}
@@ -295,7 +308,8 @@ export default function TicketQr() {
               </div>
             </div>
 
-            {ticketCode && <QrPanel ticketCode={ticketCode} busy={busy} qrImageName={qrImageName} />}
+            {/* ✅ react-qr-code 표시 + QR만 저장 버튼 */}
+            {code && <QrPanel ticketCode={code} busy={busy} qrImageName={qrImageName} />}
           </div>
         )}
 

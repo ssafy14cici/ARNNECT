@@ -66,7 +66,8 @@ export const FeedCard: React.FC<FeedCardProps> = ({ feed, viewMode, onClick, onA
         </div>
 
         {hasImage ? (
-          <img src={feed.imageUrl} alt={feed.title} loading="lazy" />
+          // ✅ className="card-img" 추가 (CSS 적용되게)
+          <img className="card-img" src={feed.imageUrl} alt={feed.title} loading="lazy" />
         ) : (
           <div className="card-placeholder">NO IMAGE</div>
         )}

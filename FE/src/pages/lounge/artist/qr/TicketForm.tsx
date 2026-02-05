@@ -1,7 +1,8 @@
 // FE/src/pages/lounge/artist/qr/TicketForm.tsx
-import { ChangeEvent, type RefObject } from "react";
+import { ChangeEvent, type RefObject, useCallback } from "react";
 import type { TicketDesign } from "./useIssuedTickets";
 import TicketPreview from "../../../../shared/ui/tickets/TicketPreview";
+import QRCode from "react-qr-code";
 
 // TicketQr.tsx에서 사용하는 FormState와 일치시킴
 export type FormState = {
@@ -12,7 +13,11 @@ export type FormState = {
   endDate: string;
   startTime: string;
   endTime: string;
-  posterUrl: string;
+
+  // ✅ URL 입력 제거 → 파일 업로드로 변경
+  posterFile: File | null;
+  posterPreviewUrl: string; // TicketPreview에 넘길 src(dataURL)
+
   ticketDesign: TicketDesign;
 };
 
@@ -21,14 +26,17 @@ type Props = {
   busy: boolean;
   onChange: (patch: Partial<FormState>) => void;
 
-  // ✅ ticketImage 캡처용 (null 허용으로 타입 정합성 해결)
+  // ✅ ticketImage 캡처용
   previewRef: RefObject<HTMLDivElement | null>;
+
+  // ✅ 캡처 이미지에 포함될 QR 값
+  qrValue: string;
 };
 
-export default function TicketForm({ form, busy, onChange, previewRef }: Props) {
+export default function TicketForm({ form, busy, onChange, previewRef, qrValue }: Props) {
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    onChange({ [name as keyof FormState]: value });
+    onChange({ [name as keyof FormState]: value } as Partial<FormState>);
   };
 
   const designOptions: { value: TicketDesign; label: string }[] = [
@@ -36,6 +44,34 @@ export default function TicketForm({ form, busy, onChange, previewRef }: Props) 
     { value: "MODERN", label: "Modern (모던)" },
     { value: "MINIMAL", label: "Minimal (미니멀)" },
   ];
+
+  const onPickPoster = useCallback(
+    async (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0] ?? null;
+      if (!file) {
+        onChange({ posterFile: null, posterPreviewUrl: "" });
+        return;
+      }
+
+      // ✅ 캡처 안정성을 위해 objectURL 대신 dataURL 사용(taint/CORS 리스크 줄임)
+      const dataUrl = await new Promise<string>((resolve) => {
+        const r = new FileReader();
+        r.onload = () => resolve(typeof r.result === "string" ? r.result : "");
+        r.onerror = () => resolve("");
+        r.readAsDataURL(file);
+      });
+
+      onChange({
+        posterFile: file,
+        posterPreviewUrl: dataUrl,
+      });
+    },
+    [onChange],
+  );
+
+  const clearPoster = useCallback(() => {
+    onChange({ posterFile: null, posterPreviewUrl: "" });
+  }, [onChange]);
 
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: "40px", alignItems: "flex-start" }}>
@@ -160,20 +196,24 @@ export default function TicketForm({ form, busy, onChange, previewRef }: Props) 
           </div>
         </div>
 
-        {/* 4. 포스터 URL (서버 전송 X, ticketImage 캡처에만 반영됨) */}
+        {/* 4. 포스터 이미지 파일 업로드 */}
         <div className="loungeInputGroup">
-          <label className="loungeLabel">포스터 URL</label>
-          <input
-            className="loungeInput"
-            name="posterUrl"
-            value={form.posterUrl}
-            onChange={handleChange}
-            placeholder="https://example.com/poster.jpg"
-            disabled={busy}
-          />
-          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginTop: "6px" }}>
-            * URL을 입력하면 우측 미리보기에 이미지가 적용됩니다. (CORS에 따라 캡처가 실패할 수 있음)
-          </p>
+          <label className="loungeLabel">포스터 이미지</label>
+
+          <input type="file" accept="image/*" disabled={busy} onChange={onPickPoster} />
+
+          {form.posterPreviewUrl ? (
+            <div style={{ marginTop: 8, display: "flex", gap: 10, alignItems: "center" }}>
+              <span style={{ fontSize: 12, opacity: 0.7 }}>선택됨: {form.posterFile?.name ?? "poster"}</span>
+              <button type="button" className="loungeTextBtn" onClick={clearPoster} disabled={busy}>
+                제거
+              </button>
+            </div>
+          ) : (
+            <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginTop: "6px" }}>
+              * 업로드한 포스터는 우측 티켓 미리보기/캡처(ticketImage)에 포함됩니다.
+            </p>
+          )}
         </div>
       </div>
 
@@ -203,8 +243,24 @@ export default function TicketForm({ form, busy, onChange, previewRef }: Props) 
             justifyContent: "center",
             alignItems: "center",
             minHeight: "400px",
+            position: "relative", // ✅ QR 오버레이용
           }}
         >
+          {/* ✅ 캡처 이미지(ticketImage)에 QR이 포함되도록 오버레이 */}
+          <div
+            style={{
+              position: "absolute",
+              top: 12,
+              right: 12,
+              background: "#fff",
+              padding: 8,
+              borderRadius: 12,
+              border: "1px solid rgba(0,0,0,0.15)",
+            }}
+          >
+            <QRCode value={qrValue} size={72} />
+          </div>
+
           <TicketPreview
             designType={form.ticketDesign}
             data={{
@@ -215,7 +271,8 @@ export default function TicketForm({ form, busy, onChange, previewRef }: Props) 
               endDate: form.endDate,
               startTime: form.startTime,
               endTime: form.endTime,
-              posterUrl: form.posterUrl,
+              // ✅ 기존 prop 이름 유지하되, dataURL을 넣음
+              posterUrl: form.posterPreviewUrl,
             }}
           />
         </div>

@@ -1,10 +1,18 @@
 // FE/src/shared/api/http.ts
 import axios from "axios";
-import { useAuthStore } from "../../features/auth/store";
+
+type TokenGetter = () => string | null;
+
+// ✅ auth store를 여기서 import 하지 말고, 바깥에서 주입 받기
+let getToken: TokenGetter = () => null;
+
+export function bindAuthTokenGetter(fn: TokenGetter) {
+  getToken = fn;
+}
 
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
-  withCredentials: true, // ✅ refreshToken(httpOnly cookie) 포함 가능
+  withCredentials: true, // refreshToken(httpOnly cookie) 포함 가능
 });
 
 http.interceptors.request.use((config) => {
@@ -17,7 +25,7 @@ http.interceptors.request.use((config) => {
     return config;
   }
 
-  const token = useAuthStore.getState().token;
+  const token = getToken();
   if (token) {
     (config.headers as any).Authorization = `Bearer ${token}`;
   }

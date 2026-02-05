@@ -420,3 +420,58 @@
     padding: 50px 16px 0;
   }
 }
+/* =============================================================================
+   COMMENTS - 강화(하얀 박스/가독성/카드 UI)
+   -> specificity 올려서 글로벌 CSS 덮어쓰기
+============================================================================= */
+
+.rd-comments .rd-comment-list {
+  gap: 16px;
+}
+
+.rd-comments .rd-comment-item {
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+}
+
+.rd-comments .rd-comment-text {
+  margin-top: 6px;
+  font-size: 0.98rem;
+  line-height: 1.7;
+  color: rgba(255,255,255,0.88);
+}
+
+.rd-comments .rd-replies {
+  margin-top: 14px;
+  padding-left: 14px;
+  border-left: 1px solid rgba(255,255,255,0.10);
+}
+
+.rd-comments .rd-reply-item {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.rd-comments .rd-comment-meta {
+  color: rgba(255,255,255,0.55);
+}
+
+.rd-comments .rd-comment-actions .rd-link {
+  color: rgba(255,255,255,0.55);
+}
+
+.rd-comments .rd-inline-textarea {
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.16);
+  color: rgba(255,255,255,0.92);
+}
+
+.rd-comments .rd-comment-input-field {
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.16);
+}

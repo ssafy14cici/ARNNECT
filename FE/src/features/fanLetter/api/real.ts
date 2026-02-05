@@ -1,4 +1,4 @@
-//FE\src\features\fanLetter\api\real.ts
+// FE/src/features/fanLetter/api/real.ts
 import { http } from "../../../shared/api/http";
 import type {
   ApiEnvelope,
@@ -68,33 +68,96 @@ function apiPath(path: string): string {
   return p.startsWith("/api/v1/") ? p : `/api/v1${p}`;
 }
 
-function mapRawToFanLetter(raw: FanLetterRaw): FanLetter {
-  const id = Number.isFinite(raw.fanLetterId as number)
-    ? (raw.fanLetterId as number)
-    : (raw.id as number);
+/**
+ * 서버가 리스트를 다양한 키로 감싸서 내려주는 케이스 대응
+ * - data: FanLetter[]
+ * - data: { fanLetters: FanLetter[] }
+ * - data: { items: FanLetter[] } 등
+ */
+function extractArray(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) return raw;
 
-  const nickname = asString(raw.nickname, "User");
-  const content = asString(raw.content, "");
+  if (isObject(raw)) {
+    const candidates = ["fanLetters", "fanletters", "items", "list", "content", "results"];
+    for (const k of candidates) {
+      const v = get(raw, k);
+      if (Array.isArray(v)) return v;
+    }
+  }
+  return [];
+}
 
-  const createdAt = asString(raw.createdAt, "") || asString(raw.date, "");
-  const answer = raw.answer ?? undefined;
+function mapRawToFanLetter(raw: FanLetterRaw | unknown): FanLetter {
+  const o: JsonObject = isObject(raw) ? raw : {};
 
-  const answered =
-    typeof raw.answered === "boolean"
-      ? raw.answered
-      : typeof raw.isAnswered === "boolean"
-        ? raw.isAnswered
-        : Boolean(answer && String(answer).trim().length > 0);
+  // id
+  const id =
+    asNumber(get(o, "fanLetterId")) ||
+    asNumber(get(o, "fanletterId")) ||
+    asNumber(get(o, "id")) ||
+    0;
+
+  // from nickname (BE/FE 흔들림 대응)
+  const fromNickname =
+    asString(get(o, "fromNickname")) ||
+    asString(get(o, "nickname")) ||
+    asString(get(o, "from_nickname")) ||
+    "User";
+
+  // question/content
+  const question =
+    asString(get(o, "question")) ||
+    asString(get(o, "content")) ||
+    asString(get(o, "message")) ||
+    "";
+
+  // createdAt/date
+  const createdAt =
+    asString(get(o, "createdAt")) ||
+    asString(get(o, "created_at")) ||
+    asString(get(o, "date")) ||
+    "";
+
+  // artwork
+  const artworkId = (() => {
+    const v = get(o, "artworkId");
+    const n = asNumber(v, NaN);
+    return Number.isFinite(n) ? n : undefined;
+  })();
+
+  const artworkName =
+    asString(get(o, "artworkName")) ||
+    asString(get(o, "artworkTitle")) ||
+    asString(get(o, "artwork_name")) ||
+    undefined;
+
+  // answer / answered
+  const answerRaw = get(o, "answer") ?? get(o, "reply") ?? get(o, "response");
+  const answer = (() => {
+    const s = asString(answerRaw, "").trim();
+    return s ? s : undefined;
+  })();
+
+  // ✅ FIX: "??" 와 "||"를 한 표현식에서 섞지 않도록 분리
+  const answeredV = get(o, "answered");
+  const isAnsweredV = get(o, "isAnswered");
+
+  const answeredBool =
+    (typeof answeredV === "boolean" ? answeredV : undefined) ??
+    (typeof isAnsweredV === "boolean" ? isAnsweredV : undefined) ??
+    asBool(get(o, "is_answered"), false);
+
+  const isAnswered = answeredBool || Boolean(answer);
 
   return {
     id: Number(id),
-    fromNickname: nickname,
-    question: content,
+    fromNickname,
+    question,
     createdAt,
-    artworkId: raw.artworkId,
-    artworkName: raw.artworkName,
-    isAnswered: answered,
-    answer: answer ? String(answer) : undefined,
+    artworkId,
+    artworkName,
+    isAnswered,
+    answer,
   };
 }
 
@@ -102,24 +165,31 @@ function mapRawToFanLetter(raw: FanLetterRaw): FanLetter {
 export async function sendFanLetter(payload: FanLetterSendPayload): Promise<void> {
   await http.post(apiPath("/fanletters"), {
     memberUuid: payload.memberUuid, // ✅ BE 키
-    title: payload.title,           // ✅ BE 키
+    title: payload.title, // ✅ BE 키
     content: payload.content,
     artworkId: payload.artworkId,
   });
 }
 
-/** ✅ 작가: 받은 팬레터 전체 조회 */
+/**
+ * ✅ 작가: 받은 팬레터 전체 조회
+ * GET /api/v1/fanletters/all?artist={memberId}
+ */
 export async function fetchArtistFanLetters(artistMemberUuid: string): Promise<FanLetter[]> {
-  const res = await http.get(apiPath("/fanletters/all"), { params: { artist: artistMemberUuid } });
+  const res = await http.get(apiPath("/fanletters/all"), {
+    params: { artist: artistMemberUuid },
+  });
 
-  // axios면 res.data가 실제 body
-  const body = isObject(res) && "data" in res ? (res as { data: unknown }).data : res;
+  // axios면 res.data가 body
+  const body = (res as any)?.data ?? res;
 
-  const maybe = unwrapEnvelope<unknown>(body);
-  const raws = unwrapEnvelope<FanLetterRaw[]>(maybe) ?? [];
+  // envelope이면 1번만 unwrap
+  const unwrapped = unwrapEnvelope<unknown>(body);
 
-  if (!Array.isArray(raws)) return [];
-  return raws.map(mapRawToFanLetter);
+  // 배열이거나, 객체 안에 배열이 들어있거나 케이스 모두 커버
+  const list = extractArray(unwrapped);
+
+  return list.map(mapRawToFanLetter);
 }
 
 /** ✅ 작가: 답장 등록 */
