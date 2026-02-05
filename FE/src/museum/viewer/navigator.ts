@@ -143,9 +143,9 @@ export function createWaypointNavigator(args: {
     // 걷기 시간 = 거리 / 속도
     const totalTime = totalLen / SPEED; // seconds
 
-    // 시작/끝에서 조금 더 여유
-    const minTime = 0.9;
-    const maxTime = 3.8;
+    // exhibitRoom(0.85초)과 비슷하게 빠르게
+    const minTime = 0.5;
+    const maxTime = 1.2;
     const T = THREE.MathUtils.clamp(totalTime, minTime, maxTime);
 
     // 목표 yaw/pitch

@@ -1017,8 +1017,8 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
         waypoints: WAYPOINTS,
         colliders,
         options: {
-          moveSpeedMps: 3.6,
-          turnSpeedRadps: 1.8,
+          moveSpeedMps: 12.0,  // exhibitRoom과 비슷한 속도
+          turnSpeedRadps: 4.5,
           clearance: 2.8,
           lockY: true,
           bobAmount: 0.0,
