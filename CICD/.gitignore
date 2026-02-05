@@ -1,0 +1,15 @@
+# 민감 정보
+.env
+*.env
+
+# 런타임 데이터
+*/mysql/
+*/redis/
+*/jenkins/
+
+# Gateway 런타임
+gateway/nginx/logs/
+gateway/certbot/
+
+# 백업 파일
+*.bak

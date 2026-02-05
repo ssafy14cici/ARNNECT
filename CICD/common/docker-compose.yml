@@ -1,0 +1,34 @@
+services:
+  # 1. MySQL (공용 데이터베이스)
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      TZ: Asia/Seoul
+    volumes:
+      - ./mysql:/var/lib/mysql              # 데이터 영구 저장 (호스트 폴더 연결
+    ports:
+      - "8806:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    networks:
+      - infra-net
+    # 리소스 제한 (선택사항): 16GB 램을 아끼기 위해
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+# [네트워크 선언]
+networks:
+  gateway-net:
+    external: true
+  infra-net:
+    name: infra-net
+    driver: bridge
