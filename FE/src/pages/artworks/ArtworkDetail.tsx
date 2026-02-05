@@ -1,449 +1,640 @@
-// FE/src/pages/artworks/ArtworkDetailView.tsx
-import { useMemo } from "react";
-import { Link } from "react-router-dom";
-import type { ArtworkDetailData, LocalComment, ReviewSummary } from "./detail/mappers";
+// FE/src/pages/artworks/ArtworkDetail.tsx
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
+import { useAuthStore } from "../../features/auth/store";
+import { http } from "../../shared/api/http";
+import { sendFanLetter } from "../../features/fanLetter/api";
+
+import "./artworkDetail.css";
+
+import ArtworkDetailView from "./ArtworkDetailView";
+import { fetchImageAsObjectUrl, normalizeArtworkId, safeToInt } from "./detail/utils";
+import type { ArtworkDetailData, LocalComment, ReviewSummary } from "./detail/mappers";
+import {
+  createCommentOnServer,
+  deleteCommentOnServer,
+  fetchArtworkComments,
+  fetchArtworkDetail,
+  fetchReviewsByArtworkId,
+  toggleFavoriteOnServer,
+  updateCommentOnServer,
+} from "./detail/api";
+
+// ✅ LocalComment에 authorId/authorName이 없을 수 있어서 UiComment로 확장
 type UiComment = LocalComment & {
   authorId?: string;
   authorName?: string;
   isMine?: boolean;
 };
 
-type Props = {
-  artwork: ArtworkDetailData;
+export default function ArtworkDetail() {
+  const params = useParams() as Record<string, string | undefined>;
+  const rawParamId = params.artworkId ?? params.id ?? "";
+  const normalizedArtworkId = useMemo(() => normalizeArtworkId(rawParamId), [rawParamId]);
 
-  // owner
-  isOwner: boolean;
+  const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
 
-  // hero image
-  displayImgSrc: string;
-  imageError: boolean;
-  onHeroImgError: () => void;
+  const meUuid = useMemo(() => String(user?.memberUuid ?? "").trim(), [user?.memberUuid]);
 
-  // like/follow
-  isLiked: boolean;
-  likeCount: number;
-  isFollowing: boolean;
-  onToggleFavorite: () => void;
-  onToggleFollow: () => void;
+  // ✅ 프로필 경로 통일
+  const profilePath = (uuid: string) => `/members/${encodeURIComponent(uuid)}`;
 
-  // actions
-  onOpenFanLetter: () => void;
-  onGoEdit: () => void;
-  onDeleteArtwork: () => void;
-  onGoHome: () => void;
+  // Data
+  const [artwork, setArtwork] = useState<ArtworkDetailData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // review
-  onGoReview: (id: string | number) => void;
-  reviews: ReviewSummary[];
-  reviewsLoading: boolean;
-  reviewsError: string | null;
+  // Reviews
+  const [reviews, setReviews] = useState<ReviewSummary[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState<string | null>(null);
 
-  // comments
-  comments: UiComment[];
-  commentsLoading: boolean;
-  commentsError: string | null;
+  // Comments
+  const [comments, setComments] = useState<UiComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsError, setCommentsError] = useState<string | null>(null);
 
-  commentText: string;
-  onChangeCommentText: (v: string) => void;
-  onSubmitComment: () => void;
+  // UI
+  const [imageError, setImageError] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [isFollowing, setIsFollowing] = useState(false);
 
-  onDeleteComment: (id: string) => void;
+  // Inputs
+  const [commentText, setCommentText] = useState("");
+  const [fanLetterText, setFanLetterText] = useState("");
 
-  // legacy(현재 상위에서 빈 함수로 내려옴)
-  onEditComment: (id: string, content: string) => void;
-  onReplyComment: (parentId: string, content: string) => void;
+  // Inline edit/reply
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [replyingParentId, setReplyingParentId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
 
-  // profile paths
-  artistProfilePath?: string;
-  commentAuthorProfilePath: (authorId: string) => string;
+  // Modal
+  const [fanLetterOpen, setFanLetterOpen] = useState(false);
+  const [fanLetterSending, setFanLetterSending] = useState(false);
 
-  // inline edit/reply
-  editingId: string | null;
-  editingText: string;
-  onStartEdit: (id: string, current: string) => void;
-  onChangeEditingText: (v: string) => void;
-  onCancelEdit: () => void;
-  onSaveEdit: () => void;
+  // hero image fallback
+  const [displayImgSrc, setDisplayImgSrc] = useState("");
+  const blobUrlRef = useRef<string | null>(null);
+  const [triedAuthBlob, setTriedAuthBlob] = useState(false);
 
-  replyingParentId: string | null;
-  replyText: string;
-  onStartReply: (parentId: string) => void;
-  onChangeReplyText: (v: string) => void;
-  onCancelReply: () => void;
-  onSubmitReply: () => void;
-};
+  const numericArtworkId = useMemo(() => {
+    const n = parseInt(String(normalizedArtworkId), 10);
+    return Number.isFinite(n) ? n : undefined;
+  }, [normalizedArtworkId]);
 
-function formatDate(v: unknown) {
-  const s = String(v ?? "").trim();
-  if (!s) return "";
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return s;
-  return d.toLocaleString("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+  const isOwner = useMemo(() => {
+    const me = String(user?.memberUuid ?? "").trim();
+    const owner = String((artwork as any)?.artistMemberUuid ?? (artwork as any)?.artistId ?? "").trim();
+    return !!me && !!owner && me === owner;
+  }, [user?.memberUuid, artwork]);
 
-export default function ArtworkDetailView(props: Props) {
-  const {
-    artwork,
-    isOwner,
-    displayImgSrc,
-    imageError,
-    onHeroImgError,
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [normalizedArtworkId]);
 
-    isLiked,
-    likeCount,
-    isFollowing,
-    onToggleFavorite,
-    onToggleFollow,
+  // ✅ LocalComment에 authorId가 없을 수 있으므로 any로 읽고 UiComment로 확장
+  const withMine = (list: LocalComment[]): UiComment[] => {
+    const me = meUuid;
 
-    onOpenFanLetter,
-    onGoEdit,
-    onDeleteArtwork,
-    onGoHome,
+    return list.map((c) => {
+      const rawAuthorId = String((c as any).authorId ?? (c as any).memberUuid ?? "").trim();
+      const rawAuthorName = String((c as any).authorName ?? (c as any).nickname ?? "").trim();
 
-    onGoReview,
-    reviews,
-    reviewsLoading,
-    reviewsError,
-
-    comments,
-    commentsLoading,
-    commentsError,
-    commentText,
-    onChangeCommentText,
-    onSubmitComment,
-    onDeleteComment,
-
-    artistProfilePath,
-    commentAuthorProfilePath,
-
-    editingId,
-    editingText,
-    onStartEdit,
-    onChangeEditingText,
-    onCancelEdit,
-    onSaveEdit,
-
-    replyingParentId,
-    replyText,
-    onStartReply,
-    onChangeReplyText,
-    onCancelReply,
-    onSubmitReply,
-  } = props;
-
-  const title = String((artwork as any)?.title ?? "");
-  const artistName = String((artwork as any)?.artist ?? "");
-
-  const tags = useMemo(
-    () => (Array.isArray((artwork as any)?.tags) ? (artwork as any).tags : []),
-    [artwork]
-  );
-
-  const rootComments = useMemo(() => (comments ?? []).filter((c) => !c.parentId), [comments]);
-
-  const repliesMap = useMemo(() => {
-    const map = new Map<string, UiComment[]>();
-
-    (comments ?? [])
-      .filter((c) => !!c.parentId)
-      .forEach((c) => {
-        const pid = String(c.parentId);
-        const arr = map.get(pid) ?? [];
-        arr.push(c);
-        map.set(pid, arr);
-      });
-
-    for (const [k, arr] of map) {
-      arr.sort((a, b) => {
-        const ta = a.createdAt ? Date.parse(String(a.createdAt)) : 0;
-        const tb = b.createdAt ? Date.parse(String(b.createdAt)) : 0;
-        return ta - tb;
-      });
-      map.set(k, arr);
-    }
-
-    return map;
-  }, [comments]);
-
-  const canShowDelete = (c: UiComment) => c.isMine === true || isOwner === true;
-  const canShowEdit = (c: UiComment) => c.isMine === true;
-
-  const renderComment = (c: UiComment) => {
-    const id = String((c as any).id ?? "");
-    const authorId = String((c as any).authorId ?? "").trim();
-    const authorName = String((c as any).authorName ?? "익명").trim();
-    const createdAt = (c as any).createdAt;
-
-    const isEditing = editingId === id;
-    const isReplying = replyingParentId === id;
-
-    const replies = repliesMap.get(id) ?? [];
-
-    return (
-      <div key={id} className="comment-item">
-        <div className="comment-meta">
-          {authorId ? (
-            <Link className="comment-author-link" to={commentAuthorProfilePath(authorId)}>
-              <strong>{authorName}</strong>
-            </Link>
-          ) : (
-            <strong>{authorName}</strong>
-          )}
-
-          {createdAt ? <span>{formatDate(createdAt)}</span> : null}
-          {c.isMine ? <span className="comment-mine">(내 댓글)</span> : null}
-        </div>
-
-        {!isEditing ? (
-          <div className="comment-text">{String((c as any).content ?? "")}</div>
-        ) : (
-          <div className="comment-editbox">
-            <textarea
-              className="input-minimal textarea"
-              rows={3}
-              value={editingText}
-              onChange={(e) => onChangeEditingText(e.target.value)}
-              placeholder="수정 내용을 입력하세요."
-            />
-            <div className="inline-actions">
-              <button className="btn-submit secondary" type="button" onClick={onCancelEdit}>
-                취소
-              </button>
-              <button className="btn-submit" type="button" onClick={onSaveEdit}>
-                저장
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="comment-actions">
-          <button className="text-btn" type="button" onClick={() => onStartReply(id)}>
-            답글
-          </button>
-
-          {canShowEdit(c) ? (
-            <button
-              className="text-btn"
-              type="button"
-              onClick={() => onStartEdit(id, String((c as any).content ?? ""))}
-            >
-              수정
-            </button>
-          ) : null}
-
-          {canShowDelete(c) ? (
-            <button className="text-btn danger" type="button" onClick={() => onDeleteComment(id)}>
-              삭제
-            </button>
-          ) : null}
-        </div>
-
-        {isReplying ? (
-          <div className="comment-replybox">
-            <textarea
-              className="input-minimal textarea"
-              rows={3}
-              value={replyText}
-              onChange={(e) => onChangeReplyText(e.target.value)}
-              placeholder="답글을 입력하세요."
-            />
-            <div className="inline-actions">
-              <button className="btn-submit secondary" type="button" onClick={onCancelReply}>
-                취소
-              </button>
-              <button className="btn-submit" type="button" onClick={onSubmitReply}>
-                등록
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        {replies.length > 0 ? <div className="replies">{replies.map(renderComment)}</div> : null}
-      </div>
-    );
+      return {
+        ...(c as any),
+        authorId: rawAuthorId || undefined,
+        authorName: rawAuthorName || undefined,
+        isMine: !!me && !!rawAuthorId && rawAuthorId === me,
+      };
+    });
   };
 
-  return (
-    <div className="artwork-detail-page">
-      {/* 상단 고정 헤더 */}
-      <div className="artwork-detail-top">
-        <button className="btn-icon" type="button" onClick={onGoHome}>
-          홈
-        </button>
+  // 상세
+  useEffect(() => {
+    let cancelled = false;
 
-        {isOwner ? (
-          <div className="top-actions">
-            <button className="btn-icon" type="button" onClick={onGoEdit}>
-              수정
-            </button>
-            <button className="btn-icon danger" type="button" onClick={onDeleteArtwork}>
-              삭제
-            </button>
-          </div>
-        ) : (
-          <div />
-        )}
+    (async () => {
+      try {
+        setIsLoading(true);
+        setImageError(false);
+        setTriedAuthBlob(false);
+        setArtwork(null);
+
+        // 인라인 상태 초기화
+        setEditingId(null);
+        setEditingText("");
+        setReplyingParentId(null);
+        setReplyText("");
+
+        if (blobUrlRef.current) {
+          URL.revokeObjectURL(blobUrlRef.current);
+          blobUrlRef.current = null;
+        }
+        setDisplayImgSrc("");
+
+        if (!normalizedArtworkId) throw new Error("작품 ID가 없습니다.");
+
+        const mapped = await fetchArtworkDetail(normalizedArtworkId);
+        if (cancelled) return;
+
+        setArtwork(mapped);
+
+        if ((mapped as any)?.src) setDisplayImgSrc((mapped as any).src);
+        if (typeof (mapped as any)?.isFavorited === "boolean") setIsLiked((mapped as any).isFavorited);
+        if (typeof (mapped as any)?.likeCount === "number" && Number.isFinite((mapped as any).likeCount)) {
+          setLikeCount((mapped as any).likeCount);
+        }
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) setArtwork(null);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [normalizedArtworkId]);
+
+  // 리뷰
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
+      if (!safeId || !Number.isFinite(safeId)) return;
+
+      try {
+        setReviewsLoading(true);
+        setReviewsError(null);
+
+        const list = await fetchReviewsByArtworkId(safeId);
+        if (cancelled) return;
+        setReviews(list);
+      } catch (e) {
+        console.error(e);
+        if (cancelled) return;
+        setReviews([]);
+        setReviewsError("감상평을 불러오지 못했습니다.");
+      } finally {
+        if (!cancelled) setReviewsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [numericArtworkId, artwork]);
+
+  // 댓글
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
+      if (!safeId || !Number.isFinite(safeId)) return;
+
+      try {
+        setCommentsLoading(true);
+        setCommentsError(null);
+
+        const list = await fetchArtworkComments(safeId);
+        if (cancelled) return;
+
+        setComments(withMine(list));
+      } catch (e) {
+        console.error(e);
+        if (cancelled) return;
+        setComments([]);
+        setCommentsError("댓글을 불러오지 못했습니다.");
+      } finally {
+        if (!cancelled) setCommentsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [numericArtworkId, artwork, meUuid]);
+
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isLoading && !artwork) {
+      const timer = setTimeout(() => navigate("/", { replace: true }), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [artwork, isLoading, navigate]);
+
+  // handlers
+  const onToggleFavorite = async () => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+
+    const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
+    if (!safeId || !Number.isFinite(safeId)) return;
+
+    const prevLiked = isLiked;
+    const prevCount = likeCount;
+
+    const nextLiked = !prevLiked;
+    setIsLiked(nextLiked);
+    setLikeCount((c) => (nextLiked ? c + 1 : Math.max(0, c - 1)));
+
+    try {
+      const result = await toggleFavoriteOnServer(safeId);
+      if (typeof (result as any).isFavorited === "boolean") setIsLiked((result as any).isFavorited);
+      if (typeof (result as any).likeCount === "number" && Number.isFinite((result as any).likeCount)) {
+        setLikeCount((result as any).likeCount);
+      }
+    } catch (e) {
+      console.error(e);
+      setIsLiked(prevLiked);
+      setLikeCount(prevCount);
+      alert("좋아요 처리 실패");
+    }
+  };
+
+  const refetchComments = async () => {
+    const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
+    if (!safeId || !Number.isFinite(safeId)) return;
+
+    setCommentsLoading(true);
+    try {
+      const list = await fetchArtworkComments(safeId);
+      setComments(withMine(list));
+    } catch (e) {
+      console.error(e);
+      setComments([]);
+      setCommentsError("댓글을 불러오지 못했습니다.");
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  const onSubmitComment = async () => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+
+    const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
+    if (!safeId || !Number.isFinite(safeId)) return;
+
+    const trimmed = commentText.trim();
+    if (!trimmed) return;
+
+    const tempId = `temp-${crypto.randomUUID()}`;
+
+    setComments((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        parentId: null,
+        content: trimmed,
+        authorId: meUuid || undefined,
+        authorName: user?.name ?? "나",
+        isMine: true,
+      } as UiComment,
+    ]);
+    setCommentText("");
+
+    try {
+      const created = await createCommentOnServer({ artworkId: safeId, content: trimmed, parentCommentId: null });
+      if (created) {
+        setComments((prev) => prev.map((c) => (c.id === tempId ? { ...(created as any), isMine: true } : c)));
+      } else {
+        await refetchComments();
+      }
+    } catch (e) {
+      console.error(e);
+      setComments((prev) => prev.filter((c) => c.id !== tempId));
+      alert("댓글 작성 실패");
+    }
+  };
+
+  const onStartEdit = (id: string, current: string) => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+    setReplyingParentId(null);
+    setReplyText("");
+    setEditingId(id);
+    setEditingText(current);
+  };
+
+  const onCancelEdit = () => {
+    setEditingId(null);
+    setEditingText("");
+  };
+
+  const onSaveEdit = async () => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+    if (!editingId) return;
+
+    const value = editingText.trim();
+    if (!value) return alert("내용을 입력해주세요.");
+
+    const id = editingId;
+    const prev = comments;
+
+    setComments((cur) => cur.map((c) => (c.id === id ? { ...c, content: value } : c)));
+    setEditingId(null);
+    setEditingText("");
+
+    try {
+      await updateCommentOnServer(id, value);
+    } catch (e) {
+      console.error(e);
+      setComments(prev);
+      alert("댓글 수정 실패");
+    }
+  };
+
+  const onStartReply = (parentId: string) => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+    setEditingId(null);
+    setEditingText("");
+    setReplyingParentId(parentId);
+    setReplyText("");
+  };
+
+  const onCancelReply = () => {
+    setReplyingParentId(null);
+    setReplyText("");
+  };
+
+  const onSubmitReply = async () => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+
+    const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
+    if (!safeId || !Number.isFinite(safeId)) return;
+
+    if (!replyingParentId) return;
+
+    const trimmed = replyText.trim();
+    if (!trimmed) return alert("내용을 입력해주세요.");
+
+    const parentNum = safeToInt(replyingParentId);
+    if (parentNum == null) return alert("부모 댓글 ID 파싱 실패");
+
+    const tempId = `temp-${crypto.randomUUID()}`;
+
+    setComments((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        parentId: replyingParentId,
+        content: trimmed,
+        authorId: meUuid || undefined,
+        authorName: user?.name ?? "나",
+        isMine: true,
+      } as UiComment,
+    ]);
+
+    setReplyText("");
+    setReplyingParentId(null);
+
+    try {
+      const created = await createCommentOnServer({
+        artworkId: safeId,
+        content: trimmed,
+        parentCommentId: parentNum,
+      });
+
+      if (created) {
+        setComments((prev) => prev.map((c) => (c.id === tempId ? { ...(created as any), isMine: true } : c)));
+      } else {
+        await refetchComments();
+      }
+    } catch (e) {
+      console.error(e);
+      setComments((prev) => prev.filter((c) => c.id !== tempId));
+      alert("답글 작성 실패");
+    }
+  };
+
+  const onDeleteComment = async (id: string) => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+
+    const target = comments.find((c) => c.id === id);
+    const canDelete = target?.isMine === true || isOwner === true;
+    if (!canDelete) return alert("삭제 권한이 없습니다.");
+
+    if (!window.confirm("삭제하시겠습니까?")) return;
+
+    const prev = comments;
+    setComments((cur) => cur.filter((c) => c.id !== id && (c as any).parentId !== id));
+
+    try {
+      await deleteCommentOnServer(id);
+    } catch (e) {
+      console.error(e);
+      setComments(prev);
+      alert("댓글 삭제 실패");
+    }
+  };
+
+  const onHeroImgError = async () => {
+    if (imageError) return;
+
+    if (triedAuthBlob) {
+      setImageError(true);
+      return;
+    }
+
+    setTriedAuthBlob(true);
+
+    const raw = (artwork as any)?.src ?? "";
+    if (!raw) {
+      setImageError(true);
+      return;
+    }
+
+    const objUrl = await fetchImageAsObjectUrl(raw);
+    if (!objUrl) {
+      setImageError(true);
+      return;
+    }
+
+    if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+    blobUrlRef.current = objUrl;
+
+    setImageError(false);
+    setDisplayImgSrc(objUrl);
+  };
+
+  const onDeleteArtwork = async () => {
+    if (!artwork) return;
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+    if (!isOwner) return alert("본인 작품만 삭제할 수 있습니다.");
+    if (!window.confirm("정말 삭제하시겠습니까?")) return;
+
+    try {
+      const id = normalizedArtworkId || String((artwork as any).id);
+      await http.delete(`/api/v1/artworks/${id}`);
+      alert("삭제되었습니다.");
+      navigate("/", { replace: true });
+    } catch (e) {
+      console.error(e);
+      alert("삭제 중 오류가 발생했습니다.");
+    }
+  };
+
+  const onGoEdit = () => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+    if (!isOwner) return alert("본인 작품만 수정할 수 있습니다.");
+    navigate(`/artworks/${normalizedArtworkId}/edit`);
+  };
+
+  const onOpenFanLetter = () => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+    setFanLetterOpen(true);
+  };
+
+  const onSendFanLetter = async (content: string) => {
+    if (!isLoggedIn || !user?.memberUuid) return alert("로그인 후 이용해주세요.");
+    if (!artwork) return;
+
+    const safeId = numericArtworkId ?? (typeof (artwork as any).id === "number" ? (artwork as any).id : Number((artwork as any).id));
+
+    setFanLetterSending(true);
+    try {
+      await sendFanLetter({
+        artistMemberUuid: (artwork as any).artistMemberUuid ?? "",
+        artworkId: safeId,
+        artworkTitle: (artwork as any).title,
+        artistName: (artwork as any).artist,
+        senderId: user.memberUuid,
+        senderName: user.name,
+        content,
+      });
+
+      alert("팬레터가 발송되었습니다.");
+      setFanLetterOpen(false);
+      setFanLetterText("");
+    } catch (e) {
+      console.error(e);
+      alert("팬레터 발송 실패");
+    } finally {
+      setFanLetterSending(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="artwork-detail-page" style={{ display: "grid", placeItems: "center" }}>
+        <h2>Loading...</h2>
       </div>
+    );
+  }
 
-      {/* HERO (CSS가 기대하는 구조로 맞춤) */}
-      <section className="artwork-hero">
-        <div className="hero-content">
-          <h1 className="hero-title">{title}</h1>
-
-          <div className="hero-artist">
-            {artistName ? (
-              artistProfilePath ? (
-                <Link className="hero-artist-link" to={artistProfilePath}>
-                  {artistName}
-                </Link>
-              ) : (
-                <span>{artistName}</span>
-              )
-            ) : null}
-          </div>
-
-          <div className="hero-frame">
-            {!imageError ? (
-              <img
-                className="hero-img"
-                src={displayImgSrc || String((artwork as any)?.src ?? "")}
-                alt={title || "artwork"}
-                onError={onHeroImgError}
-              />
-            ) : (
-              <div className="hero-fallback">이미지 로드 실패</div>
-            )}
-          </div>
+  if (!artwork) {
+    return (
+      <div className="artwork-detail-page" style={{ display: "grid", placeItems: "center" }}>
+        <div style={{ textAlign: "center" }}>
+          <h2>작품을 찾을 수 없습니다.</h2>
+          <button className="btn-icon" onClick={() => navigate("/")} style={{ marginTop: 20 }}>
+            홈으로 돌아가기
+          </button>
         </div>
+      </div>
+    );
+  }
 
-        <div className="scroll-indicator">
-          <span>SCROLL</span>
-          <div className="scroll-line" />
-        </div>
-      </section>
+  return (
+    <>
+      <ArtworkDetailView
+        artwork={artwork}
+        isOwner={isOwner}
+        displayImgSrc={displayImgSrc}
+        imageError={imageError}
+        onHeroImgError={onHeroImgError}
+        isLiked={isLiked}
+        likeCount={likeCount}
+        isFollowing={isFollowing}
+        onToggleFavorite={onToggleFavorite}
+        onToggleFollow={() => setIsFollowing((v) => !v)}
+        onOpenFanLetter={onOpenFanLetter}
+        onGoEdit={onGoEdit}
+        onDeleteArtwork={onDeleteArtwork}
+        onGoHome={() => navigate("/")}
+        onGoReview={(id) => navigate(`/reviews/${id}`)}
+        reviews={reviews}
+        reviewsLoading={reviewsLoading}
+        reviewsError={reviewsError}
+        comments={comments}
+        commentsLoading={commentsLoading}
+        commentsError={commentsError}
+        commentText={commentText}
+        onChangeCommentText={setCommentText}
+        onSubmitComment={onSubmitComment}
+        onDeleteComment={onDeleteComment}
+        // 타입 호환용(사용 안 하면 빈 함수 유지)
+        onEditComment={() => {}}
+        onReplyComment={() => {}}
+        artistProfilePath={artwork && (artwork as any).artistMemberUuid ? profilePath((artwork as any).artistMemberUuid) : undefined}
+        commentAuthorProfilePath={(authorId) => profilePath(authorId)}
+        // ✅ 인라인 편집/답글 props
+        editingId={editingId}
+        editingText={editingText}
+        onStartEdit={onStartEdit}
+        onChangeEditingText={setEditingText}
+        onCancelEdit={onCancelEdit}
+        onSaveEdit={onSaveEdit}
+        replyingParentId={replyingParentId}
+        replyText={replyText}
+        onStartReply={onStartReply}
+        onChangeReplyText={setReplyText}
+        onCancelReply={onCancelReply}
+        onSubmitReply={onSubmitReply}
+      />
 
-      {/* BODY (sticky hero 위로 올라오게) */}
-      <main className="artwork-body">
-        <div className="content-wrapper">
-          {/* 액션바 */}
-          <div className="action-bar">
-            <div className="action-left">
-              <h2>{title}</h2>
-              <p>{artistName}</p>
-            </div>
-
-            <div className="action-right">
-              {!isOwner ? (
-                <>
-                  <button className="btn-icon" type="button" onClick={onToggleFollow}>
-                    {isFollowing ? "Following" : "Follow"}
-                  </button>
-
-                  <button
-                    className={`btn-icon gold ${isLiked ? "active" : ""}`}
-                    type="button"
-                    onClick={onToggleFavorite}
-                  >
-                    {isLiked ? "♥" : "♡"} {likeCount}
-                  </button>
-                </>
-              ) : (
-                <div className="like-count-only" aria-label={`좋아요 ${likeCount}개`}>
-                  <span>좋아요</span>
-                  <strong>{likeCount}</strong>
-                </div>
-              )}
-
-              <button className="btn-icon" type="button" onClick={onOpenFanLetter}>
-                FanLetter
-              </button>
-            </div>
-          </div>
-
-          {/* 설명/태그 */}
-          <section className="info-section">
-            {(artwork as any)?.description ? (
-              <p className="description">{String((artwork as any).description)}</p>
-            ) : null}
-
-            {tags.length > 0 ? (
-              <div className="tags-row">
-                {tags.map((t: any, idx: number) => (
-                  <span key={`${String(t)}-${idx}`} className="tag-pill">
-                    #{String(t)}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </section>
-
-          {/* 감상평 */}
-          <section className="discovery-section">
-            <h3 className="section-title">감상평</h3>
-
-            {reviewsLoading ? <div style={{ opacity: 0.8 }}>로딩 중...</div> : null}
-            {reviewsError ? <div style={{ opacity: 0.85 }}>{reviewsError}</div> : null}
-
-            {!reviewsLoading && !reviewsError ? (
-              reviews.length > 0 ? (
-                <div className="review-list" style={{ display: "grid", gap: 10 }}>
-                  {reviews.map((r) => {
-                    const rid = (r as any).reviewId ?? (r as any).id;
-                    return (
-                      <button
-                        key={String(rid)}
-                        className="review-card"
-                        type="button"
-                        onClick={() => onGoReview(rid)}
-                      >
-                        <div className="review-title">{String((r as any).title ?? "제목 없음")}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div style={{ opacity: 0.75 }}>아직 감상평이 없습니다.</div>
-              )
-            ) : null}
-          </section>
-
-          {/* 댓글 */}
-          <section className="comments-container">
-            <h3 className="section-title">댓글</h3>
-
-            <div className="comment-input-wrap">
-              <textarea
-                className="input-minimal textarea"
-                rows={3}
-                value={commentText}
-                onChange={(e) => onChangeCommentText(e.target.value)}
-                placeholder="댓글을 입력하세요."
-              />
-              <button className="btn-submit" type="button" onClick={onSubmitComment}>
-                등록
+      {fanLetterOpen && (
+        <div className="modal-overlay" onClick={() => setFanLetterOpen(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 style={{ margin: 0 }}>Send FanLetter</h3>
+              <button
+                type="button"
+                onClick={() => setFanLetterOpen(false)}
+                style={{ background: "none", border: "none", color: "#fff", cursor: "pointer" }}
+              >
+                ✕
               </button>
             </div>
 
-            {commentsLoading ? <div style={{ opacity: 0.8 }}>로딩 중...</div> : null}
-            {commentsError ? <div style={{ opacity: 0.85 }}>{commentsError}</div> : null}
+            <textarea
+              className="modal-textarea"
+              rows={6}
+              value={fanLetterText}
+              onChange={(e) => setFanLetterText(e.target.value)}
+              placeholder="Artist에게 응원의 메시지를 보내세요."
+            />
 
-            {!commentsLoading && !commentsError ? (
-              rootComments.length > 0 ? (
-                <div className="comment-list">{rootComments.map(renderComment)}</div>
-              ) : (
-                <div style={{ opacity: 0.75 }}>아직 댓글이 없습니다.</div>
-              )
-            ) : null}
-          </section>
+            <div className="modal-actions">
+              <button className="btn-icon" onClick={() => setFanLetterOpen(false)}>
+                Cancel
+              </button>
+              <button
+                className="btn-icon gold"
+                disabled={fanLetterSending}
+                onClick={() => {
+                  const v = fanLetterText.trim();
+                  if (!v) return alert("내용을 입력해주세요.");
+                  onSendFanLetter(v);
+                }}
+              >
+                {fanLetterSending ? "Sending..." : "Send"}
+              </button>
+            </div>
+          </div>
         </div>
-      </main>
-    </div>
+      )}
+    </>
   );
 }

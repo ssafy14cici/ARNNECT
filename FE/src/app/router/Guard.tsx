@@ -17,10 +17,9 @@ export default function Guard({
   guestOnly,
   redirectTo = "/feed",
 }: GuardProps) {
-  const { isLoggedIn, role, hydrated } = useAuthStore();
+  const { isLoggedIn, role, hydrated, token } = useAuthStore();
   const location = useLocation();
 
-  // ✅ "원할 때만" DEV 우회 (기본 false 권장)
   const BYPASS_GUARD =
     import.meta.env.DEV && String(import.meta.env.VITE_BYPASS_GUARD) === "true";
 
@@ -28,14 +27,16 @@ export default function Guard({
     return <Outlet />;
   }
 
-  // ✅ hydrate 끝나기 전엔 판정하지 말고 대기(깜빡임/뚫림 방지)
-  if (!hydrated) return null; // 또는 로딩 컴포넌트
+  if (!hydrated) return null;
+
+  // ✅ token만 있어도 “로그인 상태”로 취급
+  const authed = isLoggedIn || !!token;
 
   if (guestOnly) {
-    return isLoggedIn ? <Navigate to={redirectTo} replace /> : <Outlet />;
+    return authed ? <Navigate to={redirectTo} replace /> : <Outlet />;
   }
 
-  if ((requireAuth || requireRole) && !isLoggedIn) {
+  if ((requireAuth || requireRole) && !authed) {
     return (
       <Navigate
         to="/login"
@@ -45,7 +46,7 @@ export default function Guard({
     );
   }
 
-  if (requireRole && role !== requireRole) {
+  if (requireRole && role && role !== requireRole) {
     return <Navigate to="/" replace />;
   }
 

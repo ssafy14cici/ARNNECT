@@ -30,6 +30,11 @@ function asString(v: unknown, fallback = ""): string {
   return fallback;
 }
 
+/** ✅ null/undefined/공백 → "" */
+function asNonEmptyString(v: unknown): string {
+  return asString(v, "").trim();
+}
+
 // ✅ string number / boolean도 흡수
 function asNumber(v: unknown, fallback = 0): number {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -201,18 +206,18 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   }
 }
 
-/** badges: unknown -> Badge[] */
-function normalizeBadges(raw: unknown): Badge[] | undefined {
-  if (!Array.isArray(raw)) return undefined;
+/** badges: unknown -> Badge[] (✅ 항상 배열 반환해서 .length 안전) */
+function normalizeBadges(raw: unknown): Badge[] {
+  if (!Array.isArray(raw)) return [];
 
   const out: Badge[] = [];
   for (const it of raw) {
     if (!isRecord(it)) continue;
 
-    const id = asString((it as any).id ?? (it as any).badgeId ?? "");
+    const id = asNonEmptyString((it as any).id ?? (it as any).badgeId ?? "");
     if (!id) continue;
 
-    const label = asString((it as any).label ?? (it as any).name ?? (it as any).title ?? "");
+    const label = asNonEmptyString((it as any).label ?? (it as any).name ?? (it as any).title ?? "");
     const description = typeof (it as any).description === "string" ? (it as any).description : undefined;
 
     out.push({ id, label, description });
@@ -220,20 +225,19 @@ function normalizeBadges(raw: unknown): Badge[] | undefined {
   return out;
 }
 
-/** featured ids: string[] or Badge[] 형태도 대응 */
-function normalizeFeaturedIds(raw: unknown): string[] | undefined {
-  if (!Array.isArray(raw)) return undefined;
+/** featured ids: string[] or Badge[] 형태도 대응 (✅ 항상 배열 반환해서 .length 안전) */
+function normalizeFeaturedIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
 
   const ids: string[] = [];
   for (const it of raw) {
     if (typeof it === "string" && it.trim()) ids.push(it.trim());
     else if (isRecord(it)) {
-      const id = asString((it as any).id ?? (it as any).badgeId ?? "");
+      const id = asNonEmptyString((it as any).id ?? (it as any).badgeId ?? "");
       if (id) ids.push(id);
     }
   }
-  const uniq = Array.from(new Set(ids));
-  return uniq.length ? uniq : undefined;
+  return Array.from(new Set(ids));
 }
 
 /**
@@ -271,7 +275,7 @@ function normalizeProfile(
 
   // ✅ id 키 흡수 강화
   const id =
-    asString(
+    asNonEmptyString(
       (rec as any).memberUuid ??
         (rec as any).memberUUID ??
         (rec as any).member_uuid ??
@@ -281,36 +285,31 @@ function normalizeProfile(
         (rec as any).memberId ??
         "",
     ) ||
-    (opts?.idHint ?? "") ||
+    asNonEmptyString(opts?.idHint ?? "") ||
     "";
 
-  const name = asString((rec as any).displayName ?? (rec as any).nickname ?? (rec as any).name ?? "—");
+  const name = asNonEmptyString((rec as any).displayName ?? (rec as any).nickname ?? (rec as any).name ?? "—") || "—";
 
-  // ✅ 여기서 오타 때문에 니가 올린 TS 에러가 났음:
-  // (rec as "any") -> (rec as any) 로 수정 + 안전하게 string만 채택
+  /**
+   * ✅ imageUrl: null/undefined 절대 금지(항상 string)
+   * - BE가 imgUrl로 내려주는 케이스 포함
+   */
   const imageUrl =
-    typeof (rec as any).profileImageUrl === "string"
-      ? (rec as any).profileImageUrl
-      : typeof (rec as any).profileImage === "string"
-        ? (rec as any).profileImage
-        : typeof (rec as any).savedProfileImageName === "string"
-          ? (rec as any).savedProfileImageName
-          : typeof (rec as any).saved_profile_image_name === "string"
-            ? (rec as any).saved_profile_image_name
-            : typeof (rec as any).imageUrl === "string"
-              ? (rec as any).imageUrl
-              : typeof (rec as any).image === "string"
-                ? (rec as any).image
-                : null;
+    asNonEmptyString((rec as any).profileImageUrl) ||
+    asNonEmptyString((rec as any).profileImage) ||
+    asNonEmptyString((rec as any).imgUrl) || // ✅ 스샷 응답에 있음
+    asNonEmptyString((rec as any).savedProfileImageName) ||
+    asNonEmptyString((rec as any).saved_profile_image_name) ||
+    asNonEmptyString((rec as any).imageUrl) ||
+    asNonEmptyString((rec as any).image) ||
+    "";
 
+  /** ✅ bio: null/undefined 절대 금지(항상 string) */
   const bio =
-    typeof (rec as any).bio === "string"
-      ? (rec as any).bio
-      : typeof (rec as any).introduction === "string"
-        ? (rec as any).introduction
-        : typeof (rec as any).artIntroduction === "string"
-          ? (rec as any).artIntroduction
-          : null;
+    asNonEmptyString((rec as any).bio) ||
+    asNonEmptyString((rec as any).introduction) ||
+    asNonEmptyString((rec as any).artIntroduction) ||
+    "";
 
   const followersCount = asNumber(
     (rec as any).followersCount ??
@@ -340,11 +339,12 @@ function normalizeProfile(
       false,
   );
 
+  /** ✅ 배열은 항상 []로 정규화해서 UI에서 .length 안전 */
   const badges = normalizeBadges((rec as any).badges);
-  const featuredBadgeIds =
-    normalizeFeaturedIds((rec as any).featuredBadgeIds) ??
-    normalizeFeaturedIds((rec as any).featuredBadges) ??
-    undefined;
+
+  const featured1 = normalizeFeaturedIds((rec as any).featuredBadgeIds);
+  const featured2 = normalizeFeaturedIds((rec as any).featuredBadges);
+  const featuredBadgeIds = (featured1.length ? featured1 : featured2.length ? featured2 : []) as string[];
 
   const common = {
     id,
@@ -360,27 +360,25 @@ function normalizeProfile(
 
   if (role === "ARTIST") {
     const genre =
-      typeof (rec as any).genre === "string"
-        ? (rec as any).genre
-        : typeof (rec as any).genreName === "string"
-          ? (rec as any).genreName
-          : typeof (rec as any).genre_name === "string"
-            ? (rec as any).genre_name
-            : undefined;
+      asNonEmptyString((rec as any).genre) ||
+      asNonEmptyString((rec as any).genreName) ||
+      asNonEmptyString((rec as any).genre_name) ||
+      "";
 
     const artist: ArtistProfile = {
       ...common,
       role: "ARTIST",
       genre,
-      contactEnabled: typeof (rec as any).contactEnabled === "boolean" ? (rec as any).contactEnabled : undefined,
-      contactUrl: typeof (rec as any).contactUrl === "string" ? (rec as any).contactUrl : undefined,
 
-      email: typeof (rec as any).email === "string" ? (rec as any).email : undefined,
-      birth: typeof (rec as any).birth === "string" ? (rec as any).birth : undefined,
-      phone: typeof (rec as any).phone === "string" ? (rec as any).phone : undefined,
+      contactEnabled: typeof (rec as any).contactEnabled === "boolean" ? (rec as any).contactEnabled : undefined,
+      contactUrl: asNonEmptyString((rec as any).contactUrl) || "",
+
+      email: asNonEmptyString((rec as any).email) || "",
+      birth: asNonEmptyString((rec as any).birth) || "",
+      phone: asNonEmptyString((rec as any).phone) || "",
       isAgree: typeof (rec as any).isAgree === "boolean" ? (rec as any).isAgree : undefined,
 
-      document: typeof (rec as any).document === "string" ? (rec as any).document : undefined,
+      document: asNonEmptyString((rec as any).document) || "",
 
       fieldId:
         typeof (rec as any).fieldId === "number"
@@ -397,13 +395,10 @@ function normalizeProfile(
             : undefined,
 
       field:
-        typeof (rec as any).field === "string"
-          ? (rec as any).field
-          : typeof (rec as any).fieldName === "string"
-            ? (rec as any).fieldName
-            : typeof (rec as any).field_name === "string"
-              ? (rec as any).field_name
-              : undefined,
+        asNonEmptyString((rec as any).field) ||
+        asNonEmptyString((rec as any).fieldName) ||
+        asNonEmptyString((rec as any).field_name) ||
+        "",
 
       debutYear:
         typeof (rec as any).debutYear === "number"
@@ -414,27 +409,18 @@ function normalizeProfile(
               ? Number((rec as any).debutYear)
               : undefined,
 
-      snsPage:
-        typeof (rec as any).snsPage === "string"
-          ? (rec as any).snsPage
-          : typeof (rec as any).sns_page === "string"
-            ? (rec as any).sns_page
-            : undefined,
-
-      introduction: typeof (rec as any).introduction === "string" ? (rec as any).introduction : undefined,
+      snsPage: asNonEmptyString((rec as any).snsPage ?? (rec as any).sns_page) || "",
+      introduction: asNonEmptyString((rec as any).introduction) || "",
 
       sns:
-        typeof (rec as any).sns === "string"
-          ? (rec as any).sns
-          : typeof (rec as any).snsPage === "string"
-            ? (rec as any).snsPage
-            : typeof (rec as any).sns_page === "string"
-              ? (rec as any).sns_page
-              : undefined,
+        asNonEmptyString((rec as any).sns) ||
+        asNonEmptyString((rec as any).snsPage) ||
+        asNonEmptyString((rec as any).sns_page) ||
+        "",
 
-      affiliation: typeof (rec as any).affiliation === "string" ? (rec as any).affiliation : undefined,
+      affiliation: asNonEmptyString((rec as any).affiliation) || "",
       isVerified: typeof (rec as any).isVerified === "boolean" ? (rec as any).isVerified : undefined,
-      artIntroduction: typeof (rec as any).artIntroduction === "string" ? (rec as any).artIntroduction : undefined,
+      artIntroduction: asNonEmptyString((rec as any).artIntroduction) || "",
     };
 
     return artist;
@@ -444,10 +430,10 @@ function normalizeProfile(
     ...common,
     role: "USER",
 
-    email: typeof (rec as any).email === "string" ? (rec as any).email : undefined,
-    nickname: typeof (rec as any).nickname === "string" ? (rec as any).nickname : undefined,
-    birth: typeof (rec as any).birth === "string" ? (rec as any).birth : undefined,
-    phone: typeof (rec as any).phone === "string" ? (rec as any).phone : undefined,
+    email: asNonEmptyString((rec as any).email) || "",
+    nickname: asNonEmptyString((rec as any).nickname) || "",
+    birth: asNonEmptyString((rec as any).birth) || "",
+    phone: asNonEmptyString((rec as any).phone) || "",
     isAgree: typeof (rec as any).isAgree === "boolean" ? (rec as any).isAgree : undefined,
   };
 
@@ -521,8 +507,8 @@ function pickNextCursor(d: unknown): string | null {
 
 function toFeedItemFromArtwork(x: unknown): FeedItem | null {
   if (!isRecord(x)) return null;
-  const id = asString((x as any).artworkId ?? (x as any).id ?? "");
-  const imageUrl = asString(
+  const id = asNonEmptyString((x as any).artworkId ?? (x as any).id ?? "");
+  const imageUrl = asNonEmptyString(
     (x as any).imageUrl ??
       (x as any).thumbnailUrl ??
       (x as any).artworkImageUrl ??
@@ -531,18 +517,22 @@ function toFeedItemFromArtwork(x: unknown): FeedItem | null {
   );
   if (!id) return null;
 
-  const createdAt = asString((x as any).createdAt ?? (x as any).createdDate ?? (x as any).date ?? new Date().toISOString());
-  return { id, imageUrl: imageUrl || "", createdAt };
+  const createdAt = asNonEmptyString(
+    (x as any).createdAt ?? (x as any).createdDate ?? (x as any).date ?? new Date().toISOString(),
+  );
+  return { id, imageUrl: imageUrl || "", createdAt: createdAt || new Date().toISOString() };
 }
 
 function toFeedItemFromReview(x: unknown): FeedItem | null {
   if (!isRecord(x)) return null;
-  const id = asString((x as any).reviewId ?? (x as any).id ?? "");
-  const imageUrl = asString((x as any).imageUrl ?? (x as any).thumbnailUrl ?? (x as any).reviewImageUrl ?? "");
+  const id = asNonEmptyString((x as any).reviewId ?? (x as any).id ?? "");
+  const imageUrl = asNonEmptyString((x as any).imageUrl ?? (x as any).thumbnailUrl ?? (x as any).reviewImageUrl ?? "");
   if (!id) return null;
 
-  const createdAt = asString((x as any).createdAt ?? (x as any).createdDate ?? (x as any).date ?? new Date().toISOString());
-  return { id, imageUrl: imageUrl || "", createdAt };
+  const createdAt = asNonEmptyString(
+    (x as any).createdAt ?? (x as any).createdDate ?? (x as any).date ?? new Date().toISOString(),
+  );
+  return { id, imageUrl: imageUrl || "", createdAt: createdAt || new Date().toISOString() };
 }
 
 export async function getArtistFeed(artistUuid: string, cursor?: string | null): Promise<PageResult<FeedItem>> {

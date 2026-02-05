@@ -1,6 +1,6 @@
 // FE/src/features/auth/store.ts
 import { create } from "zustand";
-import { http } from "../../shared/api/http";
+import { http, bindAuthTokenGetter } from "../../shared/api/http";
 
 export type AppRole = "general" | "artist";
 export type AuthUser = { memberUuid: string; name: string };
@@ -74,14 +74,8 @@ function pickRole(meData: any): AppRole | null {
   return normalizeRole(d.role);
 }
 
-function clearStorage() {
-  localStorage.removeItem(LS_KEY);
-  sessionStorage.removeItem(SS_KEY);
-}
-
 function saveStorage(data: StoredAuth, remember: boolean) {
   const raw = JSON.stringify(data);
-
   localStorage.removeItem(LS_KEY);
   sessionStorage.removeItem(SS_KEY);
 
@@ -130,7 +124,6 @@ function overwriteSamePlace(place: "local" | "session" | null, data: StoredAuth)
   else sessionStorage.setItem(SS_KEY, raw);
 }
 
-// ✅ 핵심: 토큰을 “직접” Authorization에 넣어서 /member/my를 호출
 async function fetchMyWithToken(token: string) {
   return http.get("/api/v1/member/my", {
     headers: { Authorization: `Bearer ${token}` },
@@ -152,7 +145,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: () => {
-    clearStorage();
+    localStorage.removeItem(LS_KEY);
+    sessionStorage.removeItem(SS_KEY);
     set({
       hydrated: true,
       isLoggedIn: false,
@@ -170,87 +164,59 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     void (async () => {
       let storedPlace: "local" | "session" | null = null;
 
-      try {
-        // 0) storage 복구
-        const stored = loadStorage();
-        if (stored?.data?.token) {
-          storedPlace = stored.place;
-          set({
-            token: stored.data.token,
-            role: stored.data.role,
-            user: stored.data.user,
-            isLoggedIn: true,
-          });
-        }
+      // ✅ 0) storage에서 일단 복구 + 즉시 hydrated true로 “로그인 유지”
+      const stored = loadStorage();
+      if (stored?.data?.token) {
+        storedPlace = stored.place;
 
-        const token = get().token;
+        const token = stored.data.token;
+        const role = stored.data.role ?? roleFromToken(token);
+        const user = stored.data.user;
 
-        // 1) ✅ token 있으면 my를 “직접 Bearer”로 확정 (여기서 성공하면 refresh로 절대 안 감)
-        if (token) {
-          try {
-            const me = await fetchMyWithToken(token);
-            const user = pickUser(me.data);
-            const roleFromMy = pickRole(me.data);
-
-            if (!user) throw new Error("my 응답에서 memberUuid 없음");
-
-            const role =
-              roleFromMy ?? roleFromToken(token) ?? get().role ?? stored?.data.role ?? null;
-
-            set({ hydrated: true, user, role, isLoggedIn: true });
-            overwriteSamePlace(storedPlace, { token, role, user });
-            return;
-          } catch (e: any) {
-            const status = e?.response?.status;
-            if (status !== 401 && status !== 403) throw e;
-            // 401/403이면 refresh 시도(있다면)
-          }
-        }
-
-        // 2) refresh 후보 (현재 유저 스샷에서는 403이라 여기서 죽고 catch로 감)
-        const refreshCandidates = ["/api/v1/auth/refresh", "/api/v1/auth/reissue", "/api/v1/auth/renew"];
-        let newToken: string | null = null;
-
-        for (const url of refreshCandidates) {
-          try {
-            const rr = await http.post(url, null, { headers: { "x-skip-auth": "1" } });
-            newToken = pickToken(rr.data);
-            if (newToken) break;
-          } catch {
-            // continue
-          }
-        }
-
-        if (!newToken) throw new Error("refresh 실패");
-
-        set({ token: newToken, isLoggedIn: true });
-
-        // 3) refresh 후 my도 “직접 Bearer”
-        const me2 = await fetchMyWithToken(newToken);
-        const user2 = pickUser(me2.data);
-        const roleFromMy2 = pickRole(me2.data);
-
-        if (!user2) throw new Error("my 응답에서 memberUuid 없음(2)");
-
-        const role2 =
-          roleFromMy2 ?? roleFromToken(newToken) ?? get().role ?? stored?.data.role ?? null;
-
-        set({ hydrated: true, user: user2, role: role2, isLoggedIn: true });
-        overwriteSamePlace(storedPlace ?? "session", { token: newToken, role: role2, user: user2 });
-      } catch {
-        // ✅ 여기서 바로 storage를 지워버리니까 “로그인 풀림”처럼 보임
-        // refresh가 403인 상태면 결국 여기로 오게 되어 있음
-        clearStorage();
         set({
-          hydrated: true,
-          isLoggedIn: false,
-          token: null,
-          role: null,
-          user: null,
+          hydrated: true,     // ✅ 여기서 이미 true
+          token,
+          role,
+          user,
+          isLoggedIn: true,   // ✅ token 있으면 로그인으로 취급
         });
+      } else {
+        // 저장값이 없으면 그냥 hydrated만 true
+        set({ hydrated: true, isLoggedIn: false });
+      }
+
+      try {
+        const token = get().token;
+        if (!token) return;
+
+        // ✅ 1) my로 user/role 최신화 시도 (실패해도 “로그아웃 확정” 금지)
+        const me = await fetchMyWithToken(token);
+        const user = pickUser(me.data);
+
+        // role이 my에 없으면 토큰/기존값 유지
+        const role =
+          pickRole(me.data) ?? roleFromToken(token) ?? get().role ?? stored?.data.role ?? null;
+
+        if (user) {
+          set({ user, role, isLoggedIn: true });
+          overwriteSamePlace(storedPlace, { token, role, user });
+        } else {
+          // memberUuid 못 뽑아도 로그아웃 확정 안 함(저장된 user 유지)
+          set({ role, isLoggedIn: true });
+          overwriteSamePlace(storedPlace, { token, role, user: get().user });
+        }
+
+        return;
+      } catch (e: any) {
+        // ✅ 여기서 핵심: 실패해도 storage를 지우지 않는다
+        // refresh 403이든, my 401이든 “일단 로그인 유지” 상태로 둔다
+        // (토큰이 진짜 만료면 이후 API에서 401 나오고 그때 재로그인 UX로 처리)
       } finally {
         hydrateInFlight = false;
       }
     })();
   },
 }));
+
+// ✅ http 인터셉터에 token 공급 (순환 방지)
+bindAuthTokenGetter(() => useAuthStore.getState().token);
