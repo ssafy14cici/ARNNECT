@@ -40,19 +40,31 @@ const HORIZONTAL_TYPES: TicketDesignType[] = ["MINIMAL", "HOLO", "SIMPLE", "PURP
 export default function TicketPreview({ designType, data }: TicketPreviewProps) {
   const isHorizontal = HORIZONTAL_TYPES.includes(designType);
 
-  /**
-   * ✅ 중요
-   * - TicketPreview는 "프레임" 역할만 하고, 디자인(배경/그림자/모서리/클리핑)은 각 티켓 컴포넌트가 담당.
-   * - 가로형은 maxWidth 고정값 금지 (부모 폭에 맞춰야 잘림/축소 문제 없음)
-   */
+  // 세로 컨테이너 (가로/세로 티켓 모두 동일한 세로 프레임 사용)
   const containerStyle: React.CSSProperties = {
     width: "100%",
-    maxWidth: isHorizontal ? "100%" : "280px",
-    aspectRatio: isHorizontal ? "2.5 / 1" : "1 / 2.2",
+    maxWidth: "280px",
+    aspectRatio: "1 / 2.2",
     margin: "0 auto",
     transition: "all 0.25s ease",
     position: "relative",
-    overflow: "visible", // ✅ hidden 금지 (가로 티켓 잘림 원인)
+    overflow: "hidden",
+  };
+
+  /**
+   * 가로 티켓 회전 래퍼
+   * 컨테이너가 W × 2.2W (세로)일 때:
+   * - 내부를 2.2W × W (가로)로 만들고 -90° 회전
+   * - 회전 후 시각적 크기 = W × 2.2W → 컨테이너에 딱 맞음
+   * - width: 220% = 컨테이너 높이, height: 45.45% = 컨테이너 너비
+   */
+  const horizontalInnerStyle: React.CSSProperties = {
+    position: "absolute",
+    width: "220%",
+    height: "45.4545%",
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%) rotate(-90deg)",
   };
 
   const renderContent = () => {
@@ -77,5 +89,13 @@ export default function TicketPreview({ designType, data }: TicketPreviewProps) 
     }
   };
 
-  return <div style={containerStyle}>{renderContent()}</div>;
+  return (
+    <div style={containerStyle}>
+      {isHorizontal ? (
+        <div style={horizontalInnerStyle}>{renderContent()}</div>
+      ) : (
+        renderContent()
+      )}
+    </div>
+  );
 }
