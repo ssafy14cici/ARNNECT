@@ -71,8 +71,8 @@ export default function Taste() {
 
   const activitySummary: RankItem[] = [
     { name: "좋아요", score: 27, hint: "최근 30일" },
-    { name: "조회", score: 114, hint: "최근 30일" },
-    { name: "스캔", score: 6, hint: "최근 30일" },
+    { name: "댓글", score: 114, hint: "최근 30일" },
+    { name: "발급티켓", score: 6, hint: "최근 30일" },
   ];
 
   const hasData = topGenres.some((x) => x.value > 0);

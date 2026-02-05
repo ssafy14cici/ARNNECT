@@ -1,6 +1,5 @@
 // FE/src/features/auth/api/index.ts
 import type { EmailDupCheckResult } from "../types";
-
 import { signupUserReal, signupArtistReal, loginReal, checkEmailDupReal } from "./real";
 
 export const apiSignupUser = signupUserReal;

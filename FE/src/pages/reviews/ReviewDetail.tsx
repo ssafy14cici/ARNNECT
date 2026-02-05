@@ -49,7 +49,6 @@ export type ReviewDetailData = {
 
 type UiComment = LocalComment & { authorId?: string; isMine?: boolean };
 
-
 type JsonObject = Record<string, unknown>;
 const isObject = (v: unknown): v is JsonObject => typeof v === "object" && v !== null;
 
@@ -64,13 +63,9 @@ function unwrapAxiosData(res: unknown): unknown {
 }
 
 function unwrapEnvelope(payload: unknown): unknown {
-  // axios .data 이미 unwrap 했다는 전제
   if (!isObject(payload)) return payload;
 
-  // 흔한 envelope 케이스들 처리
   if ("data" in payload) return (payload as any).data;
-
-  // { result: { ... } } 형태
   if ("result" in payload) return (payload as any).result;
 
   return payload;
@@ -99,7 +94,6 @@ function parseLikeToggleResult(payload: unknown): { isLiked?: boolean; likeCount
 
   if (!isObject(root)) return null;
 
-  // isLiked 후보 키들
   const liked =
     asBoolean((root as any).isLiked) ??
     asBoolean((root as any).liked) ??
@@ -107,7 +101,6 @@ function parseLikeToggleResult(payload: unknown): { isLiked?: boolean; likeCount
     asBoolean((root as any).is_likeed) ??
     asBoolean((root as any).is_liked);
 
-  // likeCount 후보 키들
   const count =
     asNumber((root as any).likeCount) ??
     asNumber((root as any).likes) ??
@@ -132,6 +125,10 @@ const FOLLOW_TOGGLE_PATH = "/api/v1/follow";
 
 async function fetchReviewComments(reviewId: number): Promise<LocalComment[]> {
   const tryUrls = [
+    // ✅ 1순위: 확정 스펙
+    `${COMMENTS_PATH}?targetId=${encodeURIComponent(String(reviewId))}&targetType=REVIEW`,
+
+    // fallback (필요 없으면 지워도 됨)
     `${COMMENTS_PATH}?reviewId=${encodeURIComponent(String(reviewId))}`,
     `${COMMENTS_PATH}?review=${encodeURIComponent(String(reviewId))}`,
     `${COMMENTS_PATH}?target=REVIEW&id=${encodeURIComponent(String(reviewId))}`,
@@ -187,8 +184,7 @@ async function toggleFollow(targetMemberUuid: string): Promise<void> {
 }
 
 /**
- * ✅ 좋아요 토글: 서버 라우트 확정 전이라 "후보 URL" 여러 개를 시도해서
- * 하나라도 성공하면 그걸로 동작하게 만든다.
+ * ✅ 좋아요 토글: 서버 라우트 확정 전이라 후보 URL 여러 개 시도
  */
 async function toggleReviewLikeOnServer(
   reviewId: number,
@@ -197,17 +193,21 @@ async function toggleReviewLikeOnServer(
     method: "post" | "put" | "patch" | "delete";
     url: string;
     body?: any;
+    config?: any;
   }> = [
-    // ✅ 흔한 후보들
+    // ✅ 흔한 후보들 (body로 전달)
     { method: "post", url: `/api/v1/reviews/like`, body: { reviewId } },
     { method: "post", url: `/api/v1/reviews/likes`, body: { reviewId } },
+    { method: "post", url: `/api/v1/reviews/like`, body: { id: reviewId } },
+
+    // ✅ path 방식
     { method: "post", url: `/api/v1/reviews/${reviewId}/like`, body: {} },
     { method: "post", url: `/api/v1/reviews/${reviewId}/likes`, body: {} },
     { method: "put", url: `/api/v1/reviews/${reviewId}/like`, body: {} },
     { method: "patch", url: `/api/v1/reviews/${reviewId}/like`, body: {} },
 
-    // ✅ body 키가 다른 경우도 방어
-    { method: "post", url: `/api/v1/reviews/like`, body: { id: reviewId } },
+    // ✅ query param 방식도 가끔 있음
+    { method: "post", url: `/api/v1/reviews/like`, body: {}, config: { params: { reviewId } } },
     { method: "post", url: `/api/v1/reviews/like-toggle`, body: { reviewId } },
   ];
 
@@ -215,26 +215,24 @@ async function toggleReviewLikeOnServer(
 
   for (const c of candidates) {
     try {
+      const cfg = { ...authConfig(), ...(c.config ?? {}) };
+
       const res =
         c.method === "post"
-          ? await http.post(c.url, c.body ?? {}, authConfig())
+          ? await http.post(c.url, c.body ?? {}, cfg)
           : c.method === "put"
-            ? await http.put(c.url, c.body ?? {}, authConfig())
+            ? await http.put(c.url, c.body ?? {}, cfg)
             : c.method === "patch"
-              ? await http.patch(c.url, c.body ?? {}, authConfig())
-              : await http.delete(c.url, authConfig());
+              ? await http.patch(c.url, c.body ?? {}, cfg)
+              : await http.delete(c.url, cfg);
 
       const payload = unwrapAxiosData(res);
-      const parsed = parseLikeToggleResult(payload);
-
-      // 서버가 아무것도 안 주는 경우도 있으니 null 허용
-      return parsed;
+      return parseLikeToggleResult(payload); // 서버가 값 안 주면 null일 수 있음
     } catch (e) {
       lastErr = e;
     }
   }
 
-  // 전부 실패하면 에러 던져서 UI 롤백되게
   throw lastErr;
 }
 
@@ -250,9 +248,10 @@ export default function ReviewDetail() {
 
   const normalizedReviewId = useMemo(() => normalizeId(reviewId), [reviewId]);
 
+  // ✅ parseInt 금지: "12abc" -> 12 같은 부분 파싱을 막아야 함
   const numericReviewId = useMemo(() => {
-    const n = Number.parseInt(String(normalizedReviewId), 10);
-    return Number.isFinite(n) ? n : undefined;
+    const n = safeToInt(normalizedReviewId);
+    return n == null ? undefined : n;
   }, [normalizedReviewId]);
 
   const myDisplayName = useMemo(() => {
@@ -281,7 +280,7 @@ export default function ReviewDetail() {
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
 
-  // ✅ prompt 제거용(인라인)
+  // 인라인 수정/답글
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [replyingParentId, setReplyingParentId] = useState<string | null>(null);
@@ -294,24 +293,21 @@ export default function ReviewDetail() {
   }, [user?.memberUuid, review?.memberUuid]);
 
   const withMine = (list: LocalComment[]): UiComment[] => {
-  const me = meUuid;
+    const me = meUuid;
 
-  return list.map((c) => {
-    // 서버가 authorId를 어떤 키로 줄지 몰라서 후보 다 커버
-    const author =
-      String((c as any).authorId ?? "").trim() ||
-      String((c as any).authorUuid ?? "").trim() ||
-      String((c as any).memberUuid ?? "").trim();
+    return list.map((c) => {
+      const author =
+        String((c as any).authorId ?? "").trim() ||
+        String((c as any).authorUuid ?? "").trim() ||
+        String((c as any).memberUuid ?? "").trim();
 
-    return {
-      ...c,
-      // ✅ c.authorId 읽지 말고, 우리가 파싱한 author만 주입
-      ...(author ? { authorId: author } : {}),
-      isMine: !!me && !!author && author === me,
-    };
-  });
-};
-
+      return {
+        ...c,
+        ...(author ? { authorId: author } : {}),
+        isMine: !!me && !!author && author === me,
+      };
+    });
+  };
 
   const rootComments = useMemo(() => comments.filter((c) => c.parentId == null), [comments]);
 
@@ -368,7 +364,7 @@ export default function ReviewDetail() {
     };
   }, [normalizedReviewId]);
 
-  // blob URL revoke (메모리 누수 방지)
+  // blob URL revoke
   useEffect(() => {
     return () => {
       if (imageObjectUrl && imageObjectUrl.startsWith("blob:")) {
@@ -441,9 +437,13 @@ export default function ReviewDetail() {
   // ✅ 좋아요 토글
   const onToggleLike = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
-    if (!numericReviewId || !Number.isFinite(numericReviewId)) return;
 
-    // optimistic
+    // ✅ 여기서 조용히 return하면 “반영 안됨”처럼 보임 → 메시지 주기
+    if (!numericReviewId || !Number.isFinite(numericReviewId)) {
+      alert("리뷰 ID 파싱 실패(숫자 ID가 아닙니다). 라우트/ID 형식 확인 필요");
+      return;
+    }
+
     const prevLiked = isLiked;
     const prevCount = likeCount;
 
@@ -454,15 +454,13 @@ export default function ReviewDetail() {
     try {
       const res = await toggleReviewLikeOnServer(numericReviewId);
 
-      // 서버가 값 주면 동기화
       if (res?.isLiked != null) setIsLiked(res.isLiked);
       if (res?.likeCount != null) setLikeCount(res.likeCount);
     } catch (e) {
       console.error(e);
-      // rollback
       setIsLiked(prevLiked);
       setLikeCount(prevCount);
-      alert("좋아요 처리 실패(서버 라우트/응답 확인 필요)");
+      alert("좋아요 처리 실패(서버 라우트/권한/ID 확인 필요)");
     }
   };
 
@@ -949,7 +947,11 @@ export default function ReviewDetail() {
                               {rCanDelete && (
                                 <>
                                   <span className="rd-dot">·</span>
-                                  <button type="button" className="rd-link" onClick={() => onDeleteComment(String(r.id))}>
+                                  <button
+                                    type="button"
+                                    className="rd-link"
+                                    onClick={() => onDeleteComment(String(r.id))}
+                                  >
                                     삭제
                                   </button>
                                 </>

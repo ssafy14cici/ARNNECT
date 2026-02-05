@@ -21,7 +21,12 @@ import {
   updateCommentOnServer,
 } from "./detail/api";
 
-type UiComment = LocalComment & { isMine?: boolean };
+// ✅ LocalComment에 authorId/authorName이 없을 수 있어서 UiComment로 확장
+type UiComment = LocalComment & {
+  authorId?: string;
+  authorName?: string;
+  isMine?: boolean;
+};
 
 export default function ArtworkDetail() {
   const params = useParams() as Record<string, string | undefined>;
@@ -34,6 +39,9 @@ export default function ArtworkDetail() {
 
   const meUuid = useMemo(() => String(user?.memberUuid ?? "").trim(), [user?.memberUuid]);
 
+  // ✅ 프로필 경로 통일
+  const profilePath = (uuid: string) => `/members/${encodeURIComponent(uuid)}`;
+
   // Data
   const [artwork, setArtwork] = useState<ArtworkDetailData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,7 +51,7 @@ export default function ArtworkDetail() {
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
 
-  // Comments (UI type)
+  // Comments
   const [comments, setComments] = useState<UiComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsError, setCommentsError] = useState<string | null>(null);
@@ -58,7 +66,7 @@ export default function ArtworkDetail() {
   const [commentText, setCommentText] = useState("");
   const [fanLetterText, setFanLetterText] = useState("");
 
-  // Inline edit/reply (✅ prompt 제거용)
+  // Inline edit/reply
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [replyingParentId, setReplyingParentId] = useState<string | null>(null);
@@ -80,22 +88,27 @@ export default function ArtworkDetail() {
 
   const isOwner = useMemo(() => {
     const me = String(user?.memberUuid ?? "").trim();
-    const owner = String(artwork?.artistMemberUuid ?? artwork?.artistId ?? "").trim();
+    const owner = String((artwork as any)?.artistMemberUuid ?? (artwork as any)?.artistId ?? "").trim();
     return !!me && !!owner && me === owner;
-  }, [user?.memberUuid, artwork?.artistMemberUuid, artwork?.artistId]);
+  }, [user?.memberUuid, artwork]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [normalizedArtworkId]);
 
+  // ✅ LocalComment에 authorId가 없을 수 있으므로 any로 읽고 UiComment로 확장
   const withMine = (list: LocalComment[]): UiComment[] => {
     const me = meUuid;
+
     return list.map((c) => {
-      const authorId = String((c as any).authorId ?? "").trim();
+      const rawAuthorId = String((c as any).authorId ?? (c as any).memberUuid ?? "").trim();
+      const rawAuthorName = String((c as any).authorName ?? (c as any).nickname ?? "").trim();
+
       return {
-        ...c,
-        authorId: authorId || c.authorId,
-        isMine: !!me && !!authorId && authorId === me,
+        ...(c as any),
+        authorId: rawAuthorId || undefined,
+        authorName: rawAuthorName || undefined,
+        isMine: !!me && !!rawAuthorId && rawAuthorId === me,
       };
     });
   };
@@ -130,10 +143,10 @@ export default function ArtworkDetail() {
 
         setArtwork(mapped);
 
-        if (mapped?.src) setDisplayImgSrc(mapped.src);
-        if (typeof mapped?.isFavorited === "boolean") setIsLiked(mapped.isFavorited);
-        if (typeof mapped?.likeCount === "number" && Number.isFinite(mapped.likeCount)) {
-          setLikeCount(mapped.likeCount);
+        if ((mapped as any)?.src) setDisplayImgSrc((mapped as any).src);
+        if (typeof (mapped as any)?.isFavorited === "boolean") setIsLiked((mapped as any).isFavorited);
+        if (typeof (mapped as any)?.likeCount === "number" && Number.isFinite((mapped as any).likeCount)) {
+          setLikeCount((mapped as any).likeCount);
         }
       } catch (e) {
         console.error(e);
@@ -153,7 +166,7 @@ export default function ArtworkDetail() {
     let cancelled = false;
 
     (async () => {
-      const safeId = numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
+      const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
       if (!safeId || !Number.isFinite(safeId)) return;
 
       try {
@@ -176,14 +189,14 @@ export default function ArtworkDetail() {
     return () => {
       cancelled = true;
     };
-  }, [numericArtworkId, artwork?.id]);
+  }, [numericArtworkId, artwork]);
 
   // 댓글
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      const safeId = numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
+      const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
       if (!safeId || !Number.isFinite(safeId)) return;
 
       try {
@@ -207,7 +220,7 @@ export default function ArtworkDetail() {
     return () => {
       cancelled = true;
     };
-  }, [numericArtworkId, artwork?.id, meUuid]);
+  }, [numericArtworkId, artwork, meUuid]);
 
   useEffect(() => {
     return () => {
@@ -227,7 +240,7 @@ export default function ArtworkDetail() {
   const onToggleFavorite = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
 
-    const safeId = numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
+    const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
     if (!safeId || !Number.isFinite(safeId)) return;
 
     const prevLiked = isLiked;
@@ -239,9 +252,9 @@ export default function ArtworkDetail() {
 
     try {
       const result = await toggleFavoriteOnServer(safeId);
-      if (typeof result.isFavorited === "boolean") setIsLiked(result.isFavorited);
-      if (typeof result.likeCount === "number" && Number.isFinite(result.likeCount)) {
-        setLikeCount(result.likeCount);
+      if (typeof (result as any).isFavorited === "boolean") setIsLiked((result as any).isFavorited);
+      if (typeof (result as any).likeCount === "number" && Number.isFinite((result as any).likeCount)) {
+        setLikeCount((result as any).likeCount);
       }
     } catch (e) {
       console.error(e);
@@ -252,7 +265,7 @@ export default function ArtworkDetail() {
   };
 
   const refetchComments = async () => {
-    const safeId = numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
+    const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
     if (!safeId || !Number.isFinite(safeId)) return;
 
     setCommentsLoading(true);
@@ -271,24 +284,24 @@ export default function ArtworkDetail() {
   const onSubmitComment = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
 
-    const safeId = numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
+    const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
     if (!safeId || !Number.isFinite(safeId)) return;
 
     const trimmed = commentText.trim();
     if (!trimmed) return;
 
-    // ✅ optimistic
     const tempId = `temp-${crypto.randomUUID()}`;
+
     setComments((prev) => [
       ...prev,
       {
         id: tempId,
         parentId: null,
         content: trimmed,
-        authorId: meUuid || undefined, // ✅ 내 uuid
+        authorId: meUuid || undefined,
         authorName: user?.name ?? "나",
         isMine: true,
-      },
+      } as UiComment,
     ]);
     setCommentText("");
 
@@ -306,7 +319,6 @@ export default function ArtworkDetail() {
     }
   };
 
-  // ✅ 인라인 편집/답글 UI 핸들러들
   const onStartEdit = (id: string, current: string) => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
     setReplyingParentId(null);
@@ -330,7 +342,6 @@ export default function ArtworkDetail() {
     const id = editingId;
     const prev = comments;
 
-    // optimistic
     setComments((cur) => cur.map((c) => (c.id === id ? { ...c, content: value } : c)));
     setEditingId(null);
     setEditingText("");
@@ -360,7 +371,7 @@ export default function ArtworkDetail() {
   const onSubmitReply = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
 
-    const safeId = numericArtworkId ?? (typeof artwork?.id === "number" ? artwork.id : Number(artwork?.id));
+    const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
     if (!safeId || !Number.isFinite(safeId)) return;
 
     if (!replyingParentId) return;
@@ -373,7 +384,6 @@ export default function ArtworkDetail() {
 
     const tempId = `temp-${crypto.randomUUID()}`;
 
-    // optimistic
     setComments((prev) => [
       ...prev,
       {
@@ -383,7 +393,7 @@ export default function ArtworkDetail() {
         authorId: meUuid || undefined,
         authorName: user?.name ?? "나",
         isMine: true,
-      },
+      } as UiComment,
     ]);
 
     setReplyText("");
@@ -408,7 +418,6 @@ export default function ArtworkDetail() {
     }
   };
 
-  // ✅ 삭제는 "내 댓글" 또는 "작품 주인"만 가능하게 제한(원하면 isOwner 제거 가능)
   const onDeleteComment = async (id: string) => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
 
@@ -419,7 +428,7 @@ export default function ArtworkDetail() {
     if (!window.confirm("삭제하시겠습니까?")) return;
 
     const prev = comments;
-    setComments((cur) => cur.filter((c) => c.id !== id && c.parentId !== id));
+    setComments((cur) => cur.filter((c) => c.id !== id && (c as any).parentId !== id));
 
     try {
       await deleteCommentOnServer(id);
@@ -440,7 +449,7 @@ export default function ArtworkDetail() {
 
     setTriedAuthBlob(true);
 
-    const raw = artwork?.src ?? "";
+    const raw = (artwork as any)?.src ?? "";
     if (!raw) {
       setImageError(true);
       return;
@@ -466,7 +475,7 @@ export default function ArtworkDetail() {
     if (!window.confirm("정말 삭제하시겠습니까?")) return;
 
     try {
-      const id = normalizedArtworkId || String(artwork.id);
+      const id = normalizedArtworkId || String((artwork as any).id);
       await http.delete(`/api/v1/artworks/${id}`);
       alert("삭제되었습니다.");
       navigate("/", { replace: true });
@@ -491,15 +500,15 @@ export default function ArtworkDetail() {
     if (!isLoggedIn || !user?.memberUuid) return alert("로그인 후 이용해주세요.");
     if (!artwork) return;
 
-    const safeId = numericArtworkId ?? (typeof artwork.id === "number" ? artwork.id : Number(artwork.id));
+    const safeId = numericArtworkId ?? (typeof (artwork as any).id === "number" ? (artwork as any).id : Number((artwork as any).id));
 
     setFanLetterSending(true);
     try {
       await sendFanLetter({
-        artistMemberUuid: artwork.artistMemberUuid ?? "",
+        artistMemberUuid: (artwork as any).artistMemberUuid ?? "",
         artworkId: safeId,
-        artworkTitle: artwork.title,
-        artistName: artwork.artist,
+        artworkTitle: (artwork as any).title,
+        artistName: (artwork as any).artist,
         senderId: user.memberUuid,
         senderName: user.name,
         content,
@@ -565,11 +574,11 @@ export default function ArtworkDetail() {
         onChangeCommentText={setCommentText}
         onSubmitComment={onSubmitComment}
         onDeleteComment={onDeleteComment}
-        // ✅ prompt 기반 핸들러는 더 이상 안 씀(타입 호환용으로만)
+        // 타입 호환용(사용 안 하면 빈 함수 유지)
         onEditComment={() => {}}
         onReplyComment={() => {}}
-        artistProfilePath={artwork.artistMemberUuid ? `/profile/${encodeURIComponent(artwork.artistMemberUuid)}` : undefined}
-        commentAuthorProfilePath={(authorId) => `/profile/${encodeURIComponent(authorId)}`}
+        artistProfilePath={artwork && (artwork as any).artistMemberUuid ? profilePath((artwork as any).artistMemberUuid) : undefined}
+        commentAuthorProfilePath={(authorId) => profilePath(authorId)}
         // ✅ 인라인 편집/답글 props
         editingId={editingId}
         editingText={editingText}

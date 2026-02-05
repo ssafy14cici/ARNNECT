@@ -25,25 +25,21 @@ function unwrapAxiosData(res: unknown): unknown {
   return isObject(res) && "data" in res ? (res as { data: unknown }).data : res;
 }
 
-function pickEnvelopeData(raw: unknown): unknown {
-  if (!isObject(raw)) return raw;
-  return (raw as any).data ?? raw;
-}
-
 /**
- * ✅ 리뷰 댓글 목록
- * - BE마다 쿼리 파라미터가 다름 → 후보를 순차 시도
+ * ✅ 리뷰 댓글 목록(확정 스펙)
+ * GET /api/v1/comments?targetId={targetId}&targetType=REVIEW
+ *
+ * + 혹시 서버가 예전 파라미터도 유지 중이면 fallback
  */
 export async function fetchReviewComments(reviewId: number): Promise<LocalComment[]> {
   const tryUrls = [
-    // 1) 가장 직관적인 형태
+    // ✅ 1순위: 확정 스펙
+    `${COMMENTS_PATH}?targetId=${encodeURIComponent(String(reviewId))}&targetType=REVIEW`,
+
+    // fallback (필요 없으면 지워도 됨)
     `${COMMENTS_PATH}?reviewId=${encodeURIComponent(String(reviewId))}`,
-    // 2) target/id 형태(네가 artwork에서 쓰던 것)
     `${COMMENTS_PATH}?target=${encodeURIComponent("REVIEW")}&id=${encodeURIComponent(String(reviewId))}`,
-    // 3) targetType/targetId 형태(명세서에 있던 형태)
     `${COMMENTS_PATH}?targetType=${encodeURIComponent("REVIEW")}&targetId=${encodeURIComponent(String(reviewId))}`,
-    `${COMMENTS_PATH}?targetType=${encodeURIComponent("REVIEW")}&targetId=${encodeURIComponent(String(reviewId))}&page=0&size=200`,
-    // 4) review= 형태(예전 명세 스타일)
     `${COMMENTS_PATH}?review=${encodeURIComponent(String(reviewId))}`,
   ];
 

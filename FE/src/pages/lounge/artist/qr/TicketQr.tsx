@@ -13,6 +13,9 @@ import { rememberDesign, type TicketItem, useIssuedTickets } from "./useIssuedTi
 import { svgToPngFile } from "../../../../features/tickets/qrDownload";
 import { resolveTicketMedia } from "../../../../features/tickets/resolveTicketMedia";
 
+// ✅ 추가 (artistUuid 전달용)
+import { useAuthStore } from "../../../../features/auth/store";
+
 type TabMode = "ISSUE" | "LIST";
 
 function todayYYYYMMDD() {
@@ -45,8 +48,8 @@ function toForm(t?: Partial<TicketItem> | null): FormState {
     addressDetail: t?.addressDetail ?? "",
     startDate: t?.startDate ?? todayYYYYMMDD(),
     endDate: t?.endDate ?? todayYYYYMMDD(),
-    startTime: (t?.startTime && isHHmm(t.startTime.slice(0, 5)) ? t.startTime.slice(0, 5) : "10:00"),
-    endTime: (t?.endTime && isHHmm(t.endTime.slice(0, 5)) ? t.endTime.slice(0, 5) : "20:00"),
+    startTime: t?.startTime && isHHmm(t.startTime.slice(0, 5)) ? t.startTime.slice(0, 5) : "10:00",
+    endTime: t?.endTime && isHHmm(t.endTime.slice(0, 5)) ? t.endTime.slice(0, 5) : "20:00",
     posterUrl: "",
     ticketDesign: t?.ticketDesign ?? "BASIC",
   };
@@ -122,11 +125,17 @@ export default function TicketQr() {
 
   const previewRef = useRef<HTMLDivElement | null>(null);
 
-  const { issued, reloadIssued, removeIssued } = useIssuedTickets();
+  // ✅ artistUuid(=memberUuid) 확보
+  const artistUuid = useAuthStore((s) => s.user?.memberUuid ?? "");
+
+  // ✅ useIssuedTickets는 artistUuid 1개 인자 필수
+  const { issued, reloadIssued, removeIssued } = useIssuedTickets(artistUuid);
 
   useEffect(() => {
+    // ✅ artistUuid 없으면 호출 스킵
+    if (!artistUuid) return;
     reloadIssued().catch((e) => console.error("목록 로드 실패", e));
-  }, [reloadIssued]);
+  }, [artistUuid, reloadIssued]);
 
   const canSubmit = useMemo(() => {
     if (busy) return false;
@@ -179,7 +188,7 @@ export default function TicketQr() {
       setTicketCode(res.ticketCode);
       setQrImageName(res.qrImageName || "");
 
-      // 디자인은 FE 로컬 저장(서버 필드 없으니)
+      // ✅ 디자인은 FE 로컬 저장(서버 필드 없으니)
       rememberDesign(res.ticketCode, form.ticketDesign);
 
       alert(editingTicketId ? "수정되었습니다." : "QR이 발급되었습니다.");
@@ -209,7 +218,9 @@ export default function TicketQr() {
     setBusy(true);
     setError("");
     try {
-      await removeIssued(t.ticketId, t.ticketCode);
+      // ✅ 2개 인자 전달 금지(에러 원인). 1개만 전달.
+      await removeIssued(t);
+
       if (ticketId === t.ticketId) resetForm();
     } catch (e: unknown) {
       console.error(e);
@@ -284,9 +295,7 @@ export default function TicketQr() {
               </div>
             </div>
 
-            {ticketCode && (
-              <QrPanel ticketCode={ticketCode} busy={busy} qrImageName={qrImageName} />
-            )}
+            {ticketCode && <QrPanel ticketCode={ticketCode} busy={busy} qrImageName={qrImageName} />}
           </div>
         )}
 
@@ -344,7 +353,10 @@ export default function TicketQr() {
                         />
                       )}
 
-                      <div className="loungeSubActions" style={{ marginTop: 16, justifyContent: "flex-start", gap: 10 }}>
+                      <div
+                        className="loungeSubActions"
+                        style={{ marginTop: 16, justifyContent: "flex-start", gap: 10 }}
+                      >
                         <button className="loungeSubBtn" onClick={() => startEdit(t)}>
                           수정
                         </button>
