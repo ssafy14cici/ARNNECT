@@ -9,7 +9,13 @@ import { sendFanLetter } from "../../features/fanLetter/api";
 import "./artworkDetail.css";
 
 import ArtworkDetailView from "./ArtworkDetailView";
-import { fetchImageAsObjectUrl, normalizeArtworkId, safeToInt } from "./detail/utils";
+import {
+  fetchImageAsObjectUrl,
+  normalizeArtworkId,
+  safeToInt,
+  isObject as isObj,
+  get as getObj,
+} from "./detail/utils";
 import type { ArtworkDetailData, LocalComment, ReviewSummary } from "./detail/mappers";
 import {
   createCommentOnServer,
@@ -28,6 +34,39 @@ type UiComment = LocalComment & {
   isMine?: boolean;
 };
 
+function extractErrorMessage(e: unknown): string {
+  // 1) Error 인스턴스
+  if (e instanceof Error) return e.message || "요청 중 오류가 발생했습니다.";
+
+  // 2) axios-like error: e.response.data.message
+  if (isObj(e)) {
+    const msg0 = getObj(e, "message");
+    if (typeof msg0 === "string" && msg0.trim()) return msg0;
+
+    const resp = getObj(e, "response");
+    if (isObj(resp)) {
+      const data = getObj(resp, "data");
+
+      // 서버 envelope { success:false, code, message, data:null }
+      if (isObj(data)) {
+        const code = getObj(data, "code");
+        const msg = getObj(data, "message");
+        const codeStr = typeof code === "string" ? code : "";
+        const msgStr = typeof msg === "string" ? msg : "";
+
+        if (msgStr.trim()) return codeStr ? `${codeStr}: ${msgStr}` : msgStr;
+      }
+
+      if (typeof data === "string" && data.trim()) return data;
+
+      const status = getObj(resp, "status");
+      if (typeof status === "number") return `요청 실패 (HTTP ${status})`;
+    }
+  }
+
+  return "요청 중 오류가 발생했습니다.";
+}
+
 export default function ArtworkDetail() {
   const params = useParams() as Record<string, string | undefined>;
   const rawParamId = params.artworkId ?? params.id ?? "";
@@ -45,6 +84,10 @@ export default function ArtworkDetail() {
   // Data
   const [artwork, setArtwork] = useState<ArtworkDetailData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // ✅ 상세 에러(500 포함) 표시용
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0); // 다시시도 트리거
 
   // Reviews
   const [reviews, setReviews] = useState<ReviewSummary[]>([]);
@@ -113,13 +156,17 @@ export default function ArtworkDetail() {
     });
   };
 
+  // -----------------------------
   // 상세
+  // -----------------------------
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
       try {
         setIsLoading(true);
+        setDetailError(null);
+
         setImageError(false);
         setTriedAuthBlob(false);
         setArtwork(null);
@@ -141,6 +188,13 @@ export default function ArtworkDetail() {
         const mapped = await fetchArtworkDetail(normalizedArtworkId);
         if (cancelled) return;
 
+        if (!mapped) {
+          // 매핑 실패/응답 이상
+          setArtwork(null);
+          setDetailError("작품 정보를 불러오지 못했습니다.");
+          return;
+        }
+
         setArtwork(mapped);
 
         if ((mapped as any)?.src) setDisplayImgSrc((mapped as any).src);
@@ -150,7 +204,10 @@ export default function ArtworkDetail() {
         }
       } catch (e) {
         console.error(e);
-        if (!cancelled) setArtwork(null);
+        if (!cancelled) {
+          setArtwork(null);
+          setDetailError(extractErrorMessage(e));
+        }
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -159,14 +216,21 @@ export default function ArtworkDetail() {
     return () => {
       cancelled = true;
     };
-  }, [normalizedArtworkId]);
+  }, [normalizedArtworkId, retryKey]);
 
+  // -----------------------------
   // 리뷰
+  // -----------------------------
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
+      // ✅ 상세가 에러면 리뷰/댓글 추가 호출로 더럽히지 않음
+      if (detailError) return;
+
+      const safeId =
+        numericArtworkId ??
+        (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
       if (!safeId || !Number.isFinite(safeId)) return;
 
       try {
@@ -189,14 +253,20 @@ export default function ArtworkDetail() {
     return () => {
       cancelled = true;
     };
-  }, [numericArtworkId, artwork]);
+  }, [numericArtworkId, artwork, detailError]);
 
+  // -----------------------------
   // 댓글
+  // -----------------------------
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
+      if (detailError) return;
+
+      const safeId =
+        numericArtworkId ??
+        (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
       if (!safeId || !Number.isFinite(safeId)) return;
 
       try {
@@ -220,7 +290,7 @@ export default function ArtworkDetail() {
     return () => {
       cancelled = true;
     };
-  }, [numericArtworkId, artwork, meUuid]);
+  }, [numericArtworkId, artwork, meUuid, detailError]);
 
   useEffect(() => {
     return () => {
@@ -229,18 +299,16 @@ export default function ArtworkDetail() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!isLoading && !artwork) {
-      const timer = setTimeout(() => navigate("/", { replace: true }), 1200);
-      return () => clearTimeout(timer);
-    }
-  }, [artwork, isLoading, navigate]);
+  // ❌ 기존: !artwork면 1.2초 후 홈으로 튕기던 로직 제거
+  // (서버 500도 "작품 없음"으로 오해해서 UX가 깨짐)
 
   // handlers
   const onToggleFavorite = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
 
-    const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
+    const safeId =
+      numericArtworkId ??
+      (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
     if (!safeId || !Number.isFinite(safeId)) return;
 
     const prevLiked = isLiked;
@@ -265,7 +333,9 @@ export default function ArtworkDetail() {
   };
 
   const refetchComments = async () => {
-    const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
+    const safeId =
+      numericArtworkId ??
+      (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
     if (!safeId || !Number.isFinite(safeId)) return;
 
     setCommentsLoading(true);
@@ -284,7 +354,9 @@ export default function ArtworkDetail() {
   const onSubmitComment = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
 
-    const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
+    const safeId =
+      numericArtworkId ??
+      (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
     if (!safeId || !Number.isFinite(safeId)) return;
 
     const trimmed = commentText.trim();
@@ -371,7 +443,9 @@ export default function ArtworkDetail() {
   const onSubmitReply = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
 
-    const safeId = numericArtworkId ?? (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
+    const safeId =
+      numericArtworkId ??
+      (typeof (artwork as any)?.id === "number" ? (artwork as any).id : Number((artwork as any)?.id));
     if (!safeId || !Number.isFinite(safeId)) return;
 
     if (!replyingParentId) return;
@@ -500,7 +574,9 @@ export default function ArtworkDetail() {
     if (!isLoggedIn || !user?.memberUuid) return alert("로그인 후 이용해주세요.");
     if (!artwork) return;
 
-    const safeId = numericArtworkId ?? (typeof (artwork as any).id === "number" ? (artwork as any).id : Number((artwork as any).id));
+    const safeId =
+      numericArtworkId ??
+      (typeof (artwork as any).id === "number" ? (artwork as any).id : Number((artwork as any).id));
 
     setFanLetterSending(true);
     try {
@@ -525,10 +601,34 @@ export default function ArtworkDetail() {
     }
   };
 
+  // -----------------------------
+  // Render
+  // -----------------------------
   if (isLoading) {
     return (
       <div className="artwork-detail-page" style={{ display: "grid", placeItems: "center" }}>
         <h2>Loading...</h2>
+      </div>
+    );
+  }
+
+  // ✅ 서버 500 등 에러는 여기서 보여줌 (더 이상 홈으로 튕기지 않음)
+  if (detailError) {
+    return (
+      <div className="artwork-detail-page" style={{ display: "grid", placeItems: "center" }}>
+        <div style={{ textAlign: "center", maxWidth: 520 }}>
+          <h2>작품을 불러오지 못했습니다.</h2>
+          <p style={{ opacity: 0.85, wordBreak: "break-word" }}>{detailError}</p>
+
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 18 }}>
+            <button className="btn-icon" onClick={() => setRetryKey((k) => k + 1)}>
+              다시 시도
+            </button>
+            <button className="btn-icon" onClick={() => navigate("/")}>
+              홈으로
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -577,7 +677,9 @@ export default function ArtworkDetail() {
         // 타입 호환용(사용 안 하면 빈 함수 유지)
         onEditComment={() => {}}
         onReplyComment={() => {}}
-        artistProfilePath={artwork && (artwork as any).artistMemberUuid ? profilePath((artwork as any).artistMemberUuid) : undefined}
+        artistProfilePath={
+          artwork && (artwork as any).artistMemberUuid ? profilePath((artwork as any).artistMemberUuid) : undefined
+        }
         commentAuthorProfilePath={(authorId) => profilePath(authorId)}
         // ✅ 인라인 편집/답글 props
         editingId={editingId}

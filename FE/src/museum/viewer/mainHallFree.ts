@@ -595,6 +595,44 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
       }
     });
   }
+  function makePlaceholderDataUrl(label: string, w = 768, h = 768) {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d");
+  if (!ctx) return "";
+
+  ctx.fillStyle = "#111318";
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  ctx.lineWidth = Math.max(6, Math.floor(w * 0.01));
+  ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, w - ctx.lineWidth, h - ctx.lineWidth);
+
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `700 ${Math.floor(w * 0.07)}px ui-sans-serif, system-ui, -apple-system`;
+  ctx.fillText(label, w / 2, h / 2);
+
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.font = `500 ${Math.floor(w * 0.035)}px ui-sans-serif, system-ui, -apple-system`;
+  ctx.fillText("ARNNECT", w / 2, h / 2 + Math.floor(h * 0.1));
+
+  return c.toDataURL("image/png");
+}
+
+/** API가 imageUrl을 줄 수도 있어서 둘 다 대응 */
+function resolveNewArtistImageUrl(r: any) {
+  const imageUrl = typeof r?.imageUrl === "string" ? r.imageUrl.trim() : "";
+  if (imageUrl) return imageUrl; // "/artwork/xxx.jpg" 같은 형태면 그대로 OK
+
+  const saved = typeof r?.savedImageName === "string" ? r.savedImageName.trim() : "";
+  if (saved) return buildNewArtistImageUrl(saved) || "";
+
+  return "";
+}
+
 
   // ========= NEW: 신진예술인 6명 → ART_1~ART_6 랜덤 배치 =========
   const ANCHORS = [
@@ -606,14 +644,16 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     { anchorName: "ART_6", nameAnchor: "ART_6_NAME" },
   ] as const;
 
-  const DEFAULT_ART_ITEMS: ArtworkItem[] = [
-    { id: 1, artistId: "1", anchorName: "ART_1", nameAnchor: "ART_1_NAME", artist: "최수원", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a1.jpg` },
-    { id: 2, artistId: "2", anchorName: "ART_2", nameAnchor: "ART_2_NAME", artist: "김민성", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a2.jpg` },
-    { id: 3, artistId: "3", anchorName: "ART_3", nameAnchor: "ART_3_NAME", artist: "이수진", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a3.jpg` },
-    { id: 4, artistId: "4", anchorName: "ART_4", nameAnchor: "ART_4_NAME", artist: "김지윤", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a4.jpg` },
-    { id: 5, artistId: "5", anchorName: "ART_5", nameAnchor: "ART_5_NAME", artist: "김채아", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a5.jpg` },
-    { id: 6, artistId: "6", anchorName: "ART_6", nameAnchor: "ART_6_NAME", artist: "김혜령", artworkTitle: "artworkTitle", imageUrl: `${import.meta.env.BASE_URL}art/a6.jpg` },
-  ];
+  const DEFAULT_ART_ITEMS: ArtworkItem[] = ANCHORS.map((a, i) => ({
+  id: -1,
+  artistId: "fallback",
+  anchorName: a.anchorName,
+  nameAnchor: a.nameAnchor,
+  artist: "작가",
+  artworkTitle: `EMPTY ${i + 1}`,
+  imageUrl: makePlaceholderDataUrl(`EMPTY ${i + 1}`), // ✅ a1.jpg 제거
+}));
+
 
   function shuffle<T>(arr: T[]) {
     const a = arr.slice();
@@ -646,16 +686,16 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
           artist: (r.nickname ?? "").trim() || "작가",
           artworkTitle: (r.title ?? "").trim() || "작품",
           imageUrl: (() => {
-            const url = buildNewArtistImageUrl(r.savedImageName);
+            const url = resolveNewArtistImageUrl(r);
             if (!url) {
-              console.warn(
-                `[mainHallFree] ⚠️ imageUrl 비어있음: savedImageName="${r.savedImageName}"`
-              );
+              console.warn(`[mainHallFree] ⚠️ image url empty (no imageUrl/savedImageName)`, r);
             } else {
               console.log(`[mainHallFree] ART_${i + 1} imageUrl:`, url);
             }
-            return url || `${import.meta.env.BASE_URL}art/a${(i % 6) + 1}.jpg`;
+            // ✅ 여기서도 a1.jpg로 떨어지지 말고 placeholder
+            return url || makePlaceholderDataUrl(`NO IMG ${i + 1}`);
           })(),
+
           anchorName: ANCHORS[i].anchorName,
           nameAnchor: ANCHORS[i].nameAnchor,
         });
@@ -674,8 +714,23 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   let artTexturePromises: Promise<void>[] = [];
 
   const texLoader = new THREE.TextureLoader();
-  async function loadTexture(url: string, flipV = true) {
-    const tex = await texLoader.loadAsync(url);
+  async function loadTexture(url: string, flipV = true, label = "NO IMAGE") {
+    let tex: THREE.Texture;
+
+    try {
+      // url이 비어있으면 loadAsync가 이상하게 동작할 수 있으니 선제 처리
+      if (!url) throw new Error("empty url");
+      tex = await texLoader.loadAsync(url);
+    } catch (e) {
+      console.warn("[mainHallFree] texture load failed -> placeholder:", url, e);
+
+      // ✅ placeholder texture (CanvasTexture)
+      const dataUrl = makePlaceholderDataUrl(label);
+      // TextureLoader로 dataUrl도 로드 가능하지만, 여기선 바로 CanvasTexture 써도 됨
+      // 간단히 dataUrl로 다시 로드 (CORS 이슈 회피)
+      tex = await texLoader.loadAsync(dataUrl);
+    }
+
     if (!alive) {
       tex.dispose();
       return tex;
@@ -696,10 +751,12 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
     return tex;
   }
 
+
   function startPreload(items: ArtworkItem[]) {
     preloadedTextures.clear();
     artTexturePromises = items.map((item) =>
-      loadTexture(item.imageUrl, true)
+      loadTexture(item.imageUrl, true, `${item.artist} — ${item.artworkTitle}`)
+
         .then((tex) => {
           if (!alive) return;
           preloadedTextures.set(item.imageUrl, tex);
@@ -823,7 +880,9 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   async function attachToMeshPlane(planeMesh: THREE.Mesh, item: ArtworkItem) {
     if (!alive) return;
 
-    const tex = preloadedTextures.get(item.imageUrl) ?? (await loadTexture(item.imageUrl, true));
+    const tex = 
+      preloadedTextures.get(item.imageUrl) ?? (await loadTexture(item.imageUrl, true, `${item.artist} — ${item.artworkTitle}`));
+
     if (!alive) return;
 
     const mat = new THREE.MeshStandardMaterial({

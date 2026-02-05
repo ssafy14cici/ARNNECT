@@ -12,6 +12,7 @@ const DEFAULT_HALL_START_WP = 0;
 
 export type ExhibitPayload = {
   artId?: number;
+  artistId: string; // ✅ 추가: memberUuid (작가별 15개 조회에 필요)
   artist: string;
   artworkTitle: string;
   fromWaypointId: number;
@@ -58,90 +59,6 @@ function savePose(pose: CameraPose) {
   } catch {
     /* ignore */
   }
-}
-
-/** =========================
- * ✅ Recent Artwork API (/api/v1/artwork/new)
- * ========================= */
-type RecentArtworkDto = {
-  memberUuid: string;
-  nickname: string;
-  artworkId: number;
-  title: string;
-  description: string;
-  productionDate: string;
-  savedImageName: string;
-};
-
-type JsonRecord = Record<string, unknown>;
-function isRecord(v: unknown): v is JsonRecord {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-function asString(v: unknown, fallback = ""): string {
-  return typeof v === "string" ? v : fallback;
-}
-function asNumber(v: unknown, fallback = NaN): number {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "string") {
-    const n = Number(v);
-    if (Number.isFinite(n)) return n;
-  }
-  return fallback;
-}
-
-function parseRecentArtworkList(raw: unknown): RecentArtworkDto[] {
-  if (!Array.isArray(raw)) return [];
-  const out: RecentArtworkDto[] = [];
-  for (const item of raw) {
-    if (!isRecord(item)) continue;
-    const artworkId = asNumber(item.artworkId, NaN);
-    const savedImageName = asString(item.savedImageName, "");
-    const title = asString(item.title, "");
-    const nickname = asString(item.nickname, "");
-    const memberUuid = asString(item.memberUuid, "");
-    const description = asString(item.description, "");
-    const productionDate = asString(item.productionDate, "");
-
-    if (!Number.isFinite(artworkId)) continue;
-    if (!savedImageName) continue;
-
-    out.push({
-      memberUuid,
-      nickname,
-      artworkId,
-      title: title || "(untitled)",
-      description,
-      productionDate,
-      savedImageName,
-    });
-  }
-  return out;
-}
-
-/**
- * ✅ savedImageName -> 실제 이미지 URL로 변환
- * - 백엔드가 /artwork/{savedImageName} 로 서빙한다고 가정
- * - 만약 실제가 /api/v1/artwork/image/{name} 같은 형태면 여기만 수정
- */
-function resolveArtworkImageUrl(savedImageName: string) {
-  const name = encodeURIComponent(savedImageName);
-  return `/artwork/${name}`;
-}
-
-async function fetchRecentArtworks(): Promise<RecentArtworkDto[]> {
-  const res = await fetch(`/api/v1/artwork/new`, {
-    method: "GET",
-    cache: "no-store",
-    headers: { Accept: "application/json" },
-    // 로그인 필요하면 credentials 추가 (쿠키 세션이면 필요)
-    // credentials: "include",
-  });
-
-  if (!res.ok) {
-    throw new Error(`recent artwork fetch failed: ${res.status}`);
-  }
-  const json = (await res.json()) as unknown;
-  return parseRecentArtworkList(json);
 }
 
 export function mountMuseumApp(args: {
@@ -286,7 +203,7 @@ export function mountMuseumApp(args: {
           window.dispatchEvent(new Event("intro:clear-fade"));
           toastHere("HALL READY");
         },
-        onOpenExhibit: (payload) => {
+        onOpenExhibit: (payload: ExhibitPayload) => {
           console.log("[APP] onOpenExhibit fired", payload);
           toastHere(`OPEN EXHIBIT: ${payload.artist}`);
           startExhibit(payload);
@@ -328,23 +245,19 @@ export function mountMuseumApp(args: {
     const ctx = c.getContext("2d");
     if (!ctx) return "";
 
-    // background
     ctx.fillStyle = "#111318";
     ctx.fillRect(0, 0, w, h);
 
-    // subtle frame
     ctx.strokeStyle = "rgba(255,255,255,0.15)";
     ctx.lineWidth = Math.max(6, Math.floor(w * 0.01));
     ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, w - ctx.lineWidth, h - ctx.lineWidth);
 
-    // title
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = `700 ${Math.floor(w * 0.07)}px ui-sans-serif, system-ui, -apple-system`;
     ctx.fillText(label, w / 2, h / 2);
 
-    // sub
     ctx.fillStyle = "rgba(255,255,255,0.55)";
     ctx.font = `500 ${Math.floor(w * 0.035)}px ui-sans-serif, system-ui, -apple-system`;
     ctx.fillText("ARNNECT GALLERY", w / 2, h / 2 + Math.floor(h * 0.1));
@@ -352,6 +265,7 @@ export function mountMuseumApp(args: {
     return c.toDataURL("image/png");
   }
 
+  /** ✅ 전시장 진입: 해당 작가 작품 15개 우선 */
   async function startExhibit(payload: ExhibitPayload) {
     if (disposed) return;
 
@@ -384,11 +298,22 @@ export function mountMuseumApp(args: {
     }> = [];
 
     try {
-      const list = await fetchNewArtists(); // ✅ /api/v1/artwork/new
+      // ✅ 1) 작가별(=memberUuid) 작품 목록 우선
+      let list = await fetchNewArtists({ memberUuid: payload.artistId });
       if (disposed) return;
 
+      console.log("[museum] fetchNewArtists(artist) =", list?.length ?? 0);
+
+      // ✅ 2) 작가별이 비어있으면 전체 recent로 fallback
       if (!list.length) {
-        // API 성공했는데 빈 배열이면 placeholder
+        console.warn("[museum] artist list empty -> fallback to recent list");
+        list = await fetchNewArtists();
+        if (disposed) return;
+        console.log("[museum] fetchNewArtists(recent) =", list?.length ?? 0);
+      }
+
+      if (!list.length) {
+        // API 성공했는데 빈 배열이면 placeholder 15개
         panelItems = Array.from({ length: EXHIBIT_PANEL_COUNT }, (_, i) => ({
           panelName: `EX_PANEL_${i + 1}`,
           imageUrl: makePlaceholderDataUrl(`EMPTY ${i + 1}`),
@@ -396,7 +321,7 @@ export function mountMuseumApp(args: {
           artworkId: -1,
         }));
       } else {
-        // ✅ 15개 미만이면 반복해서 15개 채움(목업 없이 실데이터 유지)
+        // ✅ 15개 미만이면 반복해서 15개 채움
         panelItems = Array.from({ length: EXHIBIT_PANEL_COUNT }, (_, i) => {
           const a = list[i % list.length];
 
@@ -412,10 +337,10 @@ export function mountMuseumApp(args: {
         });
       }
 
-      console.log("[museum] exhibit panelItems:", panelItems);
+      console.log("[museum] exhibit panelItems sample:", panelItems.slice(0, 3));
     } catch (e) {
-      console.warn("[museum] recent artworks failed -> placeholder", e);
-      toastHere("RECENT LOAD FAILED → PLACEHOLDER");
+      console.warn("[museum] artworks load failed -> placeholder", e);
+      toastHere("LOAD FAILED → PLACEHOLDER");
 
       panelItems = Array.from({ length: EXHIBIT_PANEL_COUNT }, (_, i) => ({
         panelName: `EX_PANEL_${i + 1}`,
@@ -442,21 +367,17 @@ export function mountMuseumApp(args: {
 
       onOpenArtwork: (artworkId) => {
         console.log("[museum] onOpenArtwork:", artworkId);
-        // 여기서 React 라우팅 콜백 연결 가능
-        // args.onOpenArtwork?.(Number(artworkId));
+        args.onOpenArtwork?.(Number(artworkId));
       },
     });
   }
-
-
-
-
 
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.code === "KeyX") {
       e.preventDefault();
       toastHere("DEBUG EXHIBIT");
       startExhibit({
+        artistId: "DEBUG",
         artist: "DEBUG",
         artworkTitle: "DEBUG",
         fromWaypointId: DEFAULT_HALL_START_WP,

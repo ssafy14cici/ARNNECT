@@ -2,9 +2,9 @@
 import * as THREE from "three";
 
 export type PanelArtItem = {
-  panelName: string; // ex) "ART_1"
-  imageUrl: string;  // ex) /art/b1.jpg
-  title: string;     // ex) "최수원" (지금은 userData만)
+  panelName: string; // ex) "EX_PANEL_1"
+  imageUrl: string;  // ex) /art/b1.jpg 또는 /artwork/xxx.png
+  title: string;     // ex) "작품명"
 };
 
 export type AttachPanelArtArgs = {
@@ -114,9 +114,8 @@ function raycastFacing(panelMesh: THREE.Mesh, camera: THREE.Camera) {
   return { hitPoint, nWorld };
 }
 
-/** 패널(ART plane)의 가로/세로 추정: geometry(local) 우선, 없으면 Box3 fallback */
+/** 패널(ART plane)의 가로/세로 추정 */
 function estimatePanelWH(mesh: THREE.Mesh) {
-  // 1) geometry 기반 (가장 정확: “프레임보다 작다” 문제를 가장 잘 잡음)
   const geo = mesh.geometry as THREE.BufferGeometry | undefined;
   if (geo?.attributes?.position) {
     geo.computeBoundingBox();
@@ -125,24 +124,18 @@ function estimatePanelWH(mesh: THREE.Mesh) {
       const size = new THREE.Vector3();
       bb.getSize(size);
 
-      // plane이면 두 축만 의미 있음. 보통 z는 두께(거의 0)
       const axes = [size.x, size.y, size.z].sort((a, b) => b - a);
       const wLocal = axes[0];
       const hLocal = axes[1];
 
-      // ✅ 월드 스케일 반영
       const s = new THREE.Vector3();
       mesh.getWorldScale(s);
 
-      // local bbox는 mesh local, scale만 곱하면 충분
-      // (rotation은 bbox 축에 영향 없고 planeW/H 만들 때는 스칼라만 필요)
-      const w = wLocal * Math.max(s.x, s.y, s.z);
-      const h = hLocal * Math.max(s.x, s.y, s.z);
-      return { w, h };
+      const scale = Math.max(s.x, s.y, s.z);
+      return { w: wLocal * scale, h: hLocal * scale };
     }
   }
 
-  // 2) fallback: Box3(fromObject)
   const box = new THREE.Box3().setFromObject(mesh);
   const size = new THREE.Vector3();
   box.getSize(size);
@@ -151,7 +144,7 @@ function estimatePanelWH(mesh: THREE.Mesh) {
   return { w: axes[0], h: axes[1] };
 }
 
-/** 텍스처 세팅: 지지직/모아레 줄이기 */
+/** 텍스처 세팅 */
 function tuneTexture(tex: THREE.Texture) {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = THREE.ClampToEdgeWrapping;
@@ -165,9 +158,62 @@ function tuneTexture(tex: THREE.Texture) {
   tex.needsUpdate = true;
 }
 
+/** ✅ 실패 대비 placeholder 텍스처 */
+function makePlaceholderTexture(label: string, w = 512, h = 512) {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d")!;
+
+  ctx.fillStyle = "#111318";
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.lineWidth = Math.max(8, Math.floor(w * 0.02));
+  ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, w - ctx.lineWidth, h - ctx.lineWidth);
+
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `700 ${Math.floor(w * 0.08)}px ui-sans-serif, system-ui, -apple-system`;
+  ctx.fillText(label || "NO IMAGE", w / 2, h / 2);
+
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.font = `500 ${Math.floor(w * 0.035)}px ui-sans-serif, system-ui, -apple-system`;
+  ctx.fillText("ARNNECT", w / 2, h / 2 + Math.floor(h * 0.14));
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/** ✅ 텍스처 로드: 실패해도 placeholder로 resolve */
+async function safeLoadTexture(
+  loader: THREE.TextureLoader,
+  url: string,
+  label: string,
+  fixFlipY: boolean
+): Promise<THREE.Texture> {
+  try {
+    const tex = await loader.loadAsync(url);
+    tuneTexture(tex);
+    tex.flipY = fixFlipY ? true : false;
+    tex.needsUpdate = true;
+    return tex;
+  } catch (e) {
+    console.warn("[panelArt] texture load failed -> placeholder:", url, e);
+    const tex = makePlaceholderTexture(label);
+    tuneTexture(tex);
+    tex.flipY = fixFlipY ? true : false;
+    tex.needsUpdate = true;
+    return tex;
+  }
+}
+
 export async function attachPanelArt(args: AttachPanelArtArgs): Promise<AttachPanelArtResult> {
-  const epsilon = args.epsilon ?? 0.06; // ✅ 살짝만 띄움 (너무 떠보이면 싫어함)
-  const fill = args.fill ?? 1.02;       // ✅ 프레임보다 살짝 크게 (빈 여백 제거)
+  const epsilon = args.epsilon ?? 0.06;
+  const fill = args.fill ?? 1.02;
   const faceCamera = args.faceCamera ?? true;
   const fixFlipY = args.fixFlipY ?? true;
 
@@ -176,14 +222,14 @@ export async function attachPanelArt(args: AttachPanelArtArgs): Promise<AttachPa
   const missing: string[] = [];
 
   const texLoader = new THREE.TextureLoader();
+  // 교차 도메인 이미지일 가능성 대비(안 열려있으면 anyway placeholder로 감)
+  try {
+    (texLoader as any).setCrossOrigin?.("anonymous");
+  } catch {}
 
+  // ✅ 핵심: 1장 실패로 전체가 죽지 않게 "개별 안전 로드"
   const textures = await Promise.all(
-    args.items.map(
-      (it) =>
-        new Promise<THREE.Texture>((resolve, reject) => {
-          texLoader.load(it.imageUrl, (tex) => resolve(tex), undefined, reject);
-        })
-    )
+    args.items.map((it) => safeLoadTexture(texLoader, it.imageUrl, it.title, fixFlipY))
   );
 
   for (let i = 0; i < args.items.length; i++) {
@@ -204,10 +250,8 @@ export async function attachPanelArt(args: AttachPanelArtArgs): Promise<AttachPa
       continue;
     }
 
-    // 패널 w/h (정확)
     const { w: panelW, h: panelH } = estimatePanelWH(panelMesh);
 
-    // 정면 배치용 hit/normal
     let placePoint: THREE.Vector3 | null = null;
     let normalWorld: THREE.Vector3 | null = null;
 
@@ -226,13 +270,6 @@ export async function attachPanelArt(args: AttachPanelArtArgs): Promise<AttachPa
       normalWorld = new THREE.Vector3(0, 0, 1);
     }
 
-    tuneTexture(tex);
-
-    // ✅ 상하 뒤집힘 보정
-    tex.flipY = fixFlipY ? true : false;
-    tex.needsUpdate = true;
-
-    // ✅ "패널에 꽉" (왜곡 허용, fill로 오버스캔)
     const planeW = panelW * fill;
     const planeH = panelH * fill;
 
@@ -244,7 +281,6 @@ export async function attachPanelArt(args: AttachPanelArtArgs): Promise<AttachPa
       depthWrite: false,
       toneMapped: false,
       side: THREE.FrontSide,
-
       polygonOffset: true,
       polygonOffsetFactor: -4,
       polygonOffsetUnits: -4,
@@ -257,7 +293,6 @@ export async function attachPanelArt(args: AttachPanelArtArgs): Promise<AttachPa
 
     art.quaternion.copy(quatFromNormal(normalWorld));
     art.position.copy(placePoint).addScaledVector(normalWorld, epsilon);
-
     art.renderOrder = 10;
 
     args.sceneRoot.add(art);
