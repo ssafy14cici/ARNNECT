@@ -148,6 +148,11 @@ public class ArtworkServiceImpl implements ArtworkService{
         }
     }
 
+    @Override
+    public List<Long> findGenreIdsByArtworkIds(List<Long> artworkIds){
+        return repository.findGenreIdsByArtworkIds(artworkIds);
+    }
+
     private void createTag(List<String> tagNameList, Long artworkId){
         /**
          * 태그
