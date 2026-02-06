@@ -300,7 +300,10 @@ export async function mountExhibitRoom(
   const fps = new PointerLockControls(camera, renderer.domElement);
 
   const eyeY = 1.6;
-  const speed = 3.2;
+  let speed = 30;
+  const SPEED_MIN = 5;
+  const SPEED_MAX = 100;
+  const SPEED_STEP = 5;
   let fpsEnabled = false;
   const move = { f: false, b: false, l: false, r: false };
   const tmpDir = new THREE.Vector3();
@@ -312,7 +315,7 @@ export async function mountExhibitRoom(
     "background:rgba(0,0,0,0.35);backdrop-filter:blur(8px);" +
     "color:rgba(255,255,255,0.85);font-family:monospace;font-size:12px;" +
     "letter-spacing:0.08em;display:none;pointer-events:none;";
-  fpsLabel.textContent = "FPS: ON (WASD / ESC)";
+  fpsLabel.textContent = `FPS: ON (WASD / ESC) | Speed: ${speed} (+/-)`;
 
   const setFps = (on: boolean) => {
     fpsEnabled = on;
@@ -784,6 +787,20 @@ export async function mountExhibitRoom(
       if (e.code === "KeyD") {
         e.preventDefault();
         move.r = true;
+        return;
+      }
+
+      // Speed up/down with +/- keys
+      if (e.code === "Equal" || e.code === "NumpadAdd") {
+        e.preventDefault();
+        speed = Math.min(speed + SPEED_STEP, SPEED_MAX);
+        fpsLabel.textContent = `FPS: ON (WASD / ESC) | Speed: ${speed} (+/-)`;
+        return;
+      }
+      if (e.code === "Minus" || e.code === "NumpadSubtract") {
+        e.preventDefault();
+        speed = Math.max(speed - SPEED_STEP, SPEED_MIN);
+        fpsLabel.textContent = `FPS: ON (WASD / ESC) | Speed: ${speed} (+/-)`;
         return;
       }
 
