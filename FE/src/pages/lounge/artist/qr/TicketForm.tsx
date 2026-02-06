@@ -50,14 +50,8 @@ export default function TicketForm({ form, busy, onChange, previewRef, qrValue }
   ];
 
   // ✅ 가로 티켓 자동 판별
-  const isHorizontal = useMemo(() => {
-    const H: TicketDesign[] = ["MINIMAL", "HOLO", "SIMPLE", "PURPLE", "PINK", "RED"];
-    return H.includes(form.ticketDesign);
-  }, [form.ticketDesign]);
-
-  const previewColWidth = isHorizontal ? 520 : 300;
-  const previewPadding = isHorizontal ? 14 : 20;
-  const previewMinHeight = isHorizontal ? 240 : 400;
+  const previewPadding = 18;
+  const previewMinHeight = 320;
 
   const onPickPoster = useCallback(
     async (e: ChangeEvent<HTMLInputElement>) => {
@@ -88,9 +82,9 @@ export default function TicketForm({ form, busy, onChange, previewRef, qrValue }
   }, [onChange]);
 
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "40px", alignItems: "flex-start" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
       {/* [LEFT] 입력 폼 영역 */}
-      <div style={{ flex: 1, minWidth: "320px", display: "flex", flexDirection: "column", gap: "24px" }}>
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "24px" }}>
         <div className="loungeInputGroup">
           <label className="loungeLabel">티켓 디자인 선택</label>
 
@@ -203,12 +197,11 @@ export default function TicketForm({ form, busy, onChange, previewRef, qrValue }
       {/* [RIGHT] 실시간 미리보기 영역 (ticketImage 캡처 대상) */}
       <div
         style={{
-          width: `${previewColWidth}px`,
+          width: "min(520px, 100%)",
+          alignSelf: "center",
           display: "flex",
           flexDirection: "column",
           gap: "10px",
-          position: "sticky",
-          top: "20px",
         }}
       >
         <label className="loungeLabel" style={{ textAlign: "center", color: "#C8A97E" }}>

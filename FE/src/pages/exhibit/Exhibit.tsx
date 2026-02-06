@@ -119,6 +119,12 @@ async function buildPanelsByArtist(artistId: string | null): Promise<PanelArtIte
   }
 }
 
+type ExhibitRuntime = {
+  destroy: () => void;
+  goTo: (i: number, dur?: number) => void;
+  getIndex: () => number;
+};
+
 export default function Exhibit() {
   const nav = useNavigate();
   const location = useLocation();
@@ -126,12 +132,26 @@ export default function Exhibit() {
 
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const runtimeRef = useRef<ExhibitRuntime | null>(null);
 
   // 가이드 토글 상태 (false: info.png, true: how_ex.png)
   const [showGuide, setShowGuide] = useState(false);
 
   // ✅ 전역 BGM 상태와 동기화
   const [bgmOn, setBgmOn] = useState(() => bgmIsOn());
+
+  // ✅ 좌우 이동 버튼 핸들러
+  const handlePrev = () => {
+    if (!runtimeRef.current) return;
+    const curr = runtimeRef.current.getIndex();
+    runtimeRef.current.goTo(curr - 1, 0.85);
+  };
+
+  const handleNext = () => {
+    if (!runtimeRef.current) return;
+    const curr = runtimeRef.current.getIndex();
+    runtimeRef.current.goTo(curr + 1, 0.85);
+  };
 
   // ✅ URL params에서 artistId 가져오기 (/exhibit/:artistId)
   const artistId = params.artistId ?? null;
@@ -178,7 +198,6 @@ export default function Exhibit() {
     const titleText = artist ? `${artist} 전시` : "EXHIBIT";
 
     let cancelled = false;
-    let runtime: { destroy: () => void } | null = null;
 
     (async () => {
       try {
@@ -207,7 +226,7 @@ export default function Exhibit() {
           rt.destroy();
           return;
         }
-        runtime = rt;
+        runtimeRef.current = rt;
         console.log("[Exhibit] ✅ mountExhibitRoom 완료");
       } catch (e) {
         console.error("[Exhibit] mount failed", e);
@@ -216,7 +235,8 @@ export default function Exhibit() {
 
     return () => {
       cancelled = true;
-      runtime?.destroy();
+      runtimeRef.current?.destroy();
+      runtimeRef.current = null;
       uiLayer.remove();
       document.body.style.overflow = prevOverflow;
     };
@@ -229,6 +249,79 @@ export default function Exhibit() {
       style={{ position: "relative", width: "100%", height: "100dvh", overflow: "hidden" }}
     >
       <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+
+      {/* 좌우 이동 오버레이 버튼 */}
+      <button
+        type="button"
+        onClick={handlePrev}
+        style={{
+          position: "fixed",
+          left: 24,
+          top: "50%",
+          transform: "translateY(-50%)",
+          width: 56,
+          height: 56,
+          borderRadius: "50%",
+          border: "1px solid rgba(255,255,255,0.3)",
+          background: "rgba(0,0,0,0.4)",
+          backdropFilter: "blur(8px)",
+          color: "rgba(255,255,255,0.9)",
+          fontSize: 24,
+          cursor: "pointer",
+          zIndex: 9985,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "background 0.2s, transform 0.15s",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "rgba(0,0,0,0.6)";
+          e.currentTarget.style.transform = "translateY(-50%) scale(1.08)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "rgba(0,0,0,0.4)";
+          e.currentTarget.style.transform = "translateY(-50%) scale(1)";
+        }}
+        aria-label="이전 작품"
+      >
+        ◀
+      </button>
+
+      <button
+        type="button"
+        onClick={handleNext}
+        style={{
+          position: "fixed",
+          right: 24,
+          top: "50%",
+          transform: "translateY(-50%)",
+          width: 56,
+          height: 56,
+          borderRadius: "50%",
+          border: "1px solid rgba(255,255,255,0.3)",
+          background: "rgba(0,0,0,0.4)",
+          backdropFilter: "blur(8px)",
+          color: "rgba(255,255,255,0.9)",
+          fontSize: 24,
+          cursor: "pointer",
+          zIndex: 9985,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "background 0.2s, transform 0.15s",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "rgba(0,0,0,0.6)";
+          e.currentTarget.style.transform = "translateY(-50%) scale(1.08)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "rgba(0,0,0,0.4)";
+          e.currentTarget.style.transform = "translateY(-50%) scale(1)";
+        }}
+        aria-label="다음 작품"
+      >
+        ▶
+      </button>
 
       {/* 가이드 토글 버튼 */}
       {!showGuide && (

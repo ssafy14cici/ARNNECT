@@ -1,5 +1,5 @@
 // FE/src/pages/artworks/ArtworkDetailView.tsx
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { ArtworkDetailData, LocalComment, ReviewSummary } from "./detail/mappers";
 
@@ -141,6 +141,9 @@ export default function ArtworkDetailView(props: Props) {
     onCancelReply,
     onSubmitReply,
   } = props;
+
+  // 이미지 확대 모달 상태
+  const [zoomOpen, setZoomOpen] = useState(false);
 
   // ✅ 여기서부터 전부 "undefined 들어와도 안 터지게" 정규화
   const safeReviews = useMemo(() => asArray<ReviewSummary>(reviews), [reviews]);
@@ -342,6 +345,8 @@ export default function ArtworkDetailView(props: Props) {
                 src={displayImgSrc || String((artwork as any)?.src ?? "")}
                 alt={title || "artwork"}
                 onError={onHeroImgError}
+                onClick={() => setZoomOpen(true)}
+                style={{ cursor: "zoom-in" }}
               />
             ) : (
               <div className="hero-fallback">이미지 로드 실패</div>
@@ -470,6 +475,67 @@ export default function ArtworkDetailView(props: Props) {
           </section>
         </div>
       </main>
+
+      {/* 이미지 확대 모달 */}
+      {zoomOpen && !imageError && (
+        <div
+          className="image-zoom-overlay"
+          onClick={() => setZoomOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(0,0,0,0.92)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "zoom-out",
+          }}
+        >
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setZoomOpen(false);
+            }}
+            style={{
+              position: "absolute",
+              top: 24,
+              right: 24,
+              background: "rgba(255,255,255,0.15)",
+              border: "none",
+              borderRadius: "50%",
+              width: 48,
+              height: 48,
+              color: "#fff",
+              fontSize: 28,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "background 0.2s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.3)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.15)")}
+            aria-label="닫기"
+          >
+            ✕
+          </button>
+          <img
+            src={displayImgSrc || String((artwork as any)?.src ?? "")}
+            alt={title || "artwork"}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "90vw",
+              maxHeight: "90vh",
+              objectFit: "contain",
+              borderRadius: 8,
+              boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
+              cursor: "default",
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

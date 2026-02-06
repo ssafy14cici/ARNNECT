@@ -1,6 +1,6 @@
 // FE/src/pages/lounge/artist/qr/TicketQr.tsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toBlob } from "html-to-image";
 import "../../lounge.css";
 
@@ -125,6 +125,7 @@ async function makeTicketImageFile(previewEl: HTMLElement | null, ticketCode: st
 }
 
 export default function TicketQr() {
+  const nav = useNavigate();
   const [params] = useSearchParams();
 
   const [activeTab, setActiveTab] = useState<TabMode>("ISSUE");
@@ -330,7 +331,7 @@ export default function TicketQr() {
                 <div style={{ display: "grid", gap: 16 }}>
                   {issued.map((t) => {
                     const ticketImg = resolveMediaUrl((t as any).ticketImageName);
-                    const qrImg = resolveMediaUrl((t as any).qrImageName);
+                    
 
                     return (
                       <div
@@ -376,27 +377,7 @@ Address {t.address} | Period {t.startDate} ~ {t.endDate}
                                 (e.currentTarget as HTMLImageElement).style.display = "none";
                               }}
                             />
-                            {qrImg && (
-                              <img
-                                src={qrImg}
-                                alt="qr"
-                                style={{
-                                  position: "absolute",
-                                  right: 12,
-                                  bottom: 12,
-                                  width: 84,
-                                  height: 84,
-                                  background: "#fff",
-                                  borderRadius: 10,
-                                  padding: 8,
-                                  border: "1px solid rgba(255,255,255,0.18)",
-                                }}
-                                onError={(e) => {
-                                  (e.currentTarget as HTMLImageElement).style.display = "none";
-                                }}
-                              />
-                            )}
-                          </div>
+                                                      </div>
                         )}
 
                         <div
