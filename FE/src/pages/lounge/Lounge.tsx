@@ -5,7 +5,7 @@ import "./lounge.css";
 import { useAuthStore } from "../../features/auth/store";
 
 type Role = "general" | "artist";
-type TabKey = "collectbook" | "taste" | "RemindQuiz" | "ticket" | "portfolio" | "fan-letter";
+type TabKey = "collectbook" | "Analysis" | "RemindQuiz" | "ticket" | "portfolio" | "fan-letter";
 type Tab = { key: TabKey; title: string; desc: string; to: string };
 
 function normalizeRole(role: unknown): Role {
@@ -27,7 +27,7 @@ export default function Lounge() {
         ]
       : [
           { key: "collectbook", title: "컬렉트북", desc: "스캔한 티켓/작품 기록", to: "collectbook" },
-          { key: "taste", title: "취향분석", desc: "선호/활동 기반 요약", to: "taste" },
+          { key: "Analysis", title: "취향분석", desc: "선호/활동 기반 요약", to: "Analysis" },
           { key: "RemindQuiz", title: "퀴즈", desc: "작품/작가 기반 퀴즈", to: "RemindQuiz" },
         ];
   }, [role]);

@@ -7,7 +7,7 @@
   height: 100vh;
   overflow: hidden;
   background-color: #050505;
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
 }
 
 /* 배경 장식 텍스트 */
@@ -16,7 +16,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 15vw;
   color: rgba(255, 255, 255, 0.03);
   white-space: nowrap;
@@ -125,7 +125,7 @@
 }
 
 .pane-title {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 4rem;
   font-weight: 400;
   margin: 0 0 24px 0;

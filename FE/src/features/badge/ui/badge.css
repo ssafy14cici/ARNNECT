@@ -5,7 +5,7 @@
 .badge-container {
   padding: 30px 0;
   color: #fff;
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
 }
 
 /* --- Header --- */
@@ -19,7 +19,7 @@
 }
 
 .badge-title {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 1.8rem;
   margin: 0 0 8px;
   color: #fff;
@@ -159,14 +159,14 @@
 }
 
 .badgeTitle {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 1.5rem;
   color: #fff;
   margin: 0;
 }
 
 .badgeCount {
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
   font-size: 1rem;
   color: #C8A97E; /* Gold */
   margin-left: 8px;

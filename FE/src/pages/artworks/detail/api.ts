@@ -20,26 +20,110 @@ const COMMENTS_PATH = "/api/v1/comments";
 
 const COMMENT_TARGET_TYPE = "ARTWORK" as const;
 
+// -----------------------------
+// helpers: axios + envelope unwrap
+// -----------------------------
 function unwrapAxiosData(res: unknown): unknown {
   // axios response면 res.data
   return isObject(res) && "data" in res ? (res as { data: unknown }).data : res;
 }
 
-export async function fetchArtworkDetail(artworkId: string): Promise<ArtworkDetailData | null> {
-  const res = await http.get(`${ARTWORK_DETAIL_PATH}/${artworkId}`);
-  const payload = unwrapAxiosData(res);
-  return mapArtworkDetail(payload);
+type ApiEnvelopeLike = {
+  success: boolean;
+  data: unknown;
+  message?: unknown;
+  code?: unknown;
+};
+
+function isEnvelope(v: unknown): v is ApiEnvelopeLike {
+  return isObject(v) && "success" in v && "data" in v;
 }
 
+function toStr(v: unknown, fallback = ""): string {
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return fallback;
+}
+
+function getHttpStatus(e: unknown): number | null {
+  if (!isObject(e)) return null;
+  const resp = (e as any).response;
+  const status = resp?.status;
+  return typeof status === "number" ? status : null;
+}
+
+/**
+ * ✅ 서버가 envelope({success,data,message})로 주는 경우:
+ * - success=false면 여기서 throw 해서 "null(작품없음)"로 오해하지 않게 함
+ * - success=true면 data만 반환
+ * ✅ envelope 아니면 그대로 반환
+ */
+function unwrapApiPayload(res: unknown): unknown {
+  const raw = unwrapAxiosData(res);
+
+  if (isEnvelope(raw)) {
+    if (raw.success === false) {
+      const msg = toStr(raw.message, "서버 오류가 발생했습니다.");
+      const code = toStr(raw.code, "");
+      throw new Error(code ? `${code}: ${msg}` : msg);
+    }
+    return raw.data;
+  }
+
+  return raw;
+}
+
+// -----------------------------
+// Artwork Detail
+// -----------------------------
+const ARTWORK_DETAIL_CANDIDATES = [
+  (id: string) => `${ARTWORK_DETAIL_PATH}/${id}`,
+  (id: string) => `${ARTWORK_DETAIL_PATH}/${id}/detail`,
+  (id: string) => `${ARTWORK_DETAIL_PATH}/detail/${id}`,
+] as const;
+
+export async function fetchArtworkDetail(artworkId: string): Promise<ArtworkDetailData | null> {
+  let lastErr: unknown = null;
+
+  for (const makeUrl of ARTWORK_DETAIL_CANDIDATES) {
+    const url = makeUrl(artworkId);
+
+    try {
+      const res = await http.get(url);
+      const payload = unwrapApiPayload(res);
+      return mapArtworkDetail(payload);
+    } catch (e) {
+      const status = getHttpStatus(e);
+
+      // ✅ fallback은 "경로가 틀렸을 가능성(404/405)"일 때만 시도
+      if (status === 404 || status === 405) {
+        lastErr = e;
+        continue;
+      }
+
+      // ✅ 401/403/500/네트워크 등은 즉시 종료(다른 후보 URL로 덮어쓰지 않게)
+      throw e;
+    }
+  }
+
+  throw lastErr ?? new Error("작품 상세 조회 실패");
+}
+
+// -----------------------------
+// Reviews
+// -----------------------------
 export async function fetchReviewsByArtworkId(artworkId: number): Promise<ReviewSummary[]> {
   const res = await http.get(`${REVIEWS_BY_ARTWORK_PATH}?artworkId=${encodeURIComponent(String(artworkId))}`);
-  const payload = unwrapAxiosData(res);
+  const payload = unwrapApiPayload(res);
   return mapReviewList(payload);
 }
 
+// -----------------------------
+// Favorite Toggle
+// -----------------------------
 export async function toggleFavoriteOnServer(artworkId: number): Promise<FavoriteToggleResult> {
   const res = await http.post(FAVORITES_TOGGLE_PATH, { artworkId });
-  const payload = unwrapAxiosData(res);
+  const payload = unwrapApiPayload(res);
   return parseFavoriteToggleResult(payload);
 }
 
@@ -59,17 +143,17 @@ export async function fetchArtworkComments(artworkId: number): Promise<LocalComm
           targetType: COMMENT_TARGET_TYPE,
         },
       });
-      const payload = unwrapAxiosData(res);
+      const payload = unwrapApiPayload(res);
       return mapCommentResponseList(payload);
     },
 
-    // fallback (필요 없으면 지워도 됨)
+    // fallback
     async () => {
       const url = `${COMMENTS_PATH}?target=${encodeURIComponent(COMMENT_TARGET_TYPE)}&id=${encodeURIComponent(
         String(artworkId),
       )}`;
       const res = await http.get(url);
-      const payload = unwrapAxiosData(res);
+      const payload = unwrapApiPayload(res);
       return mapCommentResponseList(payload);
     },
     async () => {
@@ -77,7 +161,7 @@ export async function fetchArtworkComments(artworkId: number): Promise<LocalComm
         String(artworkId),
       )}`;
       const res = await http.get(url);
-      const payload = unwrapAxiosData(res);
+      const payload = unwrapApiPayload(res);
       return mapCommentResponseList(payload);
     },
   ];
@@ -88,11 +172,17 @@ export async function fetchArtworkComments(artworkId: number): Promise<LocalComm
     try {
       return await call();
     } catch (e) {
+      const status = getHttpStatus(e);
+
+      // ✅ 401/403은 fallback 의미 없으니 즉시 throw
+      if (status === 401 || status === 403) throw e;
+
+      // ✅ 400/404 같은 "파라미터/경로 불일치"만 fallback 대상
       lastErr = e;
     }
   }
 
-  throw lastErr;
+  throw lastErr ?? new Error("댓글 목록 조회 실패");
 }
 
 export async function createCommentOnServer(args: {
@@ -107,14 +197,16 @@ export async function createCommentOnServer(args: {
     parentCommentId: args.parentCommentId ?? null,
   });
 
-  const payload = unwrapAxiosData(res);
+  const payload = unwrapApiPayload(res);
   return mapSingleComment(payload);
 }
 
 export async function updateCommentOnServer(commentId: string, content: string): Promise<void> {
-  await http.put(`${COMMENTS_PATH}/${encodeURIComponent(commentId)}`, { content });
+  const res = await http.put(`${COMMENTS_PATH}/${encodeURIComponent(commentId)}`, { content });
+  unwrapApiPayload(res);
 }
 
 export async function deleteCommentOnServer(commentId: string): Promise<void> {
-  await http.delete(`${COMMENTS_PATH}/${encodeURIComponent(commentId)}`);
+  const res = await http.delete(`${COMMENTS_PATH}/${encodeURIComponent(commentId)}`);
+  unwrapApiPayload(res);
 }

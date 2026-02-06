@@ -1,29 +1,45 @@
-//FE\src\pages\lounge\user\Quiz.tsx
+// FE/src/pages/lounge/user/RemindQuiz.tsx
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "../lounge.css";
+import { http } from "../../../shared/api/http";
 
 // --------------------
 // Types
 // --------------------
-type Artwork = {
-  artworkId: number | string;
-  title: string;
-  thumbnailUrl?: string;
-  artistName?: string;
+type RemindQuizItem = {
+  reviewId: number | string;
+  quiz: string;
 };
 
-type QuizType = "TITLE_GUESS" | "PREFERENCE";
-type QuizState = "idle" | "loading" | "ready" | "playing" | "result" | "error";
-
-type TitleGuessQuestion = {
-  artwork: Artwork;      // 출제 작품(이미지/작가명 힌트)
-  choices: string[];     // 보기(4지선다)
-  answer: string;        // 정답(title)
-};
+type QuizState = "idle" | "loading" | "ready" | "playing" | "error";
 
 // --------------------
 // Helpers
 // --------------------
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(v: unknown): v is JsonRecord {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+function isArray(v: unknown): v is unknown[] {
+  return Array.isArray(v);
+}
+function get(obj: JsonRecord, key: string): unknown {
+  return obj[key];
+}
+function asString(v: unknown, fallback = ""): string {
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return fallback;
+}
+function asNumberOrString(v: unknown): number | string {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  const s = String(v ?? "").trim();
+  const n = Number(s);
+  if (Number.isFinite(n) && s !== "") return n;
+  return s || 0;
+}
 function shuffle<T>(arr: T[]) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -33,192 +49,204 @@ function shuffle<T>(arr: T[]) {
   return a;
 }
 
-async function fetchMyFeed(): Promise<Artwork[]> {
-  // TODO: 실제 API로 교체
-  // 예: const res = await fetch("/api/v1/remind", { credentials: "include" });
-  // const data = await res.json();
-  // return data.items.map(...)
-  return [
-    { artworkId: 1, title: "푸른 밤", thumbnailUrl: "", artistName: "Artist A" },
-    { artworkId: 2, title: "비 오는 거리", thumbnailUrl: "", artistName: "Artist B" },
-    { artworkId: 3, title: "정적", thumbnailUrl: "", artistName: "Artist C" },
-  ];
+/**
+ * 서버가 envelope({data}/{result}/{content})로 주든, raw로 주든 흡수
+ */
+function unwrapEnvelope(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw;
+  if ("data" in raw) return (raw as any).data;
+  if ("result" in raw) return (raw as any).result;
+  if ("content" in raw) return (raw as any).content;
+  return raw;
 }
 
-// 오답 보충용 더미 풀(나중에 “추천 작품” API로 대체 가능)
-const FALLBACK_TITLES = [
-  "기억의 조각",
-  "붉은 정원",
-  "모노톤",
-  "빛의 파편",
-  "초여름",
-  "새벽의 온도",
-  "한 장면",
-];
+function parseRemindQuizList(raw: unknown): RemindQuizItem[] {
+  const unwrapped = unwrapEnvelope(raw);
+  if (!isArray(unwrapped)) return [];
 
-function buildTitleGuessQuestion(feed: Artwork[]): TitleGuessQuestion | null {
-  if (!feed.length) return null;
-
-  const pick = feed[Math.floor(Math.random() * feed.length)];
-  const correct = pick.title;
-
-  const fromFeed = feed
-    .map((x) => x.title)
-    .filter((t) => t && t !== correct);
-
-  const pool = shuffle([...new Set([...fromFeed, ...FALLBACK_TITLES])])
-    .filter((t) => t !== correct);
-
-  const wrongs = pool.slice(0, 3);
-  const choices = shuffle([correct, ...wrongs]);
-
-  // 보기 4개가 안되면 실패 처리(데이터 너무 없음)
-  if (choices.length < 4) return null;
-
-  return { artwork: pick, choices, answer: correct };
+  return unwrapped
+    .map((x) => {
+      if (!isRecord(x)) return null;
+      const reviewId = asNumberOrString(get(x, "reviewId"));
+      const quiz = asString(get(x, "quiz"), "").trim();
+      if (!quiz) return null;
+      return { reviewId, quiz };
+    })
+    .filter((x): x is RemindQuizItem => !!x);
 }
 
-export default function Quiz() {
+// --------------------
+// API
+// --------------------
+async function fetchRemindQuiz(): Promise<RemindQuizItem[]> {
+  /**
+   * ✅ 주의
+   * http baseURL이 이미 "/api/v1" 포함이면 "/remind"
+   * 포함이 아니면 "/api/v1/remind"
+   * (프로젝트 세팅에 맞춰 하나만 남겨)
+   */
+  const REMIND_PATH = "/api/v1/remind";
+
+  const res = await http.get(REMIND_PATH);
+  return parseRemindQuizList(res.data);
+}
+
+// --------------------
+// Component
+// --------------------
+export default function RemindQuiz() {
+  const nav = useNavigate();
+
   const [state, setState] = useState<QuizState>("idle");
-  const [quizType, setQuizType] = useState<QuizType>("TITLE_GUESS");
-  const [feed, setFeed] = useState<Artwork[]>([]);
-  const [question, setQuestion] = useState<TitleGuessQuestion | null>(null);
+  const [items, setItems] = useState<RemindQuizItem[]>([]);
 
-  const [selected, setSelected] = useState<string | null>(null);
-  const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [answerText, setAnswerText] = useState("");
+  const [submitted, setSubmitted] = useState(false);
 
-  const feedCount = feed.length;
-
-  // 초기 로드: 내 피드 가져오기 → 퀴즈 타입 결정
   useEffect(() => {
     (async () => {
       try {
         setState("loading");
-        const data = await fetchMyFeed();
-        setFeed(data);
-
-        const type: QuizType = data.length <= 5 ? "TITLE_GUESS" : "PREFERENCE";
-        setQuizType(type);
-
+        const list = await fetchRemindQuiz();
+        if (!list.length) {
+          setItems([]);
+          setState("error");
+          return;
+        }
+        setItems(list);
+        setCurrentIdx(0);
         setState("ready");
-      } catch (e) {
+      } catch {
         setState("error");
       }
     })();
   }, []);
 
+  const count = items.length;
+  const current = items[currentIdx];
+
   const description = useMemo(() => {
-    if (quizType === "TITLE_GUESS") {
-      return "내 활동 데이터가 적어, 작품을 보고 제목을 맞추는 퀴즈를 제공합니다.";
-    }
-    return "내 활동/취향을 기반으로 퀴즈를 제공합니다.";
-  }, [quizType]);
+    if (state === "loading") return "불러오는 중...";
+    if (state === "error") return "퀴즈 데이터를 만들 수 없습니다. (응답/로그인 상태 확인 필요)";
+    return `리마인드 퀴즈 ${count}개 중 ${count ? currentIdx + 1 : 0}번째`;
+  }, [state, count, currentIdx]);
 
-  function startQuiz() {
-    setSelected(null);
-    setIsCorrect(null);
-
-    if (quizType === "TITLE_GUESS") {
-      const q = buildTitleGuessQuestion(feed);
-      if (!q) {
-        setState("error");
-        return;
-      }
-      setQuestion(q);
-      setState("playing");
+  function start() {
+    if (!items.length) {
+      setState("error");
       return;
     }
+    setAnswerText("");
+    setSubmitted(false);
 
-    // TODO: PREFERENCE 퀴즈 구현
+    // 랜덤 시작하고 싶으면 아래 2줄로 변경
+    // const idx = Math.floor(Math.random() * items.length);
+    // setCurrentIdx(idx);
+
     setState("playing");
   }
 
-  function chooseAnswer(ans: string) {
-    if (!question) return;
-    setSelected(ans);
-    setIsCorrect(ans === question.answer);
-    setState("result");
+  function next() {
+    if (!items.length) return;
+    setAnswerText("");
+    setSubmitted(false);
+
+    // 순차 다음
+    const nextIdx = (currentIdx + 1) % items.length;
+    setCurrentIdx(nextIdx);
+    setState("playing");
+  }
+
+  function submit() {
+    if (!current) return;
+    setSubmitted(true);
+    // 채점은 불가(정답 데이터 없음)
+  }
+
+  function goReview() {
+    if (!current) return;
+    // 프로젝트 라우트가 /reviews/:reviewId 라는 가정
+    nav(`/reviews/${current.reviewId}`);
   }
 
   return (
     <section className="tasteCard">
       <h2 className="tasteCardTitle">퀴즈</h2>
       <p className="loungeSubDesc" style={{ marginTop: 6 }}>
-        {description} (내 피드 {feedCount}개)
+        {description}
       </p>
 
       {state === "loading" && <div className="loungeEmpty">불러오는 중...</div>}
+
       {state === "error" && (
         <div className="loungeEmpty">
-          퀴즈 데이터를 만들 수 없습니다. (피드/작품 데이터 확인 필요)
+          퀴즈 데이터를 불러올 수 없습니다.
+          <br />
+          (1) /api/v1/remind 응답 확인 (2) 로그인/토큰 (3) PATH(baseURL) 점검
         </div>
       )}
 
       {state === "ready" && (
-        <div className="loungeSubActions">
-          <button className="loungeSubBtn" type="button" onClick={startQuiz}>
+        <div className="loungeSubActions" style={{ marginTop: 12 }}>
+          <button className="loungeSubBtn" type="button" onClick={start}>
             퀴즈 시작
           </button>
         </div>
       )}
 
-      {state === "playing" && quizType === "TITLE_GUESS" && question && (
-        <div className="tasteDetailGrid" style={{ marginTop: 12 }}>
-          <section className="tasteCard">
-            <h3 className="tasteCardTitle">Q. 이 작품의 제목은?</h3>
+      {state === "playing" && current && (
+        <section className="tasteCard" style={{ marginTop: 12 }}>
+          <h3 className="tasteCardTitle">Q.</h3>
+          <div style={{ marginTop: 8, lineHeight: 1.6 }}>
+            {current.quiz}
+          </div>
 
-            {/* 썸네일 있으면 이미지 표시 */}
-            {question.artwork.thumbnailUrl ? (
-              <img
-                src={question.artwork.thumbnailUrl}
-                alt="quiz"
-                style={{
-                  width: "100%",
-                  borderRadius: 14,
-                  border: "1px solid rgba(0,0,0,0.06)",
-                  marginTop: 10,
-                }}
-              />
-            ) : (
-              <div className="loungeEmpty" style={{ marginTop: 10 }}>
-                (이미지 없음) — 대신 보기로 맞춰보세요
-              </div>
-            )}
-
-            <div style={{ marginTop: 10, color: "rgba(0,0,0,0.55)", fontSize: 12 }}>
-              힌트: 작가 {question.artwork.artistName ?? "알 수 없음"}
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 12, color: "rgba(0,0,0,0.55)" }}>
+              내 답(주관식)
             </div>
+            <input
+              value={answerText}
+              onChange={(e) => setAnswerText(e.target.value)}
+              placeholder="여기에 입력"
+              style={{
+                width: "100%",
+                marginTop: 6,
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: "1px solid rgba(0,0,0,0.12)",
+                outline: "none",
+              }}
+            />
+          </div>
 
-            <div className="quizChoices" style={{ marginTop: 12, display: "grid", gap: 10 }}>
-              {question.choices.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className="loungeTabBtn"
-                  onClick={() => chooseAnswer(c)}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-          </section>
-        </div>
+          <div className="loungeSubActions" style={{ marginTop: 12, gap: 10 }}>
+            <button className="loungeSubBtn" type="button" onClick={submit}>
+              제출
+            </button>
+            <button className="loungeSubBtn" type="button" onClick={goReview}>
+              정답/내용 확인 (리뷰로 이동)
+            </button>
+          </div>
+
+          <div style={{ marginTop: 10, fontSize: 12, color: "rgba(0,0,0,0.55)" }}>
+            연결 리뷰 ID: {String(current.reviewId)}
+          </div>
+        </section>
       )}
 
-      {state === "result" && quizType === "TITLE_GUESS" && question && (
+      {state === "playing" && current && submitted && (
         <section className="tasteCard" style={{ marginTop: 12 }}>
-          <h3 className="tasteCardTitle">
-            {isCorrect ? "정답입니다" : "오답입니다"}
-          </h3>
-
+          <h3 className="tasteCardTitle">제출 완료</h3>
           <div style={{ color: "rgba(0,0,0,0.60)" }}>
-            선택: <b>{selected}</b>
+            내 답: <b>{answerText || "(미입력)"}</b>
             <br />
-            정답: <b>{question.answer}</b>
+            정답은 리뷰 상세에서 확인하세요.
           </div>
 
           <div className="loungeSubActions" style={{ marginTop: 12 }}>
-            <button className="loungeSubBtn" type="button" onClick={startQuiz}>
+            <button className="loungeSubBtn" type="button" onClick={next}>
               다음 문제
             </button>
           </div>

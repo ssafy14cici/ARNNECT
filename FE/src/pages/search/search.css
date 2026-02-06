@@ -9,7 +9,7 @@
   min-height: 100vh;
   background-color: #050505; /* Deep Black */
   color: #fff;
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
 }
 
 .search-container {
@@ -52,7 +52,7 @@
   padding: 10px 50px 10px 0;
   
   /* Cinematic Font */
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 3rem;
   color: #fff;
   font-weight: 400;
@@ -138,7 +138,7 @@
   cursor: pointer;
   outline: none;
   text-align: right;
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
 }
 .sort-select option {
   background: #111;
@@ -235,7 +235,7 @@
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.5);
   margin: 0;
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-style: italic;
 }
 
@@ -244,7 +244,7 @@
   text-align: center;
   color: rgba(255, 255, 255, 0.3);
   font-size: 1.2rem;
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-style: italic;
 }
 
@@ -255,7 +255,7 @@
   justify-content: center;
   align-items: center;
   gap: 40px;
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
 }
 
 .page-control-btn {
@@ -289,7 +289,7 @@
   background: transparent;
   border: 1px solid transparent;
   color: rgba(255, 255, 255, 0.5);
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
   font-size: 0.9rem;
   width: 36px;
   height: 36px;

@@ -1,112 +1,299 @@
 // FE/src/features/artworks/api/newArtists.ts
-import { API_BASE_URL } from "../../../shared/config/env";
 
 export type NewArtistArtwork = {
   memberUuid: string;
   nickname: string;
   artworkId: number;
   title: string;
-  description?: string;
-  productionDate?: string;
-  savedImageName: string; // ex) "artworkxxxx.png" or "/artwork/xxx.png" or absolute URL
+  description: string;
+  productionDate: string;
+  savedImageName: string;
 };
 
-function ensureOk(res: Response, bodyText: string) {
-  if (res.ok) return;
-  throw new Error(
-    `[newArtists] HTTP ${res.status} ${res.statusText} - ${bodyText.slice(0, 300)}`
-  );
+/** 전시홀(작가별 작품 리스트)용: 서버 응답이 조금 달라도 흡수할 타입 */
+export type ArtistArtwork = {
+  artworkId: number;
+  title: string;
+  savedImageName: string;
+  imageUrl?: string; // 서버가 imageUrl/thumbnailUrl 등을 줄 수도 있어서
+  description?: string;
+  productionDate?: string;
+};
+
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(v: unknown): v is JsonRecord {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-/**
- * ✅ 신진예술인 6명 조회
- * - 명세에 memberUuid PathParam이 있을 수도 있어, 호출부에서 선택적으로 넘기게 처리함
- * - DEV에서는 Vite proxy(/api/v1 → target)를 타도록 "상대경로"로 호출
- * - PROD에서는 API_BASE_URL이 있으면 붙여서 호출
- *
- * 사용 예)
- *  - fetchNewArtists({ accessToken })                       // /api/v1/artwork/new
- *  - fetchNewArtists({ accessToken, memberUuid: "..." })    // /api/v1/artwork/new/{memberUuid}
- */
-export async function fetchNewArtists(args: {
-  accessToken: string;
-  memberUuid?: string | null;
-}): Promise<NewArtistArtwork[]> {
-  const { accessToken, memberUuid } = args;
+function asString(v: unknown, fallback = ""): string {
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return fallback;
+}
 
-  const isDev = !!import.meta.env.DEV;
+function asNumber(v: unknown, fallback = NaN): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return fallback;
+}
 
-  // ✅ DEV: 프록시 타게 상대경로, PROD: API_BASE_URL(있으면) 사용
-  const base = isDev ? "" : (API_BASE_URL ? `${API_BASE_URL}` : "");
+/** 여러 키 후보 중 첫 번째로 존재하는 값을 반환 */
+function pick(obj: JsonRecord, keys: string[]): unknown {
+  for (const k of keys) {
+    if (k in obj) return obj[k];
+  }
+  return undefined;
+}
 
-  const suffix = memberUuid?.trim()
-    ? `/api/v1/artwork/new/${encodeURIComponent(memberUuid.trim())}`
-    : `/api/v1/artwork/new`;
+/** envelope({data:[]}) / {result:[]} / {items:[]} / {content:[]} 등 흔한 케이스 unwrap */
+function unwrapList(raw: unknown): unknown[] | null {
+  if (Array.isArray(raw)) return raw;
 
-  const url = `${base}${suffix}`;
+  if (isRecord(raw)) {
+    const candidates = [
+      raw.data,
+      raw.result,
+      raw.items,
+      raw.content,
+      raw.list,
+      raw.artworks,
+    ] as unknown[];
 
-  const res = await fetch(url, {
-    method: "GET",
-    credentials: "include", // 서버가 쿠키/세션을 쓰는 경우 대비
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/json",
-    },
-  });
-
-  const text = await res.text();
-  ensureOk(res, text);
-
-  let json: unknown;
-  try {
-    json = text ? JSON.parse(text) : [];
-  } catch {
-    return [];
+    for (const c of candidates) {
+      if (Array.isArray(c)) return c;
+      // page 형태 { content: [] }
+      if (isRecord(c) && Array.isArray((c as any).content)) return (c as any).content as unknown[];
+    }
   }
 
-  // 명세 예시가 배열 형태인 경우가 많음
-  if (Array.isArray(json)) return json as NewArtistArtwork[];
+  return null;
+}
 
-  // 혹시 { data: [...] } 봉투 형태면 흡수
-  const any = json as any;
-  if (Array.isArray(any?.data)) return any.data as NewArtistArtwork[];
-  if (Array.isArray(any?.data?.data)) return any.data.data as NewArtistArtwork[];
+function parseNewArtists(raw: unknown): NewArtistArtwork[] {
+  const list = unwrapList(raw);
+  if (!list) return [];
 
-  return [];
+  return list
+    .map((it) => {
+      if (!isRecord(it)) return null;
+
+      const artworkId = asNumber(pick(it, ["artworkId", "artwork_id", "id"]), NaN);
+      const memberUuid = asString(pick(it, ["memberUuid", "member_uuid", "artistId", "artist_id"]), "").trim();
+      const nickname = asString(pick(it, ["nickname", "artistNickname", "artist_nickname"]), "").trim();
+      const title = asString(pick(it, ["title", "artworkTitle", "artwork_title"]), "").trim();
+      const description = asString(pick(it, ["description", "desc"]), "").trim();
+      const productionDate = asString(pick(it, ["productionDate", "production_date", "createdAt", "created_at"]), "").trim();
+
+      const savedImageName = asString(
+        pick(it, ["savedImageName", "saved_image_name", "savedImage", "saved_image", "imageName", "image_name"]),
+        ""
+      ).trim();
+
+      if (!Number.isFinite(artworkId)) return null;
+      if (!memberUuid) return null;
+
+      return {
+        artworkId,
+        memberUuid,
+        nickname,
+        title,
+        description,
+        productionDate,
+        savedImageName,
+      } as NewArtistArtwork;
+    })
+    .filter(Boolean) as NewArtistArtwork[];
+}
+
+function parseArtistArtworks(raw: unknown): ArtistArtwork[] {
+  const list = unwrapList(raw);
+  if (!list) return [];
+
+  return list
+    .map((it) => {
+      if (!isRecord(it)) return null;
+
+      const artworkId = asNumber(pick(it, ["artworkId", "artwork_id", "id"]), NaN);
+      const title = asString(pick(it, ["title", "artworkTitle", "artwork_title"]), "").trim();
+
+      // 서버가 둘 중 하나(혹은 둘 다)를 줄 수 있음
+      const savedImageName = asString(
+        pick(it, ["savedImageName", "saved_image_name", "savedImage", "saved_image", "imageName", "image_name"]),
+        ""
+      ).trim();
+
+      const imageUrl = asString(
+        pick(it, ["imageUrl", "imgUrl", "thumbnailUrl", "thumbUrl", "savedImageUrl"]),
+        ""
+      ).trim();
+
+      const description = asString(pick(it, ["description", "desc"]), "").trim();
+      const productionDate = asString(pick(it, ["productionDate", "production_date", "createdAt", "created_at"]), "").trim();
+
+      if (!Number.isFinite(artworkId)) return null;
+
+      return {
+        artworkId,
+        title,
+        savedImageName,
+        imageUrl: imageUrl || undefined,
+        description: description || undefined,
+        productionDate: productionDate || undefined,
+      } as ArtistArtwork;
+    })
+    .filter(Boolean) as ArtistArtwork[];
+}
+
+/** baseURL + path 결합 (base가 없으면 path 그대로) */
+function joinUrl(base: string, path: string): string {
+  if (!base) return path;
+  if (base.endsWith("/") && path.startsWith("/")) return base.slice(0, -1) + path;
+  if (!base.endsWith("/") && !path.startsWith("/")) return base + "/" + path;
+  return base + path;
+}
+
+/** prod에선 VITE_API_BASE_URL을 붙이고, dev에선 프록시를 타도록 base="" */
+function getFetchBase(): string {
+  const isDev = !!import.meta.env.DEV;
+  const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+  return isDev ? "" : (API_BASE_URL ? `${API_BASE_URL}` : "");
+}
+
+async function fetchJson(url: string): Promise<unknown> {
+  const res = await fetch(url, {
+    method: "GET",
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+    // credentials: "include", // 필요하면 켜기
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} @ ${url}`);
+  return (await res.json()) as unknown;
 }
 
 /**
- * ✅ mainHallFree.ts에서 import하던 함수 (빌드 깨짐 방지용)
- *
- * savedImageName -> 화면에 사용할 URL(또는 DEV에선 프록시 경로)
- * - 절대 URL이면 그대로 반환
- * - "/artwork/..." 같은 경로면:
- *   - DEV: 그대로(프록시)
- *   - PROD: API_BASE_URL이 있으면 origin 붙임
- * - 파일명만 오면: "/artwork/{파일명}"으로 변환
- *
- * ⚠️ 주의:
- * - 이 URL을 <img src>에 바로 넣으면, "인증 필요한 이미지"인 경우 403이 날 수 있음
- * - 그 경우 팀장님 utils.ts의 fetchImageAsObjectUrl()로 blob 받아서 표시해야 함
+ * ✅ 신진예술인(메인홀 대표작 6장)
+ * - 현재 서버 고정: /api/v1/artworks/new
+ * - 혹시 경로가 흔들릴 수 있어서 후보 몇 개 유지
  */
-export function buildNewArtistImageUrl(savedImageName: string): string {
-  const u0 = String(savedImageName ?? "").trim();
+export async function fetchNewArtists(): Promise<NewArtistArtwork[]> {
+  const base = getFetchBase();
+
+  const candidates = [
+    "/api/v1/artworks/new",
+    "/api/v1/artwork/new",
+  ].map((p) => joinUrl(base, p));
+
+  let lastErr: unknown = null;
+
+  for (const url of candidates) {
+    try {
+      const raw = await fetchJson(url);
+      return parseNewArtists(raw);
+    } catch (e) {
+      lastErr = e;
+      continue;
+    }
+  }
+
+  throw lastErr instanceof Error ? lastErr : new Error("fetchNewArtists failed");
+}
+
+/**
+ * ✅ 작가 전시홀 작품 목록
+ * - 서버: /api/v1/artworks?artist={memberUuid}
+ */
+export async function fetchArtworksByArtist(memberUuid: string): Promise<ArtistArtwork[]> {
+  const base = getFetchBase();
+  const uuid = String(memberUuid ?? "").trim();
+  if (!uuid) return [];
+
+  const qs = `artist=${encodeURIComponent(uuid)}`;
+
+  const candidates = [
+    `/api/v1/artworks?${qs}`,
+    `/api/v1/artwork?${qs}`,
+  ].map((p) => joinUrl(base, p));
+
+  let lastErr: unknown = null;
+
+  for (const url of candidates) {
+    try {
+      const raw = await fetchJson(url);
+      return parseArtistArtworks(raw);
+    } catch (e) {
+      lastErr = e;
+      continue;
+    }
+  }
+
+  throw lastErr instanceof Error ? lastErr : new Error("fetchArtworksByArtist failed");
+}
+
+/**
+ * ✅ 이미지 경로 만들어주기 (savedImageName or /artwork/... or absolute URL 모두 흡수)
+ * - 최종 반환은 resolveMediaUrl을 태워서 “디테일에서 잘 되던 규칙” 그대로 적용
+ */
+export function buildNewArtistImageUrl(input: string): string {
+  const raw = String(input ?? "").trim();
+  if (!raw) return "";
+
+  // 이미 완성된 URL/경로면 resolveMediaUrl로만 정리
+  if (/^https?:\/\//i.test(raw)) return resolveMediaUrl(raw);
+  if (raw.startsWith("data:") || raw.startsWith("blob:")) return raw;
+
+  // "/artwork/xxx.jpg" 같이 온 경우
+  if (raw.startsWith("/")) return resolveMediaUrl(raw);
+
+  // savedImageName만 온 경우 → "/artwork/..."
+  return resolveMediaUrl(`/artwork/${encodeURIComponent(raw)}`);
+}
+
+/** (유저가 챙겨온) 디테일에서 잘 먹히는 이미지 URL 정규화 */
+export function resolveMediaUrl(input?: string | null): string {
+  const u0 = String(input ?? "").trim();
   if (!u0 || u0 === "null" || u0 === "undefined") return "";
   if (u0.startsWith("data:") || u0.startsWith("blob:")) return u0;
 
+  const needsSrcPrefix = (p: string) => !p.startsWith("/src/") && p.startsWith("/artwork/");
   const isDev = !!import.meta.env.DEV;
 
-  // 1) 절대 URL이면 그대로
-  if (/^https?:\/\//i.test(u0)) return u0;
-
-  // 2) 경로 형태면 그대로 사용(필요 시 PROD에서는 base 붙임)
-  if (u0.startsWith("/")) {
-    if (isDev) return u0; // 프록시
-    return API_BASE_URL ? `${API_BASE_URL}${u0}` : u0;
+  // 1) 절대 URL
+  if (/^https?:\/\//i.test(u0)) {
+    try {
+      const url = new URL(u0);
+      if (needsSrcPrefix(url.pathname)) {
+        url.pathname = `/src${url.pathname}`;
+      }
+      // DEV: 절대 URL을 상대경로로 바꿔서 프록시 타게
+      if (isDev) {
+        return `${url.pathname}${url.search}${url.hash}`;
+      }
+      return url.toString();
+    } catch {
+      return u0;
+    }
   }
 
-  // 3) 파일명만 오면 /artwork/{name}
-  const path = `/artwork/${encodeURIComponent(u0)}`;
+  // 2) 상대 경로
+  let path = u0.startsWith("/") ? u0 : `/${u0}`;
+  if (needsSrcPrefix(path)) {
+    path = `/src${path}`;
+  }
+
+  // DEV: 프록시
   if (isDev) return path;
-  return API_BASE_URL ? `${API_BASE_URL}${path}` : path;
+
+  // PROD: VITE_API_BASE_URL origin 붙이기
+  const apiBase = String(import.meta.env.VITE_API_BASE_URL ?? "").trim();
+  let origin = "";
+  try {
+    if (apiBase) origin = new URL(apiBase).origin;
+  } catch {
+    origin = "";
+  }
+  return origin ? `${origin}${path}` : path;
 }

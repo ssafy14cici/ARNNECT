@@ -18,16 +18,32 @@ export default function CollectionTab() {
   const viewerRole = useAuthStore((s) => s.role); // "general" | "artist" | null
 
   const rawProfileId = memberUuid ?? "me";
-  const effectiveProfileId = rawProfileId === "me" ? (authUser?.memberUuid ?? "me") : rawProfileId;
-  const isOwner = rawProfileId === "me" || (!!authUser?.memberUuid && authUser.memberUuid === rawProfileId);
+  const resolvedMeUuid = authUser?.memberUuid ? String(authUser.memberUuid) : "";
+  const effectiveProfileId = rawProfileId === "me" ? resolvedMeUuid : rawProfileId;
+
+  // ✅ "me"인데 authUser가 없으면(하이드레이트 전/로그아웃) API를 못 때림 → UX로 안내/로그인 유도
+  const needsLoginForMe = rawProfileId === "me" && !resolvedMeUuid;
+
+  const isOwner =
+    rawProfileId === "me" ||
+    (!!authUser?.memberUuid && String(authUser.memberUuid) === String(rawProfileId));
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [items, setItems] = useState<TicketInfoResponse[]>([]);
 
   const reload = async () => {
-    if (effectiveProfileId === "me") {
+    // ✅ me인데 로그인 정보 없으면 스킵하지 말고 안내
+    if (needsLoginForMe) {
       setItems([]);
+      setError("로그인이 필요합니다. 로그인 후 다시 시도해주세요.");
+      return;
+    }
+
+    // ✅ 유효한 UUID가 없으면 방어
+    if (!effectiveProfileId) {
+      setItems([]);
+      setError("프로필 식별자를 확인할 수 없습니다.");
       return;
     }
 
@@ -45,11 +61,13 @@ export default function CollectionTab() {
   };
 
   useEffect(() => {
-    // me인데 로그인정보 없으면 스킵
-    if (effectiveProfileId === "me") return;
+    // ✅ 이전 코드처럼 'me'면 무조건 return 하지 말고,
+    //    me이면서 authUser가 있을 때는 정상적으로 reload
+    if (needsLoginForMe) return;
+    if (!effectiveProfileId) return;
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveProfileId]);
+  }, [effectiveProfileId, needsLoginForMe]);
 
   const visibleItems = useMemo(() => {
     // 서버 응답에 scannedAt 같은 정렬키가 없어서, ticketId 기준 내림차순 정도로만 정렬
@@ -68,22 +86,33 @@ export default function CollectionTab() {
     nav(`/lounge/collectbook/${ticketId}`);
   };
 
+  const goLogin = () => {
+    nav("/login", { state: { from: `/profile/${rawProfileId}` } });
+  };
+
   return (
     <div className="tab-container">
       <div className="tab-header">
         <h3 className="tab-title">Collection</h3>
 
         <div className="tab-controls">
-          <button type="button" onClick={reload} className="tab-btn" disabled={busy || effectiveProfileId === "me"}>
-            {busy ? "Loading..." : "Reload"}
-          </button>
+          {needsLoginForMe ? (
+            <button type="button" onClick={goLogin} className="tab-btn">
+              Login
+            </button>
+          ) : (
+            <button type="button" onClick={reload} className="tab-btn" disabled={busy}>
+              {busy ? "Loading..." : "Reload"}
+            </button>
+          )}
         </div>
       </div>
 
       <div className="tab-desc">
         {isOwner ? (
           <>
-            라운지에서 수집한 티켓이 이곳에 표시됩니다. <Link to="/lounge/collectbook">Go to CollectBook</Link>
+            라운지에서 수집한 티켓이 이곳에 표시됩니다.{" "}
+            <Link to="/lounge/collectbook">Go to CollectBook</Link>
           </>
         ) : (
           <>해당 사용자의 콜렉트북 티켓 목록입니다.</>

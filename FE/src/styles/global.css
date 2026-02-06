@@ -1,9 +1,34 @@
 /* FE/src/styles/global.css */
 
 /* ==========================================================================
-   1. Font Import (Pretendard)
+   1. Font Import (Pretendard - fallback)
 ========================================================================== */
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+
+/* ==========================================================================
+   1-1. MuseumClassic @font-face (L=300, M=400, B=700)
+========================================================================== */
+@font-face {
+  font-family: "MuseumClassic";
+  src: url("/fonts/MuseumClassic-L.fixed.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "MuseumClassic";
+  src: url("/fonts/MuseumClassic-M.fixed.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "MuseumClassic";
+  src: url("/fonts/MuseumClassic-B.fixed.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
 
 /* ==========================================================================
    2. Theme Variables
@@ -14,7 +39,7 @@
   --fg-dim: rgba(255, 255, 255, 0.6);
   --line: rgba(255, 255, 255, 0.15);
 
-  --font-stack: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+  --font-stack: "MuseumClassic", "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
 }
 
 /* ==========================================================================

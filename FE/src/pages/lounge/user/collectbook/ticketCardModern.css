@@ -16,7 +16,7 @@
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.6);
   transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s ease, border-color 0.4s;
   
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
   color: rgba(255, 255, 255, 0.8);
 }
 
@@ -108,7 +108,7 @@
 }
 
 .tcmTitle {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 1.8rem;
   font-weight: 500;
   color: #fff;
@@ -147,7 +147,7 @@
 }
 
 .tcmDates {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 1.2rem;
   color: #fff;
   font-style: italic;

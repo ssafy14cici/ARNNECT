@@ -27,14 +27,14 @@
 }
 
 .logout-modal-title {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 2rem;
   color: #fff;
   margin: 0 0 16px;
 }
 
 .logout-modal-desc {
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
   font-size: 1rem;
   color: rgba(255, 255, 255, 0.6);
   line-height: 1.6;

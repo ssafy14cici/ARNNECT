@@ -8,7 +8,7 @@
   min-height: 100vh;
   background-color: #050505; /* Deep Black */
   color: #fff;
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
   padding-bottom: 100px; /* 하단 여백 확보 */
 }
 
@@ -36,7 +36,7 @@
 }
 
 .loungeTitle {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 3rem;
   margin: 0;
   color: #fff;
@@ -112,7 +112,7 @@
 }
 
 .loungeSubTitle {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 2rem;
   margin: 0;
   color: #C8A97E; /* Sub pages use Gold Accent */
@@ -149,7 +149,7 @@
 }
 
 .tasteCardTitle {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 1.5rem;
   margin: 0 0 24px;
   color: #fff;
@@ -289,7 +289,7 @@
 }
 
 .loungeSubPanelTitle {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 1.5rem;
   margin-bottom: 16px;
   color: #fff;
@@ -368,7 +368,7 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   padding: 10px 0;
   color: #fff;
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
   font-size: 1.1rem;
   transition: border-color 0.3s;
   border-radius: 0;

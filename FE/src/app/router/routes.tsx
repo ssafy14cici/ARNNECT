@@ -26,7 +26,7 @@ import LoungeIndex from "../../pages/lounge/LoungeIndex";
 import CollectBook from "../../pages/lounge/user/collectbook/CollectBook";
 import CollectBookScan from "../../pages/lounge/user/collectbook/CollectBookScan";
 import CollectBookDetail from "../../pages/lounge/user/collectbook/CollectBookDetail";
-import Taste from "../../pages/lounge/user/Taste";
+import Analysis from "../../pages/lounge/user/Analysis";
 import RemindQuiz from "../../pages/lounge/user/RemindQuiz";
 
 import QrEntry from "../../pages/lounge/artist/qr/QrEntry";
@@ -180,11 +180,9 @@ export const routes: RouteObject[] = [
             ],
           },
 
-          /* Preference / Taste / Remind / Analysis (canonical) */
-          { path: "taste", element: <Taste /> },
+          /* Preference  Remind / Analysis (canonical) */
+          { path: "Analysis", element: <Analysis /> },
           { path: "RemindQuiz", element: <RemindQuiz /> },
-          { path: "analysis", element: <Taste /> },
-          { path: "analysis/total", element: <Taste /> },
 
           /* Tickets (canonical) */
           {
@@ -272,9 +270,9 @@ export const routes: RouteObject[] = [
                 children: [{ index: true, element: <CollectBookDetail /> }],
               },
               {
-                path: "taste",
+                path: "Analysis",
                 element: <Guard requireRole="general" />,
-                children: [{ index: true, element: <Taste /> }],
+                children: [{ index: true, element: <Analysis /> }],
               },
               {
                 path: "RemindQuiz",

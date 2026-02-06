@@ -1,0 +1,52 @@
+services:
+  # Frontend(nginx)
+  prod-fe:
+    image: csw197/sf:arnnect-fe-release
+    container_name: prod-fe
+    restart: always
+    pull_policy: always
+    networks:
+      - gateway-net
+    volumes:
+      - /home/ubuntu/src:/usr/share/nginx/html/src
+
+  # Backend
+  prod-be:
+    image: csw197/sf:arnnect-be-release # Jenkins 빌드 이미지
+    container_name: prod-be
+    restart: always
+    pull_policy: always
+    env_file:
+      - .env
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - TZ=Asia/Seoul
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    volumes:
+      - /home/ubuntu/src:/app/src
+    networks:
+      - gateway-net
+      - infra-net
+      - default
+
+  # Redis
+  prod-redis:
+    image: redis:7.4
+    container_name: prod-redis
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - ./redis/data:/data
+    networks:
+      - default
+
+networks:
+  gateway-net:
+    external: true
+  infra-net:
+    external: true
+  default:
+    driver: bridge

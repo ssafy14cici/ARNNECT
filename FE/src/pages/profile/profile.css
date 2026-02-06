@@ -7,7 +7,7 @@
   min-height: 100vh;
   background-color: #050505;
   color: #fff;
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
   position: relative;
   /* Navbar 높이만큼 패딩 (필요시 조정) */
   padding-top: 80px; 
@@ -201,7 +201,7 @@
 }
 
 .profileName {
-  font-family: 'Playfair Display', serif;
+  font-family: "MuseumClassic", serif;
   font-size: 2.5rem;
   font-weight: 400;
   margin: 0;
@@ -409,7 +409,7 @@
   border-bottom: 1px solid rgba(255,255,255,0.2);
   padding: 10px 0;
   color: #fff;
-  font-family: 'Pretendard', sans-serif;
+  font-family: var(--font-stack);
   font-size: 1rem;
 }
 .profileInput:focus, .profileTextarea:focus {

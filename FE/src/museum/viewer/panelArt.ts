@@ -3,27 +3,20 @@ import * as THREE from "three";
 
 export type PanelArtItem = {
   panelName: string; // ex) "ART_1"
-  imageUrl: string;  // ex) /art/b1.jpg
-  title: string;     // ex) "최수원" (지금은 userData만)
+  imageUrl: string;  // ex) "/artwork/xxx.jpg" or dataURL
+  title: string;     // ex) "최수원"
 };
 
 export type AttachPanelArtArgs = {
   sceneRoot: THREE.Object3D;
   items: PanelArtItem[];
 
-  /** 패널 표면에서 띄우기 (깜빡임/관통 방지) */
   epsilon?: number;
-
-  /** 패널 대비 이미지 채우기 비율(1=꽉, 1.02=조금 크게) */
   fill?: number;
 
-  /** 카메라에서 패널 중심으로 레이캐스트해서 정면 face 노말로 붙임 */
   faceCamera?: boolean;
-
-  /** faceCamera=true면 필수 */
   camera?: THREE.Camera;
 
-  /** 이미지 상하 뒤집힘 보정 (기본 true) */
   fixFlipY?: boolean;
 };
 
@@ -66,7 +59,6 @@ function getFirstMesh(obj: THREE.Object3D): THREE.Mesh | null {
   return found;
 }
 
-/** 월드 노말 n을 plane의 +Z가 바라보도록 quaternion 생성 */
 function quatFromNormal(nWorld: THREE.Vector3): THREE.Quaternion {
   const n = nWorld.clone().normalize();
 
@@ -82,7 +74,6 @@ function quatFromNormal(nWorld: THREE.Vector3): THREE.Quaternion {
   return new THREE.Quaternion().setFromRotationMatrix(m);
 }
 
-/** 카메라에서 패널 중심으로 레이캐스트: hit point + world normal(카메라 향하도록 보정) */
 function raycastFacing(panelMesh: THREE.Mesh, camera: THREE.Camera) {
   panelMesh.updateMatrixWorld(true);
 
@@ -114,9 +105,7 @@ function raycastFacing(panelMesh: THREE.Mesh, camera: THREE.Camera) {
   return { hitPoint, nWorld };
 }
 
-/** 패널(ART plane)의 가로/세로 추정: geometry(local) 우선, 없으면 Box3 fallback */
 function estimatePanelWH(mesh: THREE.Mesh) {
-  // 1) geometry 기반 (가장 정확: “프레임보다 작다” 문제를 가장 잘 잡음)
   const geo = mesh.geometry as THREE.BufferGeometry | undefined;
   if (geo?.attributes?.position) {
     geo.computeBoundingBox();
@@ -125,24 +114,18 @@ function estimatePanelWH(mesh: THREE.Mesh) {
       const size = new THREE.Vector3();
       bb.getSize(size);
 
-      // plane이면 두 축만 의미 있음. 보통 z는 두께(거의 0)
       const axes = [size.x, size.y, size.z].sort((a, b) => b - a);
       const wLocal = axes[0];
       const hLocal = axes[1];
 
-      // ✅ 월드 스케일 반영
       const s = new THREE.Vector3();
       mesh.getWorldScale(s);
 
-      // local bbox는 mesh local, scale만 곱하면 충분
-      // (rotation은 bbox 축에 영향 없고 planeW/H 만들 때는 스칼라만 필요)
-      const w = wLocal * Math.max(s.x, s.y, s.z);
-      const h = hLocal * Math.max(s.x, s.y, s.z);
-      return { w, h };
+      const scale = Math.max(s.x, s.y, s.z);
+      return { w: wLocal * scale, h: hLocal * scale };
     }
   }
 
-  // 2) fallback: Box3(fromObject)
   const box = new THREE.Box3().setFromObject(mesh);
   const size = new THREE.Vector3();
   box.getSize(size);
@@ -151,7 +134,6 @@ function estimatePanelWH(mesh: THREE.Mesh) {
   return { w: axes[0], h: axes[1] };
 }
 
-/** 텍스처 세팅: 지지직/모아레 줄이기 */
 function tuneTexture(tex: THREE.Texture) {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = THREE.ClampToEdgeWrapping;
@@ -165,9 +147,46 @@ function tuneTexture(tex: THREE.Texture) {
   tex.needsUpdate = true;
 }
 
+function makeFallbackTexture(label: string, w = 512, h = 512) {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#111318";
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.lineWidth = 10;
+  ctx.strokeRect(5, 5, w - 10, h - 10);
+
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "700 42px ui-sans-serif,system-ui";
+  ctx.fillText(label, w / 2, h / 2);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  tuneTexture(tex);
+  return tex;
+}
+
+async function loadTextureSafe(loader: THREE.TextureLoader, url: string, labelForFallback: string) {
+  try {
+    const tex = await new Promise<THREE.Texture>((resolve, reject) => {
+      loader.load(url, (t) => resolve(t), undefined, reject);
+    });
+    tuneTexture(tex);
+    return tex;
+  } catch (e) {
+    console.warn("[panelArt] texture load failed:", url, e);
+    return makeFallbackTexture(labelForFallback);
+  }
+}
+
 export async function attachPanelArt(args: AttachPanelArtArgs): Promise<AttachPanelArtResult> {
-  const epsilon = args.epsilon ?? 0.06; // ✅ 살짝만 띄움 (너무 떠보이면 싫어함)
-  const fill = args.fill ?? 1.02;       // ✅ 프레임보다 살짝 크게 (빈 여백 제거)
+  const epsilon = args.epsilon ?? 0.06;
+  const fill = args.fill ?? 1.02;
   const faceCamera = args.faceCamera ?? true;
   const fixFlipY = args.fixFlipY ?? true;
 
@@ -176,14 +195,12 @@ export async function attachPanelArt(args: AttachPanelArtArgs): Promise<AttachPa
   const missing: string[] = [];
 
   const texLoader = new THREE.TextureLoader();
+  // crossOrigin은 같은 오리진이면 영향 거의 없지만, 혹시 몰라 안전하게
+  texLoader.setCrossOrigin("anonymous");
 
+  // ✅ 한 장 실패해도 전체가 죽지 않게 “개별 safe 로드”
   const textures = await Promise.all(
-    args.items.map(
-      (it) =>
-        new Promise<THREE.Texture>((resolve, reject) => {
-          texLoader.load(it.imageUrl, (tex) => resolve(tex), undefined, reject);
-        })
-    )
+    args.items.map((it) => loadTextureSafe(texLoader, it.imageUrl, it.title || it.panelName))
   );
 
   for (let i = 0; i < args.items.length; i++) {
@@ -204,10 +221,8 @@ export async function attachPanelArt(args: AttachPanelArtArgs): Promise<AttachPa
       continue;
     }
 
-    // 패널 w/h (정확)
     const { w: panelW, h: panelH } = estimatePanelWH(panelMesh);
 
-    // 정면 배치용 hit/normal
     let placePoint: THREE.Vector3 | null = null;
     let normalWorld: THREE.Vector3 | null = null;
 
@@ -226,13 +241,10 @@ export async function attachPanelArt(args: AttachPanelArtArgs): Promise<AttachPa
       normalWorld = new THREE.Vector3(0, 0, 1);
     }
 
-    tuneTexture(tex);
-
-    // ✅ 상하 뒤집힘 보정
+    // ✅ flipY 보정
     tex.flipY = fixFlipY ? true : false;
     tex.needsUpdate = true;
 
-    // ✅ "패널에 꽉" (왜곡 허용, fill로 오버스캔)
     const planeW = panelW * fill;
     const planeH = panelH * fill;
 
@@ -244,7 +256,6 @@ export async function attachPanelArt(args: AttachPanelArtArgs): Promise<AttachPa
       depthWrite: false,
       toneMapped: false,
       side: THREE.FrontSide,
-
       polygonOffset: true,
       polygonOffsetFactor: -4,
       polygonOffsetUnits: -4,

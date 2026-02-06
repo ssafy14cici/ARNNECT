@@ -2,7 +2,7 @@
 import { useCallback, useState } from "react";
 import { deleteTicket, listTicketsByArtist, type TicketInfoResponse } from "../../../../features/tickets/api/realTickets";
 
-export type TicketDesign = "BASIC" | "MODERN" | "MINIMAL" | "HOLO_ABSTRACT" | "SIMPLE" | "PURPLE" | "PINK" | "RED";
+export type TicketDesign = "BASIC" | "MODERN" | "MINIMAL" | "HOLO" | "SIMPLE" | "PURPLE" | "PINK" | "RED";
 
 export type TicketItem = {
   ticketId: number;

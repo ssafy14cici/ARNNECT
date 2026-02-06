@@ -1,0 +1,35 @@
+services:
+  nginx:
+    image: nginx:1.29.4-alpine
+    container_name: gateway-nginx
+    restart: always
+    ports:
+      - "80:80"     # prod
+      - "443:443"   # prod ssh
+      - "8000:8000" # dev
+      - "8001:8001" # dev ssh
+      - "9000:9000" # Jenkins
+    volumes:
+     # - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro       # 메인 설정 ro - readonly
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro               # 라우팅 규칙
+      - ./nginx/logs:/var/log/nginx                       # 로그 저장
+      # 인증서와 검증 파일 공유 
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+
+    networks:
+      - gateway-net
+
+  certbot:
+    image: certbot/certbot:v5.2.2
+    container_name: gateway-certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+
+#  여기서 네트워크를 생성
+# 다른(Release, Develop) docker-compose 파일들은 이 네트워크를 'external'로 참조
+networks:
+  gateway-net:
+    name: gateway-net
+    driver: bridge

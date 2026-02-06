@@ -147,7 +147,7 @@
 }
 
 /* ✅ 우측 하단 FAB */
-.qr-fab {
+/* .qr-fab {
   position: fixed;
   right: 18px;
   bottom: 18px;
@@ -162,6 +162,35 @@
   place-items: center;
   cursor: pointer;
   z-index: 50;
+} */
+
+/* 우측 하단 FAB */
+.qr-fab {
+  position: fixed;
+  right: clamp(16px, 4vw, 48px);     /* ✅ 화면 끝이 아니라 적당히 안쪽 */
+  bottom: calc(clamp(16px, 4vw, 48px) + env(safe-area-inset-bottom, 0px));
+
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+
+  display: grid;
+  place-items: center;
+
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+
+  cursor: pointer;
+  z-index: 50;
+
+  backdrop-filter: blur(10px);
+}
+
+/* 아이콘 크기 조절 */
+.qr-fab-icon {
+  font-size: 20px;
+  line-height: 1;
 }
 
 .qr-fab-icon {

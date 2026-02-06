@@ -1,0 +1,52 @@
+services:
+  # Frontend(nginx)
+  test-fe:
+    image: csw197/sf:arnnect-fe-dev
+    container_name: test-fe
+    restart: always
+    pull_policy: always
+    networks:
+      - gateway-net
+    volumes:
+      - /home/ubuntu/src:/usr/share/nginx/html/src
+
+  # Backend
+  test-be:
+    image: csw197/sf:arnnect-be-dev # Jenkins 빌드 이미지
+    container_name: test-be
+    restart: always
+    pull_policy: always
+    env_file:
+      - .env
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - TZ=Asia/Seoul
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    volumes:
+      - /home/ubuntu/src:/app/src
+    networks:
+      - gateway-net
+      - infra-net
+      - default
+
+  # Redis
+  test-redis:
+    image: redis:7.4
+    container_name: test-redis
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - ./redis/data:/data
+    networks:
+      - default
+
+networks:
+  gateway-net:
+    external: true
+  infra-net:
+    external: true
+  default:
+    driver: bridge
