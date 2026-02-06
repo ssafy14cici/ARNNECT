@@ -68,7 +68,8 @@ async function buildPanelsByArtist(artistId: string | null): Promise<PanelArtIte
       panelName,
       title: `EMPTY ${idx + 1}`,
       imageUrl: makePlaceholderDataUrl(`EMPTY ${idx + 1}`),
-      // artworkId: -1, // PanelArtItem에 있으면 넣어도 됨
+      // ✅ placeholder는 artworkId 없음 (상세보기 막기)
+      artworkId: undefined,
     }));
   }
 
@@ -80,33 +81,26 @@ async function buildPanelsByArtist(artistId: string | null): Promise<PanelArtIte
         panelName,
         title: `EMPTY ${idx + 1}`,
         imageUrl: makePlaceholderDataUrl(`EMPTY ${idx + 1}`),
+        artworkId: undefined,
       }));
     }
 
-    // 1) 앞에서 N개만 (패널 개수 제한)
-    const limited = list.slice(0, EXHIBIT_PANEL_COUNT);
+    // ✅ 패널 수만큼 채우되, 작품이 부족하면 순환해서 채움
+    const panels: PanelArtItem[] = PANEL_NAMES.map((panelName, idx) => {
+      const a = list[idx % list.length];
 
-    // 2) 패널 채우기
-    const panels: PanelArtItem[] = limited.map((a, idx) => {
       const url = buildNewArtistImageUrl(a.imageUrl || a.savedImageName);
       const safeUrl = url || makePlaceholderDataUrl(`NO IMG ${idx + 1}`);
 
       return {
-        panelName: PANEL_NAMES[idx],
+        panelName,
         title: a.title || `작품 ${idx + 1}`,
         imageUrl: safeUrl,
-        // artworkId: a.artworkId, // PanelArtItem에 있으면 넣어도 됨
+
+        // ✅ 핵심: exhibitRoom이 이 값을 mesh.userData.__artworkId로 박음
+        artworkId: a.artworkId,
       };
     });
-
-    // 3) 부족분 placeholder
-    for (let i = panels.length; i < EXHIBIT_PANEL_COUNT; i++) {
-      panels.push({
-        panelName: PANEL_NAMES[i],
-        title: `EMPTY ${i + 1}`,
-        imageUrl: makePlaceholderDataUrl(`EMPTY ${i + 1}`),
-      });
-    }
 
     return panels;
   } catch (e) {
@@ -115,6 +109,7 @@ async function buildPanelsByArtist(artistId: string | null): Promise<PanelArtIte
       panelName,
       title: `OFFLINE ${idx + 1}`,
       imageUrl: makePlaceholderDataUrl(`OFFLINE ${idx + 1}`),
+      artworkId: undefined,
     }));
   }
 }
@@ -136,27 +131,14 @@ export default function Exhibit() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const runtimeRef = useRef<ExhibitRuntime | null>(null);
 
-  // 가이드 토글 상태 (false: info.png, true: how_ex.png)
   const [showGuide, setShowGuide] = useState(false);
-
-  // ✅ 전역 BGM 상태와 동기화
   const [bgmOn, setBgmOn] = useState(() => bgmIsOn());
 
-  // ✅ 좌우 스트레이프 버튼 핸들러 (현재 시점 방향 기준 좌우 이동)
-  const handleLeft = () => {
-    if (!runtimeRef.current) return;
-    runtimeRef.current.strafeLeft();
-  };
+  const handleLeft = () => runtimeRef.current?.strafeLeft();
+  const handleRight = () => runtimeRef.current?.strafeRight();
 
-  const handleRight = () => {
-    if (!runtimeRef.current) return;
-    runtimeRef.current.strafeRight();
-  };
-
-  // ✅ URL params에서 artistId 가져오기 (/exhibit/:artistId)
   const artistId = params.artistId ?? null;
 
-  // 전역 BGM: 마운트 시 재생 시도
   useEffect(() => {
     const cleanup = bgmForcePlayOnInteraction();
     return cleanup;
@@ -172,14 +154,9 @@ export default function Exhibit() {
 
     console.log("[Exhibit] mount → artistId:", artistId);
 
-    if (!artistId) {
-      console.warn("[Exhibit] ⚠️ artistId가 없음! URL을 확인하세요 (/exhibit/:artistId)");
-    }
-
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    // ✅ UI layer
     const uiLayer = document.createElement("div");
     uiLayer.id = "museum-ui-layer";
     uiLayer.dataset.museumUiLayer = "1";
@@ -188,13 +165,11 @@ export default function Exhibit() {
       "z-index:9990;pointer-events:none;";
     uiRoot.appendChild(uiLayer);
 
-    // ✅ Hall에서 넘어온 state
     const st = (location.state ?? {}) as any;
     const fromWaypointId = st.fromWaypointId ?? 0;
     const artist = st.artist ?? "";
     const artworkTitle = st.artworkTitle ?? "";
 
-    // 타이틀은 작가 중심이 자연스러움 (원하면 아래 한 줄을 원래대로 되돌려도 됨)
     const titleText = artist ? `${artist} 전시` : "EXHIBIT";
 
     let cancelled = false;
@@ -221,11 +196,14 @@ export default function Exhibit() {
 
           onOpenArtist: (id) => {
             console.log("[Exhibit] onOpenArtist → /members/", id);
-            nav(`/members/${id}`);
+            nav(`/members/${encodeURIComponent(String(id))}`);
           },
 
-          // 필요하면 여기서 작품 상세로 보내기 (mountExhibitRoom이 artworkId를 넘겨주는 구조면)
-          // onOpenArtwork: (artworkId) => nav(`/artworks/${artworkId}`),
+          // ✅ 이제 artworkId가 들어오므로 상세보기 정상 동작
+          onOpenArtwork: (artworkId) => {
+            console.log("[Exhibit] onOpenArtwork → /artworks/", artworkId);
+            nav(`/artworks/${encodeURIComponent(String(artworkId))}`);
+          },
         });
 
         if (cancelled) {
@@ -256,7 +234,6 @@ export default function Exhibit() {
     >
       <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
 
-      {/* 좌우 스트레이프 버튼 (현재 시점 방향 기준 좌우 이동) */}
       <button
         type="button"
         onClick={handleLeft}
@@ -329,7 +306,6 @@ export default function Exhibit() {
         ▶
       </button>
 
-      {/* 가이드 토글 버튼 */}
       {!showGuide && (
         <img
           src={asset("info_ex.png")}
@@ -352,7 +328,6 @@ export default function Exhibit() {
         />
       )}
 
-      {/* BGM ON/OFF 토글 버튼 */}
       <img
         src={asset(bgmOn ? "bgm/bgm_on.png" : "bgm/bgm_off.png")}
         alt={bgmOn ? "BGM ON" : "BGM OFF"}
@@ -375,7 +350,6 @@ export default function Exhibit() {
         onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.5")}
       />
 
-      {/* 조작 가이드 오버레이 */}
       {showGuide && (
         <img
           src={asset("how_ex.png")}

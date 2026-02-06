@@ -1,135 +1,161 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, useOutletContext } from "react-router-dom";
-import type { ArtistProfile, FeedItem } from "../../../features/profile/types";
-import { profileApi } from "../../../features/profile/api";
-import "../../profile/tabs/profileTabs.css";
+// FE/src/pages/lounge/artist/Portfolio.tsx
 
-// ✅ 다른 페이지에서 쓰는 “이미지 정규화 + 인증 이미지(blob)” 유틸 재사용
-import { resolveMediaUrl, fetchImageAsObjectUrl } from "../../artworks/detail/utils";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import "../lounge.css";
 
-type OutletCtx = {
-  profile: ArtistProfile;
-  isOwner: boolean;
-};
+import { useAuthStore } from "../../../features/auth/store";
+import { http } from "../../../shared/api/http";
 
-/**
- * ✅ <img> src에 그대로 넣어보고,
- * 실패하면(fetch) blob objectURL로 fallback
- */
-function SmartImage({
-  rawUrl,
-  alt = "",
-  className,
-  style,
-}: {
-  rawUrl?: string | null;
-  alt?: string;
-  className?: string;
-  style?: React.CSSProperties;
-}) {
-  const [src, setSrc] = useState<string>("");
-  const [hidden, setHidden] = useState(false);
+// ✅ 이미지 URL 정규화(프로젝트에 이미 있는 유틸 재사용)
+import { resolveMediaUrl } from "../../artworks/detail/utils";
 
-  // objectURL revoke를 위해 추적
-  const objectUrlRef = useRef<string | null>(null);
-  const triedBlobRef = useRef(false);
-
-  // rawUrl이 바뀌면 초기화
-  useEffect(() => {
-    setHidden(false);
-    triedBlobRef.current = false;
-
-    // 이전 objectURL 정리
-    if (objectUrlRef.current) {
-      try {
-        URL.revokeObjectURL(objectUrlRef.current);
-      } catch {}
-      objectUrlRef.current = null;
-    }
-
-    const normalized = resolveMediaUrl(rawUrl);
-    setSrc(normalized || "");
-  }, [rawUrl]);
-
-  // 언마운트 시 objectURL 정리
-  useEffect(() => {
-    return () => {
-      if (objectUrlRef.current) {
-        try {
-          URL.revokeObjectURL(objectUrlRef.current);
-        } catch {}
-        objectUrlRef.current = null;
-      }
-    };
-  }, []);
-
-  const onError = async () => {
-    // 1) 이미 숨김 처리했으면 끝
-    if (hidden) return;
-
-    // 2) blob fallback을 이미 시도했으면 더는 반복하지 말고 숨김
-    if (triedBlobRef.current) {
-      setHidden(true);
-      return;
-    }
-
-    triedBlobRef.current = true;
-
-    // ✅ 인증 필요 이미지면 blob으로 받아서 objectURL로 표시
-    const objUrl = await fetchImageAsObjectUrl(rawUrl ?? "");
-    if (!objUrl) {
-      setHidden(true);
-      return;
-    }
-
-    // 이전 objectURL 정리 후 새로 세팅
-    if (objectUrlRef.current) {
-      try {
-        URL.revokeObjectURL(objectUrlRef.current);
-      } catch {}
-    }
-    objectUrlRef.current = objUrl;
-    setSrc(objUrl);
-  };
-
-  if (!src || hidden) {
-    // 여기서 placeholder를 넣고 싶으면 div로 대체 가능
-    return null;
+// ------------------- safe parsers -------------------
+type JsonObject = Record<string, unknown>;
+function isObject(v: unknown): v is JsonObject {
+  return typeof v === "object" && v !== null;
+}
+function get(obj: JsonObject, key: string): unknown {
+  return obj[key];
+}
+function asString(v: unknown, fallback = ""): string {
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return fallback;
+}
+function asNumber(v: unknown, fallback = 0): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
   }
-
-  return (
-    <img
-      src={src}
-      alt={alt}
-      className={className}
-      style={style}
-      onError={() => {
-        // React onError는 sync라서 async를 감싸줌
-        void onError();
-      }}
-    />
-  );
+  return fallback;
+}
+function unwrapAxiosData(res: unknown): unknown {
+  return isObject(res) && "data" in res ? (res as any).data : res;
+}
+function pickEnvelopeData(raw: unknown): unknown {
+  if (!isObject(raw)) return raw;
+  const d = get(raw, "data");
+  return d ?? raw;
 }
 
-export default function ?????Tab() {
-  const { profile, isOwner } = useOutletContext<OutletCtx>();
+// ------------------- Types -------------------
+type ArtworkItem = {
+  artworkId: number;
+  title: string;
+  productionDate?: string;
+  thumbnailUrl?: string;
+};
 
-  const [items, setItems] = useState<FeedItem[]>([]);
-  const [loading, setLoading] = useState(true);
+function parseArtworkList(raw: unknown): ArtworkItem[] {
+  const body = pickEnvelopeData(raw);
+
+  const arr = Array.isArray(body)
+    ? body
+    : isObject(body) && Array.isArray(get(body, "content"))
+    ? (get(body, "content") as unknown[])
+    : isObject(body) && Array.isArray(get(body, "items"))
+    ? (get(body, "items") as unknown[])
+    : [];
+
+  const out: ArtworkItem[] = [];
+
+  for (const r of arr) {
+    if (!isObject(r)) continue;
+
+    const artworkId = asNumber(get(r, "artworkId"), asNumber(get(r, "id"), NaN));
+    if (!Number.isFinite(artworkId)) continue;
+
+    const title = asString(get(r, "title"), "Untitled");
+    const productionDate =
+      asString(get(r, "productionDate"), "") ||
+      asString(get(r, "production_date"), "") ||
+      asString(get(r, "date"), "");
+
+    const thumbRaw =
+      asString(get(r, "thumbnailUrl"), "") ||
+      asString(get(r, "imageUrl"), "") ||
+      asString(get(r, "savedImageName"), "") || // new artists 응답에서 보던 필드
+      asString(get(r, "thumbnail"), "") ||
+      asString(get(r, "src"), "");
+
+    const thumbnailUrl = thumbRaw ? resolveMediaUrl(thumbRaw) : "";
+
+    out.push({ artworkId, title, productionDate: productionDate || undefined, thumbnailUrl });
+  }
+
+  return out;
+}
+
+export default function Portfolio() {
+  const nav = useNavigate();
+
+  // ✅ user 구조가 프로젝트마다 다를 수 있으니 후보 넓게
+  const authUser = useAuthStore((s) => s.user);
+  const myUuid = useMemo(() => {
+    const u: any = authUser;
+    return (
+      u?.memberUuid ||
+      u?.member_uuid ||
+      u?.uuid ||
+      u?.id ||
+      ""
+    );
+  }, [authUser]);
+
+  const myNickname = useAuthStore((s) => s.user?.nickname ?? "");
+
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [items, setItems] = useState<ArtworkItem[]>([]);
 
+  const goExhibit = () => {
+    if (!myUuid) {
+      console.warn("[Portfolio] myUuid is missing. Check auth store user shape.");
+      return;
+    }
+
+    nav(`/exhibit/${myUuid}`, {
+      state: {
+        from: "lounge-portfolio",
+        artist: myNickname,
+        artworkTitle: "PORTFOLIO",
+        fromWaypointId: 0,
+      },
+    });
+  };
+
+  // ✅ 내 작품 목록 로드
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     (async () => {
+      if (!myUuid) {
+        setItems([]);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
       try {
-        // ✅ 이 탭은 "리스트"만 담당 (3D 전시는 별도 라우트에서)
-        const page = await profileApi.getArtistFeed(profile.id);
-        if (!cancelled) setItems(page.items ?? []);
+        // ✅ 명세 기반: artist query로 내 작품 목록
+        const res = await http.get(`/api/v1/artworks`, {
+          params: { artist: myUuid },
+        });
+
+        const payload = unwrapAxiosData(res);
+        const list = parseArtworkList(payload);
+
+        if (cancelled) return;
+        setItems(list);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "포트폴리오 로딩 실패");
+        console.error(e);
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "작품 목록을 불러오지 못했습니다.");
+          setItems([]);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -138,112 +164,116 @@ export default function ?????Tab() {
     return () => {
       cancelled = true;
     };
-  }, [profile.id]);
+  }, [myUuid]);
 
-  if (loading) {
-    return (
-      <div className="tab-container">
-        <div className="tab-empty">?? ?...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="tab-container">
-        <div className="tab-empty">{error}</div>
-      </div>
-    );
-  }
-
-  // ✅ Exhibit 라우트가 /exhibit/:artistId 라면 반드시 id를 붙여서 이동해야 함
-  const artistId = String(profile.id ?? "").trim();
-  const exhibitPath = artistId ? `/exhibit/${encodeURIComponent(artistId)}` : "/exhibit";
+  const isEmpty = !loading && !error && items.length === 0;
 
   return (
-    <div className="tab-container">
-      <div className="tab-header">
-        <h3 className="tab-title">?????</h3>
+    <main className="loungePage">
+      <section className="loungeWrap">
+        <div className="loungeSubTop">
+          <h1 className="loungeSubTitle">포트폴리오</h1>
 
-        {/* ✅ 버튼 영역 */}
-        <div style={{ display: "flex", gap: 8 }}>
-          {/* ✅ 관람자(일반 유저)도 3D 전시장 진입 가능하게 */}
-          <Link
-            to={exhibitPath}
-            className="tab-btn"
-            state={{
-              from: "profile",
-              artistId,
-              artist: (profile as any)?.nickname ?? "",
-              artworkTitle: "PORTFOLIO",
-              fromWaypointId: 0,
-            }}
-          >
-            3D 전시장 보기
-          </Link>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button
+              type="button"
+              className="loungeSubBtn"
+              onClick={goExhibit}
+              style={{ textDecoration: "none" }}
+            >
+              전시장 바로가기
+            </button>
 
-          {/* ✅ 작가 본인만 작품 추가 가능 */}
-          {isOwner && (
-            <Link to="/artworks/create" className="tab-btn">
-              ?? ??
+            <Link className="loungeBackLink" to="/lounge">
+              ← 라운지로
             </Link>
+          </div>
+        </div>
+
+        <p className="loungeSubDesc">
+          등록된 작품은 <strong>내 프로필</strong>의 포트폴리오 탭에 공개됩니다.
+        </p>
+
+        <div className="loungeSubPanel">
+          <h2 className="loungeSubPanelTitle">작품 관리</h2>
+
+          {/* 상태 표시 */}
+          {loading && (
+            <div className="loungeEmpty">불러오는 중...</div>
           )}
-        </div>
-      </div>
 
-      {items.length === 0 ? (
-        <div className="tab-empty">
-          <div className="tab-empty-title">No ????? Items</div>
-          <div>{isOwner ? <>작품을 등록해보세요.</> : <>아직 등록된 작품이 없습니다.</>}</div>
-        </div>
-      ) : (
-        <div className="tab-grid-2">
-          {items.map((it) => {
-            // ✅ 여기서 it.id를 artworkId로 취급
-            const artworkId = it.id;
+          {!loading && error && (
+            <div className="loungeEmpty">
+              작품 목록을 불러오지 못했습니다.
+              <br />
+              <span style={{ opacity: 0.7, fontSize: 12 }}>{error}</span>
+            </div>
+          )}
 
-            return (
-              <article key={it.id} className="tab-card">
-                <Link
-                  to={`/artworks/${artworkId}`}
-                  style={{ color: "inherit", textDecoration: "none", display: "block" }}
+          {/* 리스트 */}
+          {!loading && !error && items.length > 0 && (
+            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 12 }}>
+              {items.map((it) => (
+                <li
+                  key={it.artworkId}
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "center",
+                    padding: 12,
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: 12,
+                  }}
                 >
-                  <div className="tab-card-body">
-                    <div className="tab-card-title" style={{ marginBottom: 8 }}>
-                      작품 #{it.id}
-                    </div>
-
-                    <div
-                      style={{
-                        width: "100%",
-                        aspectRatio: "4/3",
-                        overflow: "hidden",
-                        borderRadius: 12,
-                        border: "1px solid rgba(255,255,255,0.12)",
-                        marginBottom: 10,
-                        background: "rgba(255,255,255,0.04)",
-                      }}
-                    >
-                      <SmartImage
-                        rawUrl={it.imageUrl}
-                        alt=""
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                          display: "block",
-                        }}
+                  <div style={{ width: 72, height: 72, overflow: "hidden", borderRadius: 10, background: "#111" }}>
+                    {it.thumbnailUrl ? (
+                      <img
+                        src={it.thumbnailUrl}
+                        alt={it.title}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        loading="lazy"
                       />
-                    </div>
-
-                    <div className="tab-card-info">???: {it.createdAt ?? "-"}</div>
+                    ) : null}
                   </div>
-                </Link>
-              </article>
-            );
-          })}
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {it.title}
+                    </div>
+                    <div style={{ opacity: 0.8, fontSize: 12, marginTop: 4 }}>
+                      {it.productionDate ? `제작일: ${it.productionDate}` : "제작일: -"}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Link className="loungeSubBtn" to={`/artworks/${it.artworkId}`} style={{ textDecoration: "none" }}>
+                      상세
+                    </Link>
+                    <Link className="loungeSubBtn" to={`/artworks/${it.artworkId}/edit`} style={{ textDecoration: "none" }}>
+                      수정
+                    </Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/* Empty */}
+          {isEmpty && (
+            <div className="loungeEmpty">
+              아직 등록된 작품이 없습니다.
+              <br />
+              당신의 첫 번째 작품을 등록해보세요.
+            </div>
+          )}
+
+          <div className="loungeSubActions" style={{ justifyContent: "center", marginTop: 16 }}>
+            <Link to="/artworks/create" className="loungeSubBtn" style={{ textDecoration: "none" }}>
+              + 새 작품 등록
+            </Link>
+          </div>
         </div>
-      )}
-    </div>
+      </section>
+    </main>
   );
 }

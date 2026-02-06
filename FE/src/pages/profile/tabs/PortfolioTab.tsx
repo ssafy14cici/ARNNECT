@@ -143,7 +143,7 @@ export default function PortfolioTab() {
   if (loading) {
     return (
       <div className="tab-container">
-        <div className="tab-empty">?? ?...</div>
+        <div className="tab-empty">Loading...</div>
       </div>
     );
   }
@@ -163,7 +163,7 @@ export default function PortfolioTab() {
   return (
     <div className="tab-container">
       <div className="tab-header">
-        <h3 className="tab-title">?????</h3>
+        <h3 className="tab-title">Portfolio</h3>
 
         {/* ✅ 버튼 영역 */}
         <div style={{ display: "flex", gap: 8 }}>
@@ -185,7 +185,7 @@ export default function PortfolioTab() {
           {/* ✅ 작가 본인만 작품 추가 가능 */}
           {isOwner && (
             <Link to="/artworks/create" className="tab-btn">
-              ?? ??
+              Add Artwork
             </Link>
           )}
         </div>
@@ -193,7 +193,7 @@ export default function PortfolioTab() {
 
       {items.length === 0 ? (
         <div className="tab-empty">
-          <div className="tab-empty-title">No ????? Items</div>
+          <div className="tab-empty-title">No Portfolio Items</div>
           <div>{isOwner ? <>작품을 등록해보세요.</> : <>아직 등록된 작품이 없습니다.</>}</div>
         </div>
       ) : (
@@ -236,7 +236,7 @@ export default function PortfolioTab() {
                       />
                     </div>
 
-                    <div className="tab-card-info">???: {it.createdAt ?? "-"}</div>
+                    <div className="tab-card-info">Created: {it.createdAt ?? "-"}</div>
                   </div>
                 </Link>
               </article>

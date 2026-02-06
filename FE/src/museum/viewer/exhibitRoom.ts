@@ -22,43 +22,33 @@ type Options = {
   backgroundColor?: number;
 
   titleText?: string;
-  artistId?: string | null; // ✅ 작가 ID (클릭 시 프로필 이동용)
+  artistId?: string | null;
 
   debug?: boolean;
   autoFitIfOff?: boolean;
 
   uiMount?: HTMLElement;
 
-  // ✅ mountMuseumApp에서 넘기고 있음(오브젝트 원점/스케일 초기화)
   resetRootTransform?: boolean;
 
   onExitToHall: () => void;
 
-  // ✅ 전시장에서 "작품 상세보기" 눌렀을 때 라우팅은 바깥(React)에서 하게 콜백으로 뺌
   onOpenArtwork?: (artworkId: string | number) => void;
-
-  // ✅ 작가 프로필로 이동
   onOpenArtist?: (artistId: string) => void;
 };
 
 /**
  * ✅ 텍스처 방향 보정 전략
- * - 기본(공통): 회전만 유지(필요 시)
- * - 플립(상하/좌우 뒤집기)은 "필요한 패널에만" 적용
  */
 type TexFix = {
-  rot?: number; // absolute rotation
-  rotAdd?: number; // additional rotation
-  flipX?: boolean; // mirror horizontally
-  flipY?: boolean; // mirror vertically
+  rot?: number;
+  rotAdd?: number;
+  flipX?: boolean;
+  flipY?: boolean;
 };
 
-// ✅ 공통 회전(기존에 패널이 90도 돌아가야 맞았던 상태라면 유지)
-const DEFAULT_TEX_FIX: TexFix = {
-  rot: Math.PI / 2,
-};
+const DEFAULT_TEX_FIX: TexFix = { rot: Math.PI / 2 };
 
-// ✅ 패널별 예외(여기만 만지면 됨)
 const PANEL_TEX_FIX: Record<string, TexFix> = {
   EX_PANEL_2: { rot: -Math.PI / 2, flipY: true },
 };
@@ -73,14 +63,12 @@ function applyTexFix(tex: THREE.Texture, panelName: string, debug?: boolean) {
   const flipY = !!fix.flipY;
 
   if (flipX || flipY) {
-    // ✅ flip은 RepeatWrapping + negative repeat로 처리
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
 
     tex.repeat.set(flipX ? -1 : 1, flipY ? -1 : 1);
     tex.offset.set(flipX ? 1 : 0, flipY ? 1 : 0);
   } else {
-    // ✅ 기본은 뒤집지 않음
     tex.wrapS = THREE.ClampToEdgeWrapping;
     tex.wrapT = THREE.ClampToEdgeWrapping;
 
@@ -115,10 +103,8 @@ export async function mountExhibitRoom(
 
   const uiMount = opts.uiMount ?? document.body;
 
-  // ===== lifecycle guard =====
   let alive = true;
 
-  // ===== UI scope helpers =====
   const UI_SCOPE = "exhibitRoom";
   function markUi<T extends HTMLElement>(el: T): T {
     el.dataset.museumUi = "1";
@@ -132,6 +118,19 @@ export async function mountExhibitRoom(
     return el;
   }
 
+  function toast(msg: string, ms = 1200) {
+    const el = mountEl(document.createElement("div"));
+    el.style.cssText =
+      "position:fixed;left:50%;top:18px;transform:translateX(-50%);" +
+      "z-index:100000;padding:10px 14px;border-radius:999px;" +
+      "background:rgba(0,0,0,0.55);backdrop-filter:blur(10px);" +
+      "color:rgba(255,255,255,0.92);font-family:ui-sans-serif,system-ui;" +
+      "font-size:13px;letter-spacing:0.02em;pointer-events:none;" +
+      "box-shadow:0 10px 30px rgba(0,0,0,0.35);";
+    el.textContent = msg;
+    setTimeout(() => el.remove(), ms);
+  }
+
   const getSize = () => {
     const w = canvas.clientWidth || window.innerWidth;
     const h = canvas.clientHeight || window.innerHeight;
@@ -140,7 +139,6 @@ export async function mountExhibitRoom(
 
   console.log("[exhibit] mountExhibitRoom entered", { glbUrl: opts.glbUrl, debug });
 
-  // (debug용) GLB content-type 체크
   if (debug) {
     fetch(opts.glbUrl, { cache: "no-store" })
       .then((r) => console.log("[glb check]", r.status, r.headers.get("content-type"), opts.glbUrl))
@@ -171,7 +169,6 @@ export async function mountExhibitRoom(
   scene.background = new THREE.Color(bgColor);
   scene.fog = null;
 
-  // 환경맵(기본 off)
   const useEnv = false;
   let pmrem: THREE.PMREMGenerator | null = null;
   let envTex: THREE.Texture | null = null;
@@ -241,8 +238,7 @@ export async function mountExhibitRoom(
   applyPoseInstant(index);
 
   /* ===== Lights ===== */
-  const ambient = new THREE.AmbientLight(0xdfe8ff, 1.0);
-  scene.add(ambient);
+  scene.add(new THREE.AmbientLight(0xdfe8ff, 1.0));
 
   const hemi = new THREE.HemisphereLight(0xcfe3ff, 0x2a2a2a, 1.1);
   hemi.position.set(0, 50, 0);
@@ -266,7 +262,6 @@ export async function mountExhibitRoom(
   window.addEventListener("resize", onResize);
 
   /* ===== UI ===== */
-  // ✅ 작가 이름 (클릭 가능, 크게)
   const hasArtistLink = !!(opts.artistId && opts.onOpenArtist);
   const top = mountEl(document.createElement(hasArtistLink ? "button" : "div"), hasArtistLink);
   top.style.cssText =
@@ -282,25 +277,14 @@ export async function mountExhibitRoom(
 
   if (hasArtistLink) {
     (top as HTMLButtonElement).type = "button";
-    top.addEventListener("mouseenter", () => {
-      top.style.background = "rgba(255,255,255,0.1)";
-      top.style.transform = "translateX(-50%) scale(1.02)";
-    });
-    top.addEventListener("mouseleave", () => {
-      top.style.background = "none";
-      top.style.transform = "translateX(-50%) scale(1)";
-    });
     top.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (opts.artistId && opts.onOpenArtist) {
-        opts.onOpenArtist(opts.artistId);
-      }
+      if (opts.artistId && opts.onOpenArtist) opts.onOpenArtist(opts.artistId);
     });
     top.addEventListener("pointerdown", (e) => e.stopPropagation(), { capture: true });
   }
 
-  // ✅ VIEWPOINT 라벨 (하단 중앙으로 이동)
   const viewLabel = mountEl(document.createElement("div"));
   viewLabel.style.cssText =
     "position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:99999;" +
@@ -320,9 +304,7 @@ export async function mountExhibitRoom(
     "font-size:14px;font-weight:800;cursor:pointer;" +
     "pointer-events:auto;touch-action:manipulation;";
 
-  // 전파만 차단
-  const onBackPtrDown = (e: PointerEvent) => e.stopPropagation();
-  back.addEventListener("pointerdown", onBackPtrDown, { capture: true });
+  back.addEventListener("pointerdown", (e: PointerEvent) => e.stopPropagation(), { capture: true });
 
   const loading = mountEl(document.createElement("div"), true);
   loading.style.cssText =
@@ -333,7 +315,7 @@ export async function mountExhibitRoom(
     "pointer-events:auto;";
   loading.textContent = "LOADING GALLERY…";
 
-  /* ===== FPS (PointerLockControls) ===== */
+  /* ===== FPS ===== */
   const clock = new THREE.Clock();
   const fps = new PointerLockControls(camera, renderer.domElement);
 
@@ -402,13 +384,79 @@ export async function mountExhibitRoom(
     return hits.length ? (hits[0].object as THREE.Mesh) : null;
   }
 
+  /* ===== Destroy (먼저 선언: 모달에서 destroy 호출할 거라) ===== */
+  const destroy = () => {
+    if (!alive) return;
+    alive = false;
+
+    cancelAnimationFrame(raf);
+    if (activeTween) activeTween.kill();
+
+    window.removeEventListener("resize", onResize);
+    window.removeEventListener("keydown", onKeyDown as any);
+    window.removeEventListener("keyup", onKeyUp as any);
+
+    renderer.domElement.removeEventListener("click", onCanvasClick);
+    renderer.domElement.removeEventListener("pointerdown", onCanvasPointerDown);
+    renderer.domElement.removeEventListener("pointermove", onCanvasPointerMove);
+
+    fps.removeEventListener("unlock", onFpsUnlock);
+    if (fps.isLocked) fps.unlock();
+    (document as any).exitPointerLock?.();
+
+    renderer.domElement.style.cursor = "";
+
+    uiMount.querySelector("#exhibit-art-modal")?.remove();
+    uiMount.querySelectorAll(`[data-museum-ui="1"][data-museum-ui-scope="${UI_SCOPE}"]`).forEach((n) => n.remove());
+
+    if (glbRoot) {
+      const disposedTex = new Set<THREE.Texture>();
+      const disposedMat = new Set<THREE.Material>();
+      const disposedGeo = new Set<THREE.BufferGeometry>();
+
+      glbRoot.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh) return;
+
+        const geo = m.geometry as THREE.BufferGeometry | undefined;
+        if (geo && !disposedGeo.has(geo)) {
+          disposedGeo.add(geo);
+          geo.dispose();
+        }
+
+        const matAny = m.material as any;
+        const mats: THREE.Material[] = Array.isArray(matAny) ? matAny : matAny ? [matAny] : [];
+        for (const mat of mats) {
+          if (!mat || disposedMat.has(mat)) continue;
+          disposedMat.add(mat);
+          disposeMaterialAndTextures(mat, disposedTex);
+        }
+      });
+    }
+    glbRoot = null;
+
+    for (const t of loadedPanelTextures) {
+      try {
+        t.dispose();
+      } catch {}
+    }
+    loadedPanelTextures.clear();
+
+    envTex?.dispose?.();
+    pmrem?.dispose?.();
+    envTex = null;
+    pmrem = null;
+
+    renderer.dispose();
+  };
+
   function showArtDetailModal(mesh: THREE.Mesh) {
     if (uiMount.querySelector("#exhibit-art-modal")) return;
 
     const title = mesh.userData.__title ?? "작품";
     const panelName = mesh.userData.__panelName ?? "";
     const imageUrl = mesh.userData.__imageUrl ?? "";
-    const artworkId = mesh.userData.__artworkId;
+    const artworkId = mesh.userData.__artworkId as string | number | undefined;
 
     if (fpsEnabled) setFps(false);
     if (fps.isLocked) fps.unlock();
@@ -451,22 +499,39 @@ export async function mountExhibitRoom(
 
     const detailBtn = document.createElement("button");
     detailBtn.type = "button";
+    detailBtn.textContent = "작품 상세보기";
     detailBtn.style.cssText =
       "background:#333;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;cursor:pointer;font-family:inherit;";
-    detailBtn.textContent = "작품 상세보기";
+
+    // ✅ artworkId 없으면 버튼 비활성 (여기가 지금 너 상황일 가능성 매우 큼)
+    if (artworkId === undefined || artworkId === null || String(artworkId).trim() === "") {
+      detailBtn.disabled = true;
+      detailBtn.style.opacity = "0.45";
+      detailBtn.style.cursor = "not-allowed";
+      detailBtn.title = "artworkId가 없어서 상세보기로 이동할 수 없습니다.";
+    }
 
     detailBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
 
-      console.log("[exhibit] detail clicked:", { artworkId, title, panelName, imageUrl });
+      if (artworkId === undefined || artworkId === null || String(artworkId).trim() === "") {
+        console.warn("[exhibit] missing artworkId:", { panelName, title, imageUrl, artworkId });
+        toast("artworkId가 없어서 이동 불가 (콘솔 확인)");
+        return;
+      }
+      if (!opts.onOpenArtwork) {
+        console.warn("[exhibit] opts.onOpenArtwork is missing");
+        toast("onOpenArtwork 콜백이 없음 (React 연결 필요)");
+        return;
+      }
 
+      console.log("[exhibit] open artwork:", artworkId);
       overlay.remove();
 
-      // ✅ 콜백으로 라우팅 위임
-      if (artworkId !== undefined && artworkId !== null && opts.onOpenArtwork) {
-        opts.onOpenArtwork(artworkId);
-      }
+      // ✅ 여기 핵심: 라우팅 전에 3D를 확실히 종료해야 라우트가 깔끔히 전환됨
+      destroy();
+      opts.onOpenArtwork(artworkId);
     });
 
     const closeBtn = document.createElement("button");
@@ -546,9 +611,8 @@ export async function mountExhibitRoom(
   const loader = new GLTFLoader();
   let glbRoot: THREE.Object3D | null = null;
 
-  // ✅ 패널 텍스처/재질 dispose를 위해 추적
   const loadedPanelTextures = new Set<THREE.Texture>();
-  const replacedMaterialCandidates = new Set<THREE.Material>(); // 패널에 원래 붙어있던 재질 후보
+  const replacedMaterialCandidates = new Set<THREE.Material>();
 
   const loadOk = await new Promise<boolean>((resolve) => {
     loader.load(
@@ -559,7 +623,6 @@ export async function mountExhibitRoom(
         try {
           glbRoot = gltf.scene;
 
-          // ✅ 필요 시 루트 트랜스폼 초기화
           if (opts.resetRootTransform && glbRoot) {
             glbRoot.position.set(0, 0, 0);
             glbRoot.rotation.set(0, 0, 0);
@@ -595,7 +658,6 @@ export async function mountExhibitRoom(
             }
           }
 
-          // 바닥 무광 블랙 (가능하면 "기존 재질 수정"으로 처리)
           glbRoot.traverse((o: THREE.Object3D) => {
             if (!(o as any).isMesh) return;
             const n = (o.name ?? "").toLowerCase();
@@ -611,13 +673,11 @@ export async function mountExhibitRoom(
               if (m) m.side = THREE.DoubleSide;
               if (m) m.needsUpdate = true;
             }
-
-            if (debug) console.log("[exhibit] floor darkened:", o.name);
           });
 
           if (opts.panelItems?.length) {
             const texLoader = new THREE.TextureLoader();
-            texLoader.setCrossOrigin("anonymous"); // ✅ CORS 안전장치(동일 오리진이면 영향 거의 없음)
+            texLoader.setCrossOrigin("anonymous");
 
             let attached = 0;
             const missing: string[] = [];
@@ -652,7 +712,6 @@ export async function mountExhibitRoom(
                 continue;
               }
 
-              // 교체 전 재질 후보 추적 (나중에 "사용 안 하면" 안전하게 dispose)
               const oldMat = mesh.material as any;
               if (Array.isArray(oldMat)) oldMat.forEach((m) => m && replacedMaterialCandidates.add(m));
               else if (oldMat) replacedMaterialCandidates.add(oldMat);
@@ -662,9 +721,8 @@ export async function mountExhibitRoom(
                 if (!alive) return resolve(false);
 
                 tex.colorSpace = THREE.SRGBColorSpace;
-                tex.flipY = false; // ✅ glTF UV 기준
+                tex.flipY = false;
 
-                // ✅ 여기서만 방향 보정
                 applyTexFix(tex, item.panelName, debug);
 
                 loadedPanelTextures.add(tex);
@@ -676,19 +734,18 @@ export async function mountExhibitRoom(
                   side: THREE.DoubleSide,
                 });
 
-                // ✅ userData 세팅 (클릭/모달/라우팅 핵심)
+                // ✅ 여기 핵심: artworkId를 그대로 박아둔다
                 mesh.userData.__panelName = item.panelName;
                 mesh.userData.__title = item.title;
                 mesh.userData.__imageUrl = item.imageUrl;
+                mesh.userData.__artworkId = item.artworkId; // ✅ 타입에서 가져옴
 
-                const id =
-                  (item as any).artworkId ??
-                  (item as any).id ??
-                  (item as any).artId ??
-                  undefined;
-
-                if (id !== undefined) {
-                  mesh.userData.__artworkId = id;
+                if (debug) {
+                  console.log("[exhibit] bind userData", item.panelName, {
+                    artworkId: item.artworkId,
+                    title: item.title,
+                    imageUrl: item.imageUrl,
+                  });
                 }
 
                 clickableArtMeshes.push(mesh);
@@ -699,7 +756,6 @@ export async function mountExhibitRoom(
               }
             }
 
-            // ✅ 교체된 "원래 재질" 중, glbRoot에서 더 이상 쓰지 않는 건 정리 (안전 체크)
             if (glbRoot && replacedMaterialCandidates.size) {
               const inUse = new Set<THREE.Material>();
               glbRoot.traverse((o) => {
@@ -743,7 +799,7 @@ export async function mountExhibitRoom(
   });
 
   if (!loadOk) {
-    // 실패해도 루프는 돌릴 수 있지만, 보통은 여기서 더 강하게 끊어도 됨.
+    if (debug) console.warn("[exhibit] loadOk=false");
   }
 
   /* ===== Render loop ===== */
@@ -784,51 +840,12 @@ export async function mountExhibitRoom(
       return;
     }
 
-    if (e.code === "KeyC") {
-      console.log("[exhibit] camera", { pos: camera.position.toArray(), target: lookTarget.toArray(), fov: camera.fov });
-      return;
-    }
-    if (e.code === "KeyB" && glbRoot) {
-      const box = new THREE.Box3().setFromObject(glbRoot);
-      console.log("[exhibit] bbox", {
-        center: box.getCenter(new THREE.Vector3()).toArray(),
-        size: box.getSize(new THREE.Vector3()).toArray(),
-      });
-      return;
-    }
-    if (e.code === "KeyG" && glbRoot) {
-      const box = new THREE.Box3().setFromObject(glbRoot);
-      fitCameraToBox(camera, box);
-      lookTarget.copy(box.getCenter(new THREE.Vector3()));
-      camera.lookAt(lookTarget);
-      camera.updateMatrixWorld(true);
-      console.log("[exhibit] fitCameraToBox");
-      return;
-    }
-
     if (fpsEnabled) {
-      if (e.code === "KeyW") {
-        e.preventDefault();
-        move.f = true;
-        return;
-      }
-      if (e.code === "KeyS") {
-        e.preventDefault();
-        move.b = true;
-        return;
-      }
-      if (e.code === "KeyA") {
-        e.preventDefault();
-        move.l = true;
-        return;
-      }
-      if (e.code === "KeyD") {
-        e.preventDefault();
-        move.r = true;
-        return;
-      }
+      if (e.code === "KeyW") { e.preventDefault(); move.f = true; return; }
+      if (e.code === "KeyS") { e.preventDefault(); move.b = true; return; }
+      if (e.code === "KeyA") { e.preventDefault(); move.l = true; return; }
+      if (e.code === "KeyD") { e.preventDefault(); move.r = true; return; }
 
-      // Speed up/down with +/- keys
       if (e.code === "Equal" || e.code === "NumpadAdd") {
         e.preventDefault();
         speed = Math.min(speed + SPEED_STEP, SPEED_MAX);
@@ -873,76 +890,6 @@ export async function mountExhibitRoom(
   window.addEventListener("keydown", onKeyDown, { passive: false });
   window.addEventListener("keyup", onKeyUp, { passive: false });
 
-  /* ===== Destroy ===== */
-  const destroy = () => {
-    if (!alive) return;
-    alive = false;
-
-    cancelAnimationFrame(raf);
-    if (activeTween) activeTween.kill();
-
-    window.removeEventListener("resize", onResize);
-    window.removeEventListener("keydown", onKeyDown as any);
-    window.removeEventListener("keyup", onKeyUp as any);
-
-    renderer.domElement.removeEventListener("click", onCanvasClick);
-    renderer.domElement.removeEventListener("pointerdown", onCanvasPointerDown);
-    renderer.domElement.removeEventListener("pointermove", onCanvasPointerMove);
-
-    fps.removeEventListener("unlock", onFpsUnlock);
-    if (fps.isLocked) fps.unlock();
-    (document as any).exitPointerLock?.();
-
-    renderer.domElement.style.cursor = "";
-
-    // 모달 제거 (uiMount 기준)
-    uiMount.querySelector("#exhibit-art-modal")?.remove();
-
-    // 표식 기반 UI 싹 제거
-    uiMount.querySelectorAll(`[data-museum-ui="1"][data-museum-ui-scope="${UI_SCOPE}"]`).forEach((n) => n.remove());
-
-    // GLB 리소스 정리
-    if (glbRoot) {
-      const disposedTex = new Set<THREE.Texture>();
-      const disposedMat = new Set<THREE.Material>();
-      const disposedGeo = new Set<THREE.BufferGeometry>();
-
-      glbRoot.traverse((o) => {
-        const m = o as THREE.Mesh;
-        if (!m.isMesh) return;
-
-        const geo = m.geometry as THREE.BufferGeometry | undefined;
-        if (geo && !disposedGeo.has(geo)) {
-          disposedGeo.add(geo);
-          geo.dispose();
-        }
-
-        const matAny = m.material as any;
-        const mats: THREE.Material[] = Array.isArray(matAny) ? matAny : matAny ? [matAny] : [];
-        for (const mat of mats) {
-          if (!mat || disposedMat.has(mat)) continue;
-          disposedMat.add(mat);
-          disposeMaterialAndTextures(mat, disposedTex);
-        }
-      });
-    }
-    glbRoot = null;
-
-    for (const t of loadedPanelTextures) {
-      try {
-        t.dispose();
-      } catch {}
-    }
-    loadedPanelTextures.clear();
-
-    envTex?.dispose?.();
-    pmrem?.dispose?.();
-    envTex = null;
-    pmrem = null;
-
-    renderer.dispose();
-  };
-
   // back click
   let exiting = false;
   const onBackClick = (e: MouseEvent) => {
@@ -955,16 +902,14 @@ export async function mountExhibitRoom(
   };
   back.addEventListener("click", onBackClick, { capture: true });
 
-  // ✅ 현재 시점 방향 기준 좌우 이동 (버튼용)
-  const STRAFE_DIST = 1.5; // 한 번 클릭 시 이동 거리
+  // ✅ strafe
+  const STRAFE_DIST = 1.5;
 
   const strafeLeft = (dist = STRAFE_DIST) => {
     if (!alive) return;
-    // 카메라가 보는 방향의 오른쪽 벡터 계산
     const right = new THREE.Vector3();
     camera.getWorldDirection(tmpDir);
     right.crossVectors(tmpDir, camera.up).normalize();
-    // 왼쪽으로 이동 (right의 반대)
     camera.position.addScaledVector(right, -dist);
     lookTarget.addScaledVector(right, -dist);
     camera.updateMatrixWorld(true);
@@ -972,11 +917,9 @@ export async function mountExhibitRoom(
 
   const strafeRight = (dist = STRAFE_DIST) => {
     if (!alive) return;
-    // 카메라가 보는 방향의 오른쪽 벡터 계산
     const right = new THREE.Vector3();
     camera.getWorldDirection(tmpDir);
     right.crossVectors(tmpDir, camera.up).normalize();
-    // 오른쪽으로 이동
     camera.position.addScaledVector(right, dist);
     lookTarget.addScaledVector(right, dist);
     camera.updateMatrixWorld(true);
@@ -1007,7 +950,6 @@ function fitCameraToBox(camera: THREE.PerspectiveCamera, box: THREE.Box3) {
   camera.updateMatrixWorld(true);
 }
 
-/** material.dispose()만으로는 텍스처가 안 내려가서 직접 처리 */
 function disposeMaterialAndTextures(mat: THREE.Material, disposedTex: Set<THREE.Texture>) {
   const m: any = mat;
 

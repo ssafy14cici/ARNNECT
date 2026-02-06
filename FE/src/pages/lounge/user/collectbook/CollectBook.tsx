@@ -71,7 +71,6 @@ export default function CollectBook() {
     <main className="loungePage">
       <section className="loungeWrap">
         <div className="loungeSubTop">
-          <h1 className="loungeSubTitle">컬렉트북</h1>
           <Link className="loungeBackLink" to="/lounge">
             ← 라운지로
           </Link>
