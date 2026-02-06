@@ -257,7 +257,7 @@ export default function TicketQr() {
         <div className="loungeSubTop">
           <h1 className="loungeSubTitle">QR Ticket Manager</h1>
           <Link className="loungeBackLink" to="/lounge">
-            <- Back to Lounge
+            ← Back to Lounge
           </Link>
         </div>
 
