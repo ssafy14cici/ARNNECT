@@ -302,22 +302,7 @@ export default function ArtworkDetailView(props: Props) {
   return (
     <div className="artwork-detail-page">
       {/* 상단 고정 헤더 - 작가(소유자)만 표시 */}
-      {isOwner && (
-        <div className="artwork-detail-top">
-          <button className="btn-icon" type="button" onClick={onGoHome}>
-            홈
-          </button>
-          <div className="top-actions">
-            <button className="btn-icon" type="button" onClick={onGoEdit}>
-              수정
-            </button>
-            <button className="btn-icon danger" type="button" onClick={onDeleteArtwork}>
-              삭제
-            </button>
-          </div>
-        </div>
-      )}
-
+      
       {/* HERO */}
       <section className="artwork-hero">
         <div className="hero-content">
@@ -379,14 +364,22 @@ export default function ArtworkDetailView(props: Props) {
                     type="button"
                     onClick={onToggleFavorite}
                   >
-                    {isLiked ? "♥" : "♡"} {likeCount}
+                    {isLiked ? "?" : "?"} {likeCount}
                   </button>
                 </>
               ) : (
-                <div className="like-count-only" aria-label={`좋아요 ${likeCount}개`}>
-                  <span>좋아요</span>
-                  <strong>{likeCount}</strong>
-                </div>
+                <>
+                  <div className="like-count-only" aria-label={`??? ${likeCount}?`}>
+                    <span>???</span>
+                    <strong>{likeCount}</strong>
+                  </div>
+                  <button className="btn-icon" type="button" onClick={onGoEdit}>
+                    ??
+                  </button>
+                  <button className="btn-icon danger" type="button" onClick={onDeleteArtwork}>
+                    ??
+                  </button>
+                </>
               )}
 
               <button className="btn-icon" type="button" onClick={onOpenFanLetter}>

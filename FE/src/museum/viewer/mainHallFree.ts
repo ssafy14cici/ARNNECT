@@ -351,10 +351,10 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   let lastT = performance.now();
 
   // 속도 조절 (-/+ 키로 조절 가능)
-  const SPEED_MIN = 3.0;
-  const SPEED_MAX = 25.0;
+  const SPEED_MIN = 20.0;
+  const SPEED_MAX = 40.0;
   const SPEED_STEP = 2.0;
-  let freeSpeed = 9.5;
+  let freeSpeed = 30.0;
   const FREE_MOVE_SLOW_RATIO = 0.35;  // Ctrl 누르면 35% 속도
 
   // 점프 관련
