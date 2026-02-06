@@ -264,7 +264,7 @@ export default function TicketQr() {
               onClick={() => nav("/lounge")}
               style={{ background: "none", border: "none", cursor: "pointer" }}
             >
-              <- Back to Lounge
+              ← Back to Lounge
             </button>
           </div>
         </div>
