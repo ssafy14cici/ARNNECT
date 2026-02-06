@@ -389,9 +389,14 @@ Address {t.address} | Period {t.startDate} ~ {t.endDate}
                           className="loungeSubActions"
                           style={{ marginTop: 16, justifyContent: "flex-start", gap: 10 }}
                         >
-                          <Link className="loungeSubBtn" to={`/tickets/issue?edit=${t.ticketId}`}>
+                          <button
+                            type="button"
+                            className="loungeSubBtn"
+                            onClick={() => startEdit(t)}
+                            disabled={busy}
+                          >
                             Edit
-                          </Link>
+                          </button>
                           <button
                             type="button"
                             className="loungeSubBtn"
