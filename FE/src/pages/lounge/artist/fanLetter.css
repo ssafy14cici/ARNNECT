@@ -69,7 +69,7 @@
 .fanPostitGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
 }
 
 @media (max-width: 980px) {
@@ -89,10 +89,10 @@
   border-radius: 14px;
   padding: 14px 14px 12px;
   cursor: pointer;
-  background: #fff3a5;
+  background: #fff8ea;
   color: #1b1b1b;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.24);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   transform: rotate(0deg);
   transition: transform 0.12s ease, box-shadow 0.12s ease, outline 0.12s ease;
 }
@@ -101,7 +101,7 @@
 .fanPostitCard:nth-child(3n + 2) { transform: rotate(1deg); }
 
 .fanPostitCard:hover {
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.32);
 }
 
 .fanPostitCard.isSelected {
@@ -257,4 +257,116 @@
   margin-top: 10px;
   font-size: 13px;
   color: rgba(255, 110, 110, 0.95);
+}
+
+/* ===== Reply modal ===== */
+.replyBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.replyModal {
+  width: min(620px, 100%);
+  background: #ffffff;
+  color: #141417;
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.replyHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  background: #fff4df;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.replyTitle {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.replyX {
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  cursor: pointer;
+  color: #141417;
+}
+
+.replyBody {
+  padding: 16px 18px;
+}
+
+.replyTextarea {
+  width: 100%;
+  min-height: 160px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  padding: 12px;
+  font-size: 14px;
+  color: #141417;
+  background: #fff;
+  resize: vertical;
+  outline: none;
+}
+
+.replyFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px 16px;
+}
+
+.replyBtn {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #141417;
+  color: #fff;
+  cursor: pointer;
+}
+
+.replyBtn.ghost {
+  background: transparent;
+  color: #141417;
+}
+
+.replyBtn.primary {
+  background: #141417;
+}
+
+.replyBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 560px) {
+  .fanTopBar {
+    gap: 8px;
+  }
+
+  .fanSearch {
+    min-width: 160px;
+    width: 100%;
+  }
+
+  .fanPostitGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .replyHeader,
+  .replyBody,
+  .replyFooter {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
 }

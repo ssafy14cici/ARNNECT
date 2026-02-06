@@ -4,8 +4,8 @@ import { useNavigate } from "react-router-dom";
 import "./qr.css";
 
 import { useIssuedTickets } from "./useIssuedTickets";
-import { resolveTicketMedia } from "../../../../features/tickets/resolveTicketMedia";
 import { useAuthStore } from "../../../../features/auth/store";
+import { resolveMediaUrl } from "../../../../features/tickets/resolveTicketMedia";
 
 type PreviewItem = {
   ticketId: number;
@@ -15,6 +15,7 @@ type PreviewItem = {
   startDate: string;
   endDate: string;
   ticketImageName?: string;
+  qrImageName?: string;
 };
 
 export default function QrEntry() {
@@ -35,7 +36,8 @@ export default function QrEntry() {
         address: t.address ?? "",
         startDate: t.startDate ?? "",
         endDate: t.endDate ?? "",
-        ticketImageName: t.ticketImageName,
+        ticketImageName: (t as any).ticketImageName,
+        qrImageName: (t as any).qrImageName,
       })),
     [issued],
   );
@@ -62,11 +64,8 @@ export default function QrEntry() {
     };
   }, [artistUuid, reloadIssued]);
 
-  const goIssue = () => nav("/tickets/issue");
-
-  const goEdit = (ticketId: number) => {
-    nav(`/tickets/issue?ticketId=${ticketId}`);
-  };
+  const goIssueNew = () => nav("/tickets/issue");
+  const goIssueEdit = (ticketId: number) => nav(`/tickets/issue?edit=${ticketId}`);
 
   return (
     <div className="qr-page">
@@ -85,12 +84,11 @@ export default function QrEntry() {
             <div className="qr-empty-text">
               아직 발급된 QR이 없습니다.
               <br />
-              아래 버튼을 눌러 발급을 시작하세요.
+              아래 버튼을 눌러 등록을 시작하세요.
             </div>
-
-            <div style={{ marginTop: 14 }}>
-              <button type="button" className="qr-primary" onClick={goIssue}>
-                QR 발급하러 가기 →
+            <div className="qr-empty-actions">
+              <button type="button" className="qr-primary-btn" onClick={goIssueNew}>
+                QR 등록하기
               </button>
             </div>
           </div>
@@ -99,54 +97,66 @@ export default function QrEntry() {
         <section className="qr-preview">
           <div className="qr-preview-head">
             <div className="qr-preview-title">최근 발급</div>
-            <button type="button" className="qr-link" onClick={goIssue}>
+            <button type="button" className="qr-link" onClick={() => nav("/tickets/issue")}>
               전체 관리 →
             </button>
           </div>
 
           <div className="qr-preview-grid">
-            {preview.map((t) => (
-              <button
-                key={t.ticketCode}
-                type="button"
-                className="qr-card"
-                onClick={() => goEdit(t.ticketId)}
-                aria-label={`${t.title} 티켓 편집으로 이동`}
-              >
-                <div className="qr-card-top">
-                  <div className="qr-card-title">{t.title || "Untitled"}</div>
-                  <div className="qr-card-code">{t.ticketCode}</div>
-                </div>
+            {preview.map((t) => {
+              const ticketImg = resolveMediaUrl(t.ticketImageName);
+              const qrImg = resolveMediaUrl(t.qrImageName);
 
-                <div className="qr-card-meta">
-                  <div>📍 {t.address || "-"}</div>
-                  <div>
-                    📅 {t.startDate || "-"} ~ {t.endDate || "-"}
+              return (
+                <button
+                  key={t.ticketCode}
+                  type="button"
+                  className="qr-card"
+                  onClick={() => goIssueEdit(t.ticketId)}
+                  aria-label={`${t.title || "티켓"} 수정으로 이동`}
+                >
+                  <div className="qr-card-top">
+                    <div className="qr-card-title">{t.title || "Untitled"}</div>
+                    <div className="qr-card-code">{t.ticketCode}</div>
                   </div>
-                </div>
 
-                {/* ✅ ticketImageName 있으면 “저장된 티켓 이미지”를 보여준다 */}
-                {t.ticketImageName ? (
-                  <img
-                    className="qr-card-poster"
-                    src={resolveTicketMedia(t.ticketImageName)}
-                    alt="ticket"
-                    loading="lazy"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display = "none";
-                    }}
-                  />
-                ) : (
-                  <div className="qr-card-fallback">티켓 이미지 없음</div>
-                )}
-              </button>
-            ))}
+                  <div className="qr-card-meta">
+                    <div>📍 {t.address || "-"}</div>
+                    <div>
+                      📅 {t.startDate || "-"} ~ {t.endDate || "-"}
+                    </div>
+                  </div>
+
+                  {ticketImg ? (
+                    <div className="qr-card-media">
+                      <img
+                        className="qr-card-ticket"
+                        src={ticketImg}
+                        alt="ticket"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                      {qrImg ? (
+                        <img
+                          className="qr-card-qr"
+                          src={qrImg}
+                          alt="qr"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      ) : null}
+                    </div>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         </section>
       )}
 
-      {/* FAB (우측 하단 카메라) */}
-      <button type="button" className="qr-fab" onClick={goIssue} aria-label="QR 발급/수정 화면으로 이동">
+      <button type="button" className="qr-fab" onClick={goIssueNew} aria-label="QR 발급/수정 화면으로 이동">
         <span className="qr-fab-icon">📷</span>
       </button>
     </div>

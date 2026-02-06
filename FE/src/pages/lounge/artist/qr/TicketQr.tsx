@@ -10,8 +10,8 @@ import { createTicket, updateTicket } from "../../../../features/tickets/api/rea
 import TicketForm, { type FormState } from "./TicketForm";
 import QrPanel from "./QrPanel";
 import { rememberDesign, type TicketItem, useIssuedTickets } from "./useIssuedTickets";
-import { resolveTicketMedia } from "../../../../features/tickets/resolveTicketMedia";
 import { useAuthStore } from "../../../../features/auth/store";
+import { resolveMediaUrl } from "../../../../features/tickets/resolveTicketMedia";
 
 type TabMode = "ISSUE" | "LIST";
 
@@ -125,7 +125,7 @@ async function makeTicketImageFile(previewEl: HTMLElement | null, ticketCode: st
 }
 
 export default function TicketQr() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [params] = useSearchParams();
 
   const [activeTab, setActiveTab] = useState<TabMode>("ISSUE");
   const [busy, setBusy] = useState(false);
@@ -162,41 +162,31 @@ export default function TicketQr() {
     setTicketId(null);
     setCode(makeTicketCode());
     setForm(toForm(null));
+  }, []);
 
-    // ✅ edit 진입용 쿼리 제거
-    searchParams.delete("ticketId");
-    setSearchParams(searchParams, { replace: true });
-  }, [searchParams, setSearchParams]);
+  const startEdit = useCallback((t: TicketItem) => {
+    setError("");
+    setEditingTicketId(t.ticketId);
+    setTicketId(t.ticketId);
+    setCode(t.ticketCode);
+    setForm(toForm(t));
+    setActiveTab("ISSUE");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
-  const startEdit = useCallback(
-    (t: TicketItem) => {
-      setError("");
-      setEditingTicketId(t.ticketId);
-      setTicketId(t.ticketId);
-      setCode(t.ticketCode);
-      setForm(toForm(t));
-      setActiveTab("ISSUE");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    },
-    [],
-  );
-
-  // ✅ QrEntry에서 ticketId 넘어오면 자동으로 해당 티켓 edit 열기
   useEffect(() => {
-    const q = searchParams.get("ticketId");
-    if (!q) return;
+    const editIdRaw = params.get("edit");
+    if (!editIdRaw) return;
 
-    const id = Number(q);
-    if (!Number.isFinite(id)) return;
+    const editId = Number(editIdRaw);
+    if (!Number.isFinite(editId)) return;
+    if (!issued || issued.length === 0) return;
 
-    const t = issued.find((x) => x.ticketId === id);
-    if (!t) return;
+    const found = issued.find((x) => x.ticketId === editId);
+    if (!found) return;
 
-    // 이미 같은 티켓 편집 중이면 재진입 방지
-    if (editingTicketId === id) return;
-
-    startEdit(t);
-  }, [searchParams, issued, startEdit, editingTicketId]);
+    startEdit(found);
+  }, [params, issued, startEdit]);
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -227,7 +217,8 @@ export default function TicketQr() {
       const res = editingTicketId ? await updateTicket(editingTicketId, fd) : await createTicket(fd);
 
       const nextId = typeof (res as any)?.ticketId === "number" ? (res as any).ticketId : ticketId;
-      const nextCode = typeof (res as any)?.ticketCode === "string" && (res as any).ticketCode ? (res as any).ticketCode : code;
+      const nextCode =
+        typeof (res as any)?.ticketCode === "string" && (res as any).ticketCode ? (res as any).ticketCode : code;
 
       setTicketId(nextId ?? null);
       setCode(nextCode);
@@ -290,7 +281,14 @@ export default function TicketQr() {
         {activeTab === "ISSUE" && (
           <div className="fade-in">
             <div className="loungeSubPanel" style={{ textAlign: "left" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 30,
+                }}
+              >
                 <h2 className="loungeSubPanelTitle" style={{ margin: 0 }}>
                   {editingTicketId ? "전시 정보 수정" : "새 전시 등록"}
                 </h2>
@@ -330,50 +328,91 @@ export default function TicketQr() {
                 <div className="loungeEmpty">내역이 없습니다.</div>
               ) : (
                 <div style={{ display: "grid", gap: 16 }}>
-                  {issued.map((t) => (
-                    <div key={t.ticketId} className="tasteCard" style={{ padding: 24, border: "1px solid rgba(255,255,255,0.1)" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                        <div style={{ fontWeight: 700 }}>
-                          {t.title}
-                          <span style={{ marginLeft: 10, fontSize: 12, opacity: 0.7, border: "1px solid #555", padding: "2px 6px", borderRadius: "4px" }}>
-                            {t.ticketDesign}
-                          </span>
+                  {issued.map((t) => {
+                    const ticketImg = resolveMediaUrl((t as any).ticketImageName);
+                    const qrImg = resolveMediaUrl((t as any).qrImageName);
+
+                    return (
+                      <div
+                        key={t.ticketId}
+                        className="tasteCard"
+                        style={{ padding: 24, border: "1px solid rgba(255,255,255,0.1)" }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                          <div style={{ fontWeight: 700 }}>
+                            {t.title}
+                            <span
+                              style={{
+                                marginLeft: 10,
+                                fontSize: 12,
+                                opacity: 0.7,
+                                border: "1px solid #555",
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                              }}
+                            >
+                              {t.ticketDesign}
+                            </span>
+                          </div>
+                          <div style={{ color: "#C8A97E", wordBreak: "break-all" }}>{t.ticketCode}</div>
                         </div>
-                        <div style={{ color: "#C8A97E", wordBreak: "break-all" }}>{t.ticketCode}</div>
-                      </div>
 
-                      <div style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.6)", marginTop: 8 }}>
-                        📍 {t.address} | 📅 {t.startDate} ~ {t.endDate}
-                      </div>
+                        <div style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.6)", marginTop: 8 }}>
+                          📍 {t.address} | 📅 {t.startDate} ~ {t.endDate}
+                        </div>
 
-                      {t.ticketImageName && (
-                        <img
-                          src={resolveTicketMedia(t.ticketImageName)}
-                          alt="ticket"
-                          style={{
-                            width: "100%",
-                            maxWidth: 520,
-                            borderRadius: 14,
-                            marginTop: 14,
-                            border: "1px solid rgba(255,255,255,0.12)",
-                            display: "block",
-                          }}
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).style.display = "none";
-                          }}
-                        />
-                      )}
+                        {ticketImg && (
+                          <div style={{ position: "relative", marginTop: 14, maxWidth: 520 }}>
+                            <img
+                              src={ticketImg}
+                              alt="ticket"
+                              style={{
+                                width: "100%",
+                                borderRadius: 14,
+                                border: "1px solid rgba(255,255,255,0.12)",
+                                display: "block",
+                              }}
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).style.display = "none";
+                              }}
+                            />
+                            {qrImg && (
+                              <img
+                                src={qrImg}
+                                alt="qr"
+                                style={{
+                                  position: "absolute",
+                                  right: 12,
+                                  bottom: 12,
+                                  width: 84,
+                                  height: 84,
+                                  background: "#fff",
+                                  borderRadius: 10,
+                                  padding: 8,
+                                  border: "1px solid rgba(255,255,255,0.18)",
+                                }}
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                                }}
+                              />
+                            )}
+                          </div>
+                        )}
 
-                      <div className="loungeSubActions" style={{ marginTop: 16, justifyContent: "flex-start", gap: 10 }}>
-                        <button className="loungeSubBtn" onClick={() => startEdit(t)}>
-                          수정
-                        </button>
-                        <button className="loungeSubBtn" onClick={() => remove(t)} style={{ color: "#ff6b6b" }}>
-                          삭제
-                        </button>
+                        <div
+                          className="loungeSubActions"
+                          style={{ marginTop: 16, justifyContent: "flex-start", gap: 10 }}
+                        >
+                          <Link className="loungeSubBtn" to={`/tickets/issue?edit=${t.ticketId}`}>
+                            수정
+                          </Link>
+                          <button className="loungeSubBtn" onClick={() => remove(t)} style={{ color: "#ff6b6b" }}>
+                            삭제
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

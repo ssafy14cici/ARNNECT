@@ -5,7 +5,8 @@
   border-radius: 1rem;
   padding: 0.5rem;
   color: #141417;
-  font-family: sans-serif;
+  font-family: "Poppins", "Pretendard", "Noto Sans KR", sans-serif;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
 }
 .card__hero {
   background-color: #fef4e2;
@@ -67,11 +68,26 @@
   background-color: #141417;
   color: #fff;
   font-size: 1rem;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
 }
 @media (min-width: 340px) {
   .card__btn {
     width: max-content;
   }
+}
+
+.card__btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+}
+
+.card__btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.card__btn.danger {
+  background-color: #c62828;
 }
 
 .card__body {
@@ -118,11 +134,54 @@
     cursor: pointer;
 }
 
+/* Fan Letter Page */
+.fanletterPage {
+    padding: 20px 24px 40px;
+}
+
+.fanletterHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.fanletterTitle {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 0.02em;
+}
+
+.filters {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.filterBtn {
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.filterBtn:hover,
+.filterBtn.active {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.36);
+}
+
 /* Fan Letter List */
 .fanletter-card-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1.5rem;
+    gap: 1.2rem;
 }
 
 .fanletter-card {
@@ -169,4 +228,28 @@
     border-radius: 0.25rem;
     font-size: 0.75rem;
     font-weight: 600;
+}
+
+@media (max-width: 560px) {
+    .fanletterPage {
+        padding: 16px 14px 28px;
+    }
+
+    .fanletterHeader {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .fanletterTitle {
+        font-size: 22px;
+    }
+
+    .fanletter-card-list {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .card {
+        width: 100%;
+    }
 }
