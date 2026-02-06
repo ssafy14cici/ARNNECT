@@ -111,7 +111,7 @@ function SmartImage({
   );
 }
 
-export default function ?????Tab() {
+export default function PortfolioTab() {
   const { profile, isOwner } = useOutletContext<OutletCtx>();
 
   const [items, setItems] = useState<FeedItem[]>([]);
