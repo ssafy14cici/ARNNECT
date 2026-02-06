@@ -172,7 +172,6 @@ export default function Portfolio() {
     <main className="loungePage">
       <section className="loungeWrap">
         <div className="loungeSubTop">
-          <h1 className="loungeSubTitle">포트폴리오</h1>
 
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <button
@@ -183,10 +182,6 @@ export default function Portfolio() {
             >
               전시장 바로가기
             </button>
-
-            <Link className="loungeBackLink" to="/lounge">
-              ← 라운지로
-            </Link>
           </div>
         </div>
 

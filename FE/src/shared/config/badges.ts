@@ -49,7 +49,7 @@ export const BADGES: BadgeDef[] = [
     level: 3,
   },
 
-  // social
+  // 좋아요 변경예정
   {
     id: "social_lv1",
     name: "첫 팔로워",

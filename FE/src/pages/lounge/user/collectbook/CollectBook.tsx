@@ -70,11 +70,6 @@ export default function CollectBook() {
   return (
     <main className="loungePage">
       <section className="loungeWrap">
-        <div className="loungeSubTop">
-          <Link className="loungeBackLink" to="/lounge">
-            ← 라운지로
-          </Link>
-        </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", margin: "10px 0 14px" }}>
           <button
