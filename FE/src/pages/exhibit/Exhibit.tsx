@@ -144,13 +144,14 @@ export default function Exhibit() {
   const handlePrev = () => {
     if (!runtimeRef.current) return;
     const curr = runtimeRef.current.getIndex();
-    runtimeRef.current.goTo(curr - 1, 0.85);
+    runtimeRef.current.goTo(curr + 1, 0.85);
   };
+  
 
   const handleNext = () => {
     if (!runtimeRef.current) return;
     const curr = runtimeRef.current.getIndex();
-    runtimeRef.current.goTo(curr + 1, 0.85);
+    runtimeRef.current.goTo(curr - 1, 0.85);
   };
 
   // ✅ URL params에서 artistId 가져오기 (/exhibit/:artistId)
