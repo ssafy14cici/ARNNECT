@@ -5,7 +5,6 @@ import type { ArtistProfile, FeedItem } from "../../../features/profile/types";
 import { profileApi } from "../../../features/profile/api";
 import "../../profile/tabs/profileTabs.css";
 
-// ✅ 다른 페이지에서 쓰는 “이미지 정규화 + 인증 이미지(blob)” 유틸 재사용
 import { resolveMediaUrl, fetchImageAsObjectUrl } from "../../artworks/detail/utils";
 
 type OutletCtx = {
@@ -13,10 +12,6 @@ type OutletCtx = {
   isOwner: boolean;
 };
 
-/**
- * ✅ <img> src에 그대로 넣어보고,
- * 실패하면(fetch) blob objectURL로 fallback
- */
 function SmartImage({
   rawUrl,
   alt = "",
@@ -31,16 +26,13 @@ function SmartImage({
   const [src, setSrc] = useState<string>("");
   const [hidden, setHidden] = useState(false);
 
-  // objectURL revoke를 위해 추적
   const objectUrlRef = useRef<string | null>(null);
   const triedBlobRef = useRef(false);
 
-  // rawUrl이 바뀌면 초기화
   useEffect(() => {
     setHidden(false);
     triedBlobRef.current = false;
 
-    // 이전 objectURL 정리
     if (objectUrlRef.current) {
       try {
         URL.revokeObjectURL(objectUrlRef.current);
@@ -52,7 +44,6 @@ function SmartImage({
     setSrc(normalized || "");
   }, [rawUrl]);
 
-  // 언마운트 시 objectURL 정리
   useEffect(() => {
     return () => {
       if (objectUrlRef.current) {
@@ -65,10 +56,7 @@ function SmartImage({
   }, []);
 
   const onError = async () => {
-    // 1) 이미 숨김 처리했으면 끝
     if (hidden) return;
-
-    // 2) blob fallback을 이미 시도했으면 더는 반복하지 말고 숨김
     if (triedBlobRef.current) {
       setHidden(true);
       return;
@@ -76,14 +64,12 @@ function SmartImage({
 
     triedBlobRef.current = true;
 
-    // ✅ 인증 필요 이미지면 blob으로 받아서 objectURL로 표시
     const objUrl = await fetchImageAsObjectUrl(rawUrl ?? "");
     if (!objUrl) {
       setHidden(true);
       return;
     }
 
-    // 이전 objectURL 정리 후 새로 세팅
     if (objectUrlRef.current) {
       try {
         URL.revokeObjectURL(objectUrlRef.current);
@@ -93,10 +79,7 @@ function SmartImage({
     setSrc(objUrl);
   };
 
-  if (!src || hidden) {
-    // 여기서 placeholder를 넣고 싶으면 div로 대체 가능
-    return null;
-  }
+  if (!src || hidden) return null;
 
   return (
     <img
@@ -104,27 +87,28 @@ function SmartImage({
       alt={alt}
       className={className}
       style={style}
-      onError={() => {
-        // React onError는 sync라서 async를 감싸줌
-        void onError();
-      }}
+      onError={() => void onError()}
     />
   );
 }
 
 export default function PortfolioTab() {
-  /**
-   * ✅ 라운지 탭에서는 OutletContext가 없을 수 있음!
-   *    - 있으면 ctx.profile.id 사용
-   *    - 없으면 URL param(:artistId) 사용
-   */
   const ctx = useOutletContext<OutletCtx | undefined>();
-  const { artistId: artistIdParam } = useParams<{ artistId: string }>();
+  const params = useParams(); // ✅ 제네릭/키 고정하지 말고 통째로 받기
 
   const profile = ctx?.profile;
   const isOwner = ctx?.isOwner ?? false;
 
-  const profileId = profile?.id ?? (artistIdParam ? String(artistIdParam).trim() : "");
+  // ✅ 라우트 키가 뭐든(artistId/id/profileId/userId 등) 최대한 잡아내기
+  const paramArtistId =
+    (params as any)?.artistId ??
+    (params as any)?.id ??
+    (params as any)?.profileId ??
+    (params as any)?.userId ??
+    "";
+
+  const profileId = String(profile?.id ?? paramArtistId ?? "").trim();
+
   const profileNickname = (profile as any)?.nickname ?? "";
 
   const [items, setItems] = useState<FeedItem[]>([]);
@@ -134,11 +118,11 @@ export default function PortfolioTab() {
   useEffect(() => {
     let cancelled = false;
 
-    // ✅ artistId 없으면 호출 불가
+    // ✅ 여기서 막히면 “라우트에 id 자체가 없는 구조”임
     if (!profileId) {
       setItems([]);
       setLoading(false);
-      setError("작가 정보가 없습니다.");
+      setError("작가 정보가 없습니다. (라우트 파라미터 확인 필요)");
       return;
     }
 
@@ -147,7 +131,6 @@ export default function PortfolioTab() {
 
     (async () => {
       try {
-        // ✅ 이 탭은 "리스트"만 담당 (3D 전시는 별도 라우트에서)
         const page = await profileApi.getArtistFeed(profileId);
         if (!cancelled) setItems(page.items ?? []);
       } catch (e) {
@@ -178,8 +161,7 @@ export default function PortfolioTab() {
     );
   }
 
-  // ✅ Exhibit 라우트가 /exhibit/:artistId 라면 반드시 id를 붙여서 이동해야 함
-  const artistId = String(profileId ?? "").trim();
+  const artistId = profileId;
   const exhibitPath = artistId ? `/exhibit/${encodeURIComponent(artistId)}` : "/exhibit";
 
   return (
@@ -187,9 +169,7 @@ export default function PortfolioTab() {
       <div className="tab-header">
         <h3 className="tab-title">Portfolio</h3>
 
-        {/* ✅ 버튼 영역 */}
         <div style={{ display: "flex", gap: 8 }}>
-          {/* ✅ 관람자(일반 유저)도 3D 전시장 진입 가능하게 */}
           <Link
             to={exhibitPath}
             className="tab-btn"
@@ -204,10 +184,9 @@ export default function PortfolioTab() {
             3D 전시장 보기
           </Link>
 
-          {/* ✅ 작가 본인만 작품 추가 가능 */}
           {isOwner && (
             <Link to="/artworks/create" className="tab-btn">
-              Add Artwork
+              작품 등록
             </Link>
           )}
         </div>
@@ -220,49 +199,45 @@ export default function PortfolioTab() {
         </div>
       ) : (
         <div className="tab-grid-2">
-          {items.map((it) => {
-            const artworkId = it.id;
+          {items.map((it) => (
+            <article key={it.id} className="tab-card">
+              <Link
+                to={`/artworks/${it.id}`}
+                style={{ color: "inherit", textDecoration: "none", display: "block" }}
+              >
+                <div className="tab-card-body">
+                  <div className="tab-card-title" style={{ marginBottom: 8 }}>
+                    작품 #{it.id}
+                  </div>
 
-            return (
-              <article key={it.id} className="tab-card">
-                <Link
-                  to={`/artworks/${artworkId}`}
-                  style={{ color: "inherit", textDecoration: "none", display: "block" }}
-                >
-                  <div className="tab-card-body">
-                    <div className="tab-card-title" style={{ marginBottom: 8 }}>
-                      작품 #{it.id}
-                    </div>
-
-                    <div
+                  <div
+                    style={{
+                      width: "100%",
+                      aspectRatio: "4/3",
+                      overflow: "hidden",
+                      borderRadius: 12,
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      marginBottom: 10,
+                      background: "rgba(255,255,255,0.04)",
+                    }}
+                  >
+                    <SmartImage
+                      rawUrl={it.imageUrl}
+                      alt=""
                       style={{
                         width: "100%",
-                        aspectRatio: "4/3",
-                        overflow: "hidden",
-                        borderRadius: 12,
-                        border: "1px solid rgba(255,255,255,0.12)",
-                        marginBottom: 10,
-                        background: "rgba(255,255,255,0.04)",
+                        height: "100%",
+                        objectFit: "cover",
+                        display: "block",
                       }}
-                    >
-                      <SmartImage
-                        rawUrl={it.imageUrl}
-                        alt=""
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                          display: "block",
-                        }}
-                      />
-                    </div>
-
-                    <div className="tab-card-info">Created: {it.createdAt ?? "-"}</div>
+                    />
                   </div>
-                </Link>
-              </article>
-            );
-          })}
+
+                  <div className="tab-card-info">등록일: {it.createdAt ?? "-"}</div>
+                </div>
+              </Link>
+            </article>
+          ))}
         </div>
       )}
     </div>
