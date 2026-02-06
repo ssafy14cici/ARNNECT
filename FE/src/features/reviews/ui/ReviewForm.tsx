@@ -8,6 +8,23 @@ type Props = {
   onSubmit: (data: ReviewCreateReq) => Promise<void> | void;
 };
 
+// 기본 이미지 목록
+const DEFAULT_IMAGES = [
+  "/review_basic/basic_1.png",
+  "/review_basic/basic_2.jpg",
+  "/review_basic/basic_3.jpg",
+  "/review_basic/basic_4.jpg",
+];
+
+// 랜덤 기본 이미지를 File 객체로 가져오는 함수
+async function getRandomDefaultImage(): Promise<File> {
+  const randomImage = DEFAULT_IMAGES[Math.floor(Math.random() * DEFAULT_IMAGES.length)];
+  const response = await fetch(randomImage);
+  const blob = await response.blob();
+  const filename = randomImage.split("/").pop() || "default.jpg";
+  return new File([blob], filename, { type: blob.type });
+}
+
 export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
   const [imageFile, setImageFile] = useState<File | null>(initial?.imageFile ?? null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
@@ -42,7 +59,7 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
   };
 
   const validate = () => {
-    if (!imageFile) return "이미지를 선택해주세요.";
+    // 이미지는 선택사항으로 변경
     if (!reviewTitle.trim()) return "제목을 입력해주세요.";
     if (!reviewText.trim()) return "내용을 입력해주세요.";
 
@@ -57,12 +74,23 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
     const err = validate();
     if (err) return alert(err);
 
+    // 이미지가 없으면 랜덤 기본 이미지 사용
+    let finalImageFile = imageFile;
+    if (!finalImageFile) {
+      try {
+        finalImageFile = await getRandomDefaultImage();
+      } catch (error) {
+        console.error("Failed to load default image:", error);
+        return alert("기본 이미지를 불러오는데 실패했습니다.");
+      }
+    }
+
     const payload: ReviewCreateReq = {
       title: reviewTitle.trim(),
       content: reviewText.trim(),
       artworkId: Number(artworkId),
-      tags: parsedTags,            // ✅ 항상 보냄(없으면 [])
-      imageFile: imageFile!,       // validate에서 체크
+      tags: parsedTags,
+      imageFile: finalImageFile,
     };
 
     await onSubmit(payload);
