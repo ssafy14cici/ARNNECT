@@ -1,13 +1,35 @@
+// FE/src/pages/lounge/artist/Portfolio.tsx
+
 import { Link, useNavigate } from "react-router-dom";
 import "../lounge.css";
+
+// ✅ AuthStore에서 내 memberUuid 가져오기
+import { useAuthStore } from "../../../features/auth/store";
 
 export default function Portfolio() {
   const nav = useNavigate();
 
+  // ✅ (중요) 여기 user 구조가 다르면 필드명만 맞춰줘
+  // 예: s.user?.memberUuid, s.user?.member_id, s.user?.uuid ...
+  const myUuid = useAuthStore((s) => s.user?.memberUuid);
+  const myNickname = useAuthStore((s) => s.user?.nickname ?? "");
+
   const goExhibit = () => {
-    // ✅ 공용 전시장(/exhibit)로 이동
-    // 필요하면 state로 "어디서 왔는지" 정도만 넘겨두면 디버깅이 편함
-    nav("/exhibit", { state: { from: "lounge-portfolio" } });
+    // ✅ /exhibit/:artistId 라우트가 필수라서 반드시 uuid 붙여야 함
+    if (!myUuid) {
+      console.warn("[Portfolio] myUuid is missing. Check auth store user shape.");
+      // 필요하면 토스트/알럿 처리
+      return;
+    }
+
+    nav(`/exhibit/${myUuid}`, {
+      state: {
+        from: "lounge-portfolio",
+        artist: myNickname,
+        artworkTitle: "PORTFOLIO",
+        fromWaypointId: 0,
+      },
+    });
   };
 
   return (
@@ -47,8 +69,7 @@ export default function Portfolio() {
           </div>
 
           <div className="loungeSubActions" style={{ justifyContent: "center" }}>
-            {/* ✅ posts/create는 지금 리다이렉트 로직도 섞여있어서 혼란 원인
-                작가 작품 등록은 라우터 기준 /artworks/create 로 고정 추천 */}
+            {/* ✅ 작가 작품 등록 라우트 고정 */}
             <Link
               to="/artworks/create"
               className="loungeSubBtn"
