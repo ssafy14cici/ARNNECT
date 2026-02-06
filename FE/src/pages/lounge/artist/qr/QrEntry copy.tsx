@@ -29,7 +29,7 @@ export default function QrEntry() {
 
   const preview = useMemo<PreviewItem[]>(
     () =>
-      (issued ?? []).slice(0, 3).map((t) => ({
+      issued.slice(0, 3).map((t) => ({
         ticketId: t.ticketId,
         ticketCode: t.ticketCode,
         title: t.title ?? "",
@@ -64,68 +64,32 @@ export default function QrEntry() {
     };
   }, [artistUuid, reloadIssued]);
 
-  const goIssue = () => nav("/tickets/issue"); // ✅ 실제 발급/관리 라우트로 맞춰
-  const goManage = () => nav("/tickets/issue");
-
-  const hasTickets = preview.length > 0;
-
   return (
     <div className="qr-page">
       <header className="qr-head">
         <h1 className="qr-title">QR 발급</h1>
-        <p className="qr-sub">전시 QR을 발급하고 관리할 수 있습니다.</p>
+        <p className="qr-sub">우측 하단 카메라 버튼을 눌러 QR 발급/수정 화면으로 이동하세요.</p>
       </header>
 
-      {/* 상태/에러 */}
       {busy && <div className="qr-state">불러오는 중...</div>}
       {!busy && error && <div className="qr-error">{error}</div>}
 
-      {/* 로그인 안 됨 */}
-      {!busy && !error && !artistUuid ? (
-        <section className="qr-empty">
-          <div className="qr-empty-box">
-            <div className="qr-empty-icon">🔒</div>
-            <div className="qr-empty-text">
-              로그인 정보가 없습니다.
-              <br />
-              로그인 후 다시 시도해주세요.
-            </div>
-
-            <div style={{ marginTop: 14, display: "flex", justifyContent: "center" }}>
-              <button type="button" className="qr-cta" onClick={() => nav("/login")}>
-                로그인하러 가기 →
-              </button>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      {/* 발급 내역 없음 */}
-      {!busy && !error && artistUuid && !hasTickets ? (
+      {!busy && !error && preview.length === 0 ? (
         <section className="qr-empty">
           <div className="qr-empty-box">
             <div className="qr-empty-icon">🧾</div>
             <div className="qr-empty-text">
               아직 발급된 QR이 없습니다.
               <br />
-              지금 등록(발급)해보세요.
-            </div>
-
-            <div style={{ marginTop: 14, display: "flex", justifyContent: "center" }}>
-              <button type="button" className="qr-cta" onClick={goIssue}>
-                QR 등록하기 →
-              </button>
+              카메라 버튼을 눌러 발급을 시작하세요.
             </div>
           </div>
         </section>
-      ) : null}
-
-      {/* 발급 내역 있음 */}
-      {!busy && !error && artistUuid && hasTickets ? (
+      ) : (
         <section className="qr-preview">
           <div className="qr-preview-head">
             <div className="qr-preview-title">최근 발급</div>
-            <button type="button" className="qr-link" onClick={goManage}>
+            <button type="button" className="qr-link" onClick={() => nav("/tickets/issue")}>
               전체 관리 →
             </button>
           </div>
@@ -136,8 +100,8 @@ export default function QrEntry() {
                 key={t.ticketCode}
                 type="button"
                 className="qr-card"
-                onClick={goManage}
-                aria-label={`${t.title || "Untitled"} QR 관리로 이동`}
+                onClick={() => nav("/tickets/issue")}
+                aria-label={`${t.title} QR 관리로 이동`}
               >
                 <div className="qr-card-top">
                   <div className="qr-card-title">{t.title || "Untitled"}</div>
@@ -151,7 +115,7 @@ export default function QrEntry() {
                   </div>
                 </div>
 
-                {t.ticketImageName ? (
+                {t.ticketImageName && (
                   <img
                     className="qr-card-poster"
                     src={resolveTicketMedia(t.ticketImageName)}
@@ -160,15 +124,15 @@ export default function QrEntry() {
                       (e.currentTarget as HTMLImageElement).style.display = "none";
                     }}
                   />
-                ) : null}
+                )}
               </button>
             ))}
           </div>
         </section>
-      ) : null}
+      )}
 
-      {/* ✅ FAB: 내역 있든 없든 “발급/관리” 진입점 */}
-      <button type="button" className="qr-fab" onClick={goIssue} aria-label="QR 발급/수정 화면으로 이동">
+      {/* 우측 하단 FAB */}
+      <button type="button" className="qr-fab" onClick={() => nav("/tickets/issue")} aria-label="QR 발급/수정 화면으로 이동">
         <span className="qr-fab-icon">📷</span>
       </button>
     </div>
