@@ -258,14 +258,6 @@ export default function TicketQr() {
         <div className="loungeSubTop" style={{ position: "relative", zIndex: 100, pointerEvents: "auto" }}>
           <h1 className="loungeSubTitle">QR Ticket Manager</h1>
           <div style={{ pointerEvents: "auto" }}>
-            <button
-              type="button"
-              className="loungeBackLink"
-              onClick={() => nav("/lounge")}
-              style={{ background: "none", border: "none", cursor: "pointer" }}
-            >
-              ← Back to Lounge
-            </button>
           </div>
         </div>
 

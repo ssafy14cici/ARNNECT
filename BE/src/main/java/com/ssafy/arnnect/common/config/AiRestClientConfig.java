@@ -6,20 +6,16 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
 @Configuration
-public class RestClientConfig {
+public class AiRestClientConfig {
 
-    @Value("${remind.ai.url}")
+    @Value("${recommend.ai.url}")
     String url;
 
-    @Value("${remind.ai.key}")
-    String key;
-
-    @Bean(name = "remindRestClient")
-    public RestClient restClient(RestClient.Builder builder) {
+    @Bean(name = "recommendRestClient")
+    public RestClient recommendRestClient(RestClient.Builder builder) {
         return builder
                 .baseUrl(url)
-                .defaultHeader("Content-Type","application/json")
-                .defaultHeader("Authorization", "Bearer " + key)
+                .defaultHeader("Content-Type", "application/json")
                 .build();
     }
 }

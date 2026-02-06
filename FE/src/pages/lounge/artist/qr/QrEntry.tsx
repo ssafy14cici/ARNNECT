@@ -1,7 +1,7 @@
 // FE/src/pages/lounge/artist/qr/QrEntry.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "./qr.css";
+import "../../lounge.css";
 
 import { useIssuedTickets } from "./useIssuedTickets";
 import { useAuthStore } from "../../../../features/auth/store";

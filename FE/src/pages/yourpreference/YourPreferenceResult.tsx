@@ -1,10 +1,11 @@
+// FE/src/pages/yourpreference/YourPreferenceResult.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { useAuthStore } from "../../features/auth/store";
 import { usePreferenceStore, type ResultData } from "./preferenceStore";
 import { postPreference } from "./preferenceApi";
-import { resolveMbtiProfile } from "./mbtiProfiles";
+import { resolveMbtiProfile, buildFallbackProfile } from "./mbtiProfiles";
 
 import "./yourpreference.css";
 
@@ -67,13 +68,17 @@ export default function YourPreferenceResult() {
           sleep(900), // UX용 최소 로딩 시간(원치 않으면 제거)
         ]);
 
-        const profile = resolveMbtiProfile(mbtiCode);
-        if (!profile) {
-          throw new Error(`MBTI 매핑 실패: ${mbtiCode}`);
+        // ✅ 여기부터가 핵심 수정:
+        // - 매핑이 없으면 throw 하지 말고 fallback으로라도 결과 화면은 보여주기
+        const profile = resolveMbtiProfile(mbtiCode) ?? buildFallbackProfile(mbtiCode);
+
+        // 프로필 누락이면 콘솔 경고만 남김(UX는 살림)
+        if (!resolveMbtiProfile(mbtiCode)) {
+          console.warn("[YourPreferenceResult] MBTI profile missing:", mbtiCode);
         }
 
         const next: ResultData = {
-          mbti: mbtiCode,
+          mbti: String(mbtiCode ?? "").trim(), // 서버가 string 아니어도 안전하게 표시
           title: profile.title,
           tagline: profile.tagline,
           description: profile.description,

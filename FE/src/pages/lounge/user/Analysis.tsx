@@ -217,12 +217,6 @@ export default function Analysis() {
   return (
     <main className="loungePage">
       <section className="loungeWrap">
-        <div className="loungeSubTop">
-          <Link className="loungeBackLink" to="/lounge">
-            ← 라운지로
-          </Link>
-        </div>
-
         <div className="tasteSection">
           {/* ===== Top 6 ===== */}
           <section className="tasteCard tasteChartCard">

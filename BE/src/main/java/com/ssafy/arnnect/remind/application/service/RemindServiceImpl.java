@@ -12,6 +12,7 @@ import com.ssafy.arnnect.review.application.dto.response.ReviewQuizResponse;
 import com.ssafy.arnnect.review.repository.ReviewRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -21,12 +22,21 @@ import java.util.Collections;
 import java.util.List;
 @Slf4j
 @Service
-@RequiredArgsConstructor
+// @RequiredArgsConstructor  ← 제거!
 public class RemindServiceImpl implements RemindService {
 
     private final RestClient restClient;
     private final ReviewRepository repository;
     private final MemberService memberService;
+
+    public RemindServiceImpl(
+            @Qualifier("remindRestClient") RestClient restClient,
+            ReviewRepository repository,
+            MemberService memberService) {
+        this.restClient = restClient;
+        this.repository = repository;
+        this.memberService = memberService;
+    }
 
     @Value("${remind.ai.version}")
     private String version;

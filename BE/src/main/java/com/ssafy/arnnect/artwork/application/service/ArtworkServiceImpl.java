@@ -1,7 +1,6 @@
 package com.ssafy.arnnect.artwork.application.service;
 
-import com.ssafy.arnnect.artwork.application.dto.request.CreateArtworkRequest;
-import com.ssafy.arnnect.artwork.application.dto.request.UpdateArtworkRequest;
+import com.ssafy.arnnect.artwork.application.dto.request.*;
 import com.ssafy.arnnect.artwork.application.dto.response.*;
 import com.ssafy.arnnect.artwork.domain.entity.*;
 import com.ssafy.arnnect.artwork.repository.*;
@@ -10,21 +9,38 @@ import com.ssafy.arnnect.common.exception.ErrorCode;
 import com.ssafy.arnnect.common.file.FileStorageService;
 import com.ssafy.arnnect.common.file.FileType;
 import com.ssafy.arnnect.common.logs.UserLogAction;
+import com.ssafy.arnnect.common.logs.UserLogActionDto;
+import com.ssafy.arnnect.common.logs.UserLogService;
 import com.ssafy.arnnect.common.logs.UserLoggable;
 import com.ssafy.arnnect.member.application.service.MemberService;
 import com.ssafy.arnnect.member.domain.entity.Member;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
+//@RequiredArgsConstructor
 public class ArtworkServiceImpl implements ArtworkService{
+
+//    private final ArtworkRepository repository;
+//    private final FieldRepository fieldRepository;
+//    private final GenreRepository genreRepository;
+//    private final TagRepository tagRepository;
+//    private final ArtworkTagRepository artworkTagRepository;
+//    private final FavoriteRepository favoriteRepository;
+//    private final MemberService memberService;
+//    private final FileStorageService fileService;
+//    private final UserLogService logService;
+//    @Qualifier("recommendRestClient")
+//    private final RestClient restClient;
+
 
     private final ArtworkRepository repository;
     private final FieldRepository fieldRepository;
@@ -34,6 +50,33 @@ public class ArtworkServiceImpl implements ArtworkService{
     private final FavoriteRepository favoriteRepository;
     private final MemberService memberService;
     private final FileStorageService fileService;
+    private final UserLogService logService;
+
+    private final RestClient restClient;
+
+    public ArtworkServiceImpl(
+            ArtworkRepository repository,
+            FieldRepository fieldRepository,
+            GenreRepository genreRepository,
+            TagRepository tagRepository,
+            ArtworkTagRepository artworkTagRepository,
+            FavoriteRepository favoriteRepository,
+            MemberService memberService,
+            FileStorageService fileService,
+            UserLogService logService,
+            @Qualifier("recommendRestClient") RestClient restClient) {
+        this.repository = repository;
+        this.fieldRepository = fieldRepository;
+        this.genreRepository = genreRepository;
+        this.tagRepository = tagRepository;
+        this.artworkTagRepository = artworkTagRepository;
+        this.favoriteRepository = favoriteRepository;
+        this.memberService = memberService;
+        this.fileService = fileService;
+        this.logService = logService;
+        this.restClient = restClient;
+    }
+
 
     @Override
     @Transactional
@@ -96,10 +139,22 @@ public class ArtworkServiceImpl implements ArtworkService{
     }
 
     @Override
-    public List<ArtworkResponse> getArtworkList() {
-        List<ArtworkResponse> response = repository.findAllOrderDesc();
-        response.forEach(r -> r.updateUrl(fileService.getBaseDir(FileType.ARTWORK)));
-        return response;
+    public List<ArtworkResponse> getArtworkList(String memberUuid) {
+        if(memberUuid != null){
+            List<ArtworkResponse> response =
+                    recommend(memberUuid, logService.getUserLogs(memberUuid));
+
+            response.forEach(r ->
+                    r.updateUrl(fileService.getBaseDir(FileType.ARTWORK))
+            );
+
+            return response;
+        }else{
+            //비회원
+            List<ArtworkResponse> response = repository.findAllOrderDesc();
+            response.forEach(r -> r.updateUrl(fileService.getBaseDir(FileType.ARTWORK)));
+            return response;
+        }
     }
 
     @Override
@@ -190,4 +245,56 @@ public class ArtworkServiceImpl implements ArtworkService{
 
         artworkTagRepository.saveAll(allArtworkTags);
     }
+    private List<ArtworkResponse> recommend(
+            String memberUuid,
+            List<UserLogActionDto> logs
+    ) {
+        // 1. UserLog → AI Action
+        List<AiActionDto> actions = logs.stream()
+                .map(log -> new AiActionDto(
+                        log.getArtworkId(),
+                        log.getAction()
+                ))
+                .toList();
+
+        // 2. AI 요청 DTO 구성 (중요)
+        AiInputDataDto inputData =
+                new AiInputDataDto(memberUuid, actions);
+
+        AiWrapperRequestDto request =
+                new AiWrapperRequestDto(inputData);
+
+        log.info("request : {}", request.toString());
+        AiRecommendResponseDto aiResponse = restClient.post()
+                .uri("/recommend")
+                .body(request)
+                .retrieve()
+                .body(AiRecommendResponseDto.class);
+        log.info("aiResponse : {}", aiResponse.getRecommends().toString());
+        // 방어 코드
+        if (aiResponse == null || aiResponse.getRecommends() == null) {
+            return List.of();
+        }
+
+        // 3. 추천 artworkId 추출 (String)
+        List<String> artworkIds = aiResponse.getRecommends().stream()
+                .map(AiRecommendationDto::getArtworkId)
+                .toList();
+
+
+        // 4. DB 조회
+        List<ArtworkResponse> responses =
+                repository.findByArtworkIdIn(artworkIds.stream()
+                        .map(Long::parseLong)
+                        .toList());
+
+
+
+        responses.forEach(r ->
+                r.updateUrl(fileService.getBaseDir(FileType.ARTWORK))
+        );
+
+        return responses;
+    }
+
 }

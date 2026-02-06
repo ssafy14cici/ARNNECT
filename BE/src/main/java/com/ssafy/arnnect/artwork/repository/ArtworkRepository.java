@@ -116,4 +116,20 @@ public interface ArtworkRepository extends JpaRepository<Artwork, Long> {
     """)
     List<Long> findGenreIdsByArtworkIds(List<Long> artworkIds);
 
+    @Query(value = """
+    SELECT 
+        a.artwork_id,
+        m.member_uuid,
+        m.nickname,
+        a.title,
+        a.saved_image_name as image_url,
+        (SELECT COUNT(*)
+         FROM favorite_artwork fa
+         WHERE fa.artwork_id = a.artwork_id AND fa.is_favorite = 1) as like_count
+    FROM artwork a
+    LEFT JOIN member m ON m.member_id = a.member_id
+    WHERE a.is_deleted = false
+      AND a.artwork_id IN :artworkIds
+    """, nativeQuery = true)
+    List<ArtworkResponse> findByArtworkIdIn(@Param("artworkIds") List<Long> artworkIds);
 }
