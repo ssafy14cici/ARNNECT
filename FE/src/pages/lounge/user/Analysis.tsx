@@ -218,13 +218,10 @@ export default function Analysis() {
     <main className="loungePage">
       <section className="loungeWrap">
         <div className="loungeSubTop">
-          <h1 className="loungeSubTitle">취향분석</h1>
           <Link className="loungeBackLink" to="/lounge">
             ← 라운지로
           </Link>
         </div>
-
-        <p className="loungeSubDesc">활동(좋아요/조회/스캔 등)을 기반으로 취향을 요약합니다.</p>
 
         <div className="tasteSection">
           {/* ===== Top 6 ===== */}

@@ -120,7 +120,6 @@ function buildArtworkIdImageCandidates(artworkId: number | string): string[] {
   const id = String(artworkId ?? "").trim();
   if (!id) return [];
 
-  // ✅ 여기 후보들 중 하나가 실제로 200 + image/* 를 내려줘야 함
   return [
     resolveApiUrl(`/api/v1/artworks/${encodeURIComponent(id)}/image`),
     resolveApiUrl(`/api/v1/artworks/${encodeURIComponent(id)}/thumbnail`),
@@ -132,7 +131,6 @@ async function isImageUrlOk(url: string): Promise<boolean> {
   const u = String(url ?? "").trim();
   if (!u) return false;
 
-  // data/blob은 ok 취급
   if (u.startsWith("data:") || u.startsWith("blob:")) return true;
 
   // HEAD 우선 (안 되면 GET Range로 fallback)
@@ -140,7 +138,7 @@ async function isImageUrlOk(url: string): Promise<boolean> {
     const r = await fetch(u, { method: "HEAD", cache: "no-store" });
     if (!r.ok) return false;
     const ct = (r.headers.get("content-type") ?? "").toLowerCase();
-    if (!ct) return true; // 서버가 content-type 안 주는 경우도 있어서 ok로 봄
+    if (!ct) return true;
     return ct.startsWith("image/");
   } catch {
     // ignore
@@ -163,12 +161,9 @@ async function isImageUrlOk(url: string): Promise<boolean> {
 
 /**
  * ✅ 한 작품에 대해 “실제로 로드 가능한” 이미지 URL을 고르는 함수
- * - artworkId 기반 후보를 먼저 검사
- * - 안 되면 기존(savedImageName 등) 규칙으로 fallback
- * - 그것도 안 되면 placeholder
  */
 async function resolveArtworkImageUrl(
-  artwork: { artworkId: number; imageUrl?: string; savedImageName?: string },
+  artwork: { artworkId: number | string; imageUrl?: string; savedImageName?: string },
   idxForLabel: number
 ): Promise<string> {
   // 1) artworkId 기반 우선
@@ -178,7 +173,7 @@ async function resolveArtworkImageUrl(
   }
 
   // 2) fallback (기존 규칙: imageUrl or savedImageName)
-  const raw = String((artwork.imageUrl ?? artwork.savedImageName ?? "")).trim();
+  const raw = String(artwork.imageUrl ?? artwork.savedImageName ?? "").trim();
   if (raw) {
     const legacy = buildNewArtistImageUrl(raw);
     if (legacy && (legacy.startsWith("data:") || legacy.startsWith("blob:") || (await isImageUrlOk(legacy)))) {
@@ -196,7 +191,9 @@ export function mountMuseumApp(args: {
   onExitToExterior?: () => void;
   onEnteredToHall?: (startWaypointId: number) => void;
   introOnly?: boolean;
-  onOpenArtwork?: (artworkId: number) => void;
+
+  // ✅ React에서 navigate(`/artworks/${id}`) 같은 걸 꽂기 위해 넓혀둠
+  onOpenArtwork?: (artworkId: string | number) => void;
 }) {
   const canvas = args.canvas;
   const uiRoot = args.uiRoot ?? document.body;
@@ -361,7 +358,7 @@ export function mountMuseumApp(args: {
     }
   }
 
-  // ✅ gallery5.glb는 EX_PANEL_1 ~ EX_PANEL_11 기준으로 쓰고 있음(너가 mapping도 11개만 둠)
+  // ✅ gallery5.glb는 EX_PANEL_1 ~ EX_PANEL_11 기준
   const EXHIBIT_PANEL_COUNT = 11;
 
   async function startExhibit(payload: ExhibitPayload) {
@@ -404,26 +401,35 @@ export function mountMuseumApp(args: {
           panelName: `EX_PANEL_${i + 1}`,
           imageUrl: makePlaceholderDataUrl(`EMPTY ${i + 1}`),
           title: `EMPTY ${i + 1}`,
-          artworkId: -1,
+          artworkId: undefined,
         }));
       } else {
         // ✅ URL “실제 로드 가능” 판별해서 안전하게 채우기
-        const resolvedUrls = await Promise.all(
+        const resolved = await Promise.all(
           Array.from({ length: EXHIBIT_PANEL_COUNT }, async (_, i) => {
             const a = list[i % list.length];
             const url = await resolveArtworkImageUrl(
-              { artworkId: a.artworkId, imageUrl: a.imageUrl, savedImageName: a.savedImageName },
+              {
+                artworkId: a.artworkId,
+                imageUrl: a.imageUrl,
+                savedImageName: a.savedImageName,
+              },
               i
             );
-            return { url, artworkId: a.artworkId, title: a.title || `작품 ${i + 1}` };
+
+            return {
+              url,
+              artworkId: a.artworkId,
+              title: a.title || `작품 ${i + 1}`,
+            };
           })
         );
 
-        panelItems = resolvedUrls.map((r, i) => ({
+        panelItems = resolved.map((r, i) => ({
           panelName: `EX_PANEL_${i + 1}`,
           imageUrl: r.url,
           title: r.title,
-          artworkId: r.artworkId, // ✅ 여기로 넘어가야 exhibitRoom에서 클릭 시 __artworkId가 세팅됨
+          artworkId: r.artworkId, // ✅ 이게 있어야 exhibitRoom에서 __artworkId 세팅됨
         }));
       }
 
@@ -436,20 +442,22 @@ export function mountMuseumApp(args: {
         panelName: `EX_PANEL_${i + 1}`,
         imageUrl: makePlaceholderDataUrl(`OFFLINE ${i + 1}`),
         title: `OFFLINE ${i + 1}`,
-        artworkId: -1,
+        artworkId: undefined,
       }));
     }
 
     exhibitRuntime = await mountExhibitRoom(canvas, {
       glbUrl: asset("museum/models/gallery/gallery5.glb"),
 
-      // ✅ 너 코드에 이미 넘기고 있었음 → exhibitRoom 쪽에서도 옵션으로 받아서 처리하도록 아래 파일에서 추가함
       resetRootTransform: true,
 
       uiMount,
       autoFitIfOff: true,
       debug: true,
+
       titleText: `${payload.artist} — ${payload.artworkTitle}`,
+      artistId: payload.artistId,
+
       panelItems,
 
       onExitToHall: () => {
@@ -457,10 +465,10 @@ export function mountMuseumApp(args: {
         startMainHall(payload.fromWaypointId ?? DEFAULT_HALL_START_WP);
       },
 
-      // ✅ 이제 panelItems에 artworkId가 들어가서 여기 콜백이 정상적으로 타게 됨
+      // ✅ exhibitRoom 모달의 "작품 상세보기" → 여기로 들어옴 → React 라우팅 콜백 실행
       onOpenArtwork: (artworkId) => {
         console.log("[museum] onOpenArtwork:", artworkId);
-        args.onOpenArtwork?.(Number(artworkId));
+        args.onOpenArtwork?.(artworkId);
       },
     });
   }

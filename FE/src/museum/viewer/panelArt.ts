@@ -5,6 +5,7 @@ export type PanelArtItem = {
   panelName: string; // ex) "ART_1"
   imageUrl: string;  // ex) "/artwork/xxx.jpg" or dataURL
   title: string;     // ex) "최수원"
+  artworkId?: string | number;
 };
 
 export type AttachPanelArtArgs = {
