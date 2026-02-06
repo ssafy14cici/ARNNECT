@@ -19,6 +19,9 @@
   position: relative;
   overflow: hidden;
   background: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   /* 모서리를 살짝 둥글게 할지, Lumen처럼 각지게 할지 결정 (여기선 각지게) */
   border-radius: 0;
 }
@@ -51,6 +54,8 @@
   color: #444;
   font-size: 0.8rem;
   letter-spacing: 0.1em;
+  background: #111;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
 }
 
 /* --- 2. Badge --- */
@@ -160,7 +165,7 @@
 
 .feed-card.mode-grid .card-img-box {
   width: 100%;
-  aspect-ratio: 1 / 1.2; /* 세로형 비율 */
+  aspect-ratio: 4 / 3; /* 세로형 비율 */
 }
 
 /* LIST MODE 스타일 */
@@ -175,7 +180,7 @@
 
 .feed-card.mode-list .card-img-box {
   width: 280px; /* 고정 너비 */
-  aspect-ratio: 16 / 9; /* 와이드 비율 */
+  aspect-ratio: 4 / 3; /* 와이드 비율 */
   flex-shrink: 0;
 }
 
@@ -200,6 +205,6 @@
 
   .feed-card.mode-list .card-img-box {
     width: 100%;
-    aspect-ratio: 16 / 9;
+    aspect-ratio: 4 / 3;
   }
 }

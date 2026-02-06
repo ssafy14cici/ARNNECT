@@ -369,15 +369,15 @@ export default function ArtworkDetailView(props: Props) {
                 </>
               ) : (
                 <>
-                  <div className="like-count-only" aria-label={`??? ${likeCount}?`}>
-                    <span>???</span>
+                  <div className="like-count-only" aria-label={`♥ ${likeCount}?`}>
+                    <span>좋아요</span>
                     <strong>{likeCount}</strong>
                   </div>
                   <button className="btn-icon" type="button" onClick={onGoEdit}>
-                    ??
+                    수정
                   </button>
                   <button className="btn-icon danger" type="button" onClick={onDeleteArtwork}>
-                    ??
+                    삭제
                   </button>
                 </>
               )}

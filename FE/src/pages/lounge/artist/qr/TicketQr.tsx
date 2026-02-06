@@ -128,7 +128,7 @@ export default function TicketQr() {
   const nav = useNavigate();
   const [params] = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState<TabMode>("ISSUE");
+  const [activeTab, setActiveTab] = useState<TabMode>("LIST");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -342,7 +342,13 @@ export default function TicketQr() {
                       <div
                         key={t.ticketId}
                         className="tasteCard"
-                        style={{ padding: 24, border: "1px solid rgba(255,255,255,0.1)" }}
+                        onClick={() => startEdit(t)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") startEdit(t);
+                        }}
+                        style={{ padding: 24, border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer" }}
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                           <div style={{ fontWeight: 700 }}>
