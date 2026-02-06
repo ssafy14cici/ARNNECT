@@ -2,31 +2,24 @@ FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
 
 WORKDIR /workspace
 
-# 1. 시스템 패키지 설치
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
-
-# 2. 파이썬 라이브러리 설치 (캐싱 효율을 위해 가장 먼저 수행)
+# 1. 패키지 설치
+RUN apt-get update && apt-get install -y git wget && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 3. 필요한 폴더 구조 생성 (빈 폴더)
-# artifacts 폴더는 복사하는 게 아니라, 빈 공간만 만들어둡니다.
-RUN mkdir -p artifacts && mkdir -p artifacts/chroma_db
+# 2. [핵심] 파일을 '안전 지대'(/opt)로 복사 (여기는 볼륨이 안 덮음)
+COPY artifacts/ /opt/artifacts_base/
 
-# 4. [핵심] 필요한 파일만 콕 집어서 복사 (화이트리스트 방식)
+# 3. 소스코드 복사
 COPY service.py .
 COPY bentofile.yaml .
-COPY .env.example .
-COPY README.md .
-COPY Dockerfile .
+COPY app/ /workspace/app/
 
-# 5. 필요한 폴더(소스코드) 복사
-COPY app ./app
-
-# 참고: scripts 폴더는 복사 목록에 없으므로 제외됩니다.
+# 4. 확인용 (빌드할 때 잘 들어갔나 눈으로 확인)
+RUN echo "=== Check Backup Artifacts ===" && ls -R /opt/artifacts_base
 
 EXPOSE 8000
 
-# [주의] 아래 명령어의 'service:svc' 부분은 service.py 안의 클래스 이름과 맞춰야 합니다.
-# (예: service:RecommenderService)
-CMD ["bentoml", "serve", "service:RecommenderService", "--host", "0.0.0.0", "--port", "8000"]
+# 5. [중요] 시작할 때 안전 지대에서 -> 실행 폴더로 파일 복사
+# (이미 파일이 있으면 덮어쓰지 않도록 -n 옵션 사용 가능, 여기선 강제 복사 -r 사용)
+CMD ["bash", "-c", "cp -r /opt/artifacts_base/* /workspace/artifacts/ 2>/dev/null || : && bentoml serve service:RecoService --host 0.0.0.0 --port 8000"]

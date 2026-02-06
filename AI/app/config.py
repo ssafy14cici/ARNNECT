@@ -34,7 +34,7 @@ class Settings:
     n_layers: int = int(os.getenv("N_LAYERS", "2"))
     ff_dim: int = int(os.getenv("FF_DIM", "2048"))
     dropout: float = float(os.getenv("DROPOUT", "0.1"))
-    num_actions: int = int(os.getenv("NUM_ACTIONS", "7"))
+    num_actions: int = int(os.getenv("NUM_ACTIONS", "8"))
 
     # Serving
     device: str = os.getenv("DEVICE", "cuda" if os.getenv("CUDA_VISIBLE_DEVICES") else "cpu")

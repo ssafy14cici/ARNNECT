@@ -86,11 +86,24 @@ class LoadedModels:
     sasrec: Optional[VectorSASRec]
     twotower: Optional[TwoTowerAlign]
 
+def _load_state_dict_from_file(path: str, key_hint: str = "state_dict") -> Dict[str, Any]:
+    print(f"📂 Loading: {path}")
+    ckpt = torch.load(path, map_location="cpu")
+    if isinstance(ckpt, dict):
+        if key_hint in ckpt:
+            return ckpt[key_hint]
+        if "state_dict" in ckpt:
+            return ckpt["state_dict"]
+        if "model_state_dict" in ckpt:
+            return ckpt["model_state_dict"]
+    return ckpt
+
 def load_models(
     sasrec_ckpt: Optional[Path],
     twotower_ckpt: Optional[Path],
     *,
     device: str,
+    # config params
     num_items: int,
     max_len: int,
     d_model: int,
@@ -101,59 +114,54 @@ def load_models(
     num_actions: int,
     item_vec_dim: int = 512,
 ) -> LoadedModels:
+    
     sasrec = None
     twotower = None
 
     print("\n" + "="*40)
-    print("🔧 [Model Loader] 모델 로딩 시작 (Deployment Mode)")
+    print("🔧 [Model Loader] V17 Notebook 호환 로딩 시작")
 
-    # 1. SASRec 로딩
+    # 1. SASRec
     if sasrec_ckpt and Path(sasrec_ckpt).exists():
         try:
+            # V17 노트북 파라미터 매핑
             sasrec = VectorSASRec(
-                num_items=num_items,
-                d_model=d_model,
-                n_heads=n_heads,
-                n_layers=n_layers,
-                ff_dim=ff_dim,
-                dropout=dropout,
-                max_len=max_len,
+                clip_dim=item_vec_dim,    # config.d_model (512)
+                hidden_dim=d_model,       # config.d_model (512)
                 num_actions=num_actions,
-                item_vec_dim=item_vec_dim,
+                n_layers=n_layers,
+                n_heads=n_heads,
+                dropout=dropout,
+                maxlen=max_len
             )
             
-            # 파일 읽기 -> Prefix 제거 -> 키 이름 변환
-            raw_sd = _smart_load_ckpt(str(sasrec_ckpt))
-            sd = _strip_prefix(raw_sd)
-            sd = _adapt_sasrec_keys(sd, list(sasrec.state_dict().keys()))
+            sd = _load_state_dict_from_file(str(sasrec_ckpt), key_hint="state_dict")
             
-            # 로딩 (strict=False로 하되, 중요한 키가 빠졌는지는 체크 안 함 - 작동 우선)
+            # 모델 키 매칭 (Strict=True 시도 후 실패시 보고)
             missing, unexpected = sasrec.load_state_dict(sd, strict=False)
+            print(f"✅ [SASRec] Loaded. (Missing: {len(missing)}, Unexpected: {len(unexpected)})")
             
-            print("✅ [SASRec] 로딩 완료! (가중치 적용됨)")
-            # print(f"   (참고) Missing keys: {len(missing)}, Unexpected keys: {len(unexpected)}")
-
             sasrec.to(device)
             sasrec.eval()
         except Exception as e:
-            print(f"❌ [SASRec] 로딩 치명적 오류: {e}")
+            print(f"❌ [SASRec] Load Failed: {e}")
             sasrec = None
 
-    # 2. TwoTower 로딩
+    # 2. TwoTower
     if twotower_ckpt and Path(twotower_ckpt).exists():
         try:
-            twotower = TwoTowerAlign(d_in=d_model, d_hidden=d_model, out_dim=d_model, dropout=dropout)
+            twotower = TwoTowerAlign(dim=d_model, dropout=dropout)
             
-            raw_sd = _smart_load_ckpt(str(twotower_ckpt))
-            sd = _strip_prefix(raw_sd)
+            # 노트북은 "two_tower_state_dict" 라는 키로 저장함 (Cell 10 참조)
+            sd = _load_state_dict_from_file(str(twotower_ckpt), key_hint="two_tower_state_dict")
             
             twotower.load_state_dict(sd, strict=False)
-            print("✅ [TwoTower] 로딩 완료!")
+            print("✅ [TwoTower] Loaded.")
             
             twotower.to(device)
             twotower.eval()
         except Exception as e:
-            print(f"⚠️ [TwoTower] 로딩 실패 (무시 가능): {e}")
+            print(f"⚠️ [TwoTower] Load Failed: {e}")
             twotower = None
 
     print("="*40 + "\n")

@@ -46,100 +46,87 @@ class TransformerBlock(nn.Module):
 class VectorSASRec(nn.Module):
     def __init__(
         self,
-        num_items: int,
-        d_model: int = 512,
-        n_heads: int = 8,
+        clip_dim: int,
+        hidden_dim: int,
+        num_actions: int,
         n_layers: int = 2,
-        ff_dim: int = 2048,
+        n_heads: int = 4,
         dropout: float = 0.1,
-        max_len: int = 200,
-        num_actions: int = 8,
-        item_vec_dim: int = 512,
-        pad_idx: int = 0,
+        maxlen: int = 200,
+        # 아래는 호환성을 위해 남겨둠 (loader에서 사용)
+        num_items: int = 0, 
+        item_vec_dim: int = 512, 
     ):
         super().__init__()
-        self.num_items = int(num_items)
-        self.d_model = int(d_model)
-        self.max_len = int(max_len)
-        self.pad_idx = int(pad_idx)
-        self.item_vec_dim = int(item_vec_dim)
+        # 노트북 변수명에 맞춤
+        self.clip_dim = clip_dim
+        self.hidden_dim = hidden_dim
+        self.maxlen = maxlen
 
-        # [핵심 1] 학습 코드와 동일하게 bias=False 설정
-        # (학습된 체크포인트에 bias가 없으므로 서버 코드도 맞춰줍니다)
-        self.item_proj = nn.Linear(item_vec_dim, d_model, bias=False)
+        # ✅ item vector(clip_dim) -> hidden_dim projection (trainable)
+        # 기존: item_proj -> 변경: item_in_proj (노트북 Cell 4 일치)
+        self.item_in_proj = nn.Linear(clip_dim, hidden_dim, bias=False)
+
+        # ✅ action / position embedding
+        self.act_emb = nn.Embedding(num_actions, hidden_dim, padding_idx=0)
+        self.pos_emb = nn.Embedding(maxlen, hidden_dim)
+        self.dropout = nn.Dropout(dropout)
+
+        # ✅ nn.TransformerEncoder 사용 (노트북 일치)
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=hidden_dim,
+            nhead=n_heads,
+            dim_feedforward=4 * hidden_dim,
+            dropout=dropout,
+            batch_first=True,
+            activation="gelu",
+            norm_first=True,
+        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
+
+    def item_base(self, item_vectors: torch.Tensor) -> torch.Tensor:
+        """(N, clip_dim) -> (N, hidden_dim)"""
+        return self.item_in_proj(item_vectors)
+
+    def forward(self, item_ids: torch.Tensor, action_ids: torch.Tensor, item_vectors: torch.Tensor):
+        """
+        item_ids: (B,S)
+        action_ids: (B,S)
+        item_vectors: (N, clip_dim) -> 외부에서 주입
+        """
+        B, S = item_ids.shape
         
-        self.pos_emb = nn.Embedding(max_len, d_model)
-        self.act_emb = nn.Embedding(num_actions, d_model) if num_actions > 0 else None
-
-        self.drop = nn.Dropout(dropout)
+        # ✅ 런타임 item_vectors에서 lookup (F.embedding 사용)
+        # item_ids 범위를 clamp하여 안전하게 조회
+        safe_ids = item_ids.clamp(min=0, max=item_vectors.size(0)-1)
+        v = F.embedding(safe_ids, item_vectors)      # (B,S,clip_dim)
         
-        # Transformer Blocks
-        self.blocks = nn.ModuleList([TransformerBlock(d_model, n_heads, ff_dim, dropout) for _ in range(n_layers)])
-        
-        # [핵심 2] 학습 코드에 없는 LayerNorm 제거
-        self.ln_out = None 
+        x = self.item_in_proj(v) + self.act_emb(action_ids)  # (B,S,hidden_dim)
 
-    def forward(
-        self,
-        seq_item_idx: torch.Tensor,
-        item_vec_table: torch.Tensor,  # <--- [중요] 외부에서 벡터 테이블을 받습니다!
-        seq_action_id: Optional[torch.Tensor] = None,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        
-        # 1. 시퀀스 길이 체크
-        B, L = seq_item_idx.shape
-        if L > self.max_len:
-            raise ValueError(f"seq length {L} > max_len {self.max_len}")
-
-        # 2. 패딩 마스크 생성
-        key_padding_mask = (seq_item_idx == self.pad_idx)
-
-        # 3. [벡터 룩업 로직] ID 임베딩 대신, '이미지 벡터'를 테이블에서 가져옵니다.
-        # 학습 코드의 F.embedding(..., item_vec_table) 로직과 완벽히 동일합니다.
-        item_vecs = F.embedding(seq_item_idx.clamp(min=0, max=item_vec_table.size(0)-1), item_vec_table)
-        
-        # 4. 차원 변환 (512 -> d_model)
-        x = self.item_proj(item_vecs)
-
-        # 5. 위치 정보(Position) 추가
-        pos = torch.arange(L, device=seq_item_idx.device).unsqueeze(0).expand(B, L)
+        pos = torch.arange(S, device=item_ids.device).unsqueeze(0).expand(B, S)
         x = x + self.pos_emb(pos)
+        x = self.dropout(x)
 
-        # 6. 행동 정보(Action) 추가 (있으면)
-        if self.act_emb is not None and seq_action_id is not None:
-            x = x + self.act_emb(seq_action_id.clamp(min=0, max=self.act_emb.num_embeddings-1))
-
-        # 7. 트랜스포머 통과
-        x = self.drop(x)
-        for blk in self.blocks:
-            x = blk(x, key_padding_mask=key_padding_mask)
-        
-        # (ln_out 제거됨)
-        
-        # 8. 유저 벡터 추출 (마지막 시점)
-        lengths = (~key_padding_mask).long().sum(dim=1)
-        last_idx = torch.clamp(lengths - 1, min=0)
-        user = x[torch.arange(B, device=x.device), last_idx]
-        
-        return x, user
-
+        pad_mask = (item_ids == 0)
+        x = self.encoder(x, src_key_padding_mask=pad_mask)
+        return x
 
 class TwoTowerAlign(nn.Module):
-    def __init__(self, d_in: int = 512, d_hidden: int = 512, out_dim: int = 512, dropout: float = 0.1):
+    def __init__(self, dim=512, dropout=0.1):
         super().__init__()
-        self.user_mlp = nn.Sequential(
-            nn.Linear(d_in, d_hidden),
+        # 노트북 Cell 4 일치
+        self.user_proj = nn.Sequential(
+            nn.Linear(dim, dim),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(d_hidden, out_dim),
+            nn.Linear(dim, dim),
         )
-        self.item_mlp = nn.Sequential(
-            nn.Linear(d_in, d_hidden),
+        self.item_proj = nn.Sequential(
+            nn.Linear(dim, dim),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(d_hidden, out_dim),
+            nn.Linear(dim, dim),
         )
-        self.logit_scale = nn.Parameter(torch.tensor(0.0))
 
     def forward(self, user_vec: torch.Tensor, item_vecs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         u = self.user_mlp(user_vec)

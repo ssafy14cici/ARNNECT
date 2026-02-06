@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import typing as t
-from typing import Dict, Any  # ✅ Dict, Any 추가 필수
+from typing import Dict, Any
 from PIL.Image import Image as PILImage
 
 import bentoml
@@ -14,8 +14,7 @@ from app.schemas import (
     EmbedArtworkResponse,
     RecommendResponse,
     RecommendItem,
-    RecommendRequest, # 수동 변환을 위해 필요
-    LogEvent,         # 수동 변환을 위해 필요
+    RecommendRequest,
 )
 
 # 내부 모듈 임포트
@@ -40,17 +39,25 @@ class RecoService:
             index_to_piece_path=self.cfg.index_to_piece_path,
         )
         
+        # 메타데이터 저장용 ChromaDB
         self.chroma = ChromaStore(persist_dir=self.cfg.chroma_dir, collection="artworkMetaData")
         self.artist_chroma = ChromaStore(persist_dir=self.cfg.chroma_dir, collection="artists")
 
+        # [🚨 핵심 수정] 
+        # ItemVectorTable의 차원은 SASRec의 d_model(가변)이 아니라, 
+        # CLIP 모델의 출력 차원인 512(고정)로 설정해야 안전합니다.
+        CLIP_VECTOR_DIM = 512
+        
         item_table_path = self.cfg.artifacts_dir / "item_vectors.bin"
         self.item_table = ItemVectorTable(
             path=item_table_path, 
             num_items=self.cfg.num_items, 
-            dim=self.cfg.d_model
+            dim=CLIP_VECTOR_DIM  # 기존 self.cfg.d_model -> 512로 변경
         )
 
         self.clip = ClipImageEmbedder(model_name=self.cfg.clip_model_name, device=self.cfg.device)
+        
+        # Recommender 초기화
         self.recommender = Recommender(
             device=self.cfg.device,
             num_items=self.cfg.num_items,
@@ -92,14 +99,22 @@ class RecoService:
         artistId: str = Field(...),
         category: str = Field(...),
     ) -> EmbedArtworkResponse:
+        """
+        새로운 작품을 등록하고 벡터를 저장합니다.
+        (주의: 추천 시스템의 GPU 캐시에는 서비스 재시작 후에 반영될 수 있습니다)
+        """
         vec = self.clip.encode(image)
         
         idx, _is_new = self.mapping.get_or_add(artworkId)
+        
+        # 1. 메타데이터 DB 저장
         self.chroma.upsert(
             artwork_id=artworkId, 
             embedding=vec, 
             metadata={"artistId": artistId, "category": category}
         )
+        
+        # 2. 벡터 테이블 저장
         self.item_table.upsert(idx, vec)
 
         return EmbedArtworkResponse(
@@ -109,27 +124,28 @@ class RecoService:
             category=category,
         )
 
-    # service.py의 recommend 메서드를 다음과 같이 수정
-
+    # -------------------------------------------------------
+    # API 3: Recommend
+    # -------------------------------------------------------
     @bentoml.api(route="/recommend")
     def recommend(self, inputData: RecommendRequest) -> RecommendResponse:
         """
-        BentoML이 자동으로 JSON → RecommendRequest로 변환합니다.
+        유저 로그 기반 추천 API
         """
-        # 로그 변환
+        # 1. 입력 데이터 변환 (Pydantic Model -> List[Dict])
         logs_list = [
             {"artworkId": log.artworkId, "action": log.action} 
             for log in inputData.logs
         ]
 
-        # 추천 로직 실행
+        # 2. 추천 로직 실행 (Recommender 위임)
         result = self.recommender.recommend(
             member_id=inputData.memberId,
             logs=logs_list,
             topk=50,
         )
 
-        # 결과 변환
+        # 3. 결과 포맷 변환 (Dict -> Pydantic Model)
         out_items = [
             RecommendItem(rank=r["rank"], artworkId=str(r["artworkId"]))
             for r in result.recommends
