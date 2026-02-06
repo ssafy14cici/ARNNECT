@@ -1,6 +1,6 @@
 // FE/src/pages/lounge/artist/qr/TicketQr.tsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { toBlob } from "html-to-image";
 import "../../lounge.css";
 
@@ -10,7 +10,6 @@ import { createTicket, updateTicket } from "../../../../features/tickets/api/rea
 import TicketForm, { type FormState } from "./TicketForm";
 import QrPanel from "./QrPanel";
 import { rememberDesign, type TicketItem, useIssuedTickets } from "./useIssuedTickets";
-import { resolveTicketMedia } from "../../../../features/tickets/resolveTicketMedia";
 import { useAuthStore } from "../../../../features/auth/store";
 
 type TabMode = "ISSUE" | "LIST";
@@ -141,14 +140,12 @@ export default function TicketQr() {
   const [form, setForm] = useState<FormState>(() => toForm(null));
   const previewRef = useRef<HTMLDivElement | null>(null);
 
-  // ✅ artistUuid는 쿼리스트링 말고 AuthStore에서 가져오는 게 안전
+  // ✅ artistUuid는 AuthStore에서 가져오는 게 안전
   const artistUuid = useAuthStore((s) => s.user?.memberUuid ?? "");
 
-  // ✅ useIssuedTickets는 artistUuid 없으면 내부에서 빈 배열 처리하는 버전(가드) 권장
   const { issued, reloadIssued, removeIssued } = useIssuedTickets(artistUuid);
 
   useEffect(() => {
-    // artistUuid 없으면 호출 안 함(크래시/불필요 호출 방지)
     if (!artistUuid) return;
     reloadIssued().catch((e) => console.error("목록 로드 실패", e));
   }, [artistUuid, reloadIssued]);
@@ -178,7 +175,6 @@ export default function TicketQr() {
     setError("");
 
     try {
-      // code는 state 고정
       const qrFile = await makeQrImageFile(code);
       const ticketFile = await makeTicketImageFile(previewRef.current, code, form.title.trim());
 
@@ -195,13 +191,11 @@ export default function TicketQr() {
       fd.append("ticketImage", ticketFile);
 
       // ✅ 포스터 파일 업로드 (BE 키명이 다르면 여기 key만 변경)
-      if (form.posterFile) {
-        fd.append("poster", form.posterFile);
-      }
+      if (form.posterFile) fd.append("poster", form.posterFile);
 
       const res = editingTicketId ? await updateTicket(editingTicketId, fd) : await createTicket(fd);
 
-      // 응답 방어
+      // ✅ 응답 방어
       const nextId = typeof (res as any)?.ticketId === "number" ? (res as any).ticketId : ticketId;
       const nextCode = typeof (res as any)?.ticketCode === "string" && (res as any).ticketCode ? (res as any).ticketCode : code;
 
@@ -279,14 +273,7 @@ export default function TicketQr() {
         {activeTab === "ISSUE" && (
           <div className="fade-in">
             <div className="loungeSubPanel" style={{ textAlign: "left" }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 30,
-                }}
-              >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
                 <h2 className="loungeSubPanelTitle" style={{ margin: 0 }}>
                   {editingTicketId ? "전시 정보 수정" : "새 전시 등록"}
                 </h2>
@@ -356,9 +343,9 @@ export default function TicketQr() {
                         📍 {t.address} | 📅 {t.startDate} ~ {t.endDate}
                       </div>
 
-                      {t.ticketImageName && (
+                      {t.ticketImageName ? (
                         <img
-                          src={resolveTicketMedia(t.ticketImageName)}
+                          src={t.ticketImageName} /* ⚠️ 여기 URL/이름이 맞는지에 따라 resolve 필요 */
                           alt="ticket"
                           style={{
                             width: "100%",
@@ -372,12 +359,9 @@ export default function TicketQr() {
                             (e.currentTarget as HTMLImageElement).style.display = "none";
                           }}
                         />
-                      )}
+                      ) : null}
 
-                      <div
-                        className="loungeSubActions"
-                        style={{ marginTop: 16, justifyContent: "flex-start", gap: 10 }}
-                      >
+                      <div className="loungeSubActions" style={{ marginTop: 16, justifyContent: "flex-start", gap: 10 }}>
                         <button className="loungeSubBtn" onClick={() => startEdit(t)}>
                           수정
                         </button>

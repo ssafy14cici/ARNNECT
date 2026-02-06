@@ -207,3 +207,26 @@
   font-weight: 700;
 }
 
+/* ✅ 카드 안 티켓 썸네일 영역 */
+.qr-card-preview {
+  margin-top: 12px;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.35);
+  display: grid;
+  place-items: center;
+  padding: 10px;
+}
+
+/* ✅ 서버 이미지가 있으면 위에 덮어쓰기(성공 시에만 보이게) */
+.qr-card-poster {
+  margin-top: 12px;
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain; /* cover 말고 contain이 “티켓”에 더 안전 */
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: block;
+}

@@ -1,4 +1,4 @@
-//FE\src\features\fanLetter\api\index.ts
+//FE\src/features\fanLetter\api\index.ts
 import type {
   FanLetter,
   FanLetterId,
@@ -36,6 +36,11 @@ export async function sendFanLetter(input: FanLetterSendInput): Promise<void> {
 /** ✅ 작가: 받은 팬레터 전체 조회 */
 export async function fetchArtistFanLetters(artistMemberUuid: string): Promise<FanLetter[]> {
   return real.fetchArtistFanLetters(artistMemberUuid);
+}
+
+/** ✅ 유저: 보낸 팬레터 전체 조회 */
+export async function fetchUserFanLetters(userMemberUuid: string): Promise<FanLetter[]> {
+  return real.fetchUserFanLetters(userMemberUuid);
 }
 
 /** ✅ 작가: 답장 등록 */

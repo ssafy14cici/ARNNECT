@@ -7,7 +7,7 @@ import { useAuthStore } from "../../features/auth/store";
 import { sendFanLetter } from "../../features/fanLetter/api";
 import { http } from "../../shared/api/http";
 
-import "./fanLetterCompose.css";
+import "./NewFanLetter.css";
 
 type LocationState = {
   artworkTitle?: string;
@@ -173,46 +173,38 @@ export default function FanLetterCompose() {
   };
 
   return (
-    <div className="fl-page">
-      <div className="fl-card">
-        <header className="fl-header">
-          <h1 className="fl-title">Fan Letter</h1>
-          <button type="button" className="fl-close" onClick={() => nav(-1)}>
-            ✕
-          </button>
-        </header>
+    <div className="card-page">
+      <div className="card">
+        <div className="card__hero">
+          <div className="card__hero-header">
+            <span>Fan Letter</span>
+            <button type="button" className="card__close-btn" onClick={() => nav(-1)}>
+              ✕
+            </button>
+          </div>
+          <div className="card__job-title">To. {artistName || "Artist"}</div>
+        </div>
 
-        <div className="fl-body">
-          <div className="fl-row">
-            <label className="fl-label">Artwork</label>
-            <input className="fl-input" value={artworkTitle} readOnly placeholder="(작품명 없음)" />
+        <div className="card__body">
+          <div className="card__row">
+            <label className="card__label">Artwork</label>
+            <input className="card__input" value={artworkTitle} readOnly placeholder="(작품명 없음)" />
           </div>
 
-          <div className="fl-row">
-            <label className="fl-label">To (Artist)</label>
-            <input
-              className="fl-input"
-              value={artistName || artistMemberUuid}
-              readOnly
-              placeholder="(작가 정보 없음)"
-            />
-          </div>
-
-          <div className="fl-row">
-            <label className="fl-label">Message</label>
+          <div className="card__row">
+            <label className="card__label">Message</label>
             <textarea
-              className="fl-textarea"
+              className="card__textarea"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              rows={10}
               placeholder="작가에게 전하고 싶은 말을 적어주세요."
             />
           </div>
         </div>
 
-        <footer className="fl-footer">
-          <button type="button" className="fl-send" onClick={onSend} disabled={!canSend || sending}>
-            {sending ? "Sending..." : "Send"}
+        <footer className="card__footer">
+          <button type="button" className="card__btn" onClick={onSend} disabled={!canSend || sending}>
+            {sending ? "Sending..." : "Send Fan Letter"}
           </button>
         </footer>
       </div>

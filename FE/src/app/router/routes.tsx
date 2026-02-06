@@ -35,6 +35,7 @@ import TicketQr from "../../pages/lounge/artist/qr/TicketQr";
 import Portfolio from "../../pages/lounge/artist/Portfolio";
 import FanLetter from "../../pages/lounge/artist/FanLetter";
 import FanLetterCompose from "../../pages/fanLetter/FanLetterCompose";
+import MyFanLetters from "../../pages/fanLetter/MyFanLetters";
 
 import Profile from "../../pages/profile/Profile";
 import FeedTab from "../../pages/profile/tabs/FeedTab";
@@ -279,6 +280,11 @@ export const routes: RouteObject[] = [
                 element: <Guard requireRole="general" />,
                 children: [{ index: true, element: <RemindQuiz /> }],
               },
+              {
+                path: "my-fanletters",
+                element: <Guard requireRole="general" />,
+                children: [{ index: true, element: <MyFanLetters /> }],
+              },
 
               // artist
               {
@@ -320,3 +326,4 @@ export const routes: RouteObject[] = [
 ];
 
 export const router = createBrowserRouter(routes);
+

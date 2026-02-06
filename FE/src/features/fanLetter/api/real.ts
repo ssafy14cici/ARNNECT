@@ -198,6 +198,23 @@ export async function fetchArtistFanLetters(artistMemberUuid: string): Promise<F
   return list.map(mapRawToFanLetter);
 }
 
+/**
+ * ✅ 유저: 보낸 팬레터 전체 조회
+ * GET /api/v1/fanletters/all?user={memberUuid}
+ */
+export async function fetchUserFanLetters(userMemberUuid: string): Promise<FanLetter[]> {
+  const res = await http.get(apiPath("/fanletters/all"), {
+    params: { user: userMemberUuid },
+  });
+
+  const body = (res as any)?.data ?? res;
+  const unwrapped = unwrapEnvelope<unknown>(body);
+  const list = extractArray(unwrapped);
+
+  return list.map(mapRawToFanLetter);
+}
+
+
 /** ✅ 작가: 답장 등록 */
 export async function createFanLetterAnswer(
   fanLetterId: FanLetterId,

@@ -1,6 +1,7 @@
 // FE/src/pages/lounge/artist/FanLetter.tsx
 import { useCallback, useEffect, useMemo, useState } from "react";
 import "./fanLetter.css";
+import "../../../pages/fanLetter/NewFanLetter.css";
 
 import { useAuthStore } from "../../../features/auth/store";
 import type { FanLetter as FanLetterModel } from "../../../features/fanLetter/types";
@@ -11,7 +12,6 @@ import {
   deleteFanLetterAnswer,
 } from "../../../features/fanLetter/api";
 
-type FanLetterViewMode = "postit" | "list";
 type FanLetterFilter = "all" | "unanswered" | "answered";
 type ReplyMode = "create" | "edit";
 
@@ -24,16 +24,14 @@ function formatDate(s: string) {
 export default function FanLetter() {
   const user = useAuthStore((s) => s.user);
 
-  // ✅ role이 "ARTIST"/"artist" 등으로 흔들려도 커버
   const roleRaw = useAuthStore((s) => s.role);
-  const roleNorm = String(roleRaw ?? "").toLowerCase(); // "ARTIST" -> "artist"
+  const roleNorm = String(roleRaw ?? "").toLowerCase();
 
   const artistMemberUuid = user?.memberUuid ?? "";
 
   const [items, setItems] = useState<FanLetterModel[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [viewMode, setViewMode] = useState<FanLetterViewMode>("postit");
   const [filter, setFilter] = useState<FanLetterFilter>("unanswered");
 
   const [replyingId, setReplyingId] = useState<number | null>(null);
@@ -41,31 +39,16 @@ export default function FanLetter() {
   const [answerText, setAnswerText] = useState("");
   const [sending, setSending] = useState(false);
 
-  // ✅ canUse 조건
   const canUse = roleNorm === "artist" && Boolean(artistMemberUuid);
-
-  // ✅ 상태 확인 로그 (컴포넌트 내부에서만)
-  useEffect(() => {
-    console.log("[FanLetter] state", {
-      roleRaw,
-      roleNorm,
-      artistMemberUuid,
-      canUse,
-      user,
-    });
-  }, [roleRaw, roleNorm, artistMemberUuid, canUse, user]);
 
   const refetch = useCallback(async () => {
     if (!artistMemberUuid) {
-      console.log("[FanLetter] refetch skipped: empty artistMemberUuid");
       return;
     }
 
     setLoading(true);
     try {
-      console.log("[FanLetter] fetching fanletters...", { artistMemberUuid });
       const data = await fetchArtistFanLetters(artistMemberUuid);
-      console.log("[FanLetter] fetched fanletters:", data);
       setItems(data);
     } catch (e) {
       console.error(e);
@@ -78,7 +61,6 @@ export default function FanLetter() {
 
   useEffect(() => {
     if (!canUse) {
-      console.log("[FanLetter] useEffect: canUse=false, skip refetch");
       return;
     }
     void refetch();
@@ -92,7 +74,6 @@ export default function FanLetter() {
           ? items.filter((x) => x.isAnswered)
           : items.filter((x) => !x.isAnswered);
 
-    // ✅ 미답변 우선 + 최신순
     return [...base].sort((a, b) => {
       if (a.isAnswered !== b.isAnswered) return a.isAnswered ? 1 : -1;
       return String(b.createdAt).localeCompare(String(a.createdAt));
@@ -165,7 +146,7 @@ export default function FanLetter() {
   if (!canUse) {
     return (
       <main style={{ padding: 24 }}>
-        <h1 style={{ marginBottom: 8 }}>Fan Letters</h1>
+        <h1>Fan Letters</h1>
         <div style={{ opacity: 0.8 }}>작가 계정에서만 접근할 수 있습니다.</div>
       </main>
     );
@@ -175,48 +156,28 @@ export default function FanLetter() {
     <main className="fanletterPage">
       <header className="fanletterHeader">
         <h1 className="fanletterTitle">Fan Letters</h1>
-
-        <div className="fanletterControls">
-          <div className="pill">
-            <button
-              type="button"
-              className={`pillBtn ${viewMode === "postit" ? "active" : ""}`}
-              onClick={() => setViewMode("postit")}
-            >
-              Post-it
-            </button>
-            <button
-              type="button"
-              className={`pillBtn ${viewMode === "list" ? "active" : ""}`}
-              onClick={() => setViewMode("list")}
-            >
-              List
-            </button>
-          </div>
-
-          <div className="filters">
-            <button
-              type="button"
-              className={`filterBtn ${filter === "all" ? "active" : ""}`}
-              onClick={() => setFilter("all")}
-            >
-              All
-            </button>
-            <button
-              type="button"
-              className={`filterBtn ${filter === "unanswered" ? "active" : ""}`}
-              onClick={() => setFilter("unanswered")}
-            >
-              Unanswered
-            </button>
-            <button
-              type="button"
-              className={`filterBtn ${filter === "answered" ? "active" : ""}`}
-              onClick={() => setFilter("answered")}
-            >
-              Answered
-            </button>
-          </div>
+        <div className="filters">
+          <button
+            type="button"
+            className={`filterBtn ${filter === "all" ? "active" : ""}`}
+            onClick={() => setFilter("all")}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            className={`filterBtn ${filter === "unanswered" ? "active" : ""}`}
+            onClick={() => setFilter("unanswered")}
+          >
+            Unanswered
+          </button>
+          <button
+            type="button"
+            className={`filterBtn ${filter === "answered" ? "active" : ""}`}
+            onClick={() => setFilter("answered")}
+          >
+            Answered
+          </button>
         </div>
       </header>
 
@@ -225,64 +186,64 @@ export default function FanLetter() {
       ) : filtered.length === 0 ? (
         <div style={{ padding: 24, opacity: 0.8 }}>팬레터가 없습니다.</div>
       ) : (
-        <section className={viewMode === "postit" ? "fanletterGrid" : "fanletterList"}>
+        <section className="fanletter-card-list">
           {filtered.map((fl) => (
-            <article key={fl.id} className={`flCard ${fl.isAnswered ? "answered" : "unanswered"}`}>
-              <div className="flTop">
-                <div className="flFrom">{fl.fromNickname}</div>
-                <div className="flDate">{formatDate(fl.createdAt)}</div>
-              </div>
+            <div key={fl.id} className={`card fanletter-card ${fl.isAnswered ? "answered" : ""}`}>
+                <div className="card__hero">
+                    <div className="card__hero-header">
+                        <span>From. {fl.fromNickname}</span>
+                        <span>{formatDate(fl.createdAt)}</span>
+                    </div>
+                    {fl.artworkName && <div className="fanletter-artwork-name">🎨 {fl.artworkName}</div>}
+                </div>
+              
+                <div className="card__body">
+                    <p className="fanletter-question">{fl.question}</p>
+                    {fl.isAnswered && fl.answer && (
+                    <div className="fanletter-answer">
+                        <div className="fanletter-answer-label">Answer</div>
+                        <div className="fanletter-answer-text">{fl.answer}</div>
+                    </div>
+                    )}
+                </div>
 
-              <div className="flBody">
-                {fl.artworkName && <div className="flArtwork">🎨 {fl.artworkName}</div>}
-                <div className="flQuestion">{fl.question}</div>
-
-                {fl.isAnswered && fl.answer && (
-                  <div className="flAnswer">
-                    <div className="flAnswerLabel">Answer</div>
-                    <div className="flAnswerText">{fl.answer}</div>
-                  </div>
-                )}
-              </div>
-
-              <div className="flActions">
-                {!fl.isAnswered ? (
-                  <button type="button" className="flBtn primary" onClick={() => openCreate(fl.id)}>
-                    Reply
-                  </button>
-                ) : (
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <button type="button" className="flBtn" onClick={() => openEdit(fl.id, fl.answer)}>
-                      Edit
+                <div className="card__footer">
+                    {!fl.isAnswered ? (
+                    <button type="button" className="card__btn" onClick={() => openCreate(fl.id)}>
+                        Reply
                     </button>
+                    ) : (
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <button type="button" className="card__btn" onClick={() => openEdit(fl.id, fl.answer)}>
+                        Edit
+                        </button>
 
-                    <button
-                      type="button"
-                      className="flBtn danger"
-                      onClick={async () => {
-                        if (!confirm("답변을 삭제할까요?")) return;
-                        setSending(true);
-                        try {
-                          await deleteFanLetterAnswer(fl.id);
-                          alert("답변이 삭제되었습니다.");
-                          await refetch();
-                        } catch (e) {
-                          console.error(e);
-                          alert("답변 삭제에 실패했습니다.");
-                        } finally {
-                          setSending(false);
-                        }
-                      }}
-                      disabled={sending}
-                    >
-                      Delete
-                    </button>
-
-                    <span className="flBadge">Answered</span>
-                  </div>
-                )}
-              </div>
-            </article>
+                        <button
+                        type="button"
+                        className="card__btn danger"
+                        onClick={async () => {
+                            if (!confirm("답변을 삭제할까요?")) return;
+                            setSending(true);
+                            try {
+                            await deleteFanLetterAnswer(fl.id);
+                            alert("답변이 삭제되었습니다.");
+                            await refetch();
+                            } catch (e) {
+                            console.error(e);
+                            alert("답변 삭제에 실패했습니다.");
+                            } finally {
+                            setSending(false);
+                            }
+                        }}
+                        disabled={sending}
+                        >
+                        Delete
+                        </button>
+                        <span className="fanletter-badge">Answered</span>
+                    </div>
+                    )}
+                </div>
+            </div>
           ))}
         </section>
       )}
