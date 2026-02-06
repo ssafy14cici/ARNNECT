@@ -12,13 +12,13 @@ public class MemberInfo {
     Integer isArtist;
 
     /** 예술인 **/
-    Integer isNew;
+    Boolean isNew;
     String fieldName;
     String genreName;
     Integer debutYear;
     String snsPage;
-    String origin_profile_name;
-    String saved_profile_name;
+    String originProfileName;
+    String savedProfileName;
     String introduction;
     String affiliation;
 
