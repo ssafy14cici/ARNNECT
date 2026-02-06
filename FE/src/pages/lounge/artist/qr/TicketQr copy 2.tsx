@@ -1,6 +1,6 @@
 // FE/src/pages/lounge/artist/qr/TicketQr.tsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { toBlob } from "html-to-image";
 import "../../lounge.css";
 
@@ -10,7 +10,6 @@ import { createTicket, updateTicket } from "../../../../features/tickets/api/rea
 import TicketForm, { type FormState } from "./TicketForm";
 import QrPanel from "./QrPanel";
 import { rememberDesign, type TicketItem, useIssuedTickets } from "./useIssuedTickets";
-import { resolveTicketMedia } from "../../../../features/tickets/resolveTicketMedia";
 import { useAuthStore } from "../../../../features/auth/store";
 
 type TabMode = "ISSUE" | "LIST";
@@ -53,6 +52,7 @@ function toForm(t?: Partial<TicketItem> | null): FormState {
   };
 }
 
+// ✅ 업로드용 QR png 파일 생성 (DOM 없이 qrcode로 바로 생성)
 async function makeQrImageFile(ticketCode: string) {
   const dataUrl = await QRCodeLib.toDataURL(ticketCode, {
     width: 220,
@@ -80,6 +80,7 @@ async function waitImagesLoaded(el: HTMLElement) {
   );
 }
 
+// ticketImage는 필수 -> 캡처 실패 시 fallback 이미지 생성
 async function makeTicketImageFile(previewEl: HTMLElement | null, ticketCode: string, title: string) {
   // @ts-ignore
   if (document.fonts?.ready) {
@@ -89,7 +90,7 @@ async function makeTicketImageFile(previewEl: HTMLElement | null, ticketCode: st
 
   if (previewEl) {
     try {
-      await waitImagesLoaded(previewEl);
+      await waitImagesLoaded(previewEl); // ✅ 포스터 이미지 로딩 대기
       const blob = await toBlob(previewEl, {
         cacheBust: true,
         pixelRatio: 3,
@@ -125,20 +126,23 @@ async function makeTicketImageFile(previewEl: HTMLElement | null, ticketCode: st
 }
 
 export default function TicketQr() {
-  const [searchParams, setSearchParams] = useSearchParams();
-
   const [activeTab, setActiveTab] = useState<TabMode>("ISSUE");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const [ticketId, setTicketId] = useState<number | null>(null);
+
+  // ✅ 코드(state)로 고정: 미리보기/캡처/업로드 동일 값 사용
   const [code, setCode] = useState<string>(() => makeTicketCode());
+
   const [editingTicketId, setEditingTicketId] = useState<number | null>(null);
 
   const [form, setForm] = useState<FormState>(() => toForm(null));
   const previewRef = useRef<HTMLDivElement | null>(null);
 
+  // ✅ artistUuid는 AuthStore에서 가져오는 게 안전
   const artistUuid = useAuthStore((s) => s.user?.memberUuid ?? "");
+
   const { issued, reloadIssued, removeIssued } = useIssuedTickets(artistUuid);
 
   useEffect(() => {
@@ -160,43 +164,9 @@ export default function TicketQr() {
     setBusy(false);
     setEditingTicketId(null);
     setTicketId(null);
-    setCode(makeTicketCode());
+    setCode(makeTicketCode()); // ✅ 새 코드로 갱신
     setForm(toForm(null));
-
-    // ✅ edit 진입용 쿼리 제거
-    searchParams.delete("ticketId");
-    setSearchParams(searchParams, { replace: true });
-  }, [searchParams, setSearchParams]);
-
-  const startEdit = useCallback(
-    (t: TicketItem) => {
-      setError("");
-      setEditingTicketId(t.ticketId);
-      setTicketId(t.ticketId);
-      setCode(t.ticketCode);
-      setForm(toForm(t));
-      setActiveTab("ISSUE");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    },
-    [],
-  );
-
-  // ✅ QrEntry에서 ticketId 넘어오면 자동으로 해당 티켓 edit 열기
-  useEffect(() => {
-    const q = searchParams.get("ticketId");
-    if (!q) return;
-
-    const id = Number(q);
-    if (!Number.isFinite(id)) return;
-
-    const t = issued.find((x) => x.ticketId === id);
-    if (!t) return;
-
-    // 이미 같은 티켓 편집 중이면 재진입 방지
-    if (editingTicketId === id) return;
-
-    startEdit(t);
-  }, [searchParams, issued, startEdit, editingTicketId]);
+  }, []);
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -220,12 +190,12 @@ export default function TicketQr() {
       fd.append("qrImage", qrFile);
       fd.append("ticketImage", ticketFile);
 
-      if (form.posterFile) {
-        fd.append("poster", form.posterFile);
-      }
+      // ✅ 포스터 파일 업로드 (BE 키명이 다르면 여기 key만 변경)
+      if (form.posterFile) fd.append("poster", form.posterFile);
 
       const res = editingTicketId ? await updateTicket(editingTicketId, fd) : await createTicket(fd);
 
+      // ✅ 응답 방어
       const nextId = typeof (res as any)?.ticketId === "number" ? (res as any).ticketId : ticketId;
       const nextCode = typeof (res as any)?.ticketCode === "string" && (res as any).ticketCode ? (res as any).ticketCode : code;
 
@@ -242,6 +212,19 @@ export default function TicketQr() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const startEdit = (t: TicketItem) => {
+    setError("");
+    setEditingTicketId(t.ticketId);
+    setTicketId(t.ticketId);
+
+    // ✅ 수정 시에도 code를 ticketCode로 고정 → QrPanel/미리보기 QR이 즉시 바뀜
+    setCode(t.ticketCode);
+
+    setForm(toForm(t));
+    setActiveTab("ISSUE");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const remove = async (t: TicketItem) => {
@@ -319,6 +302,7 @@ export default function TicketQr() {
               </div>
             </div>
 
+            {/* ✅ 서버 qrImageName이 깨져도 상관없게: ticketCode로 직접 렌더 */}
             {code && <QrPanel ticketCode={code} busy={busy} />}
           </div>
         )}
@@ -331,11 +315,24 @@ export default function TicketQr() {
               ) : (
                 <div style={{ display: "grid", gap: 16 }}>
                   {issued.map((t) => (
-                    <div key={t.ticketId} className="tasteCard" style={{ padding: 24, border: "1px solid rgba(255,255,255,0.1)" }}>
+                    <div
+                      key={t.ticketId}
+                      className="tasteCard"
+                      style={{ padding: 24, border: "1px solid rgba(255,255,255,0.1)" }}
+                    >
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                         <div style={{ fontWeight: 700 }}>
                           {t.title}
-                          <span style={{ marginLeft: 10, fontSize: 12, opacity: 0.7, border: "1px solid #555", padding: "2px 6px", borderRadius: "4px" }}>
+                          <span
+                            style={{
+                              marginLeft: 10,
+                              fontSize: 12,
+                              opacity: 0.7,
+                              border: "1px solid #555",
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                            }}
+                          >
                             {t.ticketDesign}
                           </span>
                         </div>
@@ -346,9 +343,9 @@ export default function TicketQr() {
                         📍 {t.address} | 📅 {t.startDate} ~ {t.endDate}
                       </div>
 
-                      {t.ticketImageName && (
+                      {t.ticketImageName ? (
                         <img
-                          src={resolveTicketMedia(t.ticketImageName)}
+                          src={t.ticketImageName} /* ⚠️ 여기 URL/이름이 맞는지에 따라 resolve 필요 */
                           alt="ticket"
                           style={{
                             width: "100%",
@@ -362,7 +359,7 @@ export default function TicketQr() {
                             (e.currentTarget as HTMLImageElement).style.display = "none";
                           }}
                         />
-                      )}
+                      ) : null}
 
                       <div className="loungeSubActions" style={{ marginTop: 16, justifyContent: "flex-start", gap: 10 }}>
                         <button className="loungeSubBtn" onClick={() => startEdit(t)}>

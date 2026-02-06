@@ -1,41 +1,56 @@
-import React from "react";
+// FE/src/shared/ui/tickets/designs/_parts/TicketQR.tsx
+import React, { useContext, useMemo } from "react";
+import QRCode from "react-qr-code";
+import { TicketQrValueContext } from "../../TicketPreview";
 
-type TicketQRProps = {
-  size?: number;                 // 박스 크기
-  variant?: "dark" | "light";     // 박스 컬러 톤
-  label?: string;                // 기본 "QR"
-  radius?: number;               // 필요하면 둥글게
+type Props = {
+  size?: number;
+  variant?: "dark" | "light";
+  value?: string; // (선택) 직접 주면 그걸 사용
 };
 
-export default function TicketQR({
-  size = 40,
-  variant = "dark",
-  label = "QR",
-  radius = 0,
-}: TicketQRProps) {
-  const dark = variant === "dark";
+export default function TicketQR({ size = 56, variant = "dark", value }: Props) {
+  const ctxValue = useContext(TicketQrValueContext);
+  const qrValue = (value ?? ctxValue ?? "").trim();
+
+  const boxStyle: React.CSSProperties = useMemo(
+    () => ({
+      width: size,
+      height: size,
+      borderRadius: Math.max(8, Math.floor(size * 0.18)),
+      background: variant === "dark" ? "#fff" : "rgba(255,255,255,0.92)",
+      display: "grid",
+      placeItems: "center",
+      overflow: "hidden",
+    }),
+    [size, variant],
+  );
+
+  // qrValue 없으면 기존처럼 placeholder
+  if (!qrValue) {
+    return (
+      <div style={boxStyle}>
+        <div
+          style={{
+            width: "72%",
+            height: "72%",
+            border: `2px solid ${variant === "dark" ? "#000" : "#111"}`,
+            display: "grid",
+            placeItems: "center",
+            fontWeight: 800,
+            fontSize: Math.max(10, Math.floor(size * 0.18)),
+            color: variant === "dark" ? "#000" : "#111",
+          }}
+        >
+          QR
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: radius,
-        backgroundColor: dark ? "#000" : "#fff",
-        color: dark ? "#fff" : "#000",
-        border: dark ? "none" : "1px solid #000",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: Math.max(8, Math.floor(size * 0.2)),
-        fontWeight: 700,
-        letterSpacing: "1px",
-        boxSizing: "border-box",
-        userSelect: "none",
-      }}
-      aria-label="QR placeholder"
-    >
-      {label}
+    <div style={boxStyle}>
+      <QRCode value={qrValue} size={Math.floor(size * 0.86)} />
     </div>
   );
 }
