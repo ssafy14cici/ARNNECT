@@ -180,7 +180,7 @@ export const routes: RouteObject[] = [
             ],
           },
 
-          /* Preference / Taste / Remind / Analysis (canonical) */
+          /* Preference  Remind / Analysis (canonical) */
           { path: "Analysis", element: <Analysis /> },
           { path: "RemindQuiz", element: <RemindQuiz /> },
 

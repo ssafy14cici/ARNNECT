@@ -622,16 +622,16 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   return c.toDataURL("image/png");
 }
 
-/** API가 imageUrl을 줄 수도 있어서 둘 다 대응 */
 function resolveNewArtistImageUrl(r: any) {
   const imageUrl = typeof r?.imageUrl === "string" ? r.imageUrl.trim() : "";
-  if (imageUrl) return imageUrl; // "/artwork/xxx.jpg" 같은 형태면 그대로 OK
+  if (imageUrl) return buildNewArtistImageUrl(imageUrl) || "";
 
-  const saved = typeof r?.savedImageName === "string" ? r.savedImageName.trim() : "";
+  const saved = typeof r?.savedImageName === "string" ? r.savedImageName.trim() : "" ;
   if (saved) return buildNewArtistImageUrl(saved) || "";
 
   return "";
 }
+
 
 
   // ========= NEW: 신진예술인 6명 → ART_1~ART_6 랜덤 배치 =========

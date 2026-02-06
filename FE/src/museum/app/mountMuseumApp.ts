@@ -2,7 +2,7 @@
 import "../styles/style.css";
 import "../styles/intro.css";
 
-import { fetchNewArtists, buildNewArtistImageUrl } from "../../features/artworks/api/newArtists";
+import { fetchArtworksByArtist, buildNewArtistImageUrl } from "../../features/artworks/api/newArtists";
 import { mountIntro, type CameraPose } from "../intro/mountIntro";
 import { mountExitOverlay } from "../viewer/exitOverlay";
 import { mountExhibitRoom } from "../viewer/exhibitRoom";
@@ -13,6 +13,7 @@ const DEFAULT_HALL_START_WP = 0;
 
 export type ExhibitPayload = {
   artId?: number;
+  artistId: string; // ✅ memberUuid (핵심)
   artist: string;
   artworkTitle: string;
   fromWaypointId: number;
@@ -233,7 +234,7 @@ export function mountMuseumApp(args: {
         onOpenExhibit: (payload) => {
           console.log("[APP] onOpenExhibit fired", payload);
           toastHere(`OPEN EXHIBIT: ${payload.artist}`);
-          startExhibit(payload);
+          startExhibit(payload as ExhibitPayload);
         },
       });
 
@@ -294,7 +295,8 @@ export function mountMuseumApp(args: {
     }> = [];
 
     try {
-      const list = await fetchNewArtists(); // ✅ /api/v1/artworks/new
+      // ✅ 핵심: 선택한 작가의 작품 전체
+      const list = await fetchArtworksByArtist(payload.artistId);
       if (disposed) return;
 
       if (!list.length) {
@@ -305,24 +307,39 @@ export function mountMuseumApp(args: {
           artworkId: -1,
         }));
       } else {
-        panelItems = Array.from({ length: EXHIBIT_PANEL_COUNT }, (_, i) => {
-          const a = list[i % list.length];
-          const url = buildNewArtistImageUrl(a.savedImageName);
-          const safeUrl = url || makePlaceholderDataUrl(`NO IMG ${i + 1}`);
+        const limited = list.slice(0, EXHIBIT_PANEL_COUNT);
+
+        panelItems = limited.map((a, idx) => {
+          const url = buildNewArtistImageUrl(a.imageUrl || a.savedImageName);
+          const safeUrl = url || makePlaceholderDataUrl(`NO IMG ${idx + 1}`);
 
           return {
-            panelName: `EX_PANEL_${i + 1}`,
+            panelName: `EX_PANEL_${idx + 1}`,
             imageUrl: safeUrl,
-            title: a.title || `작품 ${i + 1}`,
+            title: a.title || `작품 ${idx + 1}`,
             artworkId: a.artworkId,
           };
         });
+
+        // 부족한 패널은 placeholder로 채우기
+        for (let i = panelItems.length; i < EXHIBIT_PANEL_COUNT; i++) {
+          panelItems.push({
+            panelName: `EX_PANEL_${i + 1}`,
+            imageUrl: makePlaceholderDataUrl(`EMPTY ${i + 1}`),
+            title: `EMPTY ${i + 1}`,
+            artworkId: -1,
+          });
+        }
+
+        if (list.length > EXHIBIT_PANEL_COUNT) {
+          toastHere(`작품이 ${list.length}개라서 앞 ${EXHIBIT_PANEL_COUNT}개만 표시`);
+        }
       }
 
       console.log("[museum] exhibit panelItems:", panelItems);
     } catch (e) {
-      console.warn("[museum] recent artworks failed -> placeholder", e);
-      toastHere("RECENT LOAD FAILED → PLACEHOLDER");
+      console.warn("[museum] artist artworks failed -> placeholder", e);
+      toastHere("EXHIBIT LOAD FAILED → PLACEHOLDER");
 
       panelItems = Array.from({ length: EXHIBIT_PANEL_COUNT }, (_, i) => ({
         panelName: `EX_PANEL_${i + 1}`,
@@ -338,8 +355,11 @@ export function mountMuseumApp(args: {
       uiMount,
       autoFitIfOff: true,
       debug: true,
-      titleText: `${payload.artist} — ${payload.artworkTitle}`,
+
+      // ✅ 클릭한 작품 제목은 “대표”일 뿐이라 전시 타이틀은 작가 중심이 더 자연스러움
+      titleText: `${payload.artist} 전시`,
       panelItems,
+
       onExitToHall: () => {
         toastHere("BACK TO HALL");
         startMainHall(payload.fromWaypointId ?? DEFAULT_HALL_START_WP);
@@ -355,7 +375,10 @@ export function mountMuseumApp(args: {
     if (e.code === "KeyX") {
       e.preventDefault();
       toastHere("DEBUG EXHIBIT");
+
+      // ⚠️ DEBUG는 실제 UUID가 아니라서 fetch 실패 → placeholder로 떨어지는 게 정상
       startExhibit({
+        artistId: "DEBUG",
         artist: "DEBUG",
         artworkTitle: "DEBUG",
         fromWaypointId: DEFAULT_HALL_START_WP,
