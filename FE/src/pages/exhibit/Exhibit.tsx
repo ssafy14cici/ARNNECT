@@ -134,9 +134,6 @@ export default function Exhibit() {
   const [showGuide, setShowGuide] = useState(false);
   const [bgmOn, setBgmOn] = useState(() => bgmIsOn());
 
-  const handleLeft = () => runtimeRef.current?.strafeLeft();
-  const handleRight = () => runtimeRef.current?.strafeRight();
-
   const artistId = params.artistId ?? null;
 
   useEffect(() => {
@@ -233,78 +230,6 @@ export default function Exhibit() {
       style={{ position: "relative", width: "100%", height: "100dvh", overflow: "hidden" }}
     >
       <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
-
-      <button
-        type="button"
-        onClick={handleLeft}
-        style={{
-          position: "fixed",
-          left: 24,
-          top: "50%",
-          transform: "translateY(-50%)",
-          width: 56,
-          height: 56,
-          borderRadius: "50%",
-          border: "1px solid rgba(255,255,255,0.3)",
-          background: "rgba(0,0,0,0.4)",
-          backdropFilter: "blur(8px)",
-          color: "rgba(255,255,255,0.9)",
-          fontSize: 24,
-          cursor: "pointer",
-          zIndex: 9985,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          transition: "background 0.2s, transform 0.15s",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = "rgba(0,0,0,0.6)";
-          e.currentTarget.style.transform = "translateY(-50%) scale(1.08)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = "rgba(0,0,0,0.4)";
-          e.currentTarget.style.transform = "translateY(-50%) scale(1)";
-        }}
-        aria-label="왼쪽 이동"
-      >
-        ◀
-      </button>
-
-      <button
-        type="button"
-        onClick={handleRight}
-        style={{
-          position: "fixed",
-          right: 24,
-          top: "50%",
-          transform: "translateY(-50%)",
-          width: 56,
-          height: 56,
-          borderRadius: "50%",
-          border: "1px solid rgba(255,255,255,0.3)",
-          background: "rgba(0,0,0,0.4)",
-          backdropFilter: "blur(8px)",
-          color: "rgba(255,255,255,0.9)",
-          fontSize: 24,
-          cursor: "pointer",
-          zIndex: 9985,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          transition: "background 0.2s, transform 0.15s",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = "rgba(0,0,0,0.6)";
-          e.currentTarget.style.transform = "translateY(-50%) scale(1.08)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = "rgba(0,0,0,0.4)";
-          e.currentTarget.style.transform = "translateY(-50%) scale(1)";
-        }}
-        aria-label="오른쪽 이동"
-      >
-        ▶
-      </button>
 
       {!showGuide && (
         <img

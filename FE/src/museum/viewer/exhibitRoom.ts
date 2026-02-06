@@ -263,36 +263,56 @@ export async function mountExhibitRoom(
 
   /* ===== UI ===== */
   const hasArtistLink = !!(opts.artistId && opts.onOpenArtist);
-  const top = mountEl(document.createElement(hasArtistLink ? "button" : "div"), hasArtistLink);
-  top.style.cssText =
-    "position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:99999;" +
-    "font-family:'MuseumClassic','Noto Sans KR',system-ui,sans-serif;" +
-    "color:rgba(255,255,255,0.95);font-size:28px;font-weight:700;letter-spacing:0.02em;" +
-    "text-shadow:0 6px 18px rgba(0,0,0,0.55);" +
-    (hasArtistLink
-      ? "pointer-events:auto;cursor:pointer;background:none;border:none;padding:8px 16px;" +
-        "border-radius:8px;transition:background 0.2s,transform 0.15s;"
-      : "pointer-events:none;");
-  top.textContent = opts.titleText ?? "EXHIBIT";
 
+  // ─────────────────────────────────────────────────────────────
+  // 좌측 하단: 전시 타이틀 + (선택) 아티스트 라인
+  // ─────────────────────────────────────────────────────────────
+  const topWrap = mountEl(document.createElement("div"));
+  topWrap.style.cssText =
+    "position:fixed;left:24px;bottom:24px;z-index:99999;" +
+    "display:flex;flex-direction:column;align-items:flex-start;gap:6px;" +
+    "text-shadow:0 6px 18px rgba(0,0,0,0.55);" +
+    "pointer-events:none;";
+
+  const titleEl = document.createElement("div");
+  titleEl.style.cssText =
+    "font-family:'MuseumClassic','Noto Sans KR',system-ui,sans-serif;" +
+    "color:rgba(255,255,255,0.96);" +
+    "font-size:28px;font-weight:800;letter-spacing:0.02em;" +
+    "line-height:1.0;";
+  titleEl.textContent = (opts.titleText ?? "EXHIBIT").trim();
+
+  topWrap.appendChild(titleEl);
+
+  // 아티스트 버튼(있으면 클릭 가능)
+  let artistBtn: HTMLButtonElement | null = null;
   if (hasArtistLink) {
-    (top as HTMLButtonElement).type = "button";
-    top.addEventListener("click", (e) => {
+    artistBtn = document.createElement("button");
+    artistBtn.type = "button";
+    artistBtn.style.cssText =
+      "pointer-events:auto;cursor:pointer;background:rgba(0,0,0,0.25);" +
+      "border:1px solid rgba(255,255,255,0.22);" +
+      "padding:6px 12px;border-radius:999px;" +
+      "backdrop-filter:blur(8px);" +
+      "font-family:'MuseumClassic','Noto Sans KR',system-ui,sans-serif;" +
+      "color:rgba(255,255,255,0.90);" +
+      "font-size:13px;font-weight:800;letter-spacing:0.04em;" +
+      "transition:transform .12s, background .18s, border-color .18s;";
+
+    artistBtn.textContent = "작가 프로필 바로가기";
+
+    artistBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
       if (opts.artistId && opts.onOpenArtist) opts.onOpenArtist(opts.artistId);
     });
-    top.addEventListener("pointerdown", (e) => e.stopPropagation(), { capture: true });
+    artistBtn.addEventListener("pointerdown", (e) => e.stopPropagation(), { capture: true });
+    topWrap.appendChild(artistBtn);
   }
 
-  const viewLabel = mountEl(document.createElement("div"));
-  viewLabel.style.cssText =
-    "position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:99999;" +
-    "font-family:monospace;color:rgba(255,255,255,0.75);font-size:13px;" +
-    "letter-spacing:0.08em;text-shadow:0 4px 14px rgba(0,0,0,0.55);pointer-events:none;" +
-    "padding:6px 14px;background:rgba(0,0,0,0.3);border-radius:999px;backdrop-filter:blur(4px);";
-  viewLabel.textContent = points.length ? `VIEWPOINT ${index}` : `VIEWPOINT -`;
-
+  // ─────────────────────────────────────────────────────────────
+  // 좌측 상단: Back 버튼 유지
+  // ─────────────────────────────────────────────────────────────
   const back = mountEl(document.createElement("button"), true);
   back.type = "button";
   back.textContent = "← 홀로 돌아가기";
@@ -303,9 +323,90 @@ export async function mountExhibitRoom(
     "color:rgba(255,255,255,0.92);font-family:'MuseumClassic','Noto Sans KR',system-ui,sans-serif;" +
     "font-size:14px;font-weight:800;cursor:pointer;" +
     "pointer-events:auto;touch-action:manipulation;";
-
   back.addEventListener("pointerdown", (e: PointerEvent) => e.stopPropagation(), { capture: true });
 
+  // ─────────────────────────────────────────────────────────────
+  // 중앙 하단: 좌/우 버튼 + 뷰포인트 라벨 (이쁘게)
+  // ─────────────────────────────────────────────────────────────
+  const navWrap = mountEl(document.createElement("div"), true);
+  navWrap.style.cssText =
+    "position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:99999;" +
+    "display:flex;align-items:center;gap:10px;" +
+    "pointer-events:auto;touch-action:manipulation;";
+
+  function makeNavBtn(label: string) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    b.style.cssText =
+      "width:46px;height:38px;border-radius:999px;" +
+      "border:1px solid rgba(255,255,255,0.22);" +
+      "background:rgba(0,0,0,0.35);backdrop-filter:blur(10px);" +
+      "color:rgba(255,255,255,0.92);font-size:16px;font-weight:900;" +
+      "cursor:pointer;display:flex;align-items:center;justify-content:center;" +
+      "box-shadow:0 10px 26px rgba(0,0,0,0.35);" +
+      "transition:transform .12s, background .18s, border-color .18s;";
+    b.addEventListener("pointerdown", (e) => e.stopPropagation(), { capture: true });
+    b.addEventListener("mouseenter", () => (b.style.transform = "translateY(-1px)"));
+    b.addEventListener("mouseleave", () => (b.style.transform = "translateY(0px)"));
+    return b;
+  }
+
+  const btnPrev = makeNavBtn("◀");
+  const btnNext = makeNavBtn("▶");
+
+  const viewLabel = document.createElement("div");
+  viewLabel.style.cssText =
+    "min-width:160px;height:38px;border-radius:999px;" +
+    "display:flex;align-items:center;justify-content:center;gap:8px;" +
+    "padding:0 14px;" +
+    "background:rgba(0,0,0,0.40);backdrop-filter:blur(12px);" +
+    "border:1px solid rgba(255,255,255,0.22);" +
+    "box-shadow:0 12px 30px rgba(0,0,0,0.40);" +
+    "font-family:ui-sans-serif,system-ui, -apple-system, 'Noto Sans KR';" +
+    "color:rgba(255,255,255,0.92);" +
+    "letter-spacing:0.08em;";
+
+  const vpKey = document.createElement("span");
+  vpKey.style.cssText = "font-size:11px;font-weight:800;opacity:0.75;";
+  vpKey.textContent = "VIEWPOINT";
+
+  const vpNum = document.createElement("span");
+  vpNum.style.cssText =
+    "font-size:13px;font-weight:900;letter-spacing:0.02em;" +
+    "padding:5px 10px;border-radius:999px;" +
+    "background:rgba(255,255,255,0.12);" +
+    "border:1px solid rgba(255,255,255,0.18);";
+  vpNum.textContent = points.length ? `${index}` : "-";
+
+  viewLabel.append(vpKey, vpNum);
+  navWrap.append(btnPrev, viewLabel, btnNext);
+
+  // ✅ 한 군데서 UI 갱신하도록 통일
+  function syncViewUI(i: number) {
+    vpNum.textContent = points.length ? `${i}` : "-";
+  }
+
+  // 버튼 동작
+  btnPrev.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!points.length || fpsEnabled) return;
+    goTo(index - 1, 0.85, -1);
+    syncViewUI(index);
+  });
+
+  btnNext.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!points.length || fpsEnabled) return;
+    goTo(index + 1, 0.85, 1);
+    syncViewUI(index);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 로딩 오버레이 (기존 유지)
+  // ─────────────────────────────────────────────────────────────
   const loading = mountEl(document.createElement("div"), true);
   loading.style.cssText =
     "position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:99998;" +
@@ -313,6 +414,8 @@ export async function mountExhibitRoom(
     "font-family:ui-sans-serif,system-ui;color:rgba(255,255,255,0.92);" +
     "font-size:14px;letter-spacing:0.06em;" +
     "pointer-events:auto;";
+
+
   loading.textContent = "LOADING GALLERY…";
 
   /* ===== FPS ===== */
