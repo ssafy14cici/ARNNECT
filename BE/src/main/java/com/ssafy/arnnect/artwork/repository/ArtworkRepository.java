@@ -106,4 +106,14 @@ public interface ArtworkRepository extends JpaRepository<Artwork, Long> {
         LIMIT 6;
     """, nativeQuery = true)
     List<NewArtistRepresentativeResponse> getNewArtist();
+
+
+    @Query("""
+        select g.genreId
+        from Artwork a
+        left join ArtGenre g on g.genreId = a.genre.genreId
+        where a.artworkId in :artworkIds
+    """)
+    List<Long> findGenreIdsByArtworkIds(List<Long> artworkIds);
+
 }
