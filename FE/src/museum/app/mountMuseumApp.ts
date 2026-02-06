@@ -13,9 +13,9 @@ const DEFAULT_HALL_START_WP = 0;
 
 export type ExhibitPayload = {
   artId?: number;
-  artistId: string; // ✅ memberUuid (핵심)
-  artist: string;
-  artworkTitle: string;
+  artistId: string;      // ✅ memberUuid
+  artist: string;        // nickname
+  artworkTitle: string;  // 대표작 제목(홀에서 클릭한 작품)
   fromWaypointId: number;
 };
 
@@ -62,7 +62,7 @@ function savePose(pose: CameraPose) {
   }
 }
 
-/** ✅ 목업 파일 없이도 쓸 수 있는 placeholder (data URL) */
+/** placeholder (data URL) */
 function makePlaceholderDataUrl(label: string, w = 768, h = 768) {
   const c = document.createElement("canvas");
   c.width = w;
@@ -234,7 +234,7 @@ export function mountMuseumApp(args: {
         onOpenExhibit: (payload) => {
           console.log("[APP] onOpenExhibit fired", payload);
           toastHere(`OPEN EXHIBIT: ${payload.artist}`);
-          startExhibit(payload as ExhibitPayload);
+          startExhibit(payload);
         },
       });
 
@@ -291,11 +291,10 @@ export function mountMuseumApp(args: {
       panelName: string;
       imageUrl: string;
       title: string;
-      artworkId: number;
     }> = [];
 
     try {
-      // ✅ 핵심: 선택한 작가의 작품 전체
+      // ✅ 작가별 작품 전체 로드
       const list = await fetchArtworksByArtist(payload.artistId);
       if (disposed) return;
 
@@ -304,36 +303,22 @@ export function mountMuseumApp(args: {
           panelName: `EX_PANEL_${i + 1}`,
           imageUrl: makePlaceholderDataUrl(`EMPTY ${i + 1}`),
           title: `EMPTY ${i + 1}`,
-          artworkId: -1,
         }));
       } else {
-        const limited = list.slice(0, EXHIBIT_PANEL_COUNT);
+        panelItems = Array.from({ length: EXHIBIT_PANEL_COUNT }, (_, i) => {
+          const a = list[i % list.length];
 
-        panelItems = limited.map((a, idx) => {
-          const url = buildNewArtistImageUrl(a.imageUrl || a.savedImageName);
-          const safeUrl = url || makePlaceholderDataUrl(`NO IMG ${idx + 1}`);
+          // 서버가 imageUrl을 주면 그걸 우선 사용, 아니면 savedImageName
+          const raw = (a.imageUrl ?? a.savedImageName ?? "").trim();
+          const url = buildNewArtistImageUrl(raw);
+          const safeUrl = url || makePlaceholderDataUrl(`NO IMG ${i + 1}`);
 
           return {
-            panelName: `EX_PANEL_${idx + 1}`,
+            panelName: `EX_PANEL_${i + 1}`,
             imageUrl: safeUrl,
-            title: a.title || `작품 ${idx + 1}`,
-            artworkId: a.artworkId,
+            title: a.title || `작품 ${i + 1}`,
           };
         });
-
-        // 부족한 패널은 placeholder로 채우기
-        for (let i = panelItems.length; i < EXHIBIT_PANEL_COUNT; i++) {
-          panelItems.push({
-            panelName: `EX_PANEL_${i + 1}`,
-            imageUrl: makePlaceholderDataUrl(`EMPTY ${i + 1}`),
-            title: `EMPTY ${i + 1}`,
-            artworkId: -1,
-          });
-        }
-
-        if (list.length > EXHIBIT_PANEL_COUNT) {
-          toastHere(`작품이 ${list.length}개라서 앞 ${EXHIBIT_PANEL_COUNT}개만 표시`);
-        }
       }
 
       console.log("[museum] exhibit panelItems:", panelItems);
@@ -345,7 +330,6 @@ export function mountMuseumApp(args: {
         panelName: `EX_PANEL_${i + 1}`,
         imageUrl: makePlaceholderDataUrl(`OFFLINE ${i + 1}`),
         title: `OFFLINE ${i + 1}`,
-        artworkId: -1,
       }));
     }
 
@@ -355,18 +339,18 @@ export function mountMuseumApp(args: {
       uiMount,
       autoFitIfOff: true,
       debug: true,
-
-      // ✅ 클릭한 작품 제목은 “대표”일 뿐이라 전시 타이틀은 작가 중심이 더 자연스러움
-      titleText: `${payload.artist} 전시`,
+      titleText: `${payload.artist} — ${payload.artworkTitle}`,
       panelItems,
 
       onExitToHall: () => {
         toastHere("BACK TO HALL");
         startMainHall(payload.fromWaypointId ?? DEFAULT_HALL_START_WP);
       },
+
+      // onOpenArtwork는 exhibitRoom 쪽 구현이 “클릭 시 artworkId를 넘겨주는 구조”일 때만 의미가 있음
       onOpenArtwork: (artworkId) => {
         console.log("[museum] onOpenArtwork:", artworkId);
-        // args.onOpenArtwork?.(Number(artworkId));
+        args.onOpenArtwork?.(Number(artworkId));
       },
     });
   }
@@ -375,8 +359,6 @@ export function mountMuseumApp(args: {
     if (e.code === "KeyX") {
       e.preventDefault();
       toastHere("DEBUG EXHIBIT");
-
-      // ⚠️ DEBUG는 실제 UUID가 아니라서 fetch 실패 → placeholder로 떨어지는 게 정상
       startExhibit({
         artistId: "DEBUG",
         artist: "DEBUG",
