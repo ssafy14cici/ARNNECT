@@ -1,6 +1,6 @@
 // FE/src/app/router/routes.tsx
 import type { RouteObject } from "react-router-dom";
-import { Navigate, createBrowserRouter, redirect } from "react-router-dom";
+import { Navigate, createBrowserRouter, redirect, Outlet } from "react-router-dom";
 
 import { useAuthStore } from "../../features/auth/store";
 import Guard from "./Guard";
@@ -14,6 +14,8 @@ import Hall from "../../pages/hall";
 import Search from "../../pages/search/Search";
 import Guide from "../../pages/guide/Guide";
 import YourPreference from "../../pages/yourpreference/YourPreference";
+import YourPreferenceSelect from "../../pages/yourpreference/YourPreferenceSelect";
+import YourPreferenceResult from "../../pages/yourpreference/YourPreferenceResult";
 
 import Login from "../../pages/auth/Login";
 import Signup from "../../pages/auth/Signup";
@@ -53,7 +55,6 @@ import ReviewDetail from "../../pages/reviews/ReviewDetail";
 import NotFound from "../../pages/notfound/NotFound";
 import PrivacyPolicy from "../../pages/legal/PrivacyPolicy";
 import TermsOfService from "../../pages/legal/TermsOfService";
-import { path } from "framer-motion/client";
 
 const KEY_PREF_USED = "arnnect_pref_used_v1";
 const USE_MOCK = String(import.meta.env.VITE_USE_MOCK) === "true";
@@ -62,10 +63,11 @@ function preferenceOnceLoader() {
   const { isLoggedIn } = useAuthStore.getState();
   if (isLoggedIn) return null;
 
-  if (USE_MOCK) {
-    const used = localStorage.getItem(KEY_PREF_USED) === "true";
-    if (used) throw redirect("/login");
-  }
+  // ✅ mock이면 localStorage, 아니면 sessionStorage(탭 기준 1회)
+  const storage = USE_MOCK ? localStorage : sessionStorage;
+  const used = storage.getItem(KEY_PREF_USED) === "true";
+  if (used) throw redirect("/login");
+
   return null;
 }
 
@@ -98,7 +100,16 @@ export const routes: RouteObject[] = [
 
       { path: "feed", element: <Feed /> },
 
-      { path: "preference", element: <YourPreference />, loader: preferenceOnceLoader },
+      {
+        path: "preference",
+        loader: preferenceOnceLoader,
+        element: <Outlet />,
+        children: [
+          { index: true, element: <YourPreference /> },          // /preference
+          { path: "select", element: <YourPreferenceSelect /> }, // /preference/select
+          { path: "result", element: <YourPreferenceResult /> }, // /preference/result
+        ],
+      },
 
       { path: "legal/privacy", element: <PrivacyPolicy /> },
       { path: "legal/terms", element: <TermsOfService /> },
