@@ -2,15 +2,32 @@ import { create } from "zustand";
 
 export type Selection = {
   round: number;
+
+  // ✅ 백엔드가 주는 진짜 artworkId
+  artworkId: number;
+
+  // 기존 호환(필요 없으면 삭제 가능)
   selectedId: string;
-  type: string;
+  type: string; // 보통 genreName 넣으면 됨
+
+  // optional meta
+  genreId?: number;
+  genreName?: string;
+  tags?: string[];
 };
 
 export type ResultData = {
   mbti: string;
   title: string;
-  desc: string;
+  tagline: string;
+  description: string;
+  strengths: string[];
+  watchouts: string[];
+  tip: string;
+
+  // UI 배지용(원하면 제거 가능)
   keywords: string[];
+
   recommendArtist?: string;
 };
 

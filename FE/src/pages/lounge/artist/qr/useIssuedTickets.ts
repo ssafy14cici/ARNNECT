@@ -66,13 +66,36 @@ function pickString(obj: any, keys: string[], fallback = ""): string {
   return fallback;
 }
 
+/** ✅ 삭제 API가 ticketCode를 받는 케이스가 많아서 code 우선 시도 + id fallback */
+async function deleteTicketRobust(t: TicketItem) {
+  const code = (t.ticketCode ?? "").trim();
+  const id = Number(t.ticketId);
+
+  const candidates: Array<string | number> = [];
+  if (code) candidates.push(code); // ✅ 1순위: ticketCode
+  if (Number.isFinite(id) && id > 0) candidates.push(id); // ✅ 2순위: ticketId
+
+  let lastErr: unknown = null;
+
+  for (const key of candidates) {
+    try {
+      // realTickets.deleteTicket가 내부에서 path param만 꽂는 방식이면 string도 통과 가능
+      await deleteTicket(key as any);
+      return;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+
+  throw lastErr ?? new Error("티켓 삭제 실패");
+}
+
 // ✅ artistUuid를 optional로 받고, 없으면 절대 크래시 안 나게 가드
 export function useIssuedTickets(artistUuid?: string) {
   const [issued, setIssued] = useState<TicketItem[]>([]);
 
   const reloadIssued = useCallback(async () => {
     if (!artistUuid) {
-      // artistUuid 없으면 그냥 빈 배열로
       setIssued([]);
       return;
     }
@@ -115,9 +138,24 @@ export function useIssuedTickets(artistUuid?: string) {
 
   const removeIssued = useCallback(
     async (t: TicketItem) => {
-      await deleteTicket(t.ticketId);
-      forgetDesign(t.ticketCode);
-      await reloadIssued();
+      // ✅ optimistic: UI에서 먼저 제거 → 실패 시 롤백
+      let snapshot: TicketItem[] | null = null;
+      setIssued((prev) => {
+        snapshot = prev;
+        return prev.filter((x) => x.ticketId !== t.ticketId);
+      });
+
+      try {
+        await deleteTicketRobust(t);
+        forgetDesign(t.ticketCode);
+
+        // ✅ 서버 기준으로 재동기화
+        await reloadIssued();
+      } catch (e) {
+        // ❗ 실패 시 롤백
+        if (snapshot) setIssued(snapshot);
+        throw e;
+      }
     },
     [reloadIssued],
   );
