@@ -73,7 +73,7 @@ export default function ArtworkDetail() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
-
+  const ARTIST_FANLETTER_ROUTE = "/lounge/artist/fanletter";
   const meUuid = useMemo(() => String(user?.memberUuid ?? "").trim(), [user?.memberUuid]);
 
   const profilePath = (uuid: string) => `/members/${encodeURIComponent(uuid)}`;
@@ -124,6 +124,20 @@ export default function ArtworkDetail() {
     const owner = String((artwork as any)?.artistMemberUuid ?? (artwork as any)?.artistId ?? "").trim();
     return !!me && !!owner && me === owner;
   }, [user?.memberUuid, artwork]);
+
+  const onOpenFanLetter = () => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+
+    // ✅ 내 작품이면: '받은 팬레터' 페이지로 이동
+    if (isOwner) {
+      navigate(ARTIST_FANLETTER_ROUTE);
+      return;
+    }
+
+    // ✅ 남의 작품이면: '팬레터 보내기' 모달
+    setFanLetterOpen(true);
+  };
+
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -544,10 +558,6 @@ export default function ArtworkDetail() {
     navigate(`/artworks/${normalizedArtworkId}/edit`);
   };
 
-  const onOpenFanLetter = () => {
-    if (!isLoggedIn) return alert("로그인이 필요합니다.");
-    setFanLetterOpen(true);
-  };
 
   const onSendFanLetter = async (content: string) => {
     if (!isLoggedIn || !user?.memberUuid) return alert("로그인 후 이용해주세요.");
@@ -678,7 +688,7 @@ export default function ArtworkDetail() {
         onSubmitReply={onSubmitReply}
       />
 
-      {fanLetterOpen && (
+      {!isOwner && fanLetterOpen && (
         <div className="modal-overlay" onClick={() => setFanLetterOpen(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
