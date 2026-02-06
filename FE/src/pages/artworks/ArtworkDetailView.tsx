@@ -301,13 +301,12 @@ export default function ArtworkDetailView(props: Props) {
 
   return (
     <div className="artwork-detail-page">
-      {/* 상단 고정 헤더 */}
-      <div className="artwork-detail-top">
-        <button className="btn-icon" type="button" onClick={onGoHome}>
-          홈
-        </button>
-
-        {isOwner ? (
+      {/* 상단 고정 헤더 - 작가(소유자)만 표시 */}
+      {isOwner && (
+        <div className="artwork-detail-top">
+          <button className="btn-icon" type="button" onClick={onGoHome}>
+            홈
+          </button>
           <div className="top-actions">
             <button className="btn-icon" type="button" onClick={onGoEdit}>
               수정
@@ -316,10 +315,8 @@ export default function ArtworkDetailView(props: Props) {
               삭제
             </button>
           </div>
-        ) : (
-          <div />
-        )}
-      </div>
+        </div>
+      )}
 
       {/* HERO */}
       <section className="artwork-hero">

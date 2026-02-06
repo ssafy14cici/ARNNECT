@@ -32,6 +32,7 @@ export default function Navbar() {
   const isHome =
     location.pathname === "/" ||
     matches.some((m) => (m.handle as any)?.navVariant === "home");
+  const isHomeMobile = matches.some((m) => (m.handle as any)?.navVariant === "home-mobile") || (isHome && isMobile);
 
   const [isTop, setIsTop] = useState(true);
   const [isModalOpen, setModalOpen] = useState(false);
@@ -79,7 +80,12 @@ export default function Navbar() {
       document.body.classList.remove("nav-menu-open");
     }
 
-    return () => {
+
+
+
+
+
+  return () => {
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = "";
       document.body.classList.remove("nav-menu-open");
@@ -94,7 +100,12 @@ export default function Navbar() {
     const onScroll = () => setIsTop(window.scrollY <= 20);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+
+
+
+
+
+  return () => window.removeEventListener("scroll", onScroll);
   }, [isHome]);
 
   const items: MenuItem[] = useMemo(
@@ -144,6 +155,13 @@ export default function Navbar() {
     .join(" ");
 
   const shouldHideHeader = false;
+
+
+
+
+
+
+  if (isHomeMobile) return null;
 
   return (
     <>

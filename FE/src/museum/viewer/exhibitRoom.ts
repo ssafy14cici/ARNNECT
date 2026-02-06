@@ -22,6 +22,7 @@ type Options = {
   backgroundColor?: number;
 
   titleText?: string;
+  artistId?: string | null; // ✅ 작가 ID (클릭 시 프로필 이동용)
 
   debug?: boolean;
   autoFitIfOff?: boolean;
@@ -35,6 +36,9 @@ type Options = {
 
   // ✅ 전시장에서 "작품 상세보기" 눌렀을 때 라우팅은 바깥(React)에서 하게 콜백으로 뺌
   onOpenArtwork?: (artworkId: string | number) => void;
+
+  // ✅ 작가 프로필로 이동
+  onOpenArtist?: (artistId: string) => void;
 };
 
 /**
@@ -99,7 +103,13 @@ function applyTexFix(tex: THREE.Texture, panelName: string, debug?: boolean) {
 export async function mountExhibitRoom(
   canvas: HTMLCanvasElement,
   opts: Options
-): Promise<{ destroy: () => void; goTo: (i: number, dur?: number) => void; getIndex: () => number }> {
+): Promise<{
+  destroy: () => void;
+  goTo: (i: number, dur?: number) => void;
+  getIndex: () => number;
+  strafeLeft: (dist?: number) => void;
+  strafeRight: (dist?: number) => void;
+}> {
   const debug = opts.debug ?? true;
   const autoFitIfOff = opts.autoFitIfOff ?? true;
 
@@ -256,19 +266,47 @@ export async function mountExhibitRoom(
   window.addEventListener("resize", onResize);
 
   /* ===== UI ===== */
-  const top = mountEl(document.createElement("div"));
+  // ✅ 작가 이름 (클릭 가능, 크게)
+  const hasArtistLink = !!(opts.artistId && opts.onOpenArtist);
+  const top = mountEl(document.createElement(hasArtistLink ? "button" : "div"), hasArtistLink);
   top.style.cssText =
     "position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:99999;" +
     "font-family:'MuseumClassic','Noto Sans KR',system-ui,sans-serif;" +
-    "color:rgba(255,255,255,0.92);font-size:16px;letter-spacing:0.02em;" +
-    "text-shadow:0 6px 18px rgba(0,0,0,0.55);pointer-events:none;";
+    "color:rgba(255,255,255,0.95);font-size:28px;font-weight:700;letter-spacing:0.02em;" +
+    "text-shadow:0 6px 18px rgba(0,0,0,0.55);" +
+    (hasArtistLink
+      ? "pointer-events:auto;cursor:pointer;background:none;border:none;padding:8px 16px;" +
+        "border-radius:8px;transition:background 0.2s,transform 0.15s;"
+      : "pointer-events:none;");
   top.textContent = opts.titleText ?? "EXHIBIT";
 
+  if (hasArtistLink) {
+    (top as HTMLButtonElement).type = "button";
+    top.addEventListener("mouseenter", () => {
+      top.style.background = "rgba(255,255,255,0.1)";
+      top.style.transform = "translateX(-50%) scale(1.02)";
+    });
+    top.addEventListener("mouseleave", () => {
+      top.style.background = "none";
+      top.style.transform = "translateX(-50%) scale(1)";
+    });
+    top.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (opts.artistId && opts.onOpenArtist) {
+        opts.onOpenArtist(opts.artistId);
+      }
+    });
+    top.addEventListener("pointerdown", (e) => e.stopPropagation(), { capture: true });
+  }
+
+  // ✅ VIEWPOINT 라벨 (하단 중앙으로 이동)
   const viewLabel = mountEl(document.createElement("div"));
   viewLabel.style.cssText =
-    "position:fixed;left:50%;top:48px;transform:translateX(-50%);z-index:99999;" +
-    "font-family:monospace;color:rgba(255,255,255,0.75);font-size:12px;" +
-    "letter-spacing:0.08em;text-shadow:0 4px 14px rgba(0,0,0,0.55);pointer-events:none;";
+    "position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:99999;" +
+    "font-family:monospace;color:rgba(255,255,255,0.75);font-size:13px;" +
+    "letter-spacing:0.08em;text-shadow:0 4px 14px rgba(0,0,0,0.55);pointer-events:none;" +
+    "padding:6px 14px;background:rgba(0,0,0,0.3);border-radius:999px;backdrop-filter:blur(4px);";
   viewLabel.textContent = points.length ? `VIEWPOINT ${index}` : `VIEWPOINT -`;
 
   const back = mountEl(document.createElement("button"), true);
@@ -917,7 +955,34 @@ export async function mountExhibitRoom(
   };
   back.addEventListener("click", onBackClick, { capture: true });
 
-  return { destroy, goTo, getIndex: () => index };
+  // ✅ 현재 시점 방향 기준 좌우 이동 (버튼용)
+  const STRAFE_DIST = 1.5; // 한 번 클릭 시 이동 거리
+
+  const strafeLeft = (dist = STRAFE_DIST) => {
+    if (!alive) return;
+    // 카메라가 보는 방향의 오른쪽 벡터 계산
+    const right = new THREE.Vector3();
+    camera.getWorldDirection(tmpDir);
+    right.crossVectors(tmpDir, camera.up).normalize();
+    // 왼쪽으로 이동 (right의 반대)
+    camera.position.addScaledVector(right, -dist);
+    lookTarget.addScaledVector(right, -dist);
+    camera.updateMatrixWorld(true);
+  };
+
+  const strafeRight = (dist = STRAFE_DIST) => {
+    if (!alive) return;
+    // 카메라가 보는 방향의 오른쪽 벡터 계산
+    const right = new THREE.Vector3();
+    camera.getWorldDirection(tmpDir);
+    right.crossVectors(tmpDir, camera.up).normalize();
+    // 오른쪽으로 이동
+    camera.position.addScaledVector(right, dist);
+    lookTarget.addScaledVector(right, dist);
+    camera.updateMatrixWorld(true);
+  };
+
+  return { destroy, goTo, getIndex: () => index, strafeLeft, strafeRight };
 }
 
 function clampInt(v: number, a: number, b: number) {

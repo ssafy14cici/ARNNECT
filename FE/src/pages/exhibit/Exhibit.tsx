@@ -123,6 +123,8 @@ type ExhibitRuntime = {
   destroy: () => void;
   goTo: (i: number, dur?: number) => void;
   getIndex: () => number;
+  strafeLeft: (dist?: number) => void;
+  strafeRight: (dist?: number) => void;
 };
 
 export default function Exhibit() {
@@ -140,18 +142,15 @@ export default function Exhibit() {
   // ✅ 전역 BGM 상태와 동기화
   const [bgmOn, setBgmOn] = useState(() => bgmIsOn());
 
-  // ✅ 좌우 이동 버튼 핸들러
-  const handlePrev = () => {
+  // ✅ 좌우 스트레이프 버튼 핸들러 (현재 시점 방향 기준 좌우 이동)
+  const handleLeft = () => {
     if (!runtimeRef.current) return;
-    const curr = runtimeRef.current.getIndex();
-    runtimeRef.current.goTo(curr + 1, 0.85);
+    runtimeRef.current.strafeLeft();
   };
-  
 
-  const handleNext = () => {
+  const handleRight = () => {
     if (!runtimeRef.current) return;
-    const curr = runtimeRef.current.getIndex();
-    runtimeRef.current.goTo(curr - 1, 0.85);
+    runtimeRef.current.strafeRight();
   };
 
   // ✅ URL params에서 artistId 가져오기 (/exhibit/:artistId)
@@ -213,10 +212,16 @@ export default function Exhibit() {
           uiMount: uiLayer,
           titleText,
           panelItems,
+          artistId,
 
           onExitToHall: () => {
             console.log("[Exhibit] onExitToHall → /hall, fromWaypointId:", fromWaypointId);
             nav("/hall", { state: { startWaypointId: fromWaypointId } });
+          },
+
+          onOpenArtist: (id) => {
+            console.log("[Exhibit] onOpenArtist → /members/", id);
+            nav(`/members/${id}`);
           },
 
           // 필요하면 여기서 작품 상세로 보내기 (mountExhibitRoom이 artworkId를 넘겨주는 구조면)
@@ -251,10 +256,10 @@ export default function Exhibit() {
     >
       <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
 
-      {/* 좌우 이동 오버레이 버튼 */}
+      {/* 좌우 스트레이프 버튼 (현재 시점 방향 기준 좌우 이동) */}
       <button
         type="button"
-        onClick={handlePrev}
+        onClick={handleLeft}
         style={{
           position: "fixed",
           left: 24,
@@ -283,14 +288,14 @@ export default function Exhibit() {
           e.currentTarget.style.background = "rgba(0,0,0,0.4)";
           e.currentTarget.style.transform = "translateY(-50%) scale(1)";
         }}
-        aria-label="이전 작품"
+        aria-label="왼쪽 이동"
       >
         ◀
       </button>
 
       <button
         type="button"
-        onClick={handleNext}
+        onClick={handleRight}
         style={{
           position: "fixed",
           right: 24,
@@ -319,7 +324,7 @@ export default function Exhibit() {
           e.currentTarget.style.background = "rgba(0,0,0,0.4)";
           e.currentTarget.style.transform = "translateY(-50%) scale(1)";
         }}
-        aria-label="다음 작품"
+        aria-label="오른쪽 이동"
       >
         ▶
       </button>
