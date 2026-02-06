@@ -1,4 +1,11 @@
 /* fonts loaded globally via global.css */
+:root{
+  /* 전역 Navbar 실제 높이에 맞춰 숫자 조정 */
+  --app-navbar-h: 72px;
+
+  /* 상세 상단바(홈/수정/삭제) 세로 패딩을 고려한 여유 */
+  --detail-top-gap: 14px;
+}
 
 /* ==========================================================================
    RESET & LAYOUT
@@ -11,22 +18,32 @@
   min-height: 100vh;
   position: relative;
 
-  /* 상단 fixed 헤더 공간 */
-  padding-top: 70px;
+  /* ✅ 전역 Navbar가 fixed면 컨텐츠가 가려지지 않게 */
+  padding-top: calc(var(--app-navbar-h) + env(safe-area-inset-top));
 }
 
-/* 상단 고정 헤더(기존 JSX에 맞게 추가) */
+/* ✅ 상단 고정 헤더(홈/수정/삭제): 전역 Navbar 아래로 내려서 겹침 방지 */
 .artwork-detail-top {
   position: fixed;
-  top: 14px;
+  top: calc(var(--app-navbar-h) + env(safe-area-inset-top) + var(--detail-top-gap));
   left: 14px;
   right: 14px;
-  z-index: 2000;
+
+  /* ✅ 모달/이미지뷰어보다 낮게(모달이 덮어야 함) */
+  z-index: 1500;
 
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  padding: 12px 16px;
+
+  /* ✅ 배경/블러로 가독성 확보 */
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 999px;
 }
 
 .top-actions {
@@ -113,12 +130,18 @@
 
   border-radius: 18px;
   overflow: hidden;
+
+  /* ✅ 너무 작게 보이는 케이스 완화: 프레임 최대폭을 잡아주고 */
+  width: min(900px, 92vw);
 }
 
 .hero-img {
-  max-height: 60vh;
-  max-width: 100%;
-  width: auto;
+  /* ✅ 프레임 폭에 맞춰 확대될 수 있게 */
+  width: 100%;
+  height: auto;
+
+  /* 기존 의도 유지 */
+  max-height: 70vh;
   display: block;
   object-fit: contain;
 }
@@ -316,7 +339,7 @@
 /* 리스트 */
 .comment-list {
   display: flex;
-  flex-direction: column; /* ✅ 오타 수정 */
+  flex-direction: column;
   gap: 30px;
 }
 
@@ -393,7 +416,10 @@
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.8);
   backdrop-filter: blur(5px);
-  z-index: 1000;
+
+  /* ✅ 상단바(1500)보다 높게: 모달이 항상 덮도록 */
+  z-index: 9998;
+
   display: grid; place-items: center;
 }
 .modal-box {
@@ -425,6 +451,9 @@
   .artwork-hero { min-height: 60vh; }
   .action-bar { flex-direction: column; align-items: flex-start; gap: 20px; }
   .comment-input-wrap { flex-direction: column; }
+
+  /* ✅ 모바일에서 상단바 좌우 여백 조금 줄임 */
+  .artwork-detail-top { left: 10px; right: 10px; }
 }
 
 /* 링크 */
@@ -437,4 +466,61 @@
 .hero-artist-link:hover,
 .comment-author-link:hover {
   opacity: 0.85;
+}
+
+/* ==========================================================================
+   6. (옵션) 이미지 확대 뷰어 CSS (뷰어 구현했으면 바로 적용됨)
+========================================================================== */
+.img-viewer-overlay{
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.82);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.img-viewer{
+  width: min(1100px, 96vw);
+  height: min(760px, 92vh);
+  background: rgba(10,10,10,0.75);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.img-viewer-toolbar{
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+}
+
+.img-viewer-stage{
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+}
+
+.img-viewer-img{
+  max-width: 92%;
+  max-height: 92%;
+  object-fit: contain;
+  transform-origin: center center;
+  user-select: none;
+  pointer-events: none;
+}
+
+.img-viewer-hint{
+  padding: 10px 14px;
+  font-size: 12px;
+  opacity: 0.8;
+  border-top: 1px solid rgba(255,255,255,0.10);
 }

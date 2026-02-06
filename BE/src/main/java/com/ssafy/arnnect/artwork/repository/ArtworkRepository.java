@@ -81,7 +81,7 @@ public interface ArtworkRepository extends JpaRepository<Artwork, Long> {
             a.title,
             a.description,
             a.production_date,
-            concat('artwork',a.saved_image_name) as saved_image_name
+            concat('/artwork/',a.saved_image_name) as saved_image_name
         FROM artwork a
         JOIN artist at ON at.member_id = a.member_id
         JOIN member m ON m.member_id = a.member_id\s

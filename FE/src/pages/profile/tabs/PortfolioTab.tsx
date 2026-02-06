@@ -54,6 +54,10 @@ export default function PortfolioTab() {
     );
   }
 
+  // ✅ Exhibit 라우트가 /exhibit/:artistId 라면 반드시 id를 붙여서 이동해야 함
+  const artistId = String(profile.id ?? "").trim();
+  const exhibitPath = artistId ? `/exhibit/${encodeURIComponent(artistId)}` : "/exhibit";
+
   return (
     <div className="tab-container">
       <div className="tab-header">
@@ -62,12 +66,18 @@ export default function PortfolioTab() {
         {/* ✅ 버튼 영역 */}
         <div style={{ display: "flex", gap: 8 }}>
           {/* ✅ 관람자(일반 유저)도 3D 전시장 진입 가능하게 */}
-          {/* <Link
-            to={`/exhibit/${profile.id}`}
+          <Link
+            to={exhibitPath}
             className="tab-btn"
-            state={{ from: "profile", artistId: profile.id }}
-          > */}
-          <Link to="/exhibit" className="tab-btn">
+            state={{
+              from: "profile",
+              artistId,
+              // 있으면 타이틀에 쓰기 좋음 (Exhibit.tsx에서 location.state 사용 중)
+              artist: (profile as any)?.nickname ?? "",
+              artworkTitle: "PORTFOLIO",
+              fromWaypointId: 0,
+            }}
+          >
             3D 전시장 보기
           </Link>
 

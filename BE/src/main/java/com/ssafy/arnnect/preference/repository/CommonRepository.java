@@ -34,7 +34,7 @@ public interface CommonRepository extends JpaRepository<UserArtworkRanking, Long
         select m.nickname , uas.score\s
         from user_artist_score uas\s
         left join `member` m  on m.member_uuid = uas.artist_uuid\s
-        where uas.member_uuid = '7c409535-3bd2-4d43-bc13-a1776fc4172f'
+        where uas.member_uuid = :memberUuid
         order by uas.score desc
         LIMIT 3  
      """, nativeQuery = true)
