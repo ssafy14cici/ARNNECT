@@ -183,7 +183,7 @@ export default function Navbar() {
               ) : (
                 <>
                   <span className="refLabel">
-                    {it.key === "auth" ? (isLoggedIn ? "LOGOUT" : "LOGIN") : it.label}
+                    {it.key === "auth" ? (isLoggedIn ? "logout" : "LOGIN") : it.label}
                   </span>
 
                   {hoveredKey === it.key && (

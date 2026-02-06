@@ -3,18 +3,28 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./qr.css";
 
-import { useIssuedTickets } from "./useIssuedTickets";
+import { useIssuedTickets, type TicketDesign } from "./useIssuedTickets";
 import { resolveTicketMedia } from "../../../../features/tickets/resolveTicketMedia";
 import { useAuthStore } from "../../../../features/auth/store";
+
+// ✅ TicketPreview로 “썸네일 fallback” 제공
+import TicketPreview from "../../../../shared/ui/tickets/TicketPreview";
 
 type PreviewItem = {
   ticketId: number;
   ticketCode: string;
+
   title: string;
   address: string;
+  addressDetail?: string;
+
   startDate: string;
   endDate: string;
+  startTime: string;
+  endTime: string;
+
   ticketImageName?: string;
+  ticketDesign: TicketDesign;
 };
 
 export default function QrEntry() {
@@ -23,19 +33,28 @@ export default function QrEntry() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  // ✅ 로그인 안 하면 여기까지 못 온다 해도, 안전하게 null 가드 유지
   const artistUuid = useAuthStore((s) => s.user?.memberUuid ?? "");
   const { issued, reloadIssued } = useIssuedTickets(artistUuid);
 
+  // ✅ 최근 3개만 노출
   const preview = useMemo<PreviewItem[]>(
     () =>
       issued.slice(0, 3).map((t) => ({
         ticketId: t.ticketId,
         ticketCode: t.ticketCode,
+
         title: t.title ?? "",
         address: t.address ?? "",
+        addressDetail: t.addressDetail ?? "",
+
         startDate: t.startDate ?? "",
         endDate: t.endDate ?? "",
-        ticketImageName: t.ticketImageName,
+        startTime: t.startTime ?? "",
+        endTime: t.endTime ?? "",
+
+        ticketImageName: t.ticketImageName || "",
+        ticketDesign: t.ticketDesign ?? "BASIC",
       })),
     [issued],
   );
@@ -64,10 +83,6 @@ export default function QrEntry() {
 
   const goIssue = () => nav("/tickets/issue");
 
-  const goEdit = (ticketId: number) => {
-    nav(`/tickets/issue?ticketId=${ticketId}`);
-  };
-
   return (
     <div className="qr-page">
       <header className="qr-head">
@@ -88,8 +103,9 @@ export default function QrEntry() {
               아래 버튼을 눌러 발급을 시작하세요.
             </div>
 
+            {/* ✅ 빈 상태일 때 CTA도 하나 같이 주면 UX 좋아짐 */}
             <div style={{ marginTop: 14 }}>
-              <button type="button" className="qr-primary" onClick={goIssue}>
+              <button type="button" className="qr-cta" onClick={goIssue}>
                 QR 발급하러 가기 →
               </button>
             </div>
@@ -110,8 +126,8 @@ export default function QrEntry() {
                 key={t.ticketCode}
                 type="button"
                 className="qr-card"
-                onClick={() => goEdit(t.ticketId)}
-                aria-label={`${t.title} 티켓 편집으로 이동`}
+                onClick={goIssue}
+                aria-label={`${t.title || "전시"} QR 관리로 이동`}
               >
                 <div className="qr-card-top">
                   <div className="qr-card-title">{t.title || "Untitled"}</div>
@@ -125,27 +141,45 @@ export default function QrEntry() {
                   </div>
                 </div>
 
-                {/* ✅ ticketImageName 있으면 “저장된 티켓 이미지”를 보여준다 */}
+                {/* ✅ 1) 서버에 저장된 ticketImageName이 있으면 그걸 우선 보여줌 */}
                 {t.ticketImageName ? (
                   <img
                     className="qr-card-poster"
                     src={resolveTicketMedia(t.ticketImageName)}
                     alt="ticket"
-                    loading="lazy"
                     onError={(e) => {
+                      // 로드 실패 시: 이미지 숨기고 fallback 썸네일 노출되게 state로 처리하고 싶지만,
+                      // 여기서는 “즉시” fallback이 보여야 해서, 아래 fallback 영역을 항상 렌더하고
+                      // 이미지가 성공하면 CSS로 위에 쌓이게(절대배치) 처리하는 방식이 더 안정적임.
+                      // 그래서 onError에서는 그냥 display:none 처리만 하고, fallback은 항상 보여준다.
                       (e.currentTarget as HTMLImageElement).style.display = "none";
                     }}
                   />
-                ) : (
-                  <div className="qr-card-fallback">티켓 이미지 없음</div>
-                )}
+                ) : null}
+
+                {/* ✅ 2) fallback: TicketPreview로 렌더링한 썸네일 (ticketImageName이 없거나, img가 숨겨지면 이게 보임) */}
+                <div className="qr-card-preview">
+                  <TicketPreview
+                    designType={t.ticketDesign}
+                    data={{
+                      title: t.title,
+                      address: t.address,
+                      addressDetail: t.addressDetail,
+                      startDate: t.startDate,
+                      endDate: t.endDate,
+                      startTime: t.startTime,
+                      endTime: t.endTime,
+                      posterUrl: "", // entry에서는 poster를 못 받는 구조면 비워두는 게 안전
+                    }}
+                  />
+                </div>
               </button>
             ))}
           </div>
         </section>
       )}
 
-      {/* FAB (우측 하단 카메라) */}
+      {/* ✅ FAB: 위치는 css에서 “화면 끝”이 아니라 “콘텐츠 안쪽”으로 보정 */}
       <button type="button" className="qr-fab" onClick={goIssue} aria-label="QR 발급/수정 화면으로 이동">
         <span className="qr-fab-icon">📷</span>
       </button>

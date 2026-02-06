@@ -1,7 +1,8 @@
 // FE/src/pages/lounge/artist/qr/TicketForm.tsx
-import { ChangeEvent, type RefObject, useCallback, useMemo } from "react";
+import { ChangeEvent, type RefObject, useCallback } from "react";
 import type { TicketDesign } from "./useIssuedTickets";
 import TicketPreview from "../../../../shared/ui/tickets/TicketPreview";
+import QRCode from "react-qr-code";
 
 // TicketQr.tsx에서 사용하는 FormState와 일치시킴
 export type FormState = {
@@ -28,7 +29,7 @@ type Props = {
   // ✅ ticketImage 캡처용
   previewRef: RefObject<HTMLDivElement | null>;
 
-  // ✅ 티켓 내부 QR에 사용될 값(ticketCode)
+  // ✅ 캡처 이미지에 포함될 QR 값
   qrValue: string;
 };
 
@@ -49,16 +50,6 @@ export default function TicketForm({ form, busy, onChange, previewRef, qrValue }
     { value: "RED", label: "Red (레드)" },
   ];
 
-  // ✅ 가로 티켓 자동 판별
-  const isHorizontal = useMemo(() => {
-    const H: TicketDesign[] = ["MINIMAL", "HOLO", "SIMPLE", "PURPLE", "PINK", "RED"];
-    return H.includes(form.ticketDesign);
-  }, [form.ticketDesign]);
-
-  const previewColWidth = isHorizontal ? 520 : 300;
-  const previewPadding = isHorizontal ? 14 : 20;
-  const previewMinHeight = isHorizontal ? 240 : 400;
-
   const onPickPoster = useCallback(
     async (e: ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0] ?? null;
@@ -67,7 +58,7 @@ export default function TicketForm({ form, busy, onChange, previewRef, qrValue }
         return;
       }
 
-      // ✅ 캡처 안정성: objectURL 대신 dataURL
+      // ✅ 캡처 안정성을 위해 objectURL 대신 dataURL 사용(taint/CORS 리스크 줄임)
       const dataUrl = await new Promise<string>((resolve) => {
         const r = new FileReader();
         r.onload = () => resolve(typeof r.result === "string" ? r.result : "");
@@ -88,9 +79,25 @@ export default function TicketForm({ form, busy, onChange, previewRef, qrValue }
   }, [onChange]);
 
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "40px", alignItems: "flex-start" }}>
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "nowrap", // ✅ wrap 금지 → 우측 미리보기 항상 고정
+        gap: "40px",
+        alignItems: "flex-start",
+      }}
+    >
       {/* [LEFT] 입력 폼 영역 */}
-      <div style={{ flex: 1, minWidth: "320px", display: "flex", flexDirection: "column", gap: "24px" }}>
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0, // ✅ nowrap 환경에서 줄어들 수 있도록
+          display: "flex",
+          flexDirection: "column",
+          gap: "24px",
+        }}
+      >
+        {/* 1. 디자인 선택 */}
         <div className="loungeInputGroup">
           <label className="loungeLabel">티켓 디자인 선택</label>
 
@@ -122,6 +129,7 @@ export default function TicketForm({ form, busy, onChange, previewRef, qrValue }
           </div>
         </div>
 
+        {/* 2. 기본 정보 */}
         <div className="loungeInputGroup">
           <label className="loungeLabel">전시 제목 *</label>
           <input
@@ -158,28 +166,58 @@ export default function TicketForm({ form, busy, onChange, previewRef, qrValue }
           />
         </div>
 
+        {/* 3. 일정 정보 */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
           <div className="loungeInputGroup">
             <label className="loungeLabel">시작일</label>
-            <input type="date" className="loungeInput" name="startDate" value={form.startDate} onChange={handleChange} disabled={busy} />
+            <input
+              type="date"
+              className="loungeInput"
+              name="startDate"
+              value={form.startDate}
+              onChange={handleChange}
+              disabled={busy}
+            />
           </div>
           <div className="loungeInputGroup">
             <label className="loungeLabel">종료일</label>
-            <input type="date" className="loungeInput" name="endDate" value={form.endDate} onChange={handleChange} disabled={busy} />
+            <input
+              type="date"
+              className="loungeInput"
+              name="endDate"
+              value={form.endDate}
+              onChange={handleChange}
+              disabled={busy}
+            />
           </div>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
           <div className="loungeInputGroup">
             <label className="loungeLabel">오픈 시간</label>
-            <input type="time" className="loungeInput" name="startTime" value={form.startTime} onChange={handleChange} disabled={busy} />
+            <input
+              type="time"
+              className="loungeInput"
+              name="startTime"
+              value={form.startTime}
+              onChange={handleChange}
+              disabled={busy}
+            />
           </div>
           <div className="loungeInputGroup">
             <label className="loungeLabel">마감 시간</label>
-            <input type="time" className="loungeInput" name="endTime" value={form.endTime} onChange={handleChange} disabled={busy} />
+            <input
+              type="time"
+              className="loungeInput"
+              name="endTime"
+              value={form.endTime}
+              onChange={handleChange}
+              disabled={busy}
+            />
           </div>
         </div>
 
+        {/* 4. 포스터 이미지 파일 업로드 */}
         <div className="loungeInputGroup">
           <label className="loungeLabel">포스터 이미지</label>
 
@@ -203,7 +241,8 @@ export default function TicketForm({ form, busy, onChange, previewRef, qrValue }
       {/* [RIGHT] 실시간 미리보기 영역 (ticketImage 캡처 대상) */}
       <div
         style={{
-          width: `${previewColWidth}px`,
+          width: 320, // ✅ 세로/가로 동일하게 고정 (스케일링은 TicketPreview가 담당)
+          flex: "0 0 320px",
           display: "flex",
           flexDirection: "column",
           gap: "10px",
@@ -218,22 +257,21 @@ export default function TicketForm({ form, busy, onChange, previewRef, qrValue }
         <div
           ref={previewRef}
           style={{
-            padding: `${previewPadding}px`,
+            padding: 16, // ✅ 고정 패딩
             border: "1px dashed rgba(255,255,255,0.15)",
             borderRadius: "16px",
             backgroundColor: "#000",
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            minHeight: `${previewMinHeight}px`,
-            position: "relative",
+            minHeight: 420, // ✅ 세로 기준 높이 (가로는 내부에서 자동 축소)
+            position: "relative", // ✅ QR 오버레이용
             overflow: "visible",
           }}
         >
-          {/* ✅ 오버레이 QR 제거(티켓 내부 QR로만 표현) */}
+
           <TicketPreview
             designType={form.ticketDesign}
-            qrValue={qrValue}
             data={{
               title: form.title,
               address: form.address,
