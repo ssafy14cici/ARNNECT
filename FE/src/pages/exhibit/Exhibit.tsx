@@ -1,3 +1,4 @@
+// FE/src/pages/exhibit/Exhibit.tsx
 import "../../styles/home.css";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -5,6 +6,9 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { mountExhibitRoom } from "../../museum/viewer/exhibitRoom";
 import type { PanelArtItem } from "../../museum/viewer/panelArt";
 import { bgmIsOn, bgmToggle, bgmForcePlayOnInteraction } from "../../shared/audio/bgm";
+
+// ✅ API
+import { fetchArtworksByArtist, buildNewArtistImageUrl } from "../../features/artworks/api/newArtists";
 
 function asset(path: string) {
   const p = path.replace(/^\/+/, "");
@@ -25,15 +29,94 @@ const PANEL_NAMES = [
   "EX_PANEL_11",
 ] as const;
 
-// ✅ 임시: public/art/b1.jpg ~ b11.jpg가 있다고 가정
-function buildMockPanels(): PanelArtItem[] {
-  return PANEL_NAMES.map((panelName, idx) => ({
-    panelName,
-    title: `Artwork ${idx + 1}`,
-    imageUrl: asset(`art/a${idx + 1}.jpg`),
-    // (중요) 나중에 작품 상세로 보내려면 여기 artworkId 같은 것도 같이 실어두면 좋음
-    // artworkId: idx + 1,  // <- PanelArtItem 타입에 없으면 일단 빼도 됨
-  }));
+const EXHIBIT_PANEL_COUNT = PANEL_NAMES.length;
+
+/** ✅ placeholder (data URL) */
+function makePlaceholderDataUrl(label: string, w = 768, h = 768) {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+
+  const ctx = c.getContext("2d");
+  if (!ctx) return "";
+
+  ctx.fillStyle = "#111318";
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  ctx.lineWidth = Math.max(6, Math.floor(w * 0.01));
+  ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, w - ctx.lineWidth, h - ctx.lineWidth);
+
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `700 ${Math.floor(w * 0.07)}px ui-sans-serif, system-ui, -apple-system`;
+  ctx.fillText(label, w / 2, h / 2);
+
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.font = `500 ${Math.floor(w * 0.035)}px ui-sans-serif, system-ui, -apple-system`;
+  ctx.fillText("ARNNECT EXHIBIT", w / 2, h / 2 + Math.floor(h * 0.1));
+
+  return c.toDataURL("image/png");
+}
+
+/** ✅ 작가 작품 목록 → 패널 아이템 변환 */
+async function buildPanelsByArtist(artistId: string | null): Promise<PanelArtItem[]> {
+  // artistId 없으면 전부 placeholder
+  if (!artistId) {
+    return PANEL_NAMES.map((panelName, idx) => ({
+      panelName,
+      title: `EMPTY ${idx + 1}`,
+      imageUrl: makePlaceholderDataUrl(`EMPTY ${idx + 1}`),
+      // artworkId: -1, // PanelArtItem에 있으면 넣어도 됨
+    }));
+  }
+
+  try {
+    const list = await fetchArtworksByArtist(artistId);
+
+    if (!list.length) {
+      return PANEL_NAMES.map((panelName, idx) => ({
+        panelName,
+        title: `EMPTY ${idx + 1}`,
+        imageUrl: makePlaceholderDataUrl(`EMPTY ${idx + 1}`),
+      }));
+    }
+
+    // 1) 앞에서 N개만 (패널 개수 제한)
+    const limited = list.slice(0, EXHIBIT_PANEL_COUNT);
+
+    // 2) 패널 채우기
+    const panels: PanelArtItem[] = limited.map((a, idx) => {
+      const url = buildNewArtistImageUrl(a.imageUrl || a.savedImageName);
+      const safeUrl = url || makePlaceholderDataUrl(`NO IMG ${idx + 1}`);
+
+      return {
+        panelName: PANEL_NAMES[idx],
+        title: a.title || `작품 ${idx + 1}`,
+        imageUrl: safeUrl,
+        // artworkId: a.artworkId, // PanelArtItem에 있으면 넣어도 됨
+      };
+    });
+
+    // 3) 부족분 placeholder
+    for (let i = panels.length; i < EXHIBIT_PANEL_COUNT; i++) {
+      panels.push({
+        panelName: PANEL_NAMES[i],
+        title: `EMPTY ${i + 1}`,
+        imageUrl: makePlaceholderDataUrl(`EMPTY ${i + 1}`),
+      });
+    }
+
+    return panels;
+  } catch (e) {
+    console.warn("[Exhibit] fetchArtworksByArtist failed -> placeholder", e);
+    return PANEL_NAMES.map((panelName, idx) => ({
+      panelName,
+      title: `OFFLINE ${idx + 1}`,
+      imageUrl: makePlaceholderDataUrl(`OFFLINE ${idx + 1}`),
+    }));
+  }
 }
 
 export default function Exhibit() {
@@ -59,8 +142,8 @@ export default function Exhibit() {
     return cleanup;
   }, []);
 
-  console.log("[Exhibit] 🔍 params.artistId:", artistId);
-  console.log("[Exhibit] 🔍 location.state:", JSON.stringify(location.state));
+  console.log("[Exhibit] params.artistId:", artistId);
+  console.log("[Exhibit] location.state:", JSON.stringify(location.state));
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -76,7 +159,7 @@ export default function Exhibit() {
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    // ✅ Hall.tsx랑 동일하게 UI layer 만들어서 exhibitRoom UI를 여기 위에 얹음
+    // ✅ UI layer
     const uiLayer = document.createElement("div");
     uiLayer.id = "museum-ui-layer";
     uiLayer.dataset.museumUiLayer = "1";
@@ -85,35 +168,39 @@ export default function Exhibit() {
       "z-index:9990;pointer-events:none;";
     uiRoot.appendChild(uiLayer);
 
-    // ✅ Hall에서 넘어온 state(선택)
+    // ✅ Hall에서 넘어온 state
     const st = (location.state ?? {}) as any;
     const fromWaypointId = st.fromWaypointId ?? 0;
     const artist = st.artist ?? "";
     const artworkTitle = st.artworkTitle ?? "";
 
-    console.log("[Exhibit] 🔍 state:", { fromWaypointId, artist, artworkTitle, artId: st.artId });
-
-    const titleText =
-      artist && artworkTitle ? `${artist} · ${artworkTitle}` : artist ? artist : "EXHIBIT";
+    // 타이틀은 작가 중심이 자연스러움 (원하면 아래 한 줄을 원래대로 되돌려도 됨)
+    const titleText = artist ? `${artist} 전시` : "EXHIBIT";
 
     let cancelled = false;
     let runtime: { destroy: () => void } | null = null;
 
     (async () => {
       try {
+        console.log("[Exhibit] buildPanelsByArtist 시작");
+        const panelItems = await buildPanelsByArtist(artistId);
+        if (cancelled) return;
+
         console.log("[Exhibit] mountExhibitRoom 호출 →", { artistId, titleText });
 
         const rt = await mountExhibitRoom(canvas, {
           glbUrl: asset("museum/models/gallery/gallery5.glb"),
           uiMount: uiLayer,
           titleText,
-          panelItems: buildMockPanels(),
+          panelItems,
 
-          // ✅ 홀로 돌아가기
           onExitToHall: () => {
             console.log("[Exhibit] onExitToHall → /hall, fromWaypointId:", fromWaypointId);
             nav("/hall", { state: { startWaypointId: fromWaypointId } });
           },
+
+          // 필요하면 여기서 작품 상세로 보내기 (mountExhibitRoom이 artworkId를 넘겨주는 구조면)
+          // onOpenArtwork: (artworkId) => nav(`/artworks/${artworkId}`),
         });
 
         if (cancelled) {

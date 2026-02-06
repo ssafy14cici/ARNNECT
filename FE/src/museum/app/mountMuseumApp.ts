@@ -2,7 +2,7 @@
 import "../styles/style.css";
 import "../styles/intro.css";
 
-import { fetchNewArtists, buildNewArtistImageUrl } from "../../features/artworks/api/newArtists";
+import { fetchArtworksByArtist, buildNewArtistImageUrl } from "../../features/artworks/api/newArtists";
 import { mountIntro, type CameraPose } from "../intro/mountIntro";
 import { mountExitOverlay } from "../viewer/exitOverlay";
 import { mountExhibitRoom } from "../viewer/exhibitRoom";
@@ -13,8 +13,9 @@ const DEFAULT_HALL_START_WP = 0;
 
 export type ExhibitPayload = {
   artId?: number;
-  artist: string;
-  artworkTitle: string;
+  artistId: string;      // ✅ memberUuid
+  artist: string;        // nickname
+  artworkTitle: string;  // 대표작 제목(홀에서 클릭한 작품)
   fromWaypointId: number;
 };
 
@@ -61,7 +62,7 @@ function savePose(pose: CameraPose) {
   }
 }
 
-/** ✅ 목업 파일 없이도 쓸 수 있는 placeholder (data URL) */
+/** placeholder (data URL) */
 function makePlaceholderDataUrl(label: string, w = 768, h = 768) {
   const c = document.createElement("canvas");
   c.width = w;
@@ -290,11 +291,11 @@ export function mountMuseumApp(args: {
       panelName: string;
       imageUrl: string;
       title: string;
-      artworkId: number;
     }> = [];
 
     try {
-      const list = await fetchNewArtists(); // ✅ /api/v1/artworks/new
+      // ✅ 작가별 작품 전체 로드
+      const list = await fetchArtworksByArtist(payload.artistId);
       if (disposed) return;
 
       if (!list.length) {
@@ -302,33 +303,33 @@ export function mountMuseumApp(args: {
           panelName: `EX_PANEL_${i + 1}`,
           imageUrl: makePlaceholderDataUrl(`EMPTY ${i + 1}`),
           title: `EMPTY ${i + 1}`,
-          artworkId: -1,
         }));
       } else {
         panelItems = Array.from({ length: EXHIBIT_PANEL_COUNT }, (_, i) => {
           const a = list[i % list.length];
-          const url = buildNewArtistImageUrl(a.savedImageName);
+
+          // 서버가 imageUrl을 주면 그걸 우선 사용, 아니면 savedImageName
+          const raw = (a.imageUrl ?? a.savedImageName ?? "").trim();
+          const url = buildNewArtistImageUrl(raw);
           const safeUrl = url || makePlaceholderDataUrl(`NO IMG ${i + 1}`);
 
           return {
             panelName: `EX_PANEL_${i + 1}`,
             imageUrl: safeUrl,
             title: a.title || `작품 ${i + 1}`,
-            artworkId: a.artworkId,
           };
         });
       }
 
       console.log("[museum] exhibit panelItems:", panelItems);
     } catch (e) {
-      console.warn("[museum] recent artworks failed -> placeholder", e);
-      toastHere("RECENT LOAD FAILED → PLACEHOLDER");
+      console.warn("[museum] artist artworks failed -> placeholder", e);
+      toastHere("EXHIBIT LOAD FAILED → PLACEHOLDER");
 
       panelItems = Array.from({ length: EXHIBIT_PANEL_COUNT }, (_, i) => ({
         panelName: `EX_PANEL_${i + 1}`,
         imageUrl: makePlaceholderDataUrl(`OFFLINE ${i + 1}`),
         title: `OFFLINE ${i + 1}`,
-        artworkId: -1,
       }));
     }
 
@@ -340,13 +341,16 @@ export function mountMuseumApp(args: {
       debug: true,
       titleText: `${payload.artist} — ${payload.artworkTitle}`,
       panelItems,
+
       onExitToHall: () => {
         toastHere("BACK TO HALL");
         startMainHall(payload.fromWaypointId ?? DEFAULT_HALL_START_WP);
       },
+
+      // onOpenArtwork는 exhibitRoom 쪽 구현이 “클릭 시 artworkId를 넘겨주는 구조”일 때만 의미가 있음
       onOpenArtwork: (artworkId) => {
         console.log("[museum] onOpenArtwork:", artworkId);
-        // args.onOpenArtwork?.(Number(artworkId));
+        args.onOpenArtwork?.(Number(artworkId));
       },
     });
   }
@@ -356,6 +360,7 @@ export function mountMuseumApp(args: {
       e.preventDefault();
       toastHere("DEBUG EXHIBIT");
       startExhibit({
+        artistId: "DEBUG",
         artist: "DEBUG",
         artworkTitle: "DEBUG",
         fromWaypointId: DEFAULT_HALL_START_WP,
