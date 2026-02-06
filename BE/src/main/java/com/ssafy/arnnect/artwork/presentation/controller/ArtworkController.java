@@ -48,7 +48,8 @@ public class ArtworkController {
 
     @GetMapping("/feed")
     public ResponseEntity<List<ArtworkResponse>> getArtworkList(){
-        return ResponseEntity.ok(service.getArtworkList());
+        String memberUuid = SecurityUtil.getCurrentMemberUuid();
+        return ResponseEntity.ok(service.getArtworkList(memberUuid));
     }
 
     @GetMapping()

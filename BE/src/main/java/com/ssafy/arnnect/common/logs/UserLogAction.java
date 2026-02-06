@@ -5,5 +5,6 @@ public enum UserLogAction {
     REVIEW_WRITE,
     STAY,
     LIKE,
-    COMMENT
+    COMMENT,
+    SELECT
 }
