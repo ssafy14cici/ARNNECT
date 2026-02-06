@@ -255,11 +255,16 @@ export default function TicketQr() {
   return (
     <main className="loungePage">
       <section className="loungeWrap">
-        <div className="loungeSubTop">
+        <div className="loungeSubTop" style={{ position: "relative", zIndex: 100 }}>
           <h1 className="loungeSubTitle">QR Ticket Manager</h1>
-          <Link className="loungeBackLink" to="/lounge">
+          <button
+            type="button"
+            className="loungeBackLink"
+            onClick={() => nav("/lounge")}
+            style={{ background: "none", border: "none", cursor: "pointer" }}
+          >
             ← Back to Lounge
-          </Link>
+          </button>
         </div>
 
         <div className="loungeSegmentNav">

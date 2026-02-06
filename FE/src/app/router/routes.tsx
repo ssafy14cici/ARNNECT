@@ -94,7 +94,7 @@ export const routes: RouteObject[] = [
           /* ---------------- Public ---------------- */
           { path: "/", element: <Home />, handle: { navVariant: "home" } },
           { path: "/home/pc", element: <HomePC />, handle: { navVariant: "home" } },
-          { path: "/home/mobile", element: <HomeMobile />, handle: { navVariant: "home" } },
+          { path: "/home/mobile", element: <HomeMobile />, handle: { navVariant: "home-mobile" } },
 
           { path: "search", element: <Search /> },
           { path: "guide", element: <Guide /> },
