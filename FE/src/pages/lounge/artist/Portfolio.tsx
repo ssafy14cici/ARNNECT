@@ -111,7 +111,7 @@ function SmartImage({
   );
 }
 
-export default function ?????Tab() {
+export default function PortfolioTab() {
   const { profile, isOwner } = useOutletContext<OutletCtx>();
 
   const [items, setItems] = useState<FeedItem[]>([]);
@@ -143,7 +143,7 @@ export default function ?????Tab() {
   if (loading) {
     return (
       <div className="tab-container">
-        <div className="tab-empty">?? ?...</div>
+        <div className="tab-empty">Loading...</div>
       </div>
     );
   }
@@ -163,7 +163,7 @@ export default function ?????Tab() {
   return (
     <div className="tab-container">
       <div className="tab-header">
-        <h3 className="tab-title">?????</h3>
+        <h3 className="tab-title">Portfolio</h3>
 
         {/* ✅ 버튼 영역 */}
         <div style={{ display: "flex", gap: 8 }}>
@@ -193,7 +193,7 @@ export default function ?????Tab() {
 
       {items.length === 0 ? (
         <div className="tab-empty">
-          <div className="tab-empty-title">No ????? Items</div>
+          <div className="tab-empty-title">No Portfolio Items</div>
           <div>{isOwner ? <>작품을 등록해보세요.</> : <>아직 등록된 작품이 없습니다.</>}</div>
         </div>
       ) : (

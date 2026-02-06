@@ -143,7 +143,7 @@ export default function PortfolioTab() {
   if (loading) {
     return (
       <div className="tab-container">
-        <div className="tab-empty">?? ?...</div>
+        <div className="tab-empty">Loading...</div>
       </div>
     );
   }
