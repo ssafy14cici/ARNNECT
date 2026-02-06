@@ -1,93 +1,128 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
+import { useAuthStore } from "../../features/auth/store";
 import { usePreferenceStore } from "./preferenceStore";
+import { getPreferenceRounds, type PreferenceRound } from "./preferenceApi";
+
+// ✅ 네가 이미 쓰는 함수 그대로 사용
+import { resolveMediaUrl } from "../artworks/detail/utils";
+
 import "./yourpreference.css";
 
-type RoundOption = { id: string; src: string; type: string };
-type Round = { id: number; question: string; left: RoundOption; right: RoundOption };
-
-const ROUNDS: Round[] = [
-  {
-    id: 1,
-    question: "Round 1/4",
-    left: {
-      id: "A1",
-      src: "https://images.unsplash.com/photo-1547891654-e66ed7ebb968?auto=format&fit=crop&w=800&q=80",
-      type: "Abstract",
-    },
-    right: {
-      id: "B1",
-      src: "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?auto=format&fit=crop&w=800&q=80",
-      type: "Classic",
-    },
-  },
-  {
-    id: 2,
-    question: "Round 2/4",
-    left: {
-      id: "A2",
-      src: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
-      type: "Vivid",
-    },
-    right: {
-      id: "B2",
-      src: "https://images.unsplash.com/photo-1507643179173-617d654f3daf?auto=format&fit=crop&w=800&q=80",
-      type: "Mono",
-    },
-  },
-  {
-    id: 3,
-    question: "Round 3/4",
-    left: {
-      id: "A3",
-      src: "https://images.unsplash.com/photo-1515405295579-ba7b45403062?auto=format&fit=crop&w=800&q=80",
-      type: "Warm",
-    },
-    right: {
-      id: "B3",
-      src: "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=800&q=80",
-      type: "Cold",
-    },
-  },
-  {
-    id: 4,
-    question: "Round 4/4",
-    left: {
-      id: "A4",
-      src: "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=800&q=80",
-      type: "Minimal",
-    },
-    right: {
-      id: "B4",
-      src: "https://images.unsplash.com/photo-1582560475093-6f498e642f37?auto=format&fit=crop&w=800&q=80",
-      type: "Complex",
-    },
-  },
-];
+type LoadState = "idle" | "loading" | "ready" | "error";
 
 export default function YourPreferenceSelect() {
   const navigate = useNavigate();
+  const { isLoggedIn } = useAuthStore();
 
   const currentRoundIdx = usePreferenceStore((s) => s.currentRoundIdx);
   const setRoundIdx = usePreferenceStore((s) => s.setRoundIdx);
   const addSelection = usePreferenceStore((s) => s.addSelection);
 
-  const round = useMemo(() => ROUNDS[currentRoundIdx], [currentRoundIdx]);
+  const [state, setState] = useState<LoadState>("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [rounds, setRounds] = useState<PreferenceRound[]>([]);
 
-  // 잘못 진입(인덱스 범위 밖) → /preference로
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        setState("loading");
+        setErrorMsg("");
+
+        const data = await getPreferenceRounds({ skipAuth: !isLoggedIn });
+
+        if (!alive) return;
+
+        if (!data || data.length === 0) {
+          throw new Error("선택할 작품 데이터가 없습니다.");
+        }
+
+        setRounds(data);
+
+        // 인덱스가 범위 밖이면 0으로 리셋
+        if (currentRoundIdx < 0 || currentRoundIdx >= data.length) {
+          setRoundIdx(0);
+        }
+
+        setState("ready");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "데이터 로드 실패";
+        if (!alive) return;
+        setErrorMsg(msg);
+        setState("error");
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [isLoggedIn, currentRoundIdx, setRoundIdx]);
+
+  const round = useMemo(() => rounds[currentRoundIdx], [rounds, currentRoundIdx]);
+
+  if (state === "loading" || state === "idle") {
+    return (
+      <div className="pref-page">
+        <div className="pref-container">
+          <div className="pref-analyzing fade-in">
+            <h2 className="analyzing-text">작품을 불러오는 중...</h2>
+            <p className="analyzing-sub">잠시만 기다려주세요.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (state === "error") {
+    return (
+      <div className="pref-page">
+        <div className="pref-container">
+          <div className="pref-analyzing fade-in">
+            <h2 className="analyzing-text">작품을 불러오지 못했습니다</h2>
+            <p className="analyzing-sub" style={{ whiteSpace: "pre-line" }}>
+              {errorMsg || "잠시 후 다시 시도해주세요."}
+            </p>
+            <div className="result-actions" style={{ marginTop: 16 }}>
+              <button className="pref-btn-secondary" onClick={() => window.location.reload()}>
+                새로고침
+              </button>
+              <button className="pref-btn-primary" onClick={() => navigate("/preference")}>
+                처음으로
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 잘못 진입(라운드 없음)
   if (!round) {
     navigate("/preference", { replace: true });
     return null;
   }
 
-  const handleSelect = (choice: { id: string; type: string }) => {
+  const total = rounds.length;
+  const leftSrc = resolveMediaUrl(round.left.imageUrl);
+  const rightSrc = resolveMediaUrl(round.right.imageUrl);
+
+  const handleSelect = (choice: "left" | "right") => {
+    const picked = choice === "left" ? round.left : round.right;
+
     addSelection({
-      round: currentRoundIdx + 1,
-      selectedId: choice.id,
-      type: choice.type,
+      round: round.round,
+      artworkId: picked.artworkId,
+      selectedId: String(picked.artworkId),
+      type: round.genreName,
+      genreId: round.genreId,
+      genreName: round.genreName,
+      tags: picked.tags,
     });
 
-    if (currentRoundIdx < ROUNDS.length - 1) {
+    if (currentRoundIdx < total - 1) {
       window.setTimeout(() => setRoundIdx(currentRoundIdx + 1), 250);
     } else {
       navigate("/preference/result");
@@ -99,21 +134,49 @@ export default function YourPreferenceSelect() {
       <div className="pref-container">
         <div className="pref-battle fade-in">
           <div className="battle-header">
-            <span className="battle-round">ROUND {currentRoundIdx + 1} / 4</span>
+            <span className="battle-round">
+              ROUND {currentRoundIdx + 1} / {total}
+            </span>
             <h2 className="battle-title">어느 쪽이 더 끌리나요?</h2>
+
+            {/* ✅ 장르명 표시(원하면 삭제) */}
+            <p style={{ margin: "6px 0 0", opacity: 0.85 }}>
+              {round.genreName}
+            </p>
           </div>
 
           <div className="battle-arena">
-            <div className="battle-card" onClick={() => handleSelect(round.left)}>
-              <img src={round.left.src} alt="Left Option" />
+            <div className="battle-card" onClick={() => handleSelect("left")}>
+              <img src={leftSrc} alt="Left Option" />
               <div className="battle-overlay">SELECT</div>
+
+              {/* ✅ tags 표시(원하면 삭제) */}
+              {round.left.tags?.length > 0 && (
+                <div style={{ position: "absolute", bottom: 10, left: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {round.left.tags.slice(0, 3).map((t) => (
+                    <span key={t} style={{ padding: "4px 8px", borderRadius: 999, background: "rgba(0,0,0,0.55)", color: "#fff", fontSize: 12 }}>
+                      #{t}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="battle-vs">VS</div>
 
-            <div className="battle-card" onClick={() => handleSelect(round.right)}>
-              <img src={round.right.src} alt="Right Option" />
+            <div className="battle-card" onClick={() => handleSelect("right")}>
+              <img src={rightSrc} alt="Right Option" />
               <div className="battle-overlay">SELECT</div>
+
+              {round.right.tags?.length > 0 && (
+                <div style={{ position: "absolute", bottom: 10, left: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {round.right.tags.slice(0, 3).map((t) => (
+                    <span key={t} style={{ padding: "4px 8px", borderRadius: 999, background: "rgba(0,0,0,0.55)", color: "#fff", fontSize: 12 }}>
+                      #{t}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

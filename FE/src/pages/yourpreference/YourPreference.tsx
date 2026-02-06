@@ -49,12 +49,12 @@ export default function YourPreference() {
           <p className="pref-desc">
             이름도, 장르도 모른 채 오직 <strong>그림</strong>만으로 선택하세요.
             <br />
-            Lumen AI가 당신의 무의식 속 예술 취향을 찾아드립니다.
+            ARNNECT가 당신의 무의식 속 예술 취향을 찾아드립니다.
           </p>
 
           <div className="pref-badges">
             <span>#블라인드테스트</span>
-            <span>#신진작가발굴</span>
+            <span>#나의_취향_찾기</span>
             <span>#AI분석</span>
           </div>
 

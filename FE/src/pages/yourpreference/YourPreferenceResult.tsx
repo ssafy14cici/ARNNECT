@@ -1,14 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+
 import { useAuthStore } from "../../features/auth/store";
 import { usePreferenceStore, type ResultData } from "./preferenceStore";
+import { postPreference } from "./preferenceApi";
+import { resolveMbtiProfile } from "./mbtiProfiles";
+
 import "./yourpreference.css";
 
-type ViewStep = "ANALYZING" | "RESULT";
+type ViewStep = "ANALYZING" | "RESULT" | "ERROR";
 
 const KEY_PREF_USED = "arnnect_pref_used_v1";
 const USE_MOCK = String(import.meta.env.VITE_USE_MOCK) === "true";
 const getPrefStorage = () => (USE_MOCK ? localStorage : sessionStorage);
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function buildKeywords(strengths: readonly string[]) {
+  return strengths.slice(0, 4).map((s) => `#${s.replace(/\s+/g, "_")}`);
+}
 
 export default function YourPreferenceResult() {
   const navigate = useNavigate();
@@ -20,6 +30,7 @@ export default function YourPreferenceResult() {
   const reset = usePreferenceStore((s) => s.reset);
 
   const [viewStep, setViewStep] = useState<ViewStep>("ANALYZING");
+  const [errorMsg, setErrorMsg] = useState("");
 
   // selections 없이 진입 → /preference로
   useEffect(() => {
@@ -29,27 +40,64 @@ export default function YourPreferenceResult() {
   }, [selections, navigate]);
 
   useEffect(() => {
-    // 비회원이면 1회 사용 처리 기록
     if (!isLoggedIn) {
       getPrefStorage().setItem(KEY_PREF_USED, "true");
     }
 
-    setViewStep("ANALYZING");
-    const t = window.setTimeout(() => {
-      // TODO: selections를 서버로 전송해 결과 받기(현재 백엔드는 GET만 있음)
-      const mock: ResultData = {
-        mbti: "V.A.S.T",
-        title: "몽환적인 밤의 탐험가",
-        desc: "당신은 현실보다는 추상적인 감정과 깊은 색채에 끌리는 유형입니다. 정해진 형체보다는 흐르는듯한 붓터치에서 안정을 느낍니다.",
-        keywords: ["#추상", "#딥블루", "#텍스처", "#이모셔널"],
-        recommendArtist: "신진작가 김루멘",
-      };
-      setResultData(mock);
-      setViewStep("RESULT");
-    }, 3000);
+    let alive = true;
 
-    return () => window.clearTimeout(t);
-  }, [isLoggedIn, setResultData]);
+    (async () => {
+      try {
+        setErrorMsg("");
+        setViewStep("ANALYZING");
+
+        // ✅ 라운드 순서대로 artworkIdList 구성
+        const artworkIdList = selections
+          .slice()
+          .sort((a, b) => a.round - b.round)
+          .map((s) => s.artworkId)
+          .filter((n) => typeof n === "number" && Number.isFinite(n));
+
+        if (artworkIdList.length === 0) {
+          throw new Error("선택한 작품 ID가 없습니다.");
+        }
+
+        const [mbtiCode] = await Promise.all([
+          postPreference({ artworkIdList }, { skipAuth: !isLoggedIn }),
+          sleep(900), // UX용 최소 로딩 시간(원치 않으면 제거)
+        ]);
+
+        const profile = resolveMbtiProfile(mbtiCode);
+        if (!profile) {
+          throw new Error(`MBTI 매핑 실패: ${mbtiCode}`);
+        }
+
+        const next: ResultData = {
+          mbti: mbtiCode,
+          title: profile.title,
+          tagline: profile.tagline,
+          description: profile.description,
+          strengths: [...profile.strengths],
+          watchouts: [...profile.watchouts],
+          tip: profile.tip,
+          keywords: buildKeywords(profile.strengths),
+        };
+
+        if (!alive) return;
+        setResultData(next);
+        setViewStep("RESULT");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "결과를 불러오지 못했습니다.";
+        if (!alive) return;
+        setErrorMsg(msg);
+        setViewStep("ERROR");
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [isLoggedIn, selections, setResultData]);
 
   const retry = () => {
     reset();
@@ -63,12 +111,31 @@ export default function YourPreferenceResult() {
           <div className="result-header">YOUR ART MBTI</div>
           <h1 className="result-type gold-text">{resultData?.mbti}</h1>
           <h2 className="result-title">{resultData?.title}</h2>
-          <p className="result-desc">{resultData?.desc}</p>
+
+          <p className="result-desc" style={{ whiteSpace: "pre-line", opacity: 0.9 }}>
+            {resultData?.tagline}
+          </p>
+          <p className="result-desc" style={{ whiteSpace: "pre-line" }}>
+            {resultData?.description}
+          </p>
+
+          <div style={{ marginTop: 16, textAlign: "left" }}>
+            <h3 style={{ margin: "12px 0 6px" }}>강점</h3>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {resultData?.strengths?.map((s) => <li key={s}>{s}</li>)}
+            </ul>
+
+            <h3 style={{ margin: "12px 0 6px" }}>주의점</h3>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {resultData?.watchouts?.map((s) => <li key={s}>{s}</li>)}
+            </ul>
+
+            <h3 style={{ margin: "12px 0 6px" }}>팁</h3>
+            <p style={{ margin: 0, whiteSpace: "pre-line" }}>{resultData?.tip}</p>
+          </div>
 
           <div className="result-keywords">
-            {resultData?.keywords?.map((k) => (
-              <span key={k}>{k}</span>
-            ))}
+            {resultData?.keywords?.map((k) => <span key={k}>{k}</span>)}
           </div>
         </div>
 
@@ -85,7 +152,7 @@ export default function YourPreferenceResult() {
 
           {isLoggedIn && (
             <Link to="/feed" className="pref-btn-primary">
-              취향결과알아보기(피드페이지)
+              취향결과확인하기
             </Link>
           )}
         </div>
@@ -101,7 +168,25 @@ export default function YourPreferenceResult() {
         <div className="orb"></div>
       </div>
       <h2 className="analyzing-text">AI가 당신의 선택을 분석하고 있습니다...</h2>
-      <p className="analyzing-sub">패턴 인식 중 • 예술 성향 도출 중 • 추천 작가 매칭 중</p>
+      <p className="analyzing-sub">패턴 인식 중 • 예술 성향 도출 중 • 취향 업데이트 중</p>
+    </div>
+  );
+
+  const ErrorView = (
+    <div className="pref-analyzing fade-in">
+      <h2 className="analyzing-text">결과를 불러오지 못했습니다</h2>
+      <p className="analyzing-sub" style={{ whiteSpace: "pre-line" }}>
+        {errorMsg || "잠시 후 다시 시도해주세요."}
+      </p>
+
+      <div className="result-actions" style={{ marginTop: 16 }}>
+        <button className="pref-btn-secondary" onClick={retry}>
+          다시 하기
+        </button>
+        <Link to="/preference" className="pref-btn-primary">
+          처음으로
+        </Link>
+      </div>
     </div>
   );
 
@@ -110,6 +195,7 @@ export default function YourPreferenceResult() {
       <div className="pref-container">
         {viewStep === "ANALYZING" && AnalyzingView}
         {viewStep === "RESULT" && ResultView}
+        {viewStep === "ERROR" && ErrorView}
       </div>
     </div>
   );

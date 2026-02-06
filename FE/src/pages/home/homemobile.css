@@ -145,13 +145,87 @@
   border-bottom: 1px solid var(--line);
 }
 
-/* middle: 25% ~ 75% */
+/* =========================
+   middle: 25% ~ 75%
+   ✅ absolute 유지 + 내부는 grid로 겹치기
+========================= */
 .model-area {
   position: absolute;
   top: 25%;
-  height: 50%;
   width: 100%;
+  height: 50%;
   z-index: 10;
+
+  display: grid; /* ✅ 겹치기 핵심 */
+  overflow: hidden;
+}
+
+/* model-area의 자식들을 같은 칸에 겹침 */
+.model-area > .introGrid,
+.model-area > .homeCanvas {
+  grid-area: 1 / 1;
+}
+
+/* =========================
+   Intro 4x4 grid
+========================= */
+.introGrid {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+
+  gap: 8px;
+  padding: 14px;
+
+  /* 디버그 필요 시 */
+  /* outline: 2px solid red; */
+}
+
+.introCell {
+  min-width: 0;
+  min-height: 0;
+
+  /* button 기본 스타일 제거 */
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  overflow: hidden;
+
+  background: rgba(255, 255, 255, 0.02);
+  padding: 0;
+  margin: 0;
+
+  display: block;
+}
+
+.introCell img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 로딩 스켈레톤(선택) */
+.introCell.skeleton {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* =========================
+   3D Canvas
+   ✅ 그리드 위에 보이되 클릭은 그리드가 받게
+========================= */
+.homeCanvas {
+  position: relative; /* z-index 적용 안정 */
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* ✅ canvas가 클릭 먹는 문제 방지 */
+  display: block;
 }
 
 /* =========================
@@ -180,7 +254,7 @@
   justify-content: center;
 }
 
-/* 왼쪽은 표시만: 이벤트 받을 필요 없으면 그대로 */
+/* 왼쪽은 표시만 */
 .footer-left {
   pointer-events: none;
 }
