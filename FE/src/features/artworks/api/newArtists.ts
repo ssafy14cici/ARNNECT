@@ -82,11 +82,17 @@ function parseNewArtists(raw: unknown): NewArtistArtwork[] {
       if (!isRecord(it)) return null;
 
       const artworkId = asNumber(pick(it, ["artworkId", "artwork_id", "id"]), NaN);
-      const memberUuid = asString(pick(it, ["memberUuid", "member_uuid", "artistId", "artist_id"]), "").trim();
+      const memberUuid = asString(
+        pick(it, ["memberUuid", "member_uuid", "artistId", "artist_id"]),
+        ""
+      ).trim();
       const nickname = asString(pick(it, ["nickname", "artistNickname", "artist_nickname"]), "").trim();
       const title = asString(pick(it, ["title", "artworkTitle", "artwork_title"]), "").trim();
       const description = asString(pick(it, ["description", "desc"]), "").trim();
-      const productionDate = asString(pick(it, ["productionDate", "production_date", "createdAt", "created_at"]), "").trim();
+      const productionDate = asString(
+        pick(it, ["productionDate", "production_date", "createdAt", "created_at"]),
+        ""
+      ).trim();
 
       const savedImageName = asString(
         pick(it, ["savedImageName", "saved_image_name", "savedImage", "saved_image", "imageName", "image_name"]),
@@ -132,7 +138,10 @@ function parseArtistArtworks(raw: unknown): ArtistArtwork[] {
       ).trim();
 
       const description = asString(pick(it, ["description", "desc"]), "").trim();
-      const productionDate = asString(pick(it, ["productionDate", "production_date", "createdAt", "created_at"]), "").trim();
+      const productionDate = asString(
+        pick(it, ["productionDate", "production_date", "createdAt", "created_at"]),
+        ""
+      ).trim();
 
       if (!Number.isFinite(artworkId)) return null;
 
@@ -160,7 +169,7 @@ function joinUrl(base: string, path: string): string {
 function getFetchBase(): string {
   const isDev = !!import.meta.env.DEV;
   const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
-  return isDev ? "" : (API_BASE_URL ? `${API_BASE_URL}` : "");
+  return isDev ? "" : API_BASE_URL ? `${API_BASE_URL}` : "";
 }
 
 async function fetchJson(url: string): Promise<unknown> {
@@ -182,10 +191,7 @@ async function fetchJson(url: string): Promise<unknown> {
 export async function fetchNewArtists(): Promise<NewArtistArtwork[]> {
   const base = getFetchBase();
 
-  const candidates = [
-    "/api/v1/artworks/new",
-    "/api/v1/artwork/new",
-  ].map((p) => joinUrl(base, p));
+  const candidates = ["/api/v1/artworks/new", "/api/v1/artwork/new"].map((p) => joinUrl(base, p));
 
   let lastErr: unknown = null;
 
@@ -213,10 +219,7 @@ export async function fetchArtworksByArtist(memberUuid: string): Promise<ArtistA
 
   const qs = `artist=${encodeURIComponent(uuid)}`;
 
-  const candidates = [
-    `/api/v1/artworks?${qs}`,
-    `/api/v1/artwork?${qs}`,
-  ].map((p) => joinUrl(base, p));
+  const candidates = [`/api/v1/artworks?${qs}`, `/api/v1/artwork?${qs}`].map((p) => joinUrl(base, p));
 
   let lastErr: unknown = null;
 
@@ -231,6 +234,24 @@ export async function fetchArtworksByArtist(memberUuid: string): Promise<ArtistA
   }
 
   throw lastErr instanceof Error ? lastErr : new Error("fetchArtworksByArtist failed");
+}
+
+/**
+ * ✅ (중요) artworkId로 "바로" 이미지 URL 만들기
+ *
+ * 백엔드가 아래 같은 엔드포인트를 제공한다는 전제가 필요함:
+ *   - /api/v1/artworks/{artworkId}/image   (추천)
+ *
+ * 만약 실제 경로가 다르면 "여기 path 한 줄"만 바꿔서 맞추면 됨.
+ */
+export function buildArtworkImageUrlById(artworkId: string | number): string {
+  const id = String(artworkId ?? "").trim();
+  if (!id) return "";
+
+  // ✅ 여기만 백엔드 실제 라우트에 맞게 조정
+  const path = `/api/v1/artworks/${encodeURIComponent(id)}/image`;
+
+  return resolveApiUrl(path);
 }
 
 /**
@@ -250,6 +271,29 @@ export function buildNewArtistImageUrl(input: string): string {
 
   // savedImageName만 온 경우 → "/artwork/..."
   return resolveMediaUrl(`/artwork/${encodeURIComponent(raw)}`);
+}
+
+/** API 경로를 dev(프록시)/prod(origin 부착) 규칙으로 정규화 */
+function resolveApiUrl(input: string): string {
+  const u0 = String(input ?? "").trim();
+  if (!u0) return "";
+
+  // 절대 URL이면 그대로
+  if (/^https?:\/\//i.test(u0)) return u0;
+
+  const isDev = !!import.meta.env.DEV;
+  const path = u0.startsWith("/") ? u0 : `/${u0}`;
+
+  if (isDev) return path;
+
+  const apiBase = String(import.meta.env.VITE_API_BASE_URL ?? "").trim();
+  try {
+    if (!apiBase) return path;
+    const origin = new URL(apiBase).origin;
+    return `${origin}${path}`;
+  } catch {
+    return path;
+  }
 }
 
 /** (유저가 챙겨온) 디테일에서 잘 먹히는 이미지 URL 정규화 */
