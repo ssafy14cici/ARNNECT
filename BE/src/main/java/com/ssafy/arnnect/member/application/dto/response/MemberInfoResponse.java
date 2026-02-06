@@ -15,7 +15,7 @@ public class MemberInfoResponse {
     Integer isArtist;
 
     /** 예술인 **/
-    Integer isNew;
+    Boolean isNew;
     String fieldName;
     String genreName;
     Integer debutYear;
@@ -39,7 +39,7 @@ public class MemberInfoResponse {
                 .genreName(info.getGenreName())
                 .debutYear(info.getDebutYear())
                 .snsPage(info.getSnsPage())
-                .imgUrl(imgUrl+info.getSaved_profile_name())  // 기본 URL + 파일명
+                .imgUrl(imgUrl+info.getSavedProfileName())  // 기본 URL + 파일명
                 .introduction(info.getIntroduction())
                 .affiliation(info.getAffiliation())
 
