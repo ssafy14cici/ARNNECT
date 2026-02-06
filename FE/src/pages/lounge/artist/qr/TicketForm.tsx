@@ -269,21 +269,6 @@ export default function TicketForm({ form, busy, onChange, previewRef, qrValue }
             overflow: "visible",
           }}
         >
-          {/* ✅ 캡처 이미지(ticketImage)에 QR이 포함되도록 오버레이 */}
-          <div
-            style={{
-              position: "absolute",
-              top: 12,
-              right: 12,
-              background: "#fff",
-              padding: 8,
-              borderRadius: 12,
-              border: "1px solid rgba(0,0,0,0.15)",
-              zIndex: 10,
-            }}
-          >
-            <QRCode value={qrValue} size={72} />
-          </div>
 
           <TicketPreview
             designType={form.ticketDesign}
