@@ -172,7 +172,6 @@ export default function RemindQuiz() {
 
   return (
     <section className="tasteCard">
-      <h2 className="tasteCardTitle">퀴즈</h2>
       <p className="loungeSubDesc" style={{ marginTop: 6 }}>
         {description}
       </p>

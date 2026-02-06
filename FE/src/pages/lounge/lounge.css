@@ -2,7 +2,9 @@
    LOUNGE PAGE (Sophisticated Dark Mode)
    - Layout, Tabs, Taste, Quiz, Common Components
 ========================================================================== */
-
+:root {
+  --taste-accent: #C8A97E; /* Gold Accent */
+}
 /* --- 1. Global Layout --- */
 .loungePage {
   min-height: 100vh;
@@ -56,11 +58,12 @@
 }
 
 /* --- 3. Tabs (Underline Style) --- */
+/* --- 3. Tabs (Underline Style) --- */
 .loungeTabs {
   display: flex;
   gap: 32px;
   margin-bottom: 40px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2); /* 더 선명 */
   overflow-x: auto;
 }
 
@@ -70,32 +73,69 @@
   padding: 16px 4px;
   cursor: pointer;
   text-align: left;
-  transition: all 0.3s ease;
-  opacity: 0.5;
+
+  /* ✅ 기본도 너무 죽지 않게 */
+  opacity: 1;
   border-bottom: 2px solid transparent;
   min-width: 100px;
+
+  transition: border-color 0.25s ease, transform 0.25s ease;
 }
 
-.loungeTabBtn:hover { opacity: 0.8; }
-
-.loungeTabBtn.isActive {
-  opacity: 1;
-  border-bottom-color: #fff; /* Active Color */
-}
-
+/* ✅ 기본 텍스트 선명도 올리기 (투명도 줄임) */
 .loungeTabTitle {
-  font-size: 1.1rem;
+  font-size: 1.08rem;
   font-weight: 600;
   margin-bottom: 4px;
-  color: #fff;
+  color: #eaeaea; /* 기존 #fff도 OK인데, inactive는 살짝 낮춤 */
+  transition: color 0.2s ease, transform 0.2s ease, font-size 0.2s ease;
 }
 
 .loungeTabDesc {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.82rem;
+  color: #bdbdbd; /* rgba(…,0.6) 대신 고정톤 */
   font-weight: 300;
   white-space: nowrap;
+  transition: color 0.2s ease;
 }
+
+/* ✅ Hover: 글씨 커지고 + 완전 흰색으로 */
+.loungeTabBtn:hover {
+  transform: translateY(-1px);
+}
+
+.loungeTabBtn:hover .loungeTabTitle {
+  color: #fff;
+  font-size: 1.18rem; /* “커지는 느낌” */
+}
+
+.loungeTabBtn:hover .loungeTabDesc {
+  color: #e0e0e0;
+}
+
+/* ✅ Active 유지: NavLink는 aria-current="page"를 붙여줌 */
+.loungeTabBtn[aria-current="page"],
+.loungeTabBtn.active {
+  border-bottom-color: #fff;
+}
+
+.loungeTabBtn[aria-current="page"] .loungeTabTitle,
+.loungeTabBtn.active .loungeTabTitle {
+  color: #fff;
+  font-size: 1.18rem; /* hover랑 동일하게 유지 */
+}
+
+.loungeTabBtn[aria-current="page"] .loungeTabDesc,
+.loungeTabBtn.active .loungeTabDesc {
+  color: #e0e0e0;
+}
+
+/* 키보드 포커스도 보기 좋게 */
+.loungeTabBtn:focus-visible {
+  outline: none;
+  border-bottom-color: #fff;
+}
+
 
 /* --- 4. Sub Page Headers (CollectBook, Taste, Quiz) --- */
 .loungeSubTop {

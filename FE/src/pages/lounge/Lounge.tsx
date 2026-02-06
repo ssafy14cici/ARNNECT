@@ -56,8 +56,6 @@ export default function Lounge() {
             </NavLink>
           ))}
         </div>
-
-        {/* ✅ B안 핵심: 라운지 내부에서 컨텐츠가 아래에 렌더링 */}
         <Outlet />
       </section>
     </main>
