@@ -1,5 +1,6 @@
+// src/pages/lounge/tabs/PortfolioTab.tsx
 import { useEffect, useRef, useState } from "react";
-import { Link, useOutletContext } from "react-router-dom";
+import { Link, useOutletContext, useParams } from "react-router-dom";
 import type { ArtistProfile, FeedItem } from "../../../features/profile/types";
 import { profileApi } from "../../../features/profile/api";
 import "../../profile/tabs/profileTabs.css";
@@ -112,7 +113,19 @@ function SmartImage({
 }
 
 export default function PortfolioTab() {
-  const { profile, isOwner } = useOutletContext<OutletCtx>();
+  /**
+   * ✅ 라운지 탭에서는 OutletContext가 없을 수 있음!
+   *    - 있으면 ctx.profile.id 사용
+   *    - 없으면 URL param(:artistId) 사용
+   */
+  const ctx = useOutletContext<OutletCtx | undefined>();
+  const { artistId: artistIdParam } = useParams<{ artistId: string }>();
+
+  const profile = ctx?.profile;
+  const isOwner = ctx?.isOwner ?? false;
+
+  const profileId = profile?.id ?? (artistIdParam ? String(artistIdParam).trim() : "");
+  const profileNickname = (profile as any)?.nickname ?? "";
 
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,13 +133,22 @@ export default function PortfolioTab() {
 
   useEffect(() => {
     let cancelled = false;
+
+    // ✅ artistId 없으면 호출 불가
+    if (!profileId) {
+      setItems([]);
+      setLoading(false);
+      setError("작가 정보가 없습니다.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     (async () => {
       try {
         // ✅ 이 탭은 "리스트"만 담당 (3D 전시는 별도 라우트에서)
-        const page = await profileApi.getArtistFeed(profile.id);
+        const page = await profileApi.getArtistFeed(profileId);
         if (!cancelled) setItems(page.items ?? []);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "포트폴리오 로딩 실패");
@@ -138,7 +160,7 @@ export default function PortfolioTab() {
     return () => {
       cancelled = true;
     };
-  }, [profile.id]);
+  }, [profileId]);
 
   if (loading) {
     return (
@@ -157,7 +179,7 @@ export default function PortfolioTab() {
   }
 
   // ✅ Exhibit 라우트가 /exhibit/:artistId 라면 반드시 id를 붙여서 이동해야 함
-  const artistId = String(profile.id ?? "").trim();
+  const artistId = String(profileId ?? "").trim();
   const exhibitPath = artistId ? `/exhibit/${encodeURIComponent(artistId)}` : "/exhibit";
 
   return (
@@ -174,7 +196,7 @@ export default function PortfolioTab() {
             state={{
               from: "profile",
               artistId,
-              artist: (profile as any)?.nickname ?? "",
+              artist: profileNickname,
               artworkTitle: "PORTFOLIO",
               fromWaypointId: 0,
             }}
@@ -185,7 +207,7 @@ export default function PortfolioTab() {
           {/* ✅ 작가 본인만 작품 추가 가능 */}
           {isOwner && (
             <Link to="/artworks/create" className="tab-btn">
-              ?? ??
+              작품 등록
             </Link>
           )}
         </div>
@@ -199,7 +221,6 @@ export default function PortfolioTab() {
       ) : (
         <div className="tab-grid-2">
           {items.map((it) => {
-            // ✅ 여기서 it.id를 artworkId로 취급
             const artworkId = it.id;
 
             return (
@@ -236,7 +257,7 @@ export default function PortfolioTab() {
                       />
                     </div>
 
-                    <div className="tab-card-info">???: {it.createdAt ?? "-"}</div>
+                    <div className="tab-card-info">Created: {it.createdAt ?? "-"}</div>
                   </div>
                 </Link>
               </article>
