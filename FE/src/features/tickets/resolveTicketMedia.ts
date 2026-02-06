@@ -1,5 +1,5 @@
 // FE/src/features/tickets/resolveTicketMedia.ts
-import { API_BASE_URL } from "@/config/api";
+import { API_BASE_URL } from "../../../shared/config/env";
 
 /**
  * 서버가 내려주는 미디어 경로(/ticket/xxx.png, /qrcode/xxx.png)를
