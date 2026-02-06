@@ -1,13 +1,115 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import type { ArtistProfile, FeedItem } from "../../../features/profile/types";
 import { profileApi } from "../../../features/profile/api";
 import "./profileTabs.css";
 
+// ✅ 다른 페이지에서 쓰는 “이미지 정규화 + 인증 이미지(blob)” 유틸 재사용
+import { resolveMediaUrl, fetchImageAsObjectUrl } from "../../artworks/detail/utils";
+
 type OutletCtx = {
   profile: ArtistProfile;
   isOwner: boolean;
 };
+
+/**
+ * ✅ <img> src에 그대로 넣어보고,
+ * 실패하면(fetch) blob objectURL로 fallback
+ */
+function SmartImage({
+  rawUrl,
+  alt = "",
+  className,
+  style,
+}: {
+  rawUrl?: string | null;
+  alt?: string;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const [src, setSrc] = useState<string>("");
+  const [hidden, setHidden] = useState(false);
+
+  // objectURL revoke를 위해 추적
+  const objectUrlRef = useRef<string | null>(null);
+  const triedBlobRef = useRef(false);
+
+  // rawUrl이 바뀌면 초기화
+  useEffect(() => {
+    setHidden(false);
+    triedBlobRef.current = false;
+
+    // 이전 objectURL 정리
+    if (objectUrlRef.current) {
+      try {
+        URL.revokeObjectURL(objectUrlRef.current);
+      } catch {}
+      objectUrlRef.current = null;
+    }
+
+    const normalized = resolveMediaUrl(rawUrl);
+    setSrc(normalized || "");
+  }, [rawUrl]);
+
+  // 언마운트 시 objectURL 정리
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) {
+        try {
+          URL.revokeObjectURL(objectUrlRef.current);
+        } catch {}
+        objectUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  const onError = async () => {
+    // 1) 이미 숨김 처리했으면 끝
+    if (hidden) return;
+
+    // 2) blob fallback을 이미 시도했으면 더는 반복하지 말고 숨김
+    if (triedBlobRef.current) {
+      setHidden(true);
+      return;
+    }
+
+    triedBlobRef.current = true;
+
+    // ✅ 인증 필요 이미지면 blob으로 받아서 objectURL로 표시
+    const objUrl = await fetchImageAsObjectUrl(rawUrl ?? "");
+    if (!objUrl) {
+      setHidden(true);
+      return;
+    }
+
+    // 이전 objectURL 정리 후 새로 세팅
+    if (objectUrlRef.current) {
+      try {
+        URL.revokeObjectURL(objectUrlRef.current);
+      } catch {}
+    }
+    objectUrlRef.current = objUrl;
+    setSrc(objUrl);
+  };
+
+  if (!src || hidden) {
+    // 여기서 placeholder를 넣고 싶으면 div로 대체 가능
+    return null;
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      style={style}
+      onError={() => {
+        // React onError는 sync라서 async를 감싸줌
+        void onError();
+      }}
+    />
+  );
+}
 
 export default function PortfolioTab() {
   const { profile, isOwner } = useOutletContext<OutletCtx>();
@@ -72,7 +174,6 @@ export default function PortfolioTab() {
             state={{
               from: "profile",
               artistId,
-              // 있으면 타이틀에 쓰기 좋음 (Exhibit.tsx에서 location.state 사용 중)
               artist: (profile as any)?.nickname ?? "",
               artworkTitle: "PORTFOLIO",
               fromWaypointId: 0,
@@ -98,12 +199,11 @@ export default function PortfolioTab() {
       ) : (
         <div className="tab-grid-2">
           {items.map((it) => {
-            // ✅ 여기서 it.id를 artworkId로 취급 (프로젝트 구조상 "작품 #id"로 쓰고 있었음)
+            // ✅ 여기서 it.id를 artworkId로 취급
             const artworkId = it.id;
 
             return (
               <article key={it.id} className="tab-card">
-                {/* ✅ 카드 클릭하면 작품 상세로 이동 */}
                 <Link
                   to={`/artworks/${artworkId}`}
                   style={{ color: "inherit", textDecoration: "none", display: "block" }}
@@ -121,14 +221,17 @@ export default function PortfolioTab() {
                         borderRadius: 12,
                         border: "1px solid rgba(255,255,255,0.12)",
                         marginBottom: 10,
+                        background: "rgba(255,255,255,0.04)",
                       }}
                     >
-                      <img
-                        src={it.imageUrl}
+                      <SmartImage
+                        rawUrl={it.imageUrl}
                         alt=""
-                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          display: "block",
                         }}
                       />
                     </div>

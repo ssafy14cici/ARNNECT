@@ -28,11 +28,13 @@ type Options = {
 
   uiMount?: HTMLElement;
 
+  // ✅ mountMuseumApp에서 넘기고 있음(오브젝트 원점/스케일 초기화)
+  resetRootTransform?: boolean;
+
   onExitToHall: () => void;
 
-    // ✅ 전시장에서 "작품 상세보기" 눌렀을 때 라우팅은 바깥(React)에서 하게 콜백으로 뺌
+  // ✅ 전시장에서 "작품 상세보기" 눌렀을 때 라우팅은 바깥(React)에서 하게 콜백으로 뺌
   onOpenArtwork?: (artworkId: string | number) => void;
-
 };
 
 /**
@@ -54,17 +56,7 @@ const DEFAULT_TEX_FIX: TexFix = {
 
 // ✅ 패널별 예외(여기만 만지면 됨)
 const PANEL_TEX_FIX: Record<string, TexFix> = {
-  // EX_PANEL_2만 좌우/상하 뒤집힘 증상 → 180도 추가 회전으로 상쇄(대개 이게 정답)
-  EX_PANEL_2: { rot: -Math.PI / 2,  flipY: true },
-
-  // 만약 EX_PANEL_2가 여전히 상하만 뒤집히면 → 아래로 바꿔서 테스트
-  // EX_PANEL_2: { flipY: true },
-
-  // 좌우만 뒤집히면
-  // EX_PANEL_2: { flipX: true },
-
-  // 좌우+상하(=flipX+flipY)
-  // EX_PANEL_2: { flipX: false, flipY: true },
+  EX_PANEL_2: { rot: -Math.PI / 2, flipY: true },
 };
 
 function applyTexFix(tex: THREE.Texture, panelName: string, debug?: boolean) {
@@ -138,7 +130,7 @@ export async function mountExhibitRoom(
 
   console.log("[exhibit] mountExhibitRoom entered", { glbUrl: opts.glbUrl, debug });
 
-  // (debug용) GLB content-type 체크 — 필요 없으면 지워도 됨
+  // (debug용) GLB content-type 체크
   if (debug) {
     fetch(opts.glbUrl, { cache: "no-store" })
       .then((r) => console.log("[glb check]", r.status, r.headers.get("content-type"), opts.glbUrl))
@@ -375,6 +367,7 @@ export async function mountExhibitRoom(
     const title = mesh.userData.__title ?? "작품";
     const panelName = mesh.userData.__panelName ?? "";
     const imageUrl = mesh.userData.__imageUrl ?? "";
+    const artworkId = mesh.userData.__artworkId;
 
     if (fpsEnabled) setFps(false);
     if (fps.isLocked) fps.unlock();
@@ -420,29 +413,20 @@ export async function mountExhibitRoom(
     detailBtn.style.cssText =
       "background:#333;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;cursor:pointer;font-family:inherit;";
     detailBtn.textContent = "작품 상세보기";
-    // detailBtn.addEventListener("click", (e) => {
-    //   e.preventDefault();
-    //   e.stopPropagation();
-    //   console.log("[exhibit] detail clicked:", { title, panelName, imageUrl });
-    //   overlay.remove();
-    // });
 
     detailBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
 
-      const artworkId = mesh.userData.__artworkId;
-
       console.log("[exhibit] detail clicked:", { artworkId, title, panelName, imageUrl });
 
       overlay.remove();
 
-      // ✅ React 라우팅은 exhibitRoom이 직접 못하니까 콜백으로 넘김
-      if (artworkId !== undefined && opts.onOpenArtwork) {
+      // ✅ 콜백으로 라우팅 위임
+      if (artworkId !== undefined && artworkId !== null && opts.onOpenArtwork) {
         opts.onOpenArtwork(artworkId);
       }
     });
-
 
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
@@ -533,6 +517,15 @@ export async function mountExhibitRoom(
 
         try {
           glbRoot = gltf.scene;
+
+          // ✅ 필요 시 루트 트랜스폼 초기화
+          if (opts.resetRootTransform && glbRoot) {
+            glbRoot.position.set(0, 0, 0);
+            glbRoot.rotation.set(0, 0, 0);
+            glbRoot.scale.set(1, 1, 1);
+            glbRoot.updateMatrixWorld(true);
+          }
+
           scene.add(glbRoot);
 
           if (debug) {
@@ -583,6 +576,8 @@ export async function mountExhibitRoom(
 
           if (opts.panelItems?.length) {
             const texLoader = new THREE.TextureLoader();
+            texLoader.setCrossOrigin("anonymous"); // ✅ CORS 안전장치(동일 오리진이면 영향 거의 없음)
+
             let attached = 0;
             const missing: string[] = [];
 
@@ -633,7 +628,6 @@ export async function mountExhibitRoom(
 
                 loadedPanelTextures.add(tex);
 
-                // 패널은 map이 달라야 하니 "패널별 material"로 교체하는 게 안전
                 mesh.material = new THREE.MeshStandardMaterial({
                   map: tex,
                   roughness: 0.9,
@@ -641,13 +635,22 @@ export async function mountExhibitRoom(
                   side: THREE.DoubleSide,
                 });
 
+                // ✅ userData 세팅 (클릭/모달/라우팅 핵심)
                 mesh.userData.__panelName = item.panelName;
                 mesh.userData.__title = item.title;
                 mesh.userData.__imageUrl = item.imageUrl;
-                mesh.userData.__artworkId = (item as any).artworkId ?? (item as any).id;
+
+                const id =
+                  (item as any).artworkId ??
+                  (item as any).id ??
+                  (item as any).artId ??
+                  undefined;
+
+                if (id !== undefined) {
+                  mesh.userData.__artworkId = id;
+                }
 
                 clickableArtMeshes.push(mesh);
-
                 attached++;
               } catch (e) {
                 if (debug) console.warn("[exhibit] texture load failed:", item.panelName, e);
@@ -843,7 +846,7 @@ export async function mountExhibitRoom(
     // 표식 기반 UI 싹 제거
     uiMount.querySelectorAll(`[data-museum-ui="1"][data-museum-ui-scope="${UI_SCOPE}"]`).forEach((n) => n.remove());
 
-    // GLB 리소스 정리 (geometry/material + material이 참조하는 텍스처까지)
+    // GLB 리소스 정리
     if (glbRoot) {
       const disposedTex = new Set<THREE.Texture>();
       const disposedMat = new Set<THREE.Material>();
@@ -870,7 +873,6 @@ export async function mountExhibitRoom(
     }
     glbRoot = null;
 
-    // 패널 텍스처 추적분도 확실히 dispose (중복 dispose 방지용 Set이니 안전)
     for (const t of loadedPanelTextures) {
       try {
         t.dispose();

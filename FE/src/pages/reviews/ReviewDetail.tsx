@@ -26,6 +26,9 @@ function toSafeNumber(v: unknown, fallback = 0): number {
   return fallback;
 }
 
+// ✅ public/basic_review.png (Vite: public은 루트로 서빙됨)
+const FALLBACK_IMG = "/basic_review.png";
+
 export default function ReviewDetail() {
   const { reviewId = "" } = useParams<{ reviewId: string }>();
   const nav = useNavigate();
@@ -152,7 +155,7 @@ export default function ReviewDetail() {
 
   const onToggleFollow = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
-    if (isOwner) return; // ✅ 방어: 본인 글엔 팔로우 의미 없음(버튼도 숨김)
+    if (isOwner) return;
 
     const target = String(review?.artistUuid || review?.memberUuid || "").trim();
     if (!target) return;
@@ -162,7 +165,7 @@ export default function ReviewDetail() {
 
     try {
       const res = await toggleFollow(target);
-      if (typeof res?.isFollowing === "boolean") setIsFollowing(res.isFollowing);
+      if (typeof (res as any)?.isFollowing === "boolean") setIsFollowing((res as any).isFollowing);
     } catch (e) {
       console.error(e);
       setIsFollowing(prev);
@@ -170,14 +173,31 @@ export default function ReviewDetail() {
     }
   };
 
+  /**
+   * ✅ 표시할 src 결정
+   * 우선순위:
+   * 1) blob(objectURL)
+   * 2) review.imageUrl 정규화
+   * 3) 없으면 fallback
+   */
   const resolvedImgSrc = useMemo(() => {
     if (imageObjectUrl) return imageObjectUrl;
-    return resolveMediaUrl(review?.imageUrl);
+
+    const normalized = resolveMediaUrl(review?.imageUrl);
+    return normalized || FALLBACK_IMG;
   }, [imageObjectUrl, review?.imageUrl]);
 
   const onImgError = async () => {
+    // 이미 fallback 상태면 더 할 게 없음
+    if (resolvedImgSrc === FALLBACK_IMG) {
+      setImageError(false); // fallback은 정상 취급
+      return;
+    }
+
     if (imageFallbackTried) {
-      setImageError(true);
+      // blob도 실패 → fallback로 끝
+      setImageError(false);
+      setImageObjectUrl(null);
       return;
     }
 
@@ -185,7 +205,9 @@ export default function ReviewDetail() {
 
     const raw = String(review?.imageUrl ?? "").trim();
     if (!raw) {
-      setImageError(true);
+      // 원본이 없음 → fallback
+      setImageError(false);
+      setImageObjectUrl(null);
       return;
     }
 
@@ -200,7 +222,9 @@ export default function ReviewDetail() {
       console.error(e);
     }
 
-    setImageError(true);
+    // blob 실패 → fallback
+    setImageError(false);
+    setImageObjectUrl(null);
   };
 
   if (loading) {
@@ -260,30 +284,11 @@ export default function ReviewDetail() {
           </div>
 
           <div className="rd-actions">
-            {/* ✅ 본인 글에는 Follow 버튼 숨김 */}
             {!isOwner && (
               <button type="button" className="rd-btn" onClick={onToggleFollow}>
                 {isFollowing ? "Following" : "Follow"}
               </button>
             )}
-
-            {/* ✅ 좋아요는 “수만” 표시(버튼/토글 없음) */}
-            <div
-              className="rd-like-count"
-              aria-label={`좋아요 ${likeCount}개`}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "10px 12px",
-                border: "1px solid rgba(255,255,255,0.18)",
-                borderRadius: 12,
-                opacity: 0.9,
-              }}
-            >
-              <span style={{ opacity: 0.85 }}>좋아요</span>
-              <strong>{likeCount}</strong>
-            </div>
 
             {isOwner && (
               <>
@@ -299,13 +304,14 @@ export default function ReviewDetail() {
         </header>
 
         <section className="rd-image">
-          {!resolvedImgSrc ? (
-            <div className="rd-image-fallback">이미지가 없습니다.</div>
-          ) : imageError ? (
-            <div className="rd-image-fallback">이미지 로드 실패</div>
-          ) : (
-            <img src={resolvedImgSrc} alt={review.title ?? "review"} className="rd-image-img" onError={onImgError} />
-          )}
+          <img
+            src={resolvedImgSrc}
+            alt={review.title ?? "review"}
+            className="rd-image-img"
+            onError={() => {
+              void onImgError();
+            }}
+          />
         </section>
 
         <section className="rd-body">
@@ -322,12 +328,7 @@ export default function ReviewDetail() {
           </div>
         </section>
 
-        <CommentThread
-          reviewId={numericReviewId}
-          isLoggedIn={isLoggedIn}
-          meUuid={meUuid}
-          myDisplayName={myDisplayName}
-        />
+        <CommentThread reviewId={numericReviewId} isLoggedIn={isLoggedIn} meUuid={meUuid} myDisplayName={myDisplayName} />
       </div>
     </div>
   );

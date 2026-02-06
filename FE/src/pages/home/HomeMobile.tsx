@@ -1,8 +1,10 @@
+// FE/src/pages/home/HomeMobile.tsx
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
 
 import HoverModel from "../../shared/ui/three/HoverModel";
+import IntroArtworkGrid from "./IntroArtworkGrid"; // ✅ intro 4x4 그리드
 import "./homemobile.css";
 
 type ShapeType = "knot" | "sphere" | "box" | "octahedron" | "torus";
@@ -165,11 +167,7 @@ export default function HomeMobile() {
 
       {/* 2) Fixed header (Top 25%) */}
       <header className="fixed-header">
-        <div
-          className="header-left"
-          onClick={() => navigate("/feed")}
-          style={{ cursor: "pointer" }}
-        >
+        <div className="header-left" onClick={() => navigate("/feed")} style={{ cursor: "pointer" }}>
           <div className="logo-box">
             <span>
               THE
@@ -179,11 +177,7 @@ export default function HomeMobile() {
           </div>
         </div>
 
-        <div
-          className="header-right"
-          onClick={handleMenuTrigger}
-          style={{ cursor: "pointer" }}
-        >
+        <div className="header-right" onClick={handleMenuTrigger} style={{ cursor: "pointer" }}>
           <div className="hamburger" />
         </div>
       </header>
@@ -199,16 +193,24 @@ export default function HomeMobile() {
           >
             {/* 3D middle area (25% ~ 75%) */}
             <div className="model-area">
-              <Canvas camera={{ position: [0, 0, 14], fov: 35 }} dpr={[1, 2]}>
+              {/* ✅ 첫 페이지에서만: 4x4 작품 그리드 (feed에서 작품만 추출해서 랜덤 16개) */}
+              {item.key === "intro" && (
+                <IntroArtworkGrid
+                  count={16}
+                  onClickArtwork={(artworkId) => {
+                    // ✅ 라우트가 다르면 여기만 바꾸면 됨
+                    navigate(`/artworks/${artworkId}`);
+                  }}
+                />
+              )}
+
+              <Canvas className="homeCanvas" camera={{ position: [0, 0, 14], fov: 35 }} dpr={[1, 2]}>
                 <ambientLight intensity={0.8} />
                 <pointLight position={[10, 10, 10]} intensity={1.5} />
                 <pointLight position={[-10, -10, -10]} intensity={0.5} />
                 <Suspense fallback={null}>
                   <group rotation={[0.5, 0.5, 0]} scale={0.55}>
-                    <HoverModel
-                      color={i === 0 ? "#ffffff" : "#d0d0d0"}
-                      shape={item.shape}
-                    />
+                    <HoverModel color={i === 0 ? "#ffffff" : "#d0d0d0"} shape={item.shape} />
                   </group>
                 </Suspense>
               </Canvas>
