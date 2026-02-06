@@ -6,6 +6,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class UserLogService {
@@ -21,5 +23,9 @@ public class UserLogService {
     ) {
         UserActionLog log = UserActionLog.of(memberUuid, action, artworkId);
         userLogRepository.save(log);
+    }
+
+    public List<UserLogActionDto> getUserLogs(String memberUuid){
+        return userLogRepository.findByMemberUuid(memberUuid).stream().map(UserLogActionDto::from).toList();
     }
 }
