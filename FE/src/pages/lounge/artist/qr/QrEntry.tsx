@@ -10,12 +10,7 @@ import { resolveMediaUrl } from "../../../../features/tickets/resolveTicketMedia
 type PreviewItem = {
   ticketId: number;
   ticketCode: string;
-  title: string;
-  address: string;
-  startDate: string;
-  endDate: string;
   ticketImageName?: string;
-  qrImageName?: string;
 };
 
 export default function QrEntry() {
@@ -24,20 +19,15 @@ export default function QrEntry() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const artistUuid = useAuthStore((s) => s.user?.memberUuid ?? "");
+  const artistUuid = useAuthStore((s) => s.user?.memberUuid + "");
   const { issued, reloadIssued } = useIssuedTickets(artistUuid);
 
   const preview = useMemo<PreviewItem[]>(
     () =>
-      issued.slice(0, 3).map((t) => ({
+      issued.map((t) => ({
         ticketId: t.ticketId,
         ticketCode: t.ticketCode,
-        title: t.title ?? "",
-        address: t.address ?? "",
-        startDate: t.startDate ?? "",
-        endDate: t.endDate ?? "",
         ticketImageName: (t as any).ticketImageName,
-        qrImageName: (t as any).qrImageName,
       })),
     [issued],
   );
@@ -80,15 +70,14 @@ export default function QrEntry() {
       {!busy && !error && preview.length === 0 ? (
         <section className="qr-empty">
           <div className="qr-empty-box">
-            <div className="qr-empty-icon">🧾</div>
             <div className="qr-empty-text">
-              아직 발급된 QR이 없습니다.
+              No QR tickets yet.
               <br />
-              아래 버튼을 눌러 등록을 시작하세요.
+              Click below to register a QR ticket.
             </div>
             <div className="qr-empty-actions">
-              <button type="button" className="qr-primary-btn" onClick={goIssueNew}>
-                QR 등록하기
+              <button type="button" className="qr-primary" onClick={goIssueNew}>
+                Register QR
               </button>
             </div>
           </div>
@@ -96,16 +85,12 @@ export default function QrEntry() {
       ) : (
         <section className="qr-preview">
           <div className="qr-preview-head">
-            <div className="qr-preview-title">최근 발급</div>
-            <button type="button" className="qr-link" onClick={() => nav("/tickets/issue")}>
-              전체 관리 →
-            </button>
+            <div className="qr-preview-title">My Tickets</div>
           </div>
 
           <div className="qr-preview-grid">
             {preview.map((t) => {
               const ticketImg = resolveMediaUrl(t.ticketImageName);
-              const qrImg = resolveMediaUrl(t.qrImageName);
 
               return (
                 <button
@@ -113,42 +98,20 @@ export default function QrEntry() {
                   type="button"
                   className="qr-card"
                   onClick={() => goIssueEdit(t.ticketId)}
-                  aria-label={`${t.title || "티켓"} 수정으로 이동`}
+                  aria-label="Go to edit ticket"
                 >
-                  <div className="qr-card-top">
-                    <div className="qr-card-title">{t.title || "Untitled"}</div>
-                    <div className="qr-card-code">{t.ticketCode}</div>
-                  </div>
-
-                  <div className="qr-card-meta">
-                    <div>📍 {t.address || "-"}</div>
-                    <div>
-                      📅 {t.startDate || "-"} ~ {t.endDate || "-"}
-                    </div>
-                  </div>
-
                   {ticketImg ? (
-                    <div className="qr-card-media">
-                      <img
-                        className="qr-card-ticket"
-                        src={ticketImg}
-                        alt="ticket"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).style.display = "none";
-                        }}
-                      />
-                      {qrImg ? (
-                        <img
-                          className="qr-card-qr"
-                          src={qrImg}
-                          alt="qr"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).style.display = "none";
-                          }}
-                        />
-                      ) : null}
-                    </div>
-                  ) : null}
+                    <img
+                      className="qr-card-ticket"
+                      src={ticketImg}
+                      alt="ticket"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <div className="qr-card-fallback">?My Tickets?My Tickets+.</div>
+                  )}
                 </button>
               );
             })}
@@ -156,8 +119,8 @@ export default function QrEntry() {
         </section>
       )}
 
-      <button type="button" className="qr-fab" onClick={goIssueNew} aria-label="QR 발급/수정 화면으로 이동">
-        <span className="qr-fab-icon">📷</span>
+      <button type="button" className="qr-fab" onClick={goIssueNew} aria-label="Go to issue/edit QR">
+        <span className="qr-fab-icon">+</span>
       </button>
     </div>
   );

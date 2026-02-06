@@ -36,23 +36,23 @@ export default function Portfolio() {
     <main className="loungePage">
       <section className="loungeWrap">
         <div className="loungeSubTop">
-          <h1 className="loungeSubTitle">포트폴리오</h1>
+          <h1 className="loungeSubTitle">?????</h1>
 
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            {/* ✅ 전시장 바로가기 버튼 */}
             <button
               type="button"
               className="loungeSubBtn"
               onClick={goExhibit}
               style={{ textDecoration: "none" }}
             >
-              전시장 바로가기
+              ??? ????
             </button>
 
             <Link className="loungeBackLink" to="/lounge">
-              ← 라운지로
+              ? ????
             </Link>
           </div>
+        </div>
         </div>
 
         <p className="loungeSubDesc">

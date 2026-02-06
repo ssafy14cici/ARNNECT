@@ -15,6 +15,7 @@ type Props = {
   metaLeft?: string;           // 작은 설명 텍스트
   metaRight?: string;          // 작은 설명 텍스트
   onClick?: () => void;
+  showCode?: boolean;
 };
 
 function barcodeStyleFromCode(code: string): CSSProperties {
@@ -53,6 +54,7 @@ export default function TicketCardModern({
   metaLeft = "This ticket admits one visitor.",
   metaRight = "No returns, no exchange.",
   onClick,
+  showCode = false,
 }: Props) {
   return (
     <article className="tcm" role="button" tabIndex={0} onClick={onClick}>
@@ -65,7 +67,7 @@ export default function TicketCardModern({
             {leftLabel2 ? <div className="tcmStubTop">{leftLabel2}</div> : null}
           </div>
           <div className="tcmStubBottom">
-            <div className="tcmStubCode">{ticketCode}</div>
+            {showCode ? <div className="tcmStubCode">{ticketCode}</div> : null}
             <div className="tcmStubDate">{dateRangeText}</div>
           </div>
         </div>
@@ -106,7 +108,7 @@ export default function TicketCardModern({
       {/* RIGHT BARCODE */}
       <aside className="tcmRight">
         <div className="tcmRightBarcode" style={barcodeStyleFromCode(ticketCode)} />
-        <div className="tcmRightCode">{ticketCode}</div>
+        {showCode ? <div className="tcmRightCode">{ticketCode}</div> : null}
       </aside>
     </article>
   );

@@ -217,7 +217,7 @@ export const routes: RouteObject[] = [
               {
                 path: "portfolio",
                 element: <Guard requireRole="artist" />,
-                children: [{ index: true, element: <Portfolio /> }],
+                children: [{ index: true, element: <Navigate to="/members/me/portfolio" replace /> }],
               },
             ],
           },
@@ -312,7 +312,7 @@ export const routes: RouteObject[] = [
                 path: "portfolio",
                 // 일반 유저 홀에서 전시장 진입을 위해 주석처리?
                 element: <Guard requireRole="artist" />,
-                children: [{ index: true, element: <Portfolio /> }],
+                children: [{ index: true, element: <Navigate to="/members/me/portfolio" replace /> }],
               },
               {
                 path: "fan-letter",

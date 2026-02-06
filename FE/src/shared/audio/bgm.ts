@@ -8,6 +8,7 @@ function getAssetUrl(path: string) {
 
 let audio: HTMLAudioElement | null = null;
 let _on = true; // 기본 ON
+let boundEnded = false;
 
 function getAudio(): HTMLAudioElement {
   if (!audio) {
@@ -15,6 +16,18 @@ function getAudio(): HTMLAudioElement {
     audio.loop = true;
     audio.volume = 0.4;
   }
+
+  // ✅ loop가 먹통인 케이스 대비: ended 시 수동 재시작
+  if (audio && !boundEnded) {
+    boundEnded = true;
+    audio.addEventListener("ended", () => {
+      if (!_on) return;
+      // some browsers need currentTime reset
+      audio!.currentTime = 0;
+      audio!.play().catch(() => {});
+    });
+  }
+
   return audio;
 }
 

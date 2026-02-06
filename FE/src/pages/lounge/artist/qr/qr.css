@@ -84,6 +84,7 @@
 
 .qr-preview-grid {
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 14px;
 }
 
@@ -92,50 +93,24 @@
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 18px;
-  padding: 18px;
+  padding: 12px;
   background: rgba(255, 255, 255, 0.03);
   cursor: pointer;
 }
 
-.qr-card-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: baseline;
-}
-
-.qr-card-title {
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.qr-card-code {
-  opacity: 0.7;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  word-break: break-all;
-}
-
-.qr-card-meta {
-  margin-top: 10px;
-  opacity: 0.75;
-  line-height: 1.6;
-}
-
-/* ✅ 저장된 티켓 이미지(썸네일) */
-.qr-card-poster {
+.qr-card-ticket {
   width: 100%;
-  max-width: 520px;
   display: block;
-  margin-top: 14px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(0, 0, 0, 0.25);
 }
 
 .qr-card-fallback {
-  margin-top: 14px;
-  opacity: 0.55;
-  font-size: 12px;
+  padding: 24px 12px;
+  text-align: center;
+  opacity: 0.6;
+  font-size: 13px;
 }
 
 /* ✅ FAB: 너무 구석 말고 안쪽으로 */

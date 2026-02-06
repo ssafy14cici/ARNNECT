@@ -48,7 +48,7 @@ function toForm(t?: Partial<TicketItem> | null): FormState {
     startTime: t?.startTime && isHHmm(String(t.startTime).slice(0, 5)) ? String(t.startTime).slice(0, 5) : "10:00",
     endTime: t?.endTime && isHHmm(String(t.endTime).slice(0, 5)) ? String(t.endTime).slice(0, 5) : "20:00",
     posterFile: null,
-    posterPreviewUrl: "",
+    posterPreviewUrl: resolveMediaUrl((t as any)?.posterUrl ?? (t as any)?.posterImageUrl ?? (t as any)?.posterImageName ?? ""),
     ticketDesign: t?.ticketDesign ?? "BASIC",
   };
 }
@@ -255,9 +255,9 @@ export default function TicketQr() {
     <main className="loungePage">
       <section className="loungeWrap">
         <div className="loungeSubTop">
-          <h1 className="loungeSubTitle">전시 QR 관리</h1>
+          <h1 className="loungeSubTitle">QR Ticket Manager</h1>
           <Link className="loungeBackLink" to="/lounge">
-            ← 라운지로
+            <- Back to Lounge
           </Link>
         </div>
 
@@ -294,7 +294,7 @@ export default function TicketQr() {
                 </h2>
 
                 {editingTicketId && (
-                  <button className="loungeTextBtn" onClick={resetForm}>
+                  <button type="button" className="loungeTextBtn" onClick={resetForm}>
                     새로 만들기
                   </button>
                 )}
@@ -358,7 +358,7 @@ export default function TicketQr() {
                         </div>
 
                         <div style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.6)", marginTop: 8 }}>
-                          📍 {t.address} | 📅 {t.startDate} ~ {t.endDate}
+Address {t.address} | Period {t.startDate} ~ {t.endDate}
                         </div>
 
                         {ticketImg && (
@@ -404,10 +404,18 @@ export default function TicketQr() {
                           style={{ marginTop: 16, justifyContent: "flex-start", gap: 10 }}
                         >
                           <Link className="loungeSubBtn" to={`/tickets/issue?edit=${t.ticketId}`}>
-                            수정
+                            Edit
                           </Link>
-                          <button className="loungeSubBtn" onClick={() => remove(t)} style={{ color: "#ff6b6b" }}>
-                            삭제
+                          <button
+                            type="button"
+                            className="loungeSubBtn"
+                            onClick={async () => {
+                              await remove(t);
+                            }}
+                            disabled={busy}
+                            style={{ color: "#ff6b6b" }}
+                          >
+                            Delete
                           </button>
                         </div>
                       </div>

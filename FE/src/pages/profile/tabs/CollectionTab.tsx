@@ -139,7 +139,7 @@ export default function CollectionTab() {
               <div className="tab-card-body">
                 <div className="tab-card-header">
                   <div className="tab-card-title">{t.title ?? "Untitled"}</div>
-                  <div className="tab-card-meta">{t.ticketCode}</div>
+                  
                 </div>
 
                 <div className="tab-card-info">

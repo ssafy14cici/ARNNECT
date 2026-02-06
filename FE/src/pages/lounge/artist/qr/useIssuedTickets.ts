@@ -19,6 +19,7 @@ export type TicketItem = {
 
   qrImageName: string;
   ticketImageName: string;
+  posterUrl?: string;
 
   ticketDesign: TicketDesign;
 };
@@ -103,6 +104,7 @@ export function useIssuedTickets(artistUuid?: string) {
           // ✅ BE 필드명이 다른 경우도 대비(없으면 "")
           qrImageName: pickString(x, ["qrImageName", "qrImgName", "qrImage"], ""),
           ticketImageName: pickString(x, ["ticketImageName", "ticketImgName", "ticketImage"], ""),
+          posterUrl: pickString(x, ["posterUrl", "posterImageUrl", "posterImageName", "poster"], ""),
 
           ticketDesign,
         } satisfies TicketItem;
