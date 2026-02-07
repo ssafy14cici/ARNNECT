@@ -264,7 +264,8 @@ export default function TicketQr() {
         <button
           type="button"
           className="loungeBackLink"
-          onClick={() => nav("/lounge/ticket")}
+          // ✅ /lounge/ticket/issue -> .. => /lounge/ticket
+          onClick={() => nav("..")}
           style={{ background: "none", border: "none", cursor: "pointer" }}
         >
           ← Back

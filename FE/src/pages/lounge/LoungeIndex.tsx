@@ -4,5 +4,5 @@ import { useAuthStore } from "../../features/auth/store";
 
 export default function LoungeIndex() {
   const role = useAuthStore((s) => s.role); // "general" | "artist"
-  return <Navigate to={role === "artist" ? "ticket" : "collectbook"} replace />;
+  return <Navigate to={role === "artist" ? "portfolio" : "collectbook"} replace />;
 }
