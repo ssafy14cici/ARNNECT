@@ -63,22 +63,30 @@ export default function YourPreferenceResult() {
           throw new Error("선택한 작품 ID가 없습니다.");
         }
 
-        const [mbtiCode] = await Promise.all([
+        // ✅ 결과 코드 요청 + UX 최소 로딩
+        const [mbtiCodeRaw] = await Promise.all([
           postPreference({ artworkIdList }, { skipAuth: !isLoggedIn }),
-          sleep(900), // UX용 최소 로딩 시간(원치 않으면 제거)
+          sleep(900),
         ]);
 
-        // ✅ 여기부터가 핵심 수정:
-        // - 매핑이 없으면 throw 하지 말고 fallback으로라도 결과 화면은 보여주기
-        const profile = resolveMbtiProfile(mbtiCode) ?? buildFallbackProfile(mbtiCode);
+        const mbtiCode = String(mbtiCodeRaw ?? "").trim().toUpperCase();
+
+        // mbtiCode가 비어있으면 서버 응답 파싱/키 불일치 가능성 큼
+        if (!mbtiCode) {
+          console.warn("[YourPreferenceResult] Empty MBTI code from server:", mbtiCodeRaw);
+        }
+
+        // ✅ resolve 1회만 수행
+        const resolved = resolveMbtiProfile(mbtiCode);
+        const profile = resolved ?? buildFallbackProfile(mbtiCode);
 
         // 프로필 누락이면 콘솔 경고만 남김(UX는 살림)
-        if (!resolveMbtiProfile(mbtiCode)) {
+        if (!resolved) {
           console.warn("[YourPreferenceResult] MBTI profile missing:", mbtiCode);
         }
 
         const next: ResultData = {
-          mbti: String(mbtiCode ?? "").trim(), // 서버가 string 아니어도 안전하게 표시
+          mbti: mbtiCode || "UNKNOWN",
           title: profile.title,
           tagline: profile.tagline,
           description: profile.description,
@@ -102,7 +110,7 @@ export default function YourPreferenceResult() {
     return () => {
       alive = false;
     };
-  }, [isLoggedIn, selections, setResultData]);
+  }, [isLoggedIn, selections, setResultData, navigate]);
 
   const retry = () => {
     reset();
@@ -127,12 +135,16 @@ export default function YourPreferenceResult() {
           <div style={{ marginTop: 16, textAlign: "left" }}>
             <h3 style={{ margin: "12px 0 6px" }}>강점</h3>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {resultData?.strengths?.map((s) => <li key={s}>{s}</li>)}
+              {resultData?.strengths?.map((s) => (
+                <li key={s}>{s}</li>
+              ))}
             </ul>
 
             <h3 style={{ margin: "12px 0 6px" }}>주의점</h3>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {resultData?.watchouts?.map((s) => <li key={s}>{s}</li>)}
+              {resultData?.watchouts?.map((s) => (
+                <li key={s}>{s}</li>
+              ))}
             </ul>
 
             <h3 style={{ margin: "12px 0 6px" }}>팁</h3>
@@ -140,7 +152,9 @@ export default function YourPreferenceResult() {
           </div>
 
           <div className="result-keywords">
-            {resultData?.keywords?.map((k) => <span key={k}>{k}</span>)}
+            {resultData?.keywords?.map((k) => (
+              <span key={k}>{k}</span>
+            ))}
           </div>
         </div>
 

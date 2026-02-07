@@ -48,7 +48,7 @@ export default function Lounge() {
             <NavLink
               key={t.key}
               to={t.to}
-              end
+              // ✅ end 제거: /lounge/ticket/issue에서도 ticket 탭 active 유지
               className={({ isActive }) => `loungeTabBtn ${isActive ? "active" : ""}`}
             >
               <div className="loungeTabTitle">{t.title}</div>
@@ -56,6 +56,7 @@ export default function Lounge() {
             </NavLink>
           ))}
         </div>
+
         <Outlet />
       </section>
     </main>

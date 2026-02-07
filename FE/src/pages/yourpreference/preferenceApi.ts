@@ -1,3 +1,4 @@
+// FE/src/pages/yourpreference/preferenceApi.ts
 import { http } from "../../shared/api/http";
 
 type JsonRecord = Record<string, unknown>;
@@ -23,14 +24,27 @@ function asStringArray(v: unknown): string[] {
 }
 
 function unwrapAxios(res: unknown): unknown {
+  // axios response { data: ... } → data만 추출
   return isRecord(res) && "data" in res ? (res as any).data : res;
 }
+
+/**
+ * ✅ 엔벨로프(래핑) 응답을 최대한 관대하게 풀기
+ * - 백엔드가 { data }, { result }, { response } 등으로 감싸도 처리
+ * - 기존처럼 success/code 같은 키 존재 여부에 의존하지 않음
+ */
 function unwrapEnvelope(raw: unknown): unknown {
-  // { success, data, ... } 형태도 흡수
-  if (isRecord(raw) && "data" in raw && ("success" in raw || "code" in raw)) {
-    return (raw as any).data;
-  }
+  if (!isRecord(raw)) return raw;
+
+  if ("data" in raw) return (raw as any).data;
+  if ("result" in raw) return (raw as any).result;
+  if ("response" in raw) return (raw as any).response;
+
   return raw;
+}
+
+function normalizeMbtiCode(v: unknown): string {
+  return asString(v, "").trim().toUpperCase();
 }
 
 // ------------------------
@@ -38,7 +52,7 @@ function unwrapEnvelope(raw: unknown): unknown {
 // ------------------------
 export type PreferenceArtwork = {
   artworkId: number;
-  imageUrl: string;   // 파일명 or 경로
+  imageUrl: string; // 파일명 or 경로
   tags: string[];
 };
 
@@ -64,7 +78,7 @@ function normalizeImagePath(imageUrl: string): string {
   if (/^https?:\/\//i.test(u)) return u;
   if (u.startsWith("/")) return u;
 
-  // ✅ 파일명만 오면 /artwork/ prefix 붙임 (resolveMediaUrl 전제)
+  // 파일명만 오면 prefix
   return `/artwork/${u}`;
 }
 
@@ -84,9 +98,11 @@ function parseGenreGroups(raw: unknown): PreferenceGenreGroup[] {
       const artworks: PreferenceArtwork[] = artworksRaw
         .map((a): PreferenceArtwork | null => {
           if (!isRecord(a)) return null;
+
           const artworkId = asNumber(a["artworkId"], NaN);
           const imageUrl = normalizeImagePath(asString(a["imageUrl"], ""));
           const tags = asStringArray(a["tags"]);
+
           if (!Number.isFinite(artworkId) || !imageUrl) return null;
           return { artworkId, imageUrl, tags };
         })
@@ -107,11 +123,12 @@ export async function getPreferenceRounds(opts?: { skipAuth?: boolean }): Promis
 
   const groups = parseGenreGroups(raw);
 
-  // ✅ 각 genre 당 artworks 2개를 라운드로 구성
+  // 각 genre 당 artworks 2개를 라운드로 구성
   const rounds: PreferenceRound[] = [];
   for (let i = 0; i < groups.length; i++) {
     const g = groups[i];
     if (g.artworks.length < 2) continue;
+
     rounds.push({
       round: rounds.length + 1,
       genreId: g.genreId,
@@ -131,6 +148,11 @@ export type PreferenceRequest = {
   artworkIdList: number[];
 };
 
+/**
+ * ✅ 백엔드가 ResultMBTIResponse { String type; } 형태로 주는 경우:
+ *   { "type": "ANLS" }
+ * - 혹시 다른 브랜치/이전 키도 같이 호환(MBTI_name, mbti, mbtiCode 등)
+ */
 export async function postPreference(
   body: PreferenceRequest,
   opts?: { skipAuth?: boolean },
@@ -142,6 +164,19 @@ export async function postPreference(
   const raw0 = unwrapAxios(res);
   const raw = unwrapEnvelope(raw0);
 
+  // 서버가 그냥 문자열로 내려주는 특이 케이스 방어
+  if (typeof raw === "string") return normalizeMbtiCode(raw);
+
   if (!isRecord(raw)) return "";
-  return asString(raw["MBTI_name"], "").trim().toUpperCase();
+
+  const code =
+    // ✅ 현재 백엔드 스펙
+    raw["type"] ??
+    // ✅ 혹시 예전/다른 응답 키 호환
+    raw["MBTI_name"] ??
+    raw["mbti"] ??
+    raw["mbtiCode"] ??
+    raw["MBTI"];
+
+  return normalizeMbtiCode(code);
 }

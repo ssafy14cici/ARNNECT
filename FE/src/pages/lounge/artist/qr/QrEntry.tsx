@@ -19,7 +19,7 @@ export default function QrEntry() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const artistUuid = useAuthStore((s) => s.user?.memberUuid + "");
+  const artistUuid = useAuthStore((s) => s.user?.memberUuid ?? "");
   const { issued, reloadIssued } = useIssuedTickets(artistUuid);
 
   const preview = useMemo<PreviewItem[]>(
@@ -54,16 +54,12 @@ export default function QrEntry() {
     };
   }, [artistUuid, reloadIssued]);
 
-  const goIssueNew = () => nav("/tickets/issue");
-  const goIssueEdit = (ticketId: number) => nav(`/tickets/issue?edit=${ticketId}`);
+  // ✅ 핵심: Lounge(ticket) 하위로 이동 (상대경로)
+  const goIssueNew = () => nav("issue");
+  const goIssueEdit = (ticketId: number) => nav(`issue?edit=${ticketId}`);
 
   return (
     <div className="qr-page">
-      <header className="qr-head">
-        <h1 className="qr-title">QR 발급</h1>
-        <p className="qr-sub">전시 QR을 발급하고 관리할 수 있습니다.</p>
-      </header>
-
       {busy && <div className="qr-state">불러오는 중...</div>}
       {!busy && error && <div className="qr-error">{error}</div>}
 
@@ -110,7 +106,7 @@ export default function QrEntry() {
                       }}
                     />
                   ) : (
-                    <div className="qr-card-fallback">?My Tickets?My Tickets+.</div>
+                    <div className="qr-card-fallback">No Preview</div>
                   )}
                 </button>
               );
