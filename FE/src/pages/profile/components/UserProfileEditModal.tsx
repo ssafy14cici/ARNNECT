@@ -19,7 +19,12 @@ function unwrapData(v: any) {
   return v?.data ?? v;
 }
 
-// ✅ public 정적 자산은 resolveMediaUrl 필요 없음 (BASE_URL로 안전하게)
+/**
+ * ✅ public/badges/badges1~9.png 매핑 (BASE_URL 안전)
+ *  - review: 1~3
+ *  - ticket: 4~6
+ *  - social: 7~9
+ */
 const ID_TO_NO: Record<string, number> = {
   review_lv1: 1,
   review_lv2: 2,
@@ -44,9 +49,10 @@ const ID_TO_LABEL: Record<string, string> = {
   social_lv3: "인플루언서",
 };
 
+const ALL_BADGE_IDS = Object.keys(ID_TO_NO);
+
 function badgeImageSrc(id: string) {
   const no = ID_TO_NO[id] ?? 1;
-  // ✅ BASE_URL은 보통 끝에 "/"가 포함됨 → 앞에 "/" 안 붙이는 게 안전
   return `${import.meta.env.BASE_URL}badges/badges${no}.png`;
 }
 
@@ -55,17 +61,14 @@ function computeEarnedBadgeIds(stats: { reviewCount: number; ticketCount: number
 
   const ids: string[] = [];
 
-  // review
   if (reviewCount >= 1) ids.push("review_lv1");
   if (reviewCount >= 5) ids.push("review_lv2");
   if (reviewCount >= 20) ids.push("review_lv3");
 
-  // ticket
   if (ticketCount >= 1) ids.push("ticket_lv1");
   if (ticketCount >= 5) ids.push("ticket_lv2");
   if (ticketCount >= 20) ids.push("ticket_lv3");
 
-  // social (followers)
   if (followerCount >= 1) ids.push("social_lv1");
   if (followerCount >= 10) ids.push("social_lv2");
   if (followerCount >= 50) ids.push("social_lv3");
@@ -73,40 +76,104 @@ function computeEarnedBadgeIds(stats: { reviewCount: number; ticketCount: number
   return ids;
 }
 
-// ✅ API helper: 403/HTML 응답 방어 + 인증 헤더 조합 재시도
-async function apiGet<T>(path: string): Promise<T> {
+/**
+ * ✅ 토큰을 최대한 찾아봄:
+ *  - zustand store
+ *  - localStorage 흔한 키
+ *  - localStorage에 persist된 auth store(JSON) 파싱
+ */
+function getAnyAuthToken(): string {
+  try {
+    const st: any = useAuthStore.getState?.() ?? {};
+    const fromStore =
+      st.accessToken ??
+      st.token ??
+      st.jwt ??
+      st?.auth?.token ??
+      st?.tokens?.accessToken ??
+      st?.state?.accessToken ??
+      "";
+    if (fromStore) return String(fromStore);
+
+    const directKeys = ["accessToken", "ACCESS_TOKEN", "token", "TOKEN", "jwt", "JWT", "bearer", "Bearer"];
+    for (const k of directKeys) {
+      const v = localStorage.getItem(k);
+      if (v && v !== "null" && v !== "undefined") return v;
+    }
+
+    // persist store 뒤져보기
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i) ?? "";
+      if (!k) continue;
+      if (!/auth|token|jwt|login|user/i.test(k)) continue;
+      const raw = localStorage.getItem(k);
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw);
+        // zustand persist 형태: { state: {...}, version: n }
+        const s = parsed?.state ?? parsed;
+        const v =
+          s?.accessToken ??
+          s?.token ??
+          s?.jwt ??
+          s?.auth?.token ??
+          s?.tokens?.accessToken ??
+          "";
+        if (v) return String(v);
+      } catch {
+        // ignore
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return "";
+}
+
+/**
+ * ✅ API URL 만들기:
+ *  - DEV: 상대경로(프록시)
+ *  - PROD: VITE_API_BASE_URL이 있으면 그 base로 붙임
+ *    (base가 .../api/v1 인데 path가 /api/v1/... 로 시작하면 중복 제거)
+ */
+function buildApiUrl(path: string): string {
   const p = path.startsWith("/") ? path : `/${path}`;
+  if (import.meta.env.DEV) return p;
 
-  // ✅ PROD에서만 VITE_API_BASE_URL 기준으로 붙임(값이 "https://.../api/v1" 형태여도 OK)
   const apiBase = String(import.meta.env.VITE_API_BASE_URL ?? "").trim();
-  const url =
-    import.meta.env.DEV || !apiBase
-      ? p
-      : new URL(p.replace(/^\//, ""), apiBase.endsWith("/") ? apiBase : `${apiBase}/`).toString();
+  if (!apiBase) return p; // 없으면 현재 origin으로 감 (지금 네 환경이 이 케이스일 가능성 높음)
 
-  const st: any = useAuthStore.getState();
-  const raw =
-    st.accessToken ??
-    st.token ??
-    st.jwt ??
-    st?.auth?.token ??
-    st?.tokens?.accessToken ??
-    "";
+  try {
+    const base = apiBase.endsWith("/") ? apiBase : `${apiBase}/`;
+    const baseUrl = new URL(base);
+    const basePath = baseUrl.pathname.replace(/\/+$/, ""); // "/api/v1"
+    let rel = p.replace(/^\//, ""); // "api/v1/review/my"
 
-  const baseHeaders: Record<string, string> = {
-    Accept: "application/json",
-  };
+    // base가 /api/v1 인데 rel이 api/v1/...면 중복 제거
+    if (basePath.endsWith("/api/v1") && rel.startsWith("api/v1/")) {
+      rel = rel.replace(/^api\/v1\//, "");
+    }
 
-  // ✅ 쿠키 인증 / Bearer / raw / X-Auth-Token 순서로 재시도
+    return new URL(rel, base).toString();
+  } catch {
+    return p;
+  }
+}
+
+async function apiGet<T>(path: string): Promise<T> {
+  const url = buildApiUrl(path);
+
+  const tokenRaw = getAnyAuthToken();
+  const tokenBearer = tokenRaw ? (tokenRaw.startsWith("Bearer ") ? tokenRaw : `Bearer ${tokenRaw}`) : "";
+
+  const baseHeaders: Record<string, string> = { Accept: "application/json" };
+
   const tries: Array<Record<string, string>> = [
-    baseHeaders,
-    ...(raw
-      ? [
-          { ...baseHeaders, Authorization: raw.startsWith("Bearer ") ? raw : `Bearer ${raw}` },
-          { ...baseHeaders, Authorization: raw },
-          { ...baseHeaders, "X-Auth-Token": raw },
-        ]
-      : []),
+    baseHeaders, // 쿠키 인증만 되는 케이스
+    ...(tokenBearer ? [{ ...baseHeaders, Authorization: tokenBearer }] : []),
+    ...(tokenRaw ? [{ ...baseHeaders, Authorization: tokenRaw }] : []),
+    ...(tokenRaw ? [{ ...baseHeaders, "X-Auth-Token": tokenRaw }] : []),
+    ...(tokenRaw ? [{ ...baseHeaders, "X-ACCESS-TOKEN": tokenRaw }] : []),
   ];
 
   let lastStatus = 0;
@@ -129,14 +196,11 @@ async function apiGet<T>(path: string): Promise<T> {
     }
 
     lastStatus = res.status;
-
-    // 401/403이면 다음 조합으로 재시도
-    if (res.status === 401 || res.status === 403) {
-      lastText = await res.text().catch(() => "");
-      continue;
-    }
-
     lastText = await res.text().catch(() => "");
+
+    // 401/403이면 다음 헤더 조합으로 재시도
+    if (res.status === 401 || res.status === 403) continue;
+
     break;
   }
 
@@ -187,8 +251,9 @@ export default function UserProfileEditModal({
   const [draftPassword, setDraftPassword] = useState("");
   const [draftImageFile, setDraftImageFile] = useState<File | null>(null);
 
-  // ✅ prop(서버)로 earnedBadges가 안 오면, 여기서 프론트 계산으로 채움
+  // ✅ prop(서버) earnedBadges가 비면, 프론트 계산으로 earnedIds를 채움
   const [earnedIdsFallback, setEarnedIdsFallback] = useState<string[]>([]);
+  const [badgeHint, setBadgeHint] = useState<string | null>(null);
 
   // ✅ store seeding
   useEffect(() => {
@@ -197,7 +262,11 @@ export default function UserProfileEditModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // ✅ open 시점에 earnedIds 확보 (prop 우선, 없으면 fallback 계산)
+  /**
+   * ✅ 중요: 지금 네 콘솔에서 요청이 여러 번 반복됨
+   * - deps에 객체 전체(profile, earnedBadges)를 넣으면 렌더마다 새 참조로 effect가 재실행될 수 있음
+   * - 그래서 "길이/숫자"만 deps로 둬서 과호출을 막음
+   */
   useEffect(() => {
     if (!open) return;
 
@@ -206,26 +275,24 @@ export default function UserProfileEditModal({
     console.log("[badge] earnedBadges(prop) =", earnedBadges);
     console.log("[badge] earnedIds(prop) =", propIds);
 
-    // ✅ prop이 있으면 fallback 계산 불필요
+    // ✅ 서버/부모가 내려주는 earnedBadges가 있으면 그걸 신뢰
     if (propIds.length > 0) {
       setEarnedIdsFallback([]);
+      setBadgeHint(null);
       return;
     }
 
     (async () => {
-      // 너희 실제 경로가 정확히 이거면 첫 후보에서 바로 성공함
+      // ✅ 네가 예전에 "내 피드"에서 성공했던 응답 형태를 고려해서 후보를 넓힘
       const REVIEW_MY = [
         "/api/v1/review/my",
         "/api/v1/reviews/my",
-        "/review/my",
-        "/reviews/my",
+        "/api/v1/feed/my", // 내 피드가 이 경로일 가능성
       ];
 
       const TICKET_COUNT = [
         "/api/v1/ticket/count",
         "/api/v1/tickets/count",
-        "/ticket/count",
-        "/tickets/count",
       ];
 
       const followerCount = Number((profile as any).followers ?? 0);
@@ -237,13 +304,17 @@ export default function UserProfileEditModal({
         ]);
 
         const reviewsData = unwrapData(reviewsRaw);
+
+        // array / envelope.data(array) / envelope.data.items(array) 모두 대응
         const reviewsArr = Array.isArray(reviewsRaw)
           ? reviewsRaw
           : Array.isArray(reviewsData)
             ? reviewsData
             : Array.isArray(reviewsData?.items)
               ? reviewsData.items
-              : [];
+              : Array.isArray(reviewsData?.list)
+                ? reviewsData.list
+                : [];
 
         const reviewCount = reviewsArr.length;
 
@@ -260,12 +331,21 @@ export default function UserProfileEditModal({
         console.log("[badge] computed earnedIds =", ids);
 
         setEarnedIdsFallback(ids);
+        setBadgeHint(null);
       } catch (e) {
         console.log("[badge] fallback compute failed:", e);
-        setEarnedIdsFallback([]);
+
+        /**
+         * ✅ 핵심 안전장치:
+         * - API가 401/403이면 "획득 뱃지만 보여주기"는 불가능
+         * - 그래도 UI가 비면 UX가 박살나니까, '전체 뱃지 선택 가능'으로 fallback
+         * - 나중에 백에서 stats/earnedBadges API 생기면 이 fallback 제거하면 됨
+         */
+        setEarnedIdsFallback(ALL_BADGE_IDS);
+        setBadgeHint("활동량 조회에 실패하여 전체 뱃지를 표시합니다. (서버 권한/인증 확인 필요)");
       }
     })();
-  }, [open, earnedBadges, profile]);
+  }, [open, (earnedBadges ?? []).length, Number((profile as any).followers ?? 0)]);
 
   // ✅ 최종 earnedIds: prop 우선, 없으면 fallback
   const earnedIds = useMemo(() => {
@@ -273,14 +353,10 @@ export default function UserProfileEditModal({
     return propIds.length > 0 ? propIds : earnedIdsFallback;
   }, [earnedBadges, earnedIdsFallback]);
 
-  // ✅ 라벨/프리뷰용 Badge 객체: prop 우선, 없으면 id→label로 생성
+  // ✅ 라벨/프리뷰용 Badge 객체: prop 우선, 없으면 id->label 생성
   const earnedBadgesForUI: Badge[] = useMemo(() => {
     if ((earnedBadges ?? []).length > 0) return earnedBadges;
-
-    return earnedIds.map((id) => ({
-      id,
-      label: ID_TO_LABEL[id] ?? id,
-    }));
+    return earnedIds.map((id) => ({ id, label: ID_TO_LABEL[id] ?? id }));
   }, [earnedBadges, earnedIds]);
 
   const draftBadgeObjects = useMemo(() => {
@@ -394,6 +470,8 @@ export default function UserProfileEditModal({
                 </button>
               </div>
 
+              {badgeHint && <div className="profileHelp" style={{ opacity: 0.8 }}>{badgeHint}</div>}
+
               <div className="profileBadgePreview">
                 {draftBadgeObjects.length > 0 ? (
                   draftBadgeObjects.map((b) => (
@@ -429,7 +507,7 @@ export default function UserProfileEditModal({
         </div>
       </div>
 
-      {/* ✅ 핵심: prop/계산값으로 만든 earnedIds를 Picker에 전달 */}
+      {/* ✅ 핵심: prop/계산값 earnedIds를 Picker에 전달 */}
       <BadgePicker open={pickerOpen} onClose={() => setPickerOpen(false)} earnedIds={earnedIds} />
     </>
   );
