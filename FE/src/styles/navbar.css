@@ -20,7 +20,6 @@
   justify-content: space-between;
   align-items: center;
 
-  /* ✅ 세련된 폰트 적용 */
   font-family: var(--font-stack);
   color: white;
 }
@@ -66,7 +65,7 @@
 
 .menu-trigger span {
   position: absolute;
-  left: 6px; /* 길이 조정 */
+  left: 6px;
   right: 6px;
   height: 2px;
   background-color: white;
@@ -77,7 +76,6 @@
 .menu-trigger span:nth-of-type(2) { top: 17px; }
 .menu-trigger span:nth-of-type(3) { top: 23px; }
 
-/* 열렸을 때 햄버거 숨기기 (그리드 내부의 X버튼을 쓸 것이므로) */
 .menu-trigger.active {
   opacity: 0;
   pointer-events: none;
@@ -90,10 +88,11 @@
   position: fixed;
   inset: 0;
   z-index: 5500;
-  background: var(--nav-bg); /* 배경색 #050505 */
+  background: var(--nav-bg);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  
   display: flex;
   flex-direction: column;
 }
@@ -103,13 +102,21 @@
   pointer-events: auto;
 }
 
-/* 그리드 컨테이너 */
-.refMenuGrid {
+/* ✅ 스크롤 컨테이너 추가 */
+.refMenuScrollContainer {
   flex: 1;
-  display: grid;
   width: 100%;
   height: 100%;
-  /* 데스크탑: 4열 2행 */
+  overflow-y: auto; /* 세로 스크롤 허용 */
+  -webkit-overflow-scrolling: touch; /* 모바일 부드러운 스크롤 */
+}
+
+/* 그리드 컨테이너 */
+.refMenuGrid {
+  display: grid;
+  width: 100%;
+  min-height: 100%; /* 최소 높이 100% */
+  /* 데스크탑: 4열 2행 (50vh) */
   grid-template-columns: repeat(4, 1fr); 
   grid-template-rows: repeat(2, 50vh);
 }
@@ -121,77 +128,45 @@
   background: transparent;
   cursor: pointer;
   display: flex;
-  flex-direction: column; /* 텍스트와 점 수직 정렬 */
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   
-  /* 그리드 라인 */
   border-right: 1px solid var(--nav-line);
   border-bottom: 1px solid var(--nav-line);
   
   transition: background-color 0.3s ease;
-  overflow: hidden; /* 애니메이션이 밖으로 나가지 않게 */
+  overflow: hidden;
 }
 
-/* 오른쪽 끝 라인 제거 (선택사항, 깔끔하게 보이기 위함) */
 .refCell:nth-child(4n) {
   border-right: none;
 }
 
 .refCell:hover {
-  background-color: #0e0e0e; /* 호버 시 아주 살짝 밝은 블랙 */
+  background-color: #0e0e0e;
 }
-
 
 .refLabel {
   color: var(--nav-text);
-  font-size: 1.3rem; /* 크기 약간 조정 */
-  
-  /* ✅ 세련된 폰트 적용 */
+  font-size: 1.3rem;
   font-family: var(--font-stack);
-  font-weight: 400; /* 너무 얇지 않게 기본 두께 설정 */
-  letter-spacing: 0.02em; /* 자간을 살짝 좁혀서 단단한 느낌 */
-  
+  font-weight: 400;
+  letter-spacing: 0.02em;
   transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease, font-weight 0.3s ease;
+  z-index: 10; 
+  position: relative;
 }
 
-/* 텍스트 호버 애니메이션: 위로 살짝 뜨면서 두꺼워짐 */
 .refCell:hover .refLabel {
   transform: translateY(-12px);
-  font-weight: 700; /* 호버 시 강조 */
+  font-weight: 700;
 }
 
 /* =========================
-   DOT ANIMATION (첫 번째 사진 느낌)
-========================= */
-.refDot {
-  width: 6px;
-  height: 6px;
-  background-color: white;
-  border-radius: 50%;
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
-  
-  /* 초기 상태: 안 보이고 아래에 위치 */
-  opacity: 0;
-  transform: translateY(20px);
-  transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-  
-  margin-top: 8px; /* 텍스트와의 간격 */
-  position: absolute;
-  top: 55%; /* 위치 미세 조정 */
-}
-
-/* 호버 시 점이 올라오면서 나타남 */
-.refCell:hover .refDot {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* =========================
-   CLOSE BUTTON (Cell 안에 위치)
+   CLOSE BUTTON
 ========================= */
 .refCellClose {
-  /* X 모양 만들기 */
   position: relative;
   width: 100%;
   height: 100%;
@@ -226,31 +201,26 @@
   .refMenuGrid {
     /* 모바일: 2열 4행 */
     grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: repeat(4, 25vh);
+    /* ✅ 고정 25vh 대신 minmax 사용 -> 내용이 길면 늘어나서 스크롤 됨 */
+    grid-template-rows: repeat(4, minmax(25vh, auto));
   }
   
-  .refCell:nth-child(2n) { border-right: none; } /* 2번째마다 오른쪽 선 제거 */
-  .refCell:nth-child(4n) { border-right: 1px solid var(--nav-line); } /* 리셋 */
+  .refCell:nth-child(2n) { border-right: none; }
+  .refCell:nth-child(4n) { border-right: 1px solid var(--nav-line); }
   
   .refLabel { font-size: 1.1rem; }
 }
 
-/* 3D 캔버스를 감싸는 박스 */
+/* 3D Wrapper */
 .ref3DWrapper {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 0; /* 글자(refLabel)보다 뒤로 가게 */
-  pointer-events: none; /* 3D가 클릭을 방해하지 않게 */
+  z-index: 0;
+  pointer-events: none;
   animation: fadeIn 0.5s ease;
-}
-
-/* 글자는 3D 위로 올라와야 함 */
-.refLabel {
-  z-index: 10; 
-  position: relative;
 }
 
 @keyframes fadeIn {

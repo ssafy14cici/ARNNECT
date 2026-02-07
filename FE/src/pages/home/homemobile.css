@@ -1,7 +1,5 @@
 /* =========================
    HOME Mobile (Snap Sections)
-   - 상단: 3D Canvas
-   - 하단: 텍스트 오버레이
 ========================= */
 :root {
   --bg: #0c0c0c;
@@ -17,6 +15,28 @@
   background-color: var(--bg);
   color: var(--text);
   overflow: hidden;
+}
+
+/* =========================
+   UI VISIBILITY CONTROL
+   첫 화면과 그 이후 화면의 UI 표시 여부 제어
+========================= */
+.ui-transition {
+  transition: opacity 0.4s ease-in-out, visibility 0.4s;
+}
+
+/* 첫 화면일 때 숨길 요소 (Footer, Header) */
+.ui-transition.hidden-on-intro {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* 두 번째 화면부터 보일 요소 */
+.ui-transition.visible-on-content {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 /* =========================
@@ -58,7 +78,7 @@
 }
 
 /* =========================
-   2) FIXED HEADER (Top 25%)
+   2) FIXED HEADER (내부 헤더)
 ========================= */
 .fixed-header {
   position: fixed;
@@ -66,9 +86,8 @@
   left: 0;
   width: 100%;
   height: 25%;
-  z-index: 9999;
+  z-index: 9000; /* Main Scroll(5)보다 위, Navbar(9999)보다 아래 */
   display: flex;
-  pointer-events: none;
 }
 
 .header-left,
@@ -78,9 +97,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: auto;
   position: relative;
-  z-index: 10000;
+  z-index: 9001;
+  cursor: pointer;
 }
 
 .logo-box {
@@ -102,7 +121,6 @@
   height: 1px;
   background: white;
   position: relative;
-  cursor: pointer;
 }
 
 .hamburger::before,
@@ -114,13 +132,8 @@
   height: 1px;
   background: white;
 }
-
-.hamburger::before {
-  top: -6px;
-}
-.hamburger::after {
-  top: 6px;
-}
+.hamburger::before { top: -6px; }
+.hamburger::after { top: 6px; }
 
 /* =========================
    3) MAIN SNAP SCROLL
@@ -132,11 +145,12 @@
   overflow-y: scroll;
   scroll-snap-type: y mandatory;
   scrollbar-width: none;
-  z-index: 5;
+  z-index: 5; /* 기본 레이어 */
+  /* 중요: 터치 스크롤 동작 보장 */
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
-.snap-container::-webkit-scrollbar {
-  display: none;
-}
+.snap-container::-webkit-scrollbar { display: none; }
 
 .snap-section {
   position: relative;
@@ -147,9 +161,45 @@
   border-bottom: 1px solid var(--line);
 }
 
+/* ✅ 첫 화면 전용: 배경 꽉 채우기 */
+.intro-full-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 1; /* 가장 뒤 */
+}
+
+/* 그리드 스타일 */
+.intro-full-bg .introGrid {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: 0;
+  padding: 0;
+}
+
+.intro-full-bg .introCell {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+.intro-full-bg .introCell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 네비바 가독성을 위한 약한 음영 */
+.vignette-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.2);
+  pointer-events: none;
+}
+
 /* =========================
-   middle: 25% ~ 75%
-   ✅ absolute 유지 + 내부는 grid로 겹치기
+   Middle Area (3D Canvas)
 ========================= */
 .model-area {
   position: absolute;
@@ -157,83 +207,20 @@
   width: 100%;
   height: 50%;
   z-index: 10;
-
-  display: grid; /* ✅ 겹치기 핵심 */
+  display: grid; 
   overflow: hidden;
+  pointer-events: none; /* 스크롤 방해 금지 */
 }
 
-/* model-area의 자식들을 같은 칸에 겹침 */
-.model-area > .introGrid,
 .model-area > .homeCanvas {
   grid-area: 1 / 1;
-}
-
-/* =========================
-   Intro 4x4 grid
-========================= */
-.introGrid {
-  width: 100%;
-  height: 100%;
-  z-index: 1;
-
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-rows: repeat(4, minmax(0, 1fr));
-
-  gap: 8px;
-  padding: 14px;
-
-  /* 디버그 필요 시 */
-  /* outline: 2px solid red; */
-}
-
-.introCell {
-  min-width: 0;
-  min-height: 0;
-
-  /* button 기본 스타일 제거 */
-  appearance: none;
-  -webkit-appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  overflow: hidden;
-
-  background: rgba(255, 255, 255, 0.02);
-  padding: 0;
-  margin: 0;
-
-  display: block;
-}
-
-.introCell img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* 로딩 스켈레톤(선택) */
-.introCell.skeleton {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-/* =========================
-   3D Canvas
-   ✅ 그리드 위에 보이되 클릭은 그리드가 받게
-========================= */
-.homeCanvas {
-  position: relative; /* z-index 적용 안정 */
   z-index: 2;
   width: 100%;
   height: 100%;
-  pointer-events: none; /* ✅ canvas가 클릭 먹는 문제 방지 */
-  display: block;
 }
 
 /* =========================
-   4) FIXED FOOTER (Bottom 25%)
-   - Left: fixed indicator
-   - Right: internal scroller (synced)
+   4) FIXED FOOTER
 ========================= */
 .fixed-footer {
   position: fixed;
@@ -243,7 +230,6 @@
   height: 25%;
   z-index: 60;
   display: flex;
-  pointer-events: none;
 }
 
 .footer-left,
@@ -256,10 +242,7 @@
   justify-content: center;
 }
 
-/* 왼쪽은 표시만 */
-.footer-left {
-  pointer-events: none;
-}
+.footer-left { pointer-events: none; }
 
 .scroll-content {
   display: flex;
@@ -269,26 +252,15 @@
   opacity: 0.6;
 }
 
-.scroll-text {
-  font-size: 9px;
-  letter-spacing: 0.2em;
-}
+.scroll-text { font-size: 9px; letter-spacing: 0.2em; }
+.scroll-line { width: 1px; height: 30px; background: white; }
 
-.scroll-line {
-  width: 1px;
-  height: 30px;
-  background: white;
-}
-
-/* 오른쪽은 스크롤/클릭 허용 */
 .footer-right {
-  pointer-events: auto;
   flex-direction: column;
   gap: 10px;
   padding: 10px 0;
 }
 
-/* 오른쪽 하단 메뉴 자체 스크롤 */
 .menu-scroller {
   width: 100%;
   height: 100%;
@@ -296,11 +268,8 @@
   scroll-snap-type: y mandatory;
   scrollbar-width: none;
 }
-.menu-scroller::-webkit-scrollbar {
-  display: none;
-}
+.menu-scroller::-webkit-scrollbar { display: none; }
 
-/* 메뉴 각 아이템은 footer 높이(25%)와 동일 -> snap */
 .menu-item {
   height: 100%;
   width: 100%;
@@ -315,55 +284,29 @@
   transition: opacity 0.15s ease;
 }
 
-.menu-item.active {
-  opacity: 1;
-}
-
-.index-text {
-  font-family: monospace;
-  font-size: 10px;
-  margin-bottom: 6px;
-  opacity: 0.75;
-}
+.menu-item.active { opacity: 1; }
 
 .main-title {
   font-family: var(--font-main);
   font-size: 1.8rem;
   font-weight: 500;
-  margin: 0;
-  line-height: 1;
   text-transform: uppercase;
 }
-
-.arrow-down {
-  margin-top: 10px;
-  font-size: 14px;
-  opacity: 0.5;
+.menu-item.active .main-title {
+  text-decoration: underline;
+  text-underline-offset: 6px;
 }
 
-/* 선택: 현재 섹션 path로 바로 이동 버튼 */
+.arrow-down { margin-top: 10px; font-size: 14px; opacity: 0.5; }
+
 .menu-enter {
   position: absolute;
   right: 12px;
   bottom: 10px;
-  pointer-events: auto;
   background: transparent;
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.35);
   padding: 6px 10px;
   font-size: 11px;
-  letter-spacing: 0.08em;
   cursor: pointer;
-  opacity: 0.85;
-}
-
-.menu-enter:hover {
-  opacity: 1;
-}
-
-/* 접근성: 모션 민감 사용자 */
-@media (prefers-reduced-motion: reduce) {
-  .menu-item {
-    transition: none;
-  }
 }

@@ -21,18 +21,19 @@ type MenuItem = {
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
-
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
 
   const navigate = useNavigate();
   const location = useLocation();
   const matches = useMatches();
 
-  // ✅ 홈 판별: handle.navVariant + pathname fallback
   const isHome =
     location.pathname === "/" ||
     matches.some((m) => (m.handle as any)?.navVariant === "home");
-  const isHomeMobile = matches.some((m) => (m.handle as any)?.navVariant === "home-mobile") || (isHome && isMobile);
+
+  const isHomeMobile =
+    matches.some((m) => (m.handle as any)?.navVariant === "home-mobile") ||
+    (isHome && isMobile);
 
   const [isTop, setIsTop] = useState(true);
   const [isModalOpen, setModalOpen] = useState(false);
@@ -40,13 +41,14 @@ export default function Navbar() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const logout = useAuthStore((s) => s.logout);
 
+  // resize
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // ✅ 라우트 바뀌면 열린 메뉴/hover 상태 정리
+  // 라우트 바뀌면 열린 메뉴/hover 상태 정리
   useEffect(() => {
     setOpen(false);
     setHoveredKey(null);
@@ -66,6 +68,7 @@ export default function Navbar() {
     navigate("/");
   };
 
+  // esc + body scroll lock
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -80,33 +83,30 @@ export default function Navbar() {
       document.body.classList.remove("nav-menu-open");
     }
 
-
-
-
-
-
-  return () => {
+    return () => {
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = "";
       document.body.classList.remove("nav-menu-open");
     };
   }, [open]);
 
+  // home에서만 top transparent 처리
   useEffect(() => {
+    if (isHomeMobile) {
+      setIsTop(false);
+      return;
+    }
+
     if (!isHome) {
       setIsTop(false);
       return;
     }
+
     const onScroll = () => setIsTop(window.scrollY <= 20);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-
-
-
-
-
-  return () => window.removeEventListener("scroll", onScroll);
-  }, [isHome]);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [isHome, isHomeMobile]);
 
   const items: MenuItem[] = useMemo(
     () => [
@@ -148,26 +148,23 @@ export default function Navbar() {
 
   const headerClassName = [
     "nav",
-    isHome ? "nav--home" : "nav--solid",
-    isHome && isTop ? "nav--transparent" : "nav--elevated",
+    (isHome && !isHomeMobile) ? "nav--home" : "nav--solid",
+    (isHome && !isHomeMobile && isTop) ? "nav--transparent" : "nav--elevated",
   ]
     .filter(Boolean)
     .join(" ");
 
   const shouldHideHeader = false;
 
-
-
-
-
-
-  if (isHomeMobile) return null;
-
   return (
     <>
       <header className={headerClassName} style={shouldHideHeader ? { display: "none" } : undefined}>
         <div className="navInner">
-          <button className="navBrand" type="button" onClick={() => navigate(isLoggedIn ? "/hall" : "/")}>
+          <button
+            className="navBrand"
+            type="button"
+            onClick={() => navigate(isLoggedIn ? "/hall" : "/")}
+          >
             ARNNECT
           </button>
 
@@ -186,37 +183,40 @@ export default function Navbar() {
       </header>
 
       <div className={`refMenu ${open ? "open" : ""}`} aria-hidden={!open}>
-        <div className="refMenuGrid">
-          {items.map((it) => (
-            <button
-              key={it.key}
-              type="button"
-              className="refCell"
-              onClick={() => handleItemClick(it)}
-              onMouseEnter={() => setHoveredKey(it.key)}
-              onMouseLeave={() => setHoveredKey(null)}
-            >
-              {it.type === "close" ? (
-                <div className="refCellClose" aria-label="Close Menu" />
-              ) : (
-                <>
-                  <span className="refLabel">
-                    {it.key === "auth" ? (isLoggedIn ? "logout" : "LOGIN") : it.label}
-                  </span>
+        {/* ✅ 스크롤 가능 컨테이너 추가 */}
+        <div className="refMenuScrollContainer">
+          <div className="refMenuGrid">
+            {items.map((it) => (
+              <button
+                key={it.key}
+                type="button"
+                className="refCell"
+                onClick={() => handleItemClick(it)}
+                onMouseEnter={() => setHoveredKey(it.key)}
+                onMouseLeave={() => setHoveredKey(null)}
+              >
+                {it.type === "close" ? (
+                  <div className="refCellClose" aria-label="Close Menu" />
+                ) : (
+                  <>
+                    <span className="refLabel">
+                      {it.key === "auth" ? (isLoggedIn ? "logout" : "LOGIN") : it.label}
+                    </span>
 
-                  {hoveredKey === it.key && (
-                    <div className="ref3DWrapper">
-                      <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
-                        <Suspense fallback={null}>
-                          <HoverModel color="#ffffff" shape={it.shape} />
-                        </Suspense>
-                      </Canvas>
-                    </div>
-                  )}
-                </>
-              )}
-            </button>
-          ))}
+                    {!isMobile && hoveredKey === it.key && (
+                      <div className="ref3DWrapper">
+                        <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
+                          <Suspense fallback={null}>
+                            <HoverModel color="#ffffff" shape={it.shape} />
+                          </Suspense>
+                        </Canvas>
+                      </div>
+                    )}
+                  </>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
