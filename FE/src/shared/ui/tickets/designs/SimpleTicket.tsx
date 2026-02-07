@@ -51,18 +51,19 @@ export default function MuseumClassicTicket({ data }: TicketDesignProps) {
               whiteSpace: "pre-line",
               letterSpacing: 1,
               wordBreak: "keep-all",
+              overflowWrap: "anywhere",
             }}
           >
             {title}
           </h1>
         </div>
 
-        {/* ✅ POSTER SLOT (이미지 넣을 자리) */}
+        {/* POSTER SLOT */}
         <div
           style={{
             zIndex: 2,
             width: "100%",
-            height: 190, // 필요하면 160~240 사이로 조절
+            height: 190,
             borderRadius: 14,
             overflow: "hidden",
             border: "1px solid rgba(74, 78, 178, 0.18)",
@@ -101,52 +102,56 @@ export default function MuseumClassicTicket({ data }: TicketDesignProps) {
           )}
         </div>
 
-        {/* ✅ DATE BADGES (보라 박스 작게) */}
+        {/* ✅ DATE BADGES (두 박스 완전 동일 크기) */}
         <div style={{ display: "flex", gap: 10, zIndex: 2 }}>
+          {/* START */}
           <div
             style={{
+              flex: 1,
+              minWidth: 0,
               backgroundColor: "#5D5FBB",
               color: "#fff",
-              padding: "6px 10px", // ↓ 줄임
-              fontSize: 12, // ↓ 줄임
-              minWidth: 96, // ↓ 줄임
-              textAlign: "center",
+              height: 38,
+              borderRadius: 10,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0 10px",
+              fontSize: 12,
               fontWeight: 700,
               boxSizing: "border-box",
-              borderRadius: 10,
-              lineHeight: 1.1,
+              textAlign: "center",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
             {startDate || "START DATE"}
           </div>
 
+          {/* END */}
           <div
             style={{
+              flex: 1,
+              minWidth: 0,
               backgroundColor: "#5D5FBB",
               color: "#fff",
-              padding: "6px 10px", // ↓ 줄임
-              fontSize: 12, // ↓ 줄임
-              flex: 1,
-              textAlign: "center",
-              fontWeight: 700,
-              boxSizing: "border-box",
+              height: 38,
               borderRadius: 10,
-              lineHeight: 1.1,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: 8,
-              minHeight: 34,
+              padding: "0 10px",
+              fontSize: 12,
+              fontWeight: 700,
+              boxSizing: "border-box",
+              textAlign: "center",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
-            {endDate ? (
-              <>
-                <span style={{ fontSize: 10, opacity: 0.9, letterSpacing: 1 }}>UNTIL</span>
-                <span>{endDate}</span>
-              </>
-            ) : (
-              "END DATE"
-            )}
+            {endDate || "END DATE"}
           </div>
         </div>
 
@@ -180,7 +185,7 @@ export default function MuseumClassicTicket({ data }: TicketDesignProps) {
           </div>
         </div>
 
-        {/* DECOR (기존 유지, 포스터랑 겹치면 zIndex 낮춰도 됨) */}
+        {/* DECOR */}
         <div
           style={{
             position: "absolute",
@@ -215,14 +220,14 @@ export default function MuseumClassicTicket({ data }: TicketDesignProps) {
         <div style={{ height: "90%", borderLeft: "1.5px dashed rgba(93, 95, 187, 0.4)" }} />
       </div>
 
-      {/* RIGHT STUB */}
+      {/* RIGHT STUB (STUB ONLY 제거) */}
       <div
         style={{
           flex: 0.8,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          justifyContent: "space-between",
+          justifyContent: "center",
           padding: "18px 12px",
           background: "rgba(93, 95, 187, 0.03)",
           boxSizing: "border-box",
@@ -238,10 +243,6 @@ export default function MuseumClassicTicket({ data }: TicketDesignProps) {
           }}
         >
           <TicketQR size={88} variant="dark" />
-        </div>
-
-        <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 9, letterSpacing: 1, opacity: 0.75, fontWeight: 700 }}>STUB ONLY</span>
         </div>
       </div>
     </div>
