@@ -213,18 +213,19 @@ export const routes: RouteObject[] = [
               { path: "Analysis", element: <Analysis /> },
               { path: "RemindQuiz", element: <RemindQuiz /> },
 
-              /* Tickets (canonical) */
+              /* Tickets (canonical) - ✅ 라운지로 보내서 "페이지 따로 뜨는" 문제 제거 */
               {
                 path: "tickets",
                 children: [
                   {
                     element: <Guard requireRole="artist" />,
-                    children: [{ index: true, element: <QrEntry /> }],
-                  },
-                  {
-                    path: "issue",
-                    element: <Guard requireRole="artist" />,
-                    children: [{ index: true, element: <TicketQr /> }],
+                    children: [
+                      // /tickets -> /lounge/ticket
+                      { index: true, element: <Navigate to="/lounge/ticket" replace /> },
+
+                      // /tickets/issue -> /lounge/ticket/issue
+                      { path: "issue", element: <Navigate to="/lounge/ticket/issue" replace /> },
+                    ],
                   },
                   {
                     path: "scan",
@@ -314,20 +315,25 @@ export const routes: RouteObject[] = [
                     children: [{ index: true, element: <MyFanLetters /> }],
                   },
 
-                  // artist
+                  // artist ✅ 핵심: ticket 아래에 issue를 중첩
                   {
                     path: "ticket",
                     element: <Guard requireRole="artist" />,
-                    children: [{ index: true, element: <QrEntry /> }],
+                    children: [
+                      { index: true, element: <QrEntry /> }, // /lounge/ticket
+                      { path: "issue", element: <TicketQr /> }, // /lounge/ticket/issue ✅
+                    ],
                   },
+
+                  // (호환) 예전 /lounge/qr/issue로 들어와도 새 경로로 보내기
                   {
                     path: "qr/issue",
                     element: <Guard requireRole="artist" />,
-                    children: [{ index: true, element: <TicketQr /> }],
+                    children: [{ index: true, element: <Navigate to="/lounge/ticket/issue" replace /> }],
                   },
+
                   {
                     path: "portfolio",
-                    // 일반 유저 홀에서 전시장 진입을 위해 주석처리?
                     element: <Guard requireRole="artist" />,
                     children: [{ index: true, element: <Portfolio /> }],
                   },

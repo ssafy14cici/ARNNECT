@@ -1,6 +1,6 @@
 // FE/src/pages/lounge/artist/qr/TicketQr.tsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toBlob } from "html-to-image";
 import "../../lounge.css";
 
@@ -48,7 +48,9 @@ function toForm(t?: Partial<TicketItem> | null): FormState {
     startTime: t?.startTime && isHHmm(String(t.startTime).slice(0, 5)) ? String(t.startTime).slice(0, 5) : "10:00",
     endTime: t?.endTime && isHHmm(String(t.endTime).slice(0, 5)) ? String(t.endTime).slice(0, 5) : "20:00",
     posterFile: null,
-    posterPreviewUrl: resolveMediaUrl((t as any)?.posterUrl ?? (t as any)?.posterImageUrl ?? (t as any)?.posterImageName ?? ""),
+    posterPreviewUrl: resolveMediaUrl(
+      (t as any)?.posterUrl ?? (t as any)?.posterImageUrl ?? (t as any)?.posterImageName ?? "",
+    ),
     ticketDesign: t?.ticketDesign ?? "BASIC",
   };
 }
@@ -128,7 +130,8 @@ export default function TicketQr() {
   const nav = useNavigate();
   const [params] = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState<TabMode>("LIST");
+  // ✅ issue 페이지는 기본적으로 ISSUE 탭이 자연스러움
+  const [activeTab, setActiveTab] = useState<TabMode>("ISSUE");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -141,6 +144,7 @@ export default function TicketQr() {
 
   const artistUuid = useAuthStore((s) => s.user?.memberUuid ?? "");
   const { issued, reloadIssued, removeIssued } = useIssuedTickets(artistUuid);
+  const issuedCount = issued?.length ?? 0;
 
   useEffect(() => {
     if (!artistUuid) return;
@@ -219,7 +223,7 @@ export default function TicketQr() {
 
       const nextId = typeof (res as any)?.ticketId === "number" ? (res as any).ticketId : ticketId;
       const nextCode =
-        typeof (res as any)?.ticketCode === "string" && (res as any).ticketCode ? (res as any).ticketCode : code;
+        typeof (res as any)?.ticketCode === "string" && (res as any)?.ticketCode ? (res as any).ticketCode : code;
 
       setTicketId(nextId ?? null);
       setCode(nextCode);
@@ -253,171 +257,169 @@ export default function TicketQr() {
   };
 
   return (
-    <main className="loungePage">
-      <section className="loungeWrap">
-        <div className="loungeSubTop" style={{ position: "relative", zIndex: 100, pointerEvents: "auto" }}>
-          <h1 className="loungeSubTitle">QR Ticket Manager</h1>
-          <div style={{ pointerEvents: "auto" }}>
-          </div>
-        </div>
+    <div className="fade-in">
+      <div className="loungeSubTop" style={{ position: "relative", zIndex: 10, pointerEvents: "auto" }}>
+        <h1 className="loungeSubTitle">QR Ticket Manager</h1>
 
-        <div className="loungeSegmentNav">
-          <button
-            type="button"
-            className={`loungeSegmentBtn ${activeTab === "ISSUE" ? "active" : ""}`}
-            onClick={() => setActiveTab("ISSUE")}
-          >
-            QR 발급 / 수정
-          </button>
-          <button
-            type="button"
-            className={`loungeSegmentBtn ${activeTab === "LIST" ? "active" : ""}`}
-            onClick={() => setActiveTab("LIST")}
-          >
-            발급 목록 ({issued.length})
-          </button>
-        </div>
+        <button
+          type="button"
+          className="loungeBackLink"
+          // ✅ /lounge/ticket/issue -> .. => /lounge/ticket
+          onClick={() => nav("..")}
+          style={{ background: "none", border: "none", cursor: "pointer" }}
+        >
+          ← Back
+        </button>
+      </div>
 
-        {activeTab === "ISSUE" && (
-          <div className="fade-in">
-            <div className="loungeSubPanel" style={{ textAlign: "left" }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 30,
-                }}
-              >
-                <h2 className="loungeSubPanelTitle" style={{ margin: 0 }}>
-                  {editingTicketId ? "전시 정보 수정" : "새 전시 등록"}
-                </h2>
+      <div className="loungeSegmentNav" style={{ position: "relative", zIndex: 10, pointerEvents: "auto" }}>
+        <button
+          type="button"
+          className={`loungeSegmentBtn ${activeTab === "ISSUE" ? "active" : ""}`}
+          onClick={() => setActiveTab("ISSUE")}
+        >
+          QR 발급 / 수정
+        </button>
+        <button
+          type="button"
+          className={`loungeSegmentBtn ${activeTab === "LIST" ? "active" : ""}`}
+          onClick={() => setActiveTab("LIST")}
+        >
+          발급 목록 ({issuedCount})
+        </button>
+      </div>
 
-                {editingTicketId && (
-                  <button type="button" className="loungeTextBtn" onClick={resetForm}>
-                    새로 만들기
-                  </button>
-                )}
-              </div>
+      {activeTab === "ISSUE" && (
+        <>
+          <div className="loungeSubPanel" style={{ textAlign: "left" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
+              <h2 className="loungeSubPanelTitle" style={{ margin: 0 }}>
+                {editingTicketId ? "전시 정보 수정" : "새 전시 등록"}
+              </h2>
 
-              <TicketForm
-                form={form}
-                busy={busy}
-                onChange={(patch) => setForm((p) => ({ ...p, ...patch }))}
-                previewRef={previewRef}
-                qrValue={code}
-              />
-
-              {error && <div className="loungeNotice">{error}</div>}
-
-              <div className="loungeSubActions">
-                <button className="loungeSubBtn" type="button" onClick={submit} disabled={!canSubmit}>
-                  {busy ? "처리 중..." : editingTicketId ? "수정 저장" : "QR 발급"}
+              {editingTicketId && (
+                <button type="button" className="loungeTextBtn" onClick={resetForm}>
+                  새로 만들기
                 </button>
-              </div>
-            </div>
-
-            {code && <QrPanel ticketCode={code} busy={busy} />}
-          </div>
-        )}
-
-        {activeTab === "LIST" && (
-          <div className="fade-in">
-            <div className="loungeSubPanel" style={{ textAlign: "left", minHeight: 300 }}>
-              {issued.length === 0 ? (
-                <div className="loungeEmpty">내역이 없습니다.</div>
-              ) : (
-                <div style={{ display: "grid", gap: 16 }}>
-                  {issued.map((t) => {
-                    const ticketImg = resolveMediaUrl((t as any).ticketImageName);
-                    
-
-                    return (
-                      <div
-                        key={t.ticketId}
-                        className="tasteCard"
-                        onClick={() => startEdit(t)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") startEdit(t);
-                        }}
-                        style={{ padding: 24, border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer" }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                          <div style={{ fontWeight: 700 }}>
-                            {t.title}
-                            <span
-                              style={{
-                                marginLeft: 10,
-                                fontSize: 12,
-                                opacity: 0.7,
-                                border: "1px solid #555",
-                                padding: "2px 6px",
-                                borderRadius: "4px",
-                              }}
-                            >
-                              {t.ticketDesign}
-                            </span>
-                          </div>
-                          <div style={{ color: "#C8A97E", wordBreak: "break-all" }}>{t.ticketCode}</div>
-                        </div>
-
-                        <div style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.6)", marginTop: 8 }}>
-Address {t.address} | Period {t.startDate} ~ {t.endDate}
-                        </div>
-
-                        {ticketImg && (
-                          <div style={{ position: "relative", marginTop: 14, maxWidth: 520 }}>
-                            <img
-                              src={ticketImg}
-                              alt="ticket"
-                              style={{
-                                width: "100%",
-                                borderRadius: 14,
-                                border: "1px solid rgba(255,255,255,0.12)",
-                                display: "block",
-                              }}
-                              onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).style.display = "none";
-                              }}
-                            />
-                                                      </div>
-                        )}
-
-                        <div
-                          className="loungeSubActions"
-                          style={{ marginTop: 16, justifyContent: "flex-start", gap: 10 }}
-                        >
-                          <button
-                            type="button"
-                            className="loungeSubBtn"
-                            onClick={() => startEdit(t)}
-                            disabled={busy}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="loungeSubBtn"
-                            onClick={async () => {
-                              await remove(t);
-                            }}
-                            disabled={busy}
-                            style={{ color: "#ff6b6b" }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
               )}
             </div>
+
+            <TicketForm
+              form={form}
+              busy={busy}
+              onChange={(patch) => setForm((p) => ({ ...p, ...patch }))}
+              previewRef={previewRef}
+              qrValue={code}
+            />
+
+            {error && <div className="loungeNotice">{error}</div>}
+
+            <div className="loungeSubActions">
+              <button className="loungeSubBtn" type="button" onClick={submit} disabled={!canSubmit}>
+                {busy ? "처리 중..." : editingTicketId ? "수정 저장" : "QR 발급"}
+              </button>
+            </div>
           </div>
-        )}
-      </section>
-    </main>
+
+          {code && <QrPanel ticketCode={code} busy={busy} />}
+        </>
+      )}
+
+      {activeTab === "LIST" && (
+        <div className="loungeSubPanel" style={{ textAlign: "left", minHeight: 300 }}>
+          {issuedCount === 0 ? (
+            <div className="loungeEmpty">내역이 없습니다.</div>
+          ) : (
+            <div style={{ display: "grid", gap: 16 }}>
+              {issued.map((t) => {
+                const ticketImg = resolveMediaUrl((t as any).ticketImageName);
+
+                return (
+                  <div
+                    key={t.ticketId}
+                    className="tasteCard"
+                    onClick={() => startEdit(t)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") startEdit(t);
+                    }}
+                    style={{ padding: 24, border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer" }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                      <div style={{ fontWeight: 700 }}>
+                        {t.title}
+                        <span
+                          style={{
+                            marginLeft: 10,
+                            fontSize: 12,
+                            opacity: 0.7,
+                            border: "1px solid #555",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                          }}
+                        >
+                          {t.ticketDesign}
+                        </span>
+                      </div>
+                      <div style={{ color: "#C8A97E", wordBreak: "break-all" }}>{t.ticketCode}</div>
+                    </div>
+
+                    <div style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.6)", marginTop: 8 }}>
+                      Address {t.address} | Period {t.startDate} ~ {t.endDate}
+                    </div>
+
+                    {ticketImg && (
+                      <div style={{ position: "relative", marginTop: 14, maxWidth: 520 }}>
+                        <img
+                          src={ticketImg}
+                          alt="ticket"
+                          style={{
+                            width: "100%",
+                            borderRadius: 14,
+                            border: "1px solid rgba(255,255,255,0.12)",
+                            display: "block",
+                          }}
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    <div className="loungeSubActions" style={{ marginTop: 16, justifyContent: "flex-start", gap: 10 }}>
+                      <button
+                        type="button"
+                        className="loungeSubBtn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEdit(t);
+                        }}
+                        disabled={busy}
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        className="loungeSubBtn"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await remove(t);
+                        }}
+                        disabled={busy}
+                        style={{ color: "#ff6b6b" }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

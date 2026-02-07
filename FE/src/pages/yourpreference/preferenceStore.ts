@@ -1,3 +1,5 @@
+//FE/src/pages/yourpreference/preferenceStore.ts
+
 import { create } from "zustand";
 
 export type Selection = {
