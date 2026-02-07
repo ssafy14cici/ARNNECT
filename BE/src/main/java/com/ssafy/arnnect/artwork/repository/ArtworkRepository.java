@@ -74,7 +74,7 @@ public interface ArtworkRepository extends JpaRepository<Artwork, Long> {
     List<ArtworkResponse> findArtworkByArtist(@Param("memberUuid") String memberUuid);
 
     @Query(value = """
-        SELECT DISTINCT  -- 안전장치
+        SELECT DISTINCT 
             m.member_uuid,
             m.nickname,
             aw.artwork_id,

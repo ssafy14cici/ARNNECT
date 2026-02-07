@@ -13,7 +13,7 @@ import java.util.List;
 public class AiInputDataDto {
 
     @JsonProperty("memberId")
-    private String memberId;
+    private Long memberId;
 
     @JsonProperty("logs")
     private List<AiActionDto> logs;

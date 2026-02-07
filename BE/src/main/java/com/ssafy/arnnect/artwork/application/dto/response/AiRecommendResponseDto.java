@@ -15,7 +15,7 @@ import java.util.List;
 public class AiRecommendResponseDto {
 
     @JsonProperty("memberId")
-    private String memberId;
+    private Long memberId;
 
     private List<AiRecommendationDto> recommends;
 }

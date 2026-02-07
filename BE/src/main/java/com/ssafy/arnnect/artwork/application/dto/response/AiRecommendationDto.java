@@ -12,8 +12,7 @@ public class AiRecommendationDto {
 
     private int rank;
 
-    /**todo : Long으로 변경해야해**/
     @JsonProperty("artworkId")
-    private String artworkId;
+    private Long artworkId;
 
 }

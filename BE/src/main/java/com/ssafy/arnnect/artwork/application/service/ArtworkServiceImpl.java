@@ -29,19 +29,6 @@ import java.util.stream.Collectors;
 //@RequiredArgsConstructor
 public class ArtworkServiceImpl implements ArtworkService{
 
-//    private final ArtworkRepository repository;
-//    private final FieldRepository fieldRepository;
-//    private final GenreRepository genreRepository;
-//    private final TagRepository tagRepository;
-//    private final ArtworkTagRepository artworkTagRepository;
-//    private final FavoriteRepository favoriteRepository;
-//    private final MemberService memberService;
-//    private final FileStorageService fileService;
-//    private final UserLogService logService;
-//    @Qualifier("recommendRestClient")
-//    private final RestClient restClient;
-
-
     private final ArtworkRepository repository;
     private final FieldRepository fieldRepository;
     private final GenreRepository genreRepository;
@@ -142,16 +129,10 @@ public class ArtworkServiceImpl implements ArtworkService{
     public List<ArtworkResponse> getArtworkList(String memberUuid) {
 
         List<UserLogActionDto> userLogs = logService.getUserLogs(memberUuid);
-        log.info("userLogs : {}, userLogs.em : {},  userLogs.size : {}",userLogs, userLogs.isEmpty(), userLogs.size());
         if(!memberUuid.equals("anonymousUser") && !userLogs.isEmpty()){
-
-            List<ArtworkResponse> response =
-                    recommend(memberUuid, userLogs);
-            response.forEach(r ->
-                    r.updateUrl(fileService.getBaseDir(FileType.ARTWORK))
-            );
-
-            return response;
+            List<ArtworkResponse> recommend = recommend(memberUuid, userLogs);
+            log.info("recommend : {}",recommend);
+            return recommend;
         }else{
             //비회원
             List<ArtworkResponse> response = repository.findAllOrderDesc();
@@ -254,6 +235,7 @@ public class ArtworkServiceImpl implements ArtworkService{
             String memberUuid,
             List<UserLogActionDto> logs
     ) {
+        Long memberId = memberService.getMemberId(memberUuid);
         // 1. UserLog → AI Action
         List<AiActionDto> actions = logs.stream()
                 .map(log -> new AiActionDto(
@@ -264,7 +246,7 @@ public class ArtworkServiceImpl implements ArtworkService{
 
         // 2. AI 요청 DTO 구성 (중요)
         AiInputDataDto inputData =
-                new AiInputDataDto(memberUuid, actions);
+                new AiInputDataDto(memberId, actions);
 
         AiWrapperRequestDto request =
                 new AiWrapperRequestDto(inputData);
@@ -282,16 +264,14 @@ public class ArtworkServiceImpl implements ArtworkService{
         }
 
         // 3. 추천 artworkId 추출 (String)
-        List<String> artworkIds = aiResponse.getRecommends().stream()
+        List<Long> artworkIds = aiResponse.getRecommends().stream()
                 .map(AiRecommendationDto::getArtworkId)
                 .toList();
 
 
         // 4. DB 조회
         List<ArtworkResponse> responses =
-                repository.findByArtworkIdIn(artworkIds.stream()
-                        .map(Long::parseLong)
-                        .toList());
+                repository.findByArtworkIdIn(artworkIds);
 
 
 
