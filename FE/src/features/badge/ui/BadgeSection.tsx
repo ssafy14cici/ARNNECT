@@ -10,6 +10,7 @@ import BadgePicker from "./BadgePicker";
 import "./badge.css";
 
 export default function BadgeSection({ stats }: { stats: BadgeStats }) {
+  console.log("BadgeSection stats:", stats);
   const [open, setOpen] = useState(false);
   const { featured } = useBadgeStore();
 
