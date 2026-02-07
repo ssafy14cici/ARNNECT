@@ -13,8 +13,7 @@ import lombok.ToString;
 public class AiActionDto {
 
     @JsonProperty("artworkId")
-    /**todo : Long으로 변경해야해**/
-    private String artworkId;
+    private Long artworkId;
 
     // VIEW / STAY / LIKE 등
     @JsonProperty("action")
