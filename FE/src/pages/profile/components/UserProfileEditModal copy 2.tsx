@@ -8,6 +8,12 @@ import type { UserProfile, Badge } from "../../../features/profile/types";
 
 import BadgePicker from "../../../features/badge/ui/BadgePicker";
 import { resolveMediaUrl } from "../../artworks/detail/utils";
+
+// ✅ 추가: 뱃지 기준/계산/이미지
+import { BADGES } from "../../../shared/config/badges"; // BadgePicker가 쓰는 것과 동일 소스 권장
+import type { BadgeStats } from "../../../features/badge/types";
+import { computeEarnedBadgeIds } from "../../../features/badge/rules";
+import { badgeImageSrc } from "../../../features/badge/assets";
 import { useAuthStore } from "../../../features/auth/store";
 
 // --------- helpers ---------
@@ -19,128 +25,34 @@ function unwrapData(v: any) {
   return v?.data ?? v;
 }
 
-// ✅ public 정적 자산은 resolveMediaUrl 필요 없음 (BASE_URL로 안전하게)
-const ID_TO_NO: Record<string, number> = {
-  review_lv1: 1,
-  review_lv2: 2,
-  review_lv3: 3,
-  ticket_lv1: 4,
-  ticket_lv2: 5,
-  ticket_lv3: 6,
-  social_lv1: 7,
-  social_lv2: 8,
-  social_lv3: 9,
-};
-
-const ID_TO_LABEL: Record<string, string> = {
-  review_lv1: "첫 리뷰",
-  review_lv2: "리뷰러",
-  review_lv3: "리뷰 마스터",
-  ticket_lv1: "첫 티켓",
-  ticket_lv2: "컬렉터",
-  ticket_lv3: "슈퍼 컬렉터",
-  social_lv1: "첫 팔로워",
-  social_lv2: "인기 유저",
-  social_lv3: "인플루언서",
-};
-
-function badgeImageSrc(id: string) {
-  const no = ID_TO_NO[id] ?? 1;
-  // ✅ BASE_URL은 보통 끝에 "/"가 포함됨 → 앞에 "/" 안 붙이는 게 안전
-  return `${import.meta.env.BASE_URL}badges/badges${no}.png`;
-}
-
-function computeEarnedBadgeIds(stats: { reviewCount: number; ticketCount: number; followerCount: number }) {
-  const { reviewCount, ticketCount, followerCount } = stats;
-
-  const ids: string[] = [];
-
-  // review
-  if (reviewCount >= 1) ids.push("review_lv1");
-  if (reviewCount >= 5) ids.push("review_lv2");
-  if (reviewCount >= 20) ids.push("review_lv3");
-
-  // ticket
-  if (ticketCount >= 1) ids.push("ticket_lv1");
-  if (ticketCount >= 5) ids.push("ticket_lv2");
-  if (ticketCount >= 20) ids.push("ticket_lv3");
-
-  // social (followers)
-  if (followerCount >= 1) ids.push("social_lv1");
-  if (followerCount >= 10) ids.push("social_lv2");
-  if (followerCount >= 50) ids.push("social_lv3");
-
-  return ids;
-}
-
-// ✅ API helper: 403/HTML 응답 방어 + 인증 헤더 조합 재시도
-async function apiGet<T>(path: string): Promise<T> {
-  const p = path.startsWith("/") ? path : `/${path}`;
-
-  // ✅ PROD에서만 VITE_API_BASE_URL 기준으로 붙임(값이 "https://.../api/v1" 형태여도 OK)
+// ✅ API helper (DEV: 상대경로 프록시 / PROD: VITE_API_BASE_URL의 origin + path)
+function getApiOrigin() {
   const apiBase = String(import.meta.env.VITE_API_BASE_URL ?? "").trim();
-  const url =
-    import.meta.env.DEV || !apiBase
-      ? p
-      : new URL(p.replace(/^\//, ""), apiBase.endsWith("/") ? apiBase : `${apiBase}/`).toString();
+  try {
+    return apiBase ? new URL(apiBase).origin : "";
+  } catch {
+    return "";
+  }
+}
+async function apiGet<T>(path: string): Promise<T> {
+  const u0 = path.startsWith("/") ? path : `/${path}`;
+  const isDev = !!import.meta.env.DEV;
+
+  const origin = getApiOrigin();
+  const url = /^https?:\/\//i.test(u0) ? u0 : isDev ? u0 : origin ? `${origin}${u0}` : u0;
 
   const st: any = useAuthStore.getState();
-  const raw =
-    st.accessToken ??
-    st.token ??
-    st.jwt ??
-    st?.auth?.token ??
-    st?.tokens?.accessToken ??
-    "";
+  const token = st.accessToken ?? st.token ?? st.jwt ?? "";
 
-  const baseHeaders: Record<string, string> = {
-    Accept: "application/json",
-  };
-
-  // ✅ 쿠키 인증 / Bearer / raw / X-Auth-Token 순서로 재시도
-  const tries: Array<Record<string, string>> = [
-    baseHeaders,
-    ...(raw
-      ? [
-          { ...baseHeaders, Authorization: raw.startsWith("Bearer ") ? raw : `Bearer ${raw}` },
-          { ...baseHeaders, Authorization: raw },
-          { ...baseHeaders, "X-Auth-Token": raw },
-        ]
-      : []),
-  ];
-
-  let lastStatus = 0;
-  let lastText = "";
-
-  for (const headers of tries) {
-    const res = await fetch(url, {
-      method: "GET",
-      headers,
-      credentials: "include",
-    });
-
-    if (res.ok) {
-      const ct = res.headers.get("content-type") ?? "";
-      if (!ct.includes("application/json")) {
-        const txt = await res.text().catch(() => "");
-        throw new Error(`JSON이 아닌 응답: ${url} (${ct}) ${txt.slice(0, 120)}`);
-      }
-      return (await res.json()) as T;
-    }
-
-    lastStatus = res.status;
-
-    // 401/403이면 다음 조합으로 재시도
-    if (res.status === 401 || res.status === 403) {
-      lastText = await res.text().catch(() => "");
-      continue;
-    }
-
-    lastText = await res.text().catch(() => "");
-    break;
-  }
-
-  throw new Error(`API 실패 ${lastStatus}: ${url} ${lastText.slice(0, 120)}`);
+  const res = await fetch(url, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`API 실패 ${res.status}: ${url}`);
+  return (await res.json()) as T;
 }
 
 async function firstOk<T>(candidates: string[]): Promise<T> {
@@ -161,7 +73,7 @@ type Props = {
 
   profile: UserProfile;
 
-  earnedBadges: Badge[];
+  earnedBadges: Badge[]; // (서버/부모가 주는 값)
   initialFeaturedIds: string[];
 
   onRequestClose: () => void;
@@ -187,46 +99,35 @@ export default function UserProfileEditModal({
   const [draftPassword, setDraftPassword] = useState("");
   const [draftImageFile, setDraftImageFile] = useState<File | null>(null);
 
-  // ✅ prop(서버)로 earnedBadges가 안 오면, 여기서 프론트 계산으로 채움
+  // ✅ 추가: earnedIds fallback (earnedBadges가 비어있을 때 프론트 계산)
   const [earnedIdsFallback, setEarnedIdsFallback] = useState<string[]>([]);
 
-  // ✅ store seeding
+  // ✅ open=false면 언마운트 → useState 초기값만으로 충분
   useEffect(() => {
     if (!open) return;
     setFeatured(initialFeaturedIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // ✅ open 시점에 earnedIds 확보 (prop 우선, 없으면 fallback 계산)
+  // ✅ open 시: earnedBadges가 비어있으면 프론트에서 계산해 채움
   useEffect(() => {
     if (!open) return;
 
     const propIds = (earnedBadges ?? []).map((b) => b.id);
-
     console.log("[badge] earnedBadges(prop) =", earnedBadges);
     console.log("[badge] earnedIds(prop) =", propIds);
 
-    // ✅ prop이 있으면 fallback 계산 불필요
+    // ✅ 서버/부모가 준 earnedBadges가 있으면 그걸 신뢰
     if (propIds.length > 0) {
       setEarnedIdsFallback([]);
       return;
     }
 
+    // ✅ 없으면: reviewCount/ticketCount/followerCount로 계산
     (async () => {
-      // 너희 실제 경로가 정확히 이거면 첫 후보에서 바로 성공함
-      const REVIEW_MY = [
-        "/api/v1/review/my",
-        "/api/v1/reviews/my",
-        "/review/my",
-        "/reviews/my",
-      ];
-
-      const TICKET_COUNT = [
-        "/api/v1/ticket/count",
-        "/api/v1/tickets/count",
-        "/ticket/count",
-        "/tickets/count",
-      ];
+      // 후보 엔드포인트 (너희 실제 경로에 맞으면 여기서 바로 잡힘)
+      const REVIEW_MY = ["/api/v1/review/my", "/api/v1/reviews/my", "/review/my", "/reviews/my"];
+      const TICKET_COUNT = ["/api/v1/ticket/count", "/api/v1/tickets/count", "/ticket/count", "/tickets/count"];
 
       const followerCount = Number((profile as any).followers ?? 0);
 
@@ -244,7 +145,6 @@ export default function UserProfileEditModal({
             : Array.isArray(reviewsData?.items)
               ? reviewsData.items
               : [];
-
         const reviewCount = reviewsArr.length;
 
         const ticketData = unwrapData(ticketRaw);
@@ -253,7 +153,7 @@ export default function UserProfileEditModal({
             ? ticketData
             : Number(ticketData?.count ?? ticketData?.ticketCount ?? ticketData?.totalCount ?? 0);
 
-        const stats = { reviewCount, ticketCount, followerCount };
+        const stats: BadgeStats = { reviewCount, ticketCount, followerCount };
         const ids = computeEarnedBadgeIds(stats);
 
         console.log("[badge] computed stats =", stats);
@@ -262,25 +162,24 @@ export default function UserProfileEditModal({
         setEarnedIdsFallback(ids);
       } catch (e) {
         console.log("[badge] fallback compute failed:", e);
+        // 실패 시: 어쩔 수 없이 빈 배열 유지 (UI는 '획득 없음' 상태)
         setEarnedIdsFallback([]);
       }
     })();
   }, [open, earnedBadges, profile]);
 
-  // ✅ 최종 earnedIds: prop 우선, 없으면 fallback
+  // ✅ 최종 earnedIds 결정: prop 우선, 없으면 fallback
   const earnedIds = useMemo(() => {
     const propIds = (earnedBadges ?? []).map((b) => b.id);
     return propIds.length > 0 ? propIds : earnedIdsFallback;
   }, [earnedBadges, earnedIdsFallback]);
 
-  // ✅ 라벨/프리뷰용 Badge 객체: prop 우선, 없으면 id→label로 생성
+  // ✅ 최종 earnedBadges(라벨용): prop 우선, 없으면 BADGES에서 name으로 생성
   const earnedBadgesForUI: Badge[] = useMemo(() => {
     if ((earnedBadges ?? []).length > 0) return earnedBadges;
 
-    return earnedIds.map((id) => ({
-      id,
-      label: ID_TO_LABEL[id] ?? id,
-    }));
+    const set = new Set(earnedIds);
+    return BADGES.filter((b) => set.has(b.id)).map((b) => ({ id: b.id, label: b.name }));
   }, [earnedBadges, earnedIds]);
 
   const draftBadgeObjects = useMemo(() => {
@@ -406,7 +305,6 @@ export default function UserProfileEditModal({
                         src={badgeImageSrc(b.id)}
                         alt=""
                         style={{ width: 16, height: 16, objectFit: "contain" }}
-                        loading="lazy"
                       />
                       {b.label}
                     </span>
@@ -429,7 +327,7 @@ export default function UserProfileEditModal({
         </div>
       </div>
 
-      {/* ✅ 핵심: prop/계산값으로 만든 earnedIds를 Picker에 전달 */}
+      {/* ✅ 핵심: earnedIds를 prop/계산값으로 전달 */}
       <BadgePicker open={pickerOpen} onClose={() => setPickerOpen(false)} earnedIds={earnedIds} />
     </>
   );
