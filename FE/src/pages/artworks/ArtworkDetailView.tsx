@@ -364,12 +364,12 @@ export default function ArtworkDetailView(props: Props) {
                     type="button"
                     onClick={onToggleFavorite}
                   >
-                    {isLiked ? "♥" : "?"} {likeCount}
+                    {isLiked ? "♥" : "♡"} {likeCount}
                   </button>
                 </>
               ) : (
                 <>
-                  <div className="like-count-only" aria-label={`♥ ${likeCount}?`}>
+                  <div className="like-count-only" aria-label={`♥ ${likeCount}개`}>
                     <span>좋아요</span>
                     <strong>{likeCount}</strong>
                   </div>
