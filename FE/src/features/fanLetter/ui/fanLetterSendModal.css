@@ -1,117 +1,166 @@
 /* FE/src/features/fanLetter/ui/fanLetterSendModal.css */
 
-.fl-modal-overlay{
+.fl-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.62);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
+  font-family: var(--font-stack, 'MuseumClassic', 'Pretendard', -apple-system, sans-serif);
 }
 
-.fl-modal-box{
-  width: min(520px, calc(100vw - 32px));
-  background: rgba(18,18,18,0.92);
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 14px;
-  padding: 18px;
-  backdrop-filter: blur(12px);
+.fl-modal {
+  width: min(500px, calc(100vw - 40px));
+  background: rgba(18, 18, 18, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 0;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
 }
 
-.fl-modal-head{
+.fl-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.fl-modal-title{
+.fl-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.96);
 }
 
-.fl-modal-close{
+.fl-x {
   width: 32px;
   height: 32px;
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 8px;
+  border: none;
   background: transparent;
-  color: rgba(255,255,255,0.82);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 20px;
   cursor: pointer;
-}
-
-.fl-modal-meta{
-  margin-top: 14px;
-  padding: 12px;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.10);
-}
-
-.fl-meta-row{
+  transition: all 0.2s;
   display: flex;
-  gap: 10px;
-  align-items: baseline;
-  margin: 6px 0;
+  align-items: center;
+  justify-content: center;
 }
 
-.fl-meta-label{
-  width: 70px;
-  opacity: 0.75;
-  font-size: 12px;
+.fl-x:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
 }
 
-.fl-meta-value{
-  font-size: 14px;
-  font-weight: 600;
-  word-break: break-word;
-}
-
-.fl-modal-textarea{
-  margin-top: 12px;
-  width: 100%;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.16);
-  background: rgba(0,0,0,0.18);
-  color: #fff;
-  padding: 12px;
-  resize: none;
-  outline: none;
-}
-
-.fl-modal-actions{
-  margin-top: 12px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.fl-btn{
-  padding: 10px 14px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.16);
-  cursor: pointer;
-}
-
-.fl-btn.ghost{
-  background: transparent;
-  color: rgba(255,255,255,0.86);
-}
-
-.fl-btn.primary{
-  background: rgba(255,255,255,0.92);
-  color: #111;
-  font-weight: 700;
-}
-
-.fl-btn:disabled{
-  opacity: 0.55;
+.fl-x:disabled {
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
-.fl-modal-hint{
-  margin: 10px 0 0;
-  font-size: 12px;
-  opacity: 0.7;
+.fl-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fl-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fl-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+}
+
+.fl-input,
+.fl-textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.fl-input:focus,
+.fl-textarea:focus {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.fl-input:read-only {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fl-textarea {
+  resize: none;
+  min-height: 160px;
+  line-height: 1.5;
+}
+
+.fl-footer {
+  padding: 20px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.fl-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.02em;
+}
+
+.fl-btn.ghost {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.fl-btn.ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.fl-btn.primary {
+  background: rgba(255, 255, 255, 0.95);
+  color: #111;
+}
+
+.fl-btn.primary:hover {
+  background: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+}
+
+.fl-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none !important;
 }
