@@ -12,7 +12,7 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 5000;
+  z-index: 15000; /* 메뉴 트리거가 잘 눌리도록 높임 */
   background: transparent;
   padding: 18px 24px;
 
@@ -45,13 +45,12 @@
   font-family: "MuseumClassic", var(--font-stack);
 }
 
-
 /* =========================
    Hamburger (Trigger)
 ========================= */
 .menu-trigger {
   position: relative;
-  z-index: 6000;
+  z-index: 16000;
   width: 44px;
   height: 36px;
   display: inline-flex;
@@ -83,11 +82,12 @@
 
 /* =========================
    REFERENCE MENU (Full Grid)
+   ✅ 수정됨: z-index를 20000으로 높여서 HomeMobile 헤더(9000) 위로 올라오게 함
 ========================= */
 .refMenu {
   position: fixed;
   inset: 0;
-  z-index: 5500;
+  z-index: 20000; 
   background: var(--nav-bg);
   opacity: 0;
   pointer-events: none;
@@ -102,21 +102,20 @@
   pointer-events: auto;
 }
 
-/* ✅ 스크롤 컨테이너 추가 */
+/* 스크롤 컨테이너 */
 .refMenuScrollContainer {
   flex: 1;
   width: 100%;
   height: 100%;
-  overflow-y: auto; /* 세로 스크롤 허용 */
-  -webkit-overflow-scrolling: touch; /* 모바일 부드러운 스크롤 */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* 그리드 컨테이너 */
 .refMenuGrid {
   display: grid;
   width: 100%;
-  min-height: 100%; /* 최소 높이 100% */
-  /* 데스크탑: 4열 2행 (50vh) */
+  min-height: 100%;
   grid-template-columns: repeat(4, 1fr); 
   grid-template-rows: repeat(2, 50vh);
 }
@@ -199,9 +198,7 @@
   .nav { padding: 14px 20px; }
   
   .refMenuGrid {
-    /* 모바일: 2열 4행 */
     grid-template-columns: repeat(2, 1fr);
-    /* ✅ 고정 25vh 대신 minmax 사용 -> 내용이 길면 늘어나서 스크롤 됨 */
     grid-template-rows: repeat(4, minmax(25vh, auto));
   }
   
