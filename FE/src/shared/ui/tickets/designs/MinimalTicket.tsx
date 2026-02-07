@@ -4,7 +4,7 @@ import type { TicketDesignProps } from "../../../../features/tickets/types";
 import TicketQR from "./_parts/TicketQR";
 
 export default function EarthDayTicket({ data }: TicketDesignProps) {
-  // 연도 고정 제거 및 제목 대문자화
+  // 제목 대문자화 및 줄바꿈 처리
   const title = (data.title || "HAPPY EARTH\nDAY!").toUpperCase();
 
   return (
@@ -31,9 +31,9 @@ export default function EarthDayTicket({ data }: TicketDesignProps) {
           justifyContent: "center",
           padding: "20px",
           position: "relative",
+          flexShrink: 0,
         }}
       >
-        {/* 기존 바코드 자리에 QR 코드 배치 */}
         <div
           style={{
             backgroundColor: "#FFF",
@@ -62,87 +62,95 @@ export default function EarthDayTicket({ data }: TicketDesignProps) {
         />
       </div>
 
-      {/* 2. 메인 컨텐츠 영역 */}
+      {/* 2. 메인 컨텐츠 영역 (상하 구조로 변경) */}
       <div
         style={{
           flex: 1,
-          padding: "45px",
           display: "flex",
           flexDirection: "column",
-          justifyContent: "space-between",
           position: "relative",
         }}
       >
-        {/* 상단 타이틀 섹션 */}
-        <div>
-          <h1
-            style={{
-              fontSize: "60px",
-              lineHeight: 0.9,
-              margin: 0,
-              fontWeight: 900,
-              letterSpacing: "-2px",
-              fontFamily: "Arial Black, sans-serif",
-              whiteSpace: "pre-line", // 줄바꿈 적용
-            }}
-          >
-            {title}
-          </h1>
-          <div
-            style={{
-              fontSize: "20px",
-              fontWeight: "bold",
-              marginTop: "20px",
-              color: "#A855F7", // 강조 포인트 컬러
-            }}
-          >
-            {data.startDate ? data.startDate.toUpperCase() : "DATE NOT SET"}
-          </div>
-        </div>
-
-        {/* 하단 위치 정보 (이메일/2024 등 삭제) */}
-        <div style={{ fontSize: "16px", fontWeight: "bold" }}>
-          <div
-            style={{
-              textTransform: "uppercase",
-              borderBottom: "2px solid #000",
-              display: "inline-block",
-              paddingBottom: "4px",
-              marginBottom: "8px",
-            }}
-          >
-            Location
-          </div>
-          <div style={{ opacity: 0.8, fontSize: "18px" }}>
-            {data.address || "LOCATION PENDING"}
-          </div>
-          {data.addressDetail && (
-            <div style={{ opacity: 0.6, fontSize: "14px", marginTop: "4px" }}>
-              {data.addressDetail}
+        {/* ✅ 상단 이미지 영역 (Poster Area) */}
+        <div
+          style={{
+            height: "45%", // 이미지 영역 비중
+            width: "100%",
+            backgroundColor: "rgba(0,0,0,0.05)",
+            borderBottom: "1px solid rgba(0,0,0,0.1)",
+            overflow: "hidden",
+          }}
+        >
+          {data.posterUrl ? (
+            <img
+              src={data.posterUrl}
+              alt="poster"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          ) : (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.3, fontSize: 12 }}>
+              POSTER IMAGE AREA
             </div>
           )}
         </div>
 
-        {/* 일러스트 공간을 비워두어 깔끔하게 유지하거나, 포스터가 있을 때만 출력 */}
-        {data.posterUrl && (
-          <div
-            style={{
-              position: "absolute",
-              right: "20px",
-              bottom: "20px",
-              width: "200px",
-              height: "200px",
-              opacity: 0.2, // 배경처럼 은은하게
-              zIndex: 0,
-            }}
-          >
-            <img
-              src={data.posterUrl}
-              alt="bg-poster"
-              style={{ width: "100%", height: "100%", objectFit: "contain" }}
-            />
+        {/* ✅ 하단 정보 영역 */}
+        <div
+          style={{
+            flex: 1,
+            padding: "30px 40px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+          }}
+        >
+          {/* 타이틀 & 날짜 */}
+          <div>
+            <h1
+              style={{
+                fontSize: "42px",
+                lineHeight: 1.0,
+                margin: 0,
+                fontWeight: 900,
+                letterSpacing: "-1.5px",
+                fontFamily: "Arial Black, sans-serif",
+                whiteSpace: "pre-line",
+              }}
+            >
+              {title}
+            </h1>
+            <div
+              style={{
+                fontSize: "18px",
+                fontWeight: "bold",
+                marginTop: "12px",
+                color: "#A855F7",
+              }}
+            >
+              {data.startDate ? data.startDate.toUpperCase() : "DATE NOT SET"}
+            </div>
           </div>
-        )}
+
+          {/* 장소 정보 */}
+          <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+            <div
+              style={{
+                textTransform: "uppercase",
+                borderBottom: "2px solid #000",
+                display: "inline-block",
+                paddingBottom: "2px",
+                marginBottom: "6px",
+                fontSize: "12px",
+              }}
+            >
+              Location
+            </div>
+            <div style={{ opacity: 0.8, fontSize: "16px", wordBreak: "keep-all" }}>
+              {data.address || "LOCATION PENDING"}
+              {data.addressDetail && ` (${data.addressDetail})`}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

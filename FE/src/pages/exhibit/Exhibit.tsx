@@ -167,7 +167,7 @@ export default function Exhibit() {
     const artist = st.artist ?? "";
     const artworkTitle = st.artworkTitle ?? "";
 
-    const titleText = artist ? `${artist} 전시` : "EXHIBIT";
+    const titleText = artist ? `${artist}작가 전시` : "EXHIBIT";
 
     let cancelled = false;
 
