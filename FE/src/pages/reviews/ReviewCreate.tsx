@@ -7,7 +7,7 @@ import { useAuthStore } from "../../features/auth/store";
 import { createReview } from "../../features/reviews/api";
 import { USE_MOCK } from "../../shared/config/env";
 
-import ReviewForm from "../../features/reviews/ui/ReviewForm";
+import ReviewForm from "../../features/reviews/ui/ReviewForm_origin";
 import type { ReviewCreateReq } from "../../features/reviews/model/types"; // ✅ 타입 추가
 
 export default function ReviewCreate() {

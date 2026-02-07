@@ -310,6 +310,82 @@
   font-weight: bold;
 }
 
+/* --- BadgeChip layout (이미지 버전) --- */
+.badgeChip {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 14px;
+  padding: 12px;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+
+.badgeChip.isSelected {
+  border-color: #C8A97E;
+  box-shadow: 0 0 0 1px rgba(200, 169, 126, 0.25);
+}
+
+.badgeChip.isDisabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.badgeContent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.badgeIconImg {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 0 10px rgba(200, 169, 126, 0.08));
+}
+
+.badgeInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.badgeName {
+  font-weight: 800;
+  font-size: 0.9rem;
+  line-height: 1.15;
+}
+
+.badgeDesc {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.25;
+}
+
+.badgeCheck {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #C8A97E;
+  color: #000;
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+/* 대표 뱃지는 더 크게 */
+.badge-wrapper.featured .badgeIconImg {
+  width: 44px;
+  height: 44px;
+}
+
 /* Animations */
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }

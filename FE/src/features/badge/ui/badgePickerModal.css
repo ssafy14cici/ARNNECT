@@ -244,3 +244,25 @@
   padding: 40px 0;
   font-size: 0.9rem;
 }
+/* --- picker thumbnails --- */
+.chip-thumb {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.badge-card-top {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.badge-card-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px rgba(200, 169, 126, 0.10));
+}

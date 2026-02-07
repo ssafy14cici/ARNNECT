@@ -1,11 +1,10 @@
 // FE/src/components/badge/BadgePicker.tsx
 
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "react-dom"; // ✅ Portal 임포트
 import { BADGES } from "../../../shared/config/badges";
 import { useBadgeStore } from "../store";
 import type { BadgeDef } from "../types";
-import { badgeImageSrc } from "../assets";
 import "./badgePickerModal.css";
 
 export default function BadgePicker({
@@ -22,9 +21,8 @@ export default function BadgePicker({
 
   useEffect(() => {
     if (open) {
-      // ✅ 안전장치: 혹시 스토어에 "획득하지 않은" 뱃지가 남아있으면 제거
-      const onlyEarned = featured.filter((id) => earnedIds.includes(id));
-      setLocalSelected([...onlyEarned]);
+      setLocalSelected([...featured]);
+      // ✅ 모달 열릴 때 스크롤 막기
       document.body.style.overflow = "hidden";
     }
     return () => {
@@ -48,24 +46,26 @@ export default function BadgePicker({
   const handleClear = () => setLocalSelected([]);
 
   const handleSave = () => {
-    setFeatured(localSelected);
-    onClose();
+    setFeatured(localSelected); // 스토어 업데이트
+    onClose(); // 모달 닫기
   };
 
   const earnedBadges: BadgeDef[] = BADGES.filter((b) => earnedIds.includes(b.id));
 
+  // ✅ Portal을 사용하여 document.body 바로 아래에 렌더링 (스타일 충돌 방지)
   return createPortal(
     <div className="badge-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div className="badge-modal-container" onClick={(e) => e.stopPropagation()}>
+        
+        {/* Header */}
         <div className="badge-modal-header">
           <h3 className="modal-title">
             대표 뱃지 선택 <span className="highlight">({localSelected.length}/3)</span>
           </h3>
-          <button type="button" className="modal-close-btn" onClick={onClose}>
-            ✕
-          </button>
+          <button type="button" className="modal-close-btn" onClick={onClose}>✕</button>
         </div>
 
+        {/* Selected Chips */}
         <div className="badge-chips-area">
           {localSelected.length > 0 ? (
             localSelected.map((id) => {
@@ -73,9 +73,12 @@ export default function BadgePicker({
               if (!badge) return null;
               return (
                 <div key={id} className="badge-chip">
-                  <img className="chip-thumb" src={badgeImageSrc(id)} alt="" />
                   <span>{badge.name}</span>
-                  <button type="button" className="chip-remove-btn" onClick={() => handleToggle(id)}>
+                  <button 
+                    type="button" 
+                    className="chip-remove-btn" 
+                    onClick={() => handleToggle(id)}
+                  >
                     ✕
                   </button>
                 </div>
@@ -86,14 +89,11 @@ export default function BadgePicker({
           )}
         </div>
 
+        {/* Badge Grid */}
         <div className="badge-grid-area">
           {earnedBadges.length === 0 ? (
             <div className="badgeEmpty">
-              <p>
-                아직 획득한 뱃지가 없습니다.
-                <br />
-                활동을 통해 뱃지를 수집해보세요!
-              </p>
+              <p>아직 획득한 뱃지가 없습니다.<br />활동을 통해 뱃지를 수집해보세요!</p>
             </div>
           ) : (
             earnedBadges.map((b) => {
@@ -106,35 +106,27 @@ export default function BadgePicker({
                   className={`badge-card ${isSelected ? "selected" : ""} ${isDisabled ? "disabled" : ""}`}
                   onClick={() => !isDisabled && handleToggle(b.id)}
                 >
-                  <div className="badge-card-top">
-                    <img className="badge-card-thumb" src={badgeImageSrc(b.id)} alt="" loading="lazy" />
-                    {isSelected && <div className="badge-check-icon">✔</div>}
-                  </div>
-
                   <div className="badge-card-content">
                     <div className="badge-name">{b.name}</div>
                     {b.description && <div className="badge-desc">{b.description}</div>}
                   </div>
+                  {isSelected && <div className="badge-check-icon">✔</div>}
                 </div>
               );
             })
           )}
         </div>
 
+        {/* Footer */}
         <div className="badge-modal-footer">
-          <button type="button" className="btn-cancel" onClick={handleClear}>
-            초기화
-          </button>
-          <div style={{ flex: 1 }} />
-          <button type="button" className="btn-cancel" onClick={onClose}>
-            취소
-          </button>
-          <button type="button" className="btn-save" onClick={handleSave}>
-            저장
-          </button>
+          {/* ✅ type="button" 필수! (Form 안에 있어도 submit 되지 않도록) */}
+          <button type="button" className="btn-cancel" onClick={handleClear}>초기화</button>
+          <div style={{ flex: 1 }}></div>
+          <button type="button" className="btn-cancel" onClick={onClose}>취소</button>
+          <button type="button" className="btn-save" onClick={handleSave}>저장</button>
         </div>
       </div>
     </div>,
-    document.body
+    document.body // ✅ Portal Target
   );
 }
