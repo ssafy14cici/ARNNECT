@@ -19,4 +19,8 @@ public class NewArtistRepresentativeResponse {
     private String description;
     private Date productionDate;
     private String savedImageName;
+
+    public void addDirUrl(String dir){
+        this.savedImageName = dir+savedImageName;
+    }
 }
