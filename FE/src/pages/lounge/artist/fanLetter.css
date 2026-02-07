@@ -267,21 +267,24 @@
 .replyBackdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
   z-index: 1000;
+  font-family: var(--font-stack, 'MuseumClassic', 'Pretendard', -apple-system, sans-serif);
 }
 
 .replyModal {
-  width: min(720px, 100%);
-  background: #0f1014;
-  color: rgba(255, 255, 255, 0.9);
+  width: min(720px, calc(100vw - 40px));
+  background: rgba(18, 18, 18, 0.95);
+  color: rgba(255, 255, 255, 0.96);
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(20px);
   overflow: hidden;
 }
 
@@ -289,44 +292,61 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 18px;
-  background: rgba(255, 255, 255, 0.04);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .replyTitle {
-  font-size: 16px;
+  margin: 0;
+  font-size: 20px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .replyX {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   border: none;
   background: transparent;
-  font-size: 18px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 20px;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.85);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .replyX:hover {
-  color: rgba(255, 255, 255, 1);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.replyX:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .replyBody {
-  padding: 16px 18px;
+  padding: 24px;
 }
 
 .replyTextarea {
   width: 100%;
   min-height: 180px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  padding: 12px 14px;
+  font-family: inherit;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.92);
-  background: rgba(0, 0, 0, 0.35);
-  resize: vertical;
   outline: none;
+  transition: all 0.2s;
+  resize: vertical;
+  line-height: 1.5;
 }
 
 .replyTextarea::placeholder {
@@ -334,50 +354,60 @@
 }
 
 .replyTextarea:focus {
-  border-color: rgba(255, 255, 255, 0.32);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .replyFooter {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 18px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 10px;
+  padding: 20px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .replyBtn {
-  padding: 10px 14px;
+  padding: 10px 20px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.9);
+  border: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.02em;
 }
 
 .replyBtn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
 }
 
 .replyBtn.ghost {
   background: transparent;
-  border-color: rgba(255, 255, 255, 0.18);
-  color: rgba(255, 255, 255, 0.88);
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.replyBtn.ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .replyBtn.primary {
-  background: #ffffff;
-  border-color: rgba(255, 255, 255, 0.35);
-  color: #111218;
+  background: rgba(255, 255, 255, 0.95);
+  color: #111;
 }
 
 .replyBtn.primary:hover {
-  background: rgba(255, 255, 255, 0.92);
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
 }
 
 .replyBtn:disabled {
-  opacity: 0.55;
+  opacity: 0.4;
   cursor: not-allowed;
+  transform: none !important;
 }
 
 @media (max-width: 560px) {
