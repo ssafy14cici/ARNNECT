@@ -127,16 +127,6 @@ export default function Step1Account({
         maxLength={11}
       />
 
-      <label className="auth-label">
-        생년월일 <span className="req">*</span>
-      </label>
-      <input
-        className="auth-dark-input"
-        type="date"
-        value={value.birth}
-        onChange={(e) => onChange({ ...value, birth: e.target.value })}
-      />
-
       {error ? <div className="auth-error">{error}</div> : null}
     </div>
   );
