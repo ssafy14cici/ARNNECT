@@ -79,11 +79,11 @@ export default function DancePinkTicket({ data }: TicketDesignProps) {
             gap: 10,
           }}
         >
-          {/* ✅ IMAGE (테두리 제거) */}
+          {/* IMAGE SLOT */}
           <div
             style={{
               width: "100%",
-              height: 180, // 기존 120 -> 크게
+              height: 180,
               backgroundColor: "#fff",
               overflow: "hidden",
               display: "flex",
@@ -106,7 +106,7 @@ export default function DancePinkTicket({ data }: TicketDesignProps) {
             )}
           </div>
 
-          {/* ✅ LOCATION: 더 잘 보이게 + 2줄 허용 */}
+          {/* LOCATION */}
           <div
             style={{
               backgroundColor: "#000",
@@ -118,8 +118,6 @@ export default function DancePinkTicket({ data }: TicketDesignProps) {
               boxSizing: "border-box",
               borderRadius: 10,
               lineHeight: 1.25,
-
-              // 2줄까지 표시
               display: "-webkit-box",
               WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical",
@@ -131,7 +129,7 @@ export default function DancePinkTicket({ data }: TicketDesignProps) {
           </div>
         </div>
 
-        {/* BOTTOM: 의미없는 멘트 정리 → 최소 정보만 남김(선택) */}
+        {/* BOTTOM */}
         <div
           style={{
             display: "flex",
@@ -145,12 +143,11 @@ export default function DancePinkTicket({ data }: TicketDesignProps) {
             opacity: 0.85,
           }}
         >
-          {/* 필요없으면 이 줄도 통째로 삭제 가능 */}
           {endDate ? `${startDate} ~ ${endDate}` : startDate || "DATE"}
         </div>
       </div>
 
-      {/* RIGHT STUB */}
+      {/* ✅ RIGHT STUB (QR 배경 수정됨) */}
       <div
         style={{
           width: "110px",
@@ -159,14 +156,33 @@ export default function DancePinkTicket({ data }: TicketDesignProps) {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          justifyContent: "center", // ✅ 가운데 정렬
+          justifyContent: "center",
           padding: "16px 0",
           boxSizing: "border-box",
-          gap: 10,
+          gap: 12,
         }}
       >
-        <div style={{ background: "#000", padding: 5, borderRadius: 6 }}>
-          <TicketQR size={74} variant="light" />
+        {/* 상단 텍스트 데코 */}
+        <div style={{ fontSize: 10, fontWeight: 900, transform: "rotate(0deg)", opacity: 0.8 }}>
+          ADMIT ONE
+        </div>
+
+        {/* ✅ QR 영역: 검은 배경 제거 및 흰 바탕에 깔끔하게 배치 */}
+        <div 
+          style={{ 
+            padding: 8, 
+            backgroundColor: "#fff", 
+            borderRadius: 8,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+            border: "1px solid #f0f0f0"
+          }}
+        >
+          <TicketQR size={78} variant="dark" />
+        </div>
+
+        {/* 하단 텍스트 데코 */}
+        <div style={{ fontSize: 10, fontWeight: 900, opacity: 0.8 }}>
+          ENTRY TICKET
         </div>
       </div>
 
@@ -177,7 +193,8 @@ export default function DancePinkTicket({ data }: TicketDesignProps) {
           right: "110px",
           top: 0,
           bottom: 0,
-          borderLeft: "2px dashed rgba(0,0,0,0.3)",
+          borderLeft: "2px dashed rgba(0,0,0,0.15)",
+          zIndex: 2,
         }}
       />
     </div>

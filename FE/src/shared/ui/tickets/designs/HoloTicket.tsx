@@ -4,6 +4,8 @@ import type { TicketDesignProps } from "../../../../features/tickets/types";
 import TicketQR from "./_parts/TicketQR";
 
 export default function HoloAbstractTicket({ data }: TicketDesignProps) {
+  const title = (data.title || "ABSTRACT").toUpperCase();
+
   const startDate = data.startDate || "";
   const endDate = data.endDate || "";
   const startTime = data.startTime || "";
@@ -15,23 +17,21 @@ export default function HoloAbstractTicket({ data }: TicketDesignProps) {
       style={{
         width: "100%",
         height: "100%",
-        borderRadius: 12,
+        borderRadius: 16,
         overflow: "hidden",
         position: "relative",
         color: "#fff",
         fontFamily: "'Inter', sans-serif",
-        background:
-          "linear-gradient(135deg, #6366f1 0%, #a855f7 38%, #ec4899 70%, #f43f5e 100%)",
+        background: "linear-gradient(135deg, #6366f1 0%, #a855f7 38%, #ec4899 70%, #f43f5e 100%)",
       }}
     >
-      {/* subtle overlay */}
+      {/* 배경 오버레이 */}
       <div
         style={{
           position: "absolute",
           inset: 0,
           background:
-            "radial-gradient(circle at 20% 30%, rgba(255,255,255,0.18), transparent 55%), radial-gradient(circle at 80% 20%, rgba(255,255,255,0.12), transparent 60%)",
-          opacity: 0.9,
+            "radial-gradient(circle at 20% 30%, rgba(255,255,255,0.15), transparent 50%), radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1), transparent 50%)",
           pointerEvents: "none",
         }}
       />
@@ -46,139 +46,103 @@ export default function HoloAbstractTicket({ data }: TicketDesignProps) {
           flexDirection: "column",
         }}
       >
-        {/* ✅ TOP: 가로로 크게 포스터 */}
-        <div
-          style={{
-            position: "relative",
-            height: "52%", // 포스터 비중 크게 (원하면 55~65%까지 올려도 됨)
-            width: "100%",
-            overflow: "hidden",
-            background: "rgba(255,255,255,0.10)",
-          }}
-        >
+        {/* ✅ TOP: 포스터 영역 (이미지 칸 유지) */}
+        <div style={{ flex: 1.2, position: "relative", overflow: "hidden" }}>
           {data.posterUrl ? (
             <img
               src={data.posterUrl}
               alt="poster"
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover", // 가로로 꽉 차게
-                objectPosition: "center",
-                display: "block",
-              }}
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
             />
           ) : (
-            <div
-              style={{
-                width: "100%",
-                height: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 12,
-                opacity: 0.75,
-                letterSpacing: 1,
-              }}
-            >
-              POSTER
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.1)", fontSize: 12, opacity: 0.5 }}>
+              NO IMAGE
             </div>
           )}
-
-          {/* 포스터 위 살짝 그라데이션 (텍스트 읽힘/분위기) */}
+          
+          {/* QR 코드: 이미지 위에 작게 배치 (좌측 상단) */}
           <div
             style={{
               position: "absolute",
-              inset: 0,
-              background:
-                "linear-gradient(180deg, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.12) 35%, rgba(0,0,0,0.28) 100%)",
-              pointerEvents: "none",
-            }}
-          />
-
-          {/* ✅ QR은 유지 (원하면 제거 가능) */}
-          <div
-            style={{
-              position: "absolute",
-              right: 14,
-              bottom: 14,
-              background: "rgba(255, 255, 255, 0.18)",
-              padding: 6,
-              borderRadius: 10,
-              border: "1px solid rgba(255,255,255,0.22)",
-              backdropFilter: "none",
+              left: 12,
+              top: 12,
+              background: "rgba(255, 255, 255, 0.9)",
+              padding: "5px",
+              borderRadius: "10px",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
             }}
           >
-            <TicketQR size={62} variant="light" />
+            <TicketQR size={50} variant="dark" />
           </div>
         </div>
 
-        {/* BOTTOM: 정보 영역 (ABSTRACT/10:00 같은 “타이틀/시간 단독 텍스트” 제거) */}
+        {/* ✅ BOTTOM: 정보 패널 (제목 포함) */}
         <div
           style={{
             flex: 1,
-            minHeight: 0,
-            padding: 18,
-            boxSizing: "border-box",
+            background: "rgba(0,0,0,0.2)",
+            backdropFilter: "blur(12px)",
+            padding: "20px 18px",
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
-            gap: 12,
+            boxSizing: "border-box",
+            borderTop: "1px solid rgba(255,255,255,0.2)",
           }}
         >
-          {/* info chips */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {/* 전시 제목 */}
+          <div
+            style={{
+              fontSize: 28,
+              fontWeight: 900,
+              lineHeight: 1.1,
+              letterSpacing: "-0.8px",
+              marginBottom: 12,
+              wordBreak: "keep-all",
+              overflowWrap: "anywhere",
+            }}
+          >
+            {title}
+          </div>
+
+          {/* 상세 정보 로우 */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {/* 일시 */}
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, background: "#fff", color: "#000", padding: "4px 10px", borderRadius: 6 }}>
+                {startDate || "DATE"} {endDate ? `~ ${endDate}` : ""}
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.9 }}>
+                {startTime || "00:00"} {endTime ? `- ${endTime}` : ""}
+              </div>
+            </div>
+
+            {/* 장소 */}
             <div
               style={{
                 fontSize: 13,
-                fontWeight: 800,
-                background: "rgba(0,0,0,0.22)",
-                padding: "7px 10px",
-                borderRadius: 8,
-                width: "fit-content",
-                maxWidth: "100%",
+                fontWeight: 500,
+                opacity: 0.85,
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
               }}
             >
-              {startDate || "DATE"}
-              {endDate ? ` — ${endDate}` : ""}
-            </div>
-
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                background: "rgba(0,0,0,0.18)",
-                padding: "7px 10px",
-                borderRadius: 8,
-                width: "fit-content",
-              }}
-            >
-              {startTime || "--:--"} {endTime ? `- ${endTime}` : ""}
-            </div>
-
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                opacity: 0.95,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              <span style={{ opacity: 0.8 }}>Location:</span>{" "}
-              {address || "LOCATION"}
+              <span style={{ fontSize: 11, fontWeight: 800, opacity: 0.6 }}>LOC</span>
+              <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {address || "VENUE LOCATION"}
+              </span>
             </div>
           </div>
 
-          {/* bottom barcode */}
+          {/* 하단 데코 라인 */}
           <div
             style={{
-              height: 18,
-              width: 220,
-              opacity: 0.9,
-              background:
-                "repeating-linear-gradient(90deg, rgba(255,255,255,0.9) 0px, rgba(255,255,255,0.9) 2px, transparent 2px, transparent 6px)",
+              marginTop: 15,
+              height: 4,
+              width: "100%",
+              opacity: 0.3,
+              background: "repeating-linear-gradient(90deg, #fff 0px, #fff 2px, transparent 2px, transparent 6px)",
             }}
           />
         </div>

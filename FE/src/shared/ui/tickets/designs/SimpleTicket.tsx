@@ -102,16 +102,15 @@ export default function MuseumClassicTicket({ data }: TicketDesignProps) {
           )}
         </div>
 
-        {/* ✅ DATE BADGES (두 박스 완전 동일 크기) */}
+        {/* ✅ DATE BADGES (두 박스 크기 가로세로 완전 동일하게 고정) */}
         <div style={{ display: "flex", gap: 10, zIndex: 2 }}>
-          {/* START */}
+          {/* START DATE BOX */}
           <div
             style={{
-              flex: 1,
-              minWidth: 0,
+              width: 135,             // 가로 길이 고정
+              height: 38,            // 세로 길이 고정
               backgroundColor: "#5D5FBB",
               color: "#fff",
-              height: 38,
               borderRadius: 10,
               display: "flex",
               alignItems: "center",
@@ -129,14 +128,13 @@ export default function MuseumClassicTicket({ data }: TicketDesignProps) {
             {startDate || "START DATE"}
           </div>
 
-          {/* END */}
+          {/* END DATE BOX */}
           <div
             style={{
-              flex: 1,
-              minWidth: 0,
+              width: 135,             // 가로 길이 고정 (START와 동일)
+              height: 38,            // 세로 길이 고정 (START와 동일)
               backgroundColor: "#5D5FBB",
               color: "#fff",
-              height: 38,
               borderRadius: 10,
               display: "flex",
               alignItems: "center",
@@ -220,7 +218,7 @@ export default function MuseumClassicTicket({ data }: TicketDesignProps) {
         <div style={{ height: "90%", borderLeft: "1.5px dashed rgba(93, 95, 187, 0.4)" }} />
       </div>
 
-      {/* RIGHT STUB (STUB ONLY 제거) */}
+      {/* RIGHT STUB */}
       <div
         style={{
           flex: 0.8,

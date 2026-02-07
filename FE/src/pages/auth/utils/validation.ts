@@ -10,7 +10,6 @@ export type AccountStepValue = {
   nickname: string;  // ✅ 필수
   password: string;
   phone: string;
-  birth: string;     // ✅ 생년월일 추가
 };
 
 
@@ -35,7 +34,6 @@ export function validateAccountStep(args: {
     return "비밀번호는 8자 이상으로 입력해주세요.";
   if (v.password !== password2) return "비밀번호 확인이 일치하지 않습니다.";
   if (!v.phone.trim()) return "전화번호를 입력해주세요.";
-  if (!v.birth) return "생년월일을 선택해주세요.";
   return null;
 }
 
