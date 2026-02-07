@@ -12,6 +12,11 @@
   color: #fff;
   font-family: var(--font-stack);
   padding-bottom: 100px; /* 하단 여백 확보 */
+  --theme-color: #fff;
+}
+
+.loungePage.artist-mode {
+  --theme-color: #C8A97E;
 }
 
 .loungeWrap {
@@ -73,8 +78,6 @@
   padding: 16px 4px;
   cursor: pointer;
   text-align: left;
-
-  /* ✅ 기본도 너무 죽지 않게 */
   opacity: 1;
   border-bottom: 2px solid transparent;
   min-width: 100px;
@@ -116,18 +119,18 @@
 /* ✅ Active 유지: NavLink는 aria-current="page"를 붙여줌 */
 .loungeTabBtn[aria-current="page"],
 .loungeTabBtn.active {
-  border-bottom-color: #fff;
+  border-bottom-color: var(--theme-color);
 }
 
 .loungeTabBtn[aria-current="page"] .loungeTabTitle,
 .loungeTabBtn.active .loungeTabTitle {
-  color: #fff;
-  font-size: 1.18rem; /* hover랑 동일하게 유지 */
+  color: var(--theme-color); /* ✨ 변수로 교체 */
+  font-size: 1.18rem;
 }
 
 .loungeTabBtn[aria-current="page"] .loungeTabDesc,
 .loungeTabBtn.active .loungeTabDesc {
-  color: #e0e0e0;
+  color: var(--theme-color);
 }
 
 /* 키보드 포커스도 보기 좋게 */
