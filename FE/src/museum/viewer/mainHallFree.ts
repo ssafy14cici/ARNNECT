@@ -145,14 +145,12 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
   overlay.style.opacity = "0";
   overlay.style.transition = "opacity 180ms ease";
   overlay.textContent = "NAV 0";
+  overlay.style.display = "none";
   mountEl(overlay, false);
 
   let overlayTimer: number | null = null;
   function flashOverlay(text: string) {
-    overlay.textContent = text;
-    overlay.style.opacity = "1";
-    if (overlayTimer) window.clearTimeout(overlayTimer);
-    overlayTimer = window.setTimeout(() => (overlay.style.opacity = "0"), 750);
+    return;
   }
 
   function showSpeedIndicator() {
