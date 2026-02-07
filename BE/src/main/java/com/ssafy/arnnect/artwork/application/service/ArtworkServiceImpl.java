@@ -169,7 +169,9 @@ public class ArtworkServiceImpl implements ArtworkService{
 
     @Override
     public List<NewArtistRepresentativeResponse> getNewArtist() {
-        return repository.getNewArtist();
+        List<NewArtistRepresentativeResponse> newArtist = repository.getNewArtist();
+        newArtist.forEach((n)-> n.addDirUrl(fileService.getBaseDir(FileType.ARTWORK)));
+        return newArtist;
     }
 
     @Override
