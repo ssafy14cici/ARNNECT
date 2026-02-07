@@ -3,7 +3,7 @@ import React from "react";
 import "./FeedCard.css";
 
 import type { FeedAuthorRole, FeedItem, ViewMode } from "../model/types";
-import { resolveMediaUrl } from "../../../shared/utils/resolveMediaUrl";
+import { resolveMediaUrl } from "../../../pages/artworks/detail/utils";
 
 /* helpers */
 function formatDate(iso?: string) {
@@ -67,12 +67,8 @@ export const FeedCard: React.FC<FeedCardProps> = ({ feed, viewMode, onClick, onA
         </div>
 
         {hasImage ? (
-          <img
-            className="card-img"
-            src={resolveMediaUrl(feed.imageUrl)}
-            alt={feed.title}
-            loading="lazy"
-          />
+          // ✅ className="card-img" 추가 (CSS 적용되게)
+          <img className="card-img" src={feed.imageUrl} alt={feed.title} loading="lazy" />
         ) : (
           <div className="card-placeholder">NO IMAGE</div>
         )}
