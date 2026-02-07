@@ -31,6 +31,7 @@ export default function AppLayout() {
   // 풀스크린 3D 페이지 (풋터 숨김 + 스크롤 막기)
   const isFullscreen3D = pathname === "/" || pathname === "/hall" || pathname.startsWith("/exhibit");
   const showFooter = !isFullscreen3D;
+  const showNavbar = !pathname.startsWith("/exhibit");
 
   return (
     <div
@@ -43,7 +44,7 @@ export default function AppLayout() {
         overflow: "hidden", // ✅ 스크롤은 main에서만
       }}
     >
-      <Navbar />
+      {showNavbar && <Navbar />}
 
       {/* ✅ 스크롤 컨테이너 (3D 풀스크린 페이지는 스크롤 막음) */}
       <main

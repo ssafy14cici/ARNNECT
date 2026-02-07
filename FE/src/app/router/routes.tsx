@@ -103,9 +103,9 @@ export const routes: RouteObject[] = [
           { path: "hall", element: <Hall /> },
 
           // 임시 전시장
-          { path: "exhibit", element: <Exhibit /> },
+          { path: "exhibit", element: <Exhibit />, handle: { navVariant: "exhibit" } },
           // 작가 전시장
-          { path: "exhibit/:artistId", element: <Exhibit /> },
+          { path: "exhibit/:artistId", element: <Exhibit />, handle: { navVariant: "exhibit" } },
 
           // 로그인하면 회원가입을 막기
           {
