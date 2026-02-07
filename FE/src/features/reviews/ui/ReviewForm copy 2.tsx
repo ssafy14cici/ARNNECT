@@ -8,26 +8,22 @@ type Props = {
   onSubmit: (data: ReviewCreateReq) => Promise<void> | void;
 };
 
-// ✅ public/review_basic/... 에 두면 접근 경로는 BASE_URL + review_basic/... 로 만드는 게 안전함
+// ✅ 기본 이미지 목록 (public/review_basic/... 에 두면 /review_basic/... 로 접근됨)
 const DEFAULT_IMAGES = [
-  "review_basic/basic_1.png",
-  "review_basic/basic_2.jpg",
-  "review_basic/basic_3.jpg",
-  "review_basic/basic_4.jpg",
-] as const;
-
-function publicAssetUrl(path: string) {
-  const p = path.replace(/^\/+/, "");
-  return `${import.meta.env.BASE_URL}${p}`;
-}
+  "/review_basic/basic_1.png",
+  "/review_basic/basic_2.jpg",
+  "/review_basic/basic_3.jpg",
+  "/review_basic/basic_4.jpg",
+];
 
 // ✅ URL(기본 이미지)을 File로 변환해서 서버에 업로드 가능하게
 async function urlToFile(url: string): Promise<File> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to fetch default image: ${url} (${res.status})`);
   const blob = await res.blob();
+  const filename = url.split("/").pop() || "default.jpg";
 
-  const filename = url.split("/").pop()?.split("?")[0] || "default.jpg";
+  // blob.type이 비어있는 경우가 있어 fallback
   const mime = blob.type && blob.type.length > 0 ? blob.type : "image/jpeg";
   return new File([blob], filename, { type: mime });
 }
@@ -37,10 +33,10 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
 
   // ✅ 이 폼 인스턴스에서 사용할 기본이미지 1개를 고정(렌더마다 바뀌지 않게)
   const defaultUrlRef = useRef(
-    publicAssetUrl(DEFAULT_IMAGES[Math.floor(Math.random() * DEFAULT_IMAGES.length)]),
+    DEFAULT_IMAGES[Math.floor(Math.random() * DEFAULT_IMAGES.length)],
   );
 
-  const [previewUrl, setPreviewUrl] = useState<string>(defaultUrlRef.current);
+  const [previewUrl, setPreviewUrl] = useState<string>("");
 
   const [tags, setTags] = useState<string>((initial?.tags ?? []).join(", "));
   const [reviewTitle, setReviewTitle] = useState(initial?.title ?? "");
@@ -54,31 +50,27 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
     [tags],
   );
 
-  // ✅ blob URL 정리용 (stale previewUrl 문제 방지)
-  const blobUrlRef = useRef<string | null>(null);
-
-  // ✅ 미리보기: 파일 있으면 blob URL, 없으면 기본 이미지 URL
+  // ✅ 미리보기는 "파일이 있으면 blob URL", 없으면 "기본 이미지 URL"을 보여줌
   useEffect(() => {
-    // 이전 blob URL 정리
-    if (blobUrlRef.current) {
-      URL.revokeObjectURL(blobUrlRef.current);
-      blobUrlRef.current = null;
+    // 기존 blob URL 정리
+    if (previewUrl && previewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(previewUrl);
     }
 
     if (imageFile) {
       const url = URL.createObjectURL(imageFile);
-      blobUrlRef.current = url;
       setPreviewUrl(url);
     } else {
       setPreviewUrl(defaultUrlRef.current);
     }
 
+    // 언마운트 시에도 blob URL 정리
     return () => {
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
-        blobUrlRef.current = null;
+      if (previewUrl && previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(previewUrl);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageFile]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,7 +95,7 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
     const err = validate();
     if (err) return alert(err);
 
-    // ✅ 파일 없으면(=유저가 업로드 안함) 기본이미지를 File로 변환해 업로드
+    // ✅ 파일 없으면 화면에 보여주던 기본이미지를 그대로 File로 변환해 업로드
     let finalImageFile = imageFile;
     if (!finalImageFile) {
       try {
@@ -139,15 +131,7 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
             />
 
             {/* ✅ 기본이미지도 미리보기로 항상 보이게 */}
-            <img
-              src={previewUrl}
-              alt="Preview"
-              className="pc-preview-img"
-              onError={(e) => {
-                // 기본 이미지 로드 실패 시에도 안전하게 (경로 문제 등)
-                e.currentTarget.src = defaultUrlRef.current;
-              }}
-            />
+            <img src={previewUrl} alt="Preview" className="pc-preview-img" />
           </label>
         </div>
 
