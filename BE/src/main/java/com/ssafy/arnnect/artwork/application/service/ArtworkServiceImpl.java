@@ -140,10 +140,13 @@ public class ArtworkServiceImpl implements ArtworkService{
 
     @Override
     public List<ArtworkResponse> getArtworkList(String memberUuid) {
-        if(memberUuid != null){
-            List<ArtworkResponse> response =
-                    recommend(memberUuid, logService.getUserLogs(memberUuid));
 
+        List<UserLogActionDto> userLogs = logService.getUserLogs(memberUuid);
+
+        if(!memberUuid.equals("anonymousUser") || !userLogs.isEmpty()){
+
+            List<ArtworkResponse> response =
+                    recommend(memberUuid, userLogs);
             response.forEach(r ->
                     r.updateUrl(fileService.getBaseDir(FileType.ARTWORK))
             );
