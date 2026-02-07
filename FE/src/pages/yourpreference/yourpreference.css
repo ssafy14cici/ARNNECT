@@ -133,12 +133,23 @@
   cursor: pointer;
   transition: transform 0.4s ease, filter 0.4s ease;
   border: 1px solid rgba(255,255,255,0.1);
+
+  /* ✅ contain일 때 빈 공간(레터박스)도 예쁘게 */
+  background: radial-gradient(circle at 50% 40%, rgba(200,169,126,0.10) 0%, rgba(0,0,0,0.9) 60%);
 }
 
+/* ✅ 핵심: cover -> contain (안 잘리고 전체 노출) */
 .battle-card img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+
+  object-fit: contain;          /* ✅ 안 짤림 */
+  object-position: center;      /* ✅ 중앙 고정 */
+
+  /* 레터박스가 뜰 때 뜬금없지 않게 */
+  background: rgba(0,0,0,0.55);
+
+  /* 기존 인터랙션 유지 */
   transition: transform 0.6s ease;
 }
 
@@ -150,7 +161,7 @@
 }
 
 .battle-card:hover img {
-  transform: scale(1.1);
+  transform: scale(1.06); /* contain일 때 과도 확대하면 빈 공간이 더 티나서 살짝만 */
 }
 
 /* Non-hovered card dims out */
@@ -237,6 +248,10 @@
   font-size: 1rem;
 }
 
+.error-sub {
+  white-space: pre-line;
+}
+
 /* --- 4. Result View --- */
 .pref-result {
   display: flex;
@@ -248,7 +263,11 @@
 .result-card {
   background: rgba(255,255,255,0.05);
   border: 1px solid rgba(255,255,255,0.1);
-  padding: 60px 40px;
+
+  /* ✅ 태그/팁 공간 확보 */
+  padding: 64px 44px;
+  padding-bottom: 72px;
+
   border-radius: 20px;
   max-width: 600px;
   width: 100%;
@@ -287,51 +306,104 @@
 .result-title {
   font-size: 1.5rem;
   font-weight: 400;
-  margin-bottom: 30px;
+  margin-bottom: 26px;
 }
 
+/* ✅ 텍스트 */
 .result-desc {
-  line-height: 1.7;
-  color: rgba(255,255,255,0.8);
-  margin-bottom: 40px;
+  white-space: pre-line;
+  line-height: 1.8;
+  color: rgba(255,255,255,0.85);
   font-size: 1.05rem;
+  margin: 0 0 22px;
 }
 
+.result-tagline {
+  opacity: 0.9;
+  margin-bottom: 14px;
+}
+
+.result-description {
+  opacity: 0.82;
+  margin-bottom: 28px;
+}
+
+/* ✅ 강점/주의점/팁 블록 */
+.result-details {
+  text-align: left;
+  padding-top: 20px;
+  padding-bottom: 10px;
+  border-top: 1px solid rgba(255,255,255,0.12);
+
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.result-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.result-section-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: rgba(255,255,255,0.92);
+}
+
+.result-list {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.75;
+  color: rgba(255,255,255,0.78);
+}
+
+.result-list li {
+  margin: 6px 0;
+}
+
+.result-tip {
+  margin: 0;
+  white-space: pre-line;
+  line-height: 1.75;
+  color: rgba(255,255,255,0.88);
+  font-size: 1.08rem;
+}
+
+/* ✅ TAGS: 공간 + 줄바꿈 간격 */
 .result-keywords {
   display: flex;
   justify-content: center;
-  gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 40px;
+  gap: 12px;
+  row-gap: 12px;
+
+  margin-top: 28px;
+  margin-bottom: 56px;
 }
 
 .result-keywords span {
-  background: rgba(200, 169, 126, 0.1);
+  background: rgba(200, 169, 126, 0.08);
   color: #C8A97E;
-  padding: 8px 16px;
-  border-radius: 4px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(200, 169, 126, 0.22);
   font-size: 0.9rem;
 }
 
-.result-recommend {
-  border-top: 1px solid rgba(255,255,255,0.1);
-  padding-top: 20px;
-}
-
-.result-recommend p {
-  font-size: 0.9rem;
-  color: rgba(255,255,255,0.5);
-  margin-bottom: 8px;
-}
-
-.result-recommend strong {
-  font-size: 1.2rem;
-  color: #fff;
-}
-
+/* --- Actions --- */
 .result-actions {
   display: flex;
   gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.result-actions--error {
+  margin-top: 16px;
 }
 
 .pref-btn-primary {
@@ -343,6 +415,7 @@
   font-weight: 600;
   transition: all 0.3s;
 }
+
 .pref-btn-primary:hover {
   background: #C8A97E;
   transform: translateY(-2px);
@@ -358,6 +431,7 @@
   font-size: 1rem;
   transition: all 0.3s;
 }
+
 .pref-btn-secondary:hover {
   border-color: #fff;
   color: #fff;
@@ -370,16 +444,29 @@
     height: auto;
     gap: 10px;
   }
+
   .battle-card {
     width: 100%;
-    height: 300px; /* 모바일에서 적당한 높이 */
+    height: 300px;
   }
+
   .battle-vs {
     position: relative;
     transform: none;
     left: auto;
     top: auto;
-    margin: -30px 0; /* 겹치게 */
+    margin: -30px 0;
   }
+
   .pref-title { font-size: 3rem; }
+
+  .result-card {
+    padding: 52px 22px;
+    padding-bottom: 58px;
+  }
+
+  .result-keywords {
+    margin-top: 22px;
+    margin-bottom: 40px;
+  }
 }

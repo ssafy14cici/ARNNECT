@@ -5,7 +5,7 @@
   border-radius: 1rem;
   padding: 0.5rem;
   color: #141417;
-  font-family: "Poppins", "Pretendard", "Noto Sans KR", sans-serif;
+  font-family: var(--font-stack, 'MuseumClassic', 'Pretendard', -apple-system, sans-serif);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
 }
 .card__hero {
@@ -58,17 +58,20 @@
 }
 .card__btn {
   width: 100%;
-  font-weight: 400;
+  font-weight: 600;
   border: none;
   display: block;
   cursor: pointer;
   text-align: center;
-  padding: 0.5rem 1.25rem;
-  border-radius: 1rem;
+  padding: 0.6rem 1.4rem;
+  border-radius: 0.75rem;
   background-color: #141417;
   color: #fff;
-  font-size: 1rem;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
+  font-size: 0.9rem;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 @media (min-width: 340px) {
   .card__btn {
@@ -77,17 +80,29 @@
 }
 
 .card__btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25);
+  background-color: #2a2a2f;
 }
 
 .card__btn:active {
   transform: translateY(0);
-  box-shadow: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .card__btn.danger {
-  background-color: #c62828;
+  background-color: #dc2626;
+}
+
+.card__btn.danger:hover {
+  background-color: #ef4444;
+}
+
+.card__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
 }
 
 .card__body {
@@ -125,6 +140,7 @@
     max-width: 760px;
     margin: 0 auto;
     padding: 120px 20px;
+    font-family: var(--font-stack, 'MuseumClassic', 'Pretendard', -apple-system, sans-serif);
 }
 
 .card__close-btn {
@@ -137,6 +153,7 @@
 /* Fan Letter Page */
 .fanletterPage {
     padding: 20px 24px 40px;
+    font-family: var(--font-stack, 'MuseumClassic', 'Pretendard', -apple-system, sans-serif);
 }
 
 .fanletterHeader {
@@ -222,12 +239,14 @@
 }
 
 .fanletter-badge {
-    background-color: #4caf50;
+    background-color: #10b981;
     color: white;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 0.5rem;
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
 }
 
 @media (max-width: 560px) {
