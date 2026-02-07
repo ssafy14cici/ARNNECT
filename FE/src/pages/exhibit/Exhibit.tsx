@@ -254,7 +254,7 @@ export default function Exhibit() {
       )}
 
       <img
-        src={asset(bgmOn ? "bgm/bgm_on.png" : "bgm/bgm_off.png")}
+        src={asset(bgmOn ? "bgm/exhibit_on.png" : "bgm/exhibit_off.png")}
         alt={bgmOn ? "BGM ON" : "BGM OFF"}
         onClick={() => {
           const next = bgmToggle();

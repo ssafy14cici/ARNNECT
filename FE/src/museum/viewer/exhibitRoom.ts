@@ -326,12 +326,12 @@ export async function mountExhibitRoom(
   back.addEventListener("pointerdown", (e: PointerEvent) => e.stopPropagation(), { capture: true });
 
   // ─────────────────────────────────────────────────────────────
-  // 중앙 하단: 좌/우 버튼 + 뷰포인트 라벨 (이쁘게)
+  // 중앙 하단: 미니멀 진행 바 + 좌/우 버튼
   // ─────────────────────────────────────────────────────────────
   const navWrap = mountEl(document.createElement("div"), true);
   navWrap.style.cssText =
-    "position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:99999;" +
-    "display:flex;align-items:center;gap:10px;" +
+    "position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:99999;" +
+    "display:flex;align-items:center;gap:20px;" +
     "pointer-events:auto;touch-action:manipulation;";
 
   function makeNavBtn(label: string) {
@@ -339,52 +339,37 @@ export async function mountExhibitRoom(
     b.type = "button";
     b.textContent = label;
     b.style.cssText =
-      "width:46px;height:38px;border-radius:999px;" +
-      "border:1px solid rgba(255,255,255,0.22);" +
-      "background:rgba(0,0,0,0.35);backdrop-filter:blur(10px);" +
-      "color:rgba(255,255,255,0.92);font-size:16px;font-weight:900;" +
-      "cursor:pointer;display:flex;align-items:center;justify-content:center;" +
-      "box-shadow:0 10px 26px rgba(0,0,0,0.35);" +
-      "transition:transform .12s, background .18s, border-color .18s;";
+      "background:transparent;border:none;color:rgba(255,255,255,0.92);" +
+      "font-size:20px;cursor:pointer;opacity:0.3;" +
+      "transition:opacity 0.2s;padding:8px;";
     b.addEventListener("pointerdown", (e) => e.stopPropagation(), { capture: true });
-    b.addEventListener("mouseenter", () => (b.style.transform = "translateY(-1px)"));
-    b.addEventListener("mouseleave", () => (b.style.transform = "translateY(0px)"));
+    b.addEventListener("mouseenter", () => (b.style.opacity = "1"));
+    b.addEventListener("mouseleave", () => (b.style.opacity = "0.3"));
     return b;
   }
 
   const btnPrev = makeNavBtn("◀");
   const btnNext = makeNavBtn("▶");
 
-  const viewLabel = document.createElement("div");
-  viewLabel.style.cssText =
-    "min-width:160px;height:38px;border-radius:999px;" +
-    "display:flex;align-items:center;justify-content:center;gap:8px;" +
-    "padding:0 14px;" +
-    "background:rgba(0,0,0,0.40);backdrop-filter:blur(12px);" +
-    "border:1px solid rgba(255,255,255,0.22);" +
-    "box-shadow:0 12px 30px rgba(0,0,0,0.40);" +
-    "font-family:ui-sans-serif,system-ui, -apple-system, 'Noto Sans KR';" +
-    "color:rgba(255,255,255,0.92);" +
-    "letter-spacing:0.08em;";
+  // 진행 바 컨테이너
+  const progressBar = document.createElement("div");
+  progressBar.style.cssText =
+    "width:200px;height:2px;background:rgba(255,255,255,0.2);position:relative;";
 
-  const vpKey = document.createElement("span");
-  vpKey.style.cssText = "font-size:11px;font-weight:800;opacity:0.75;";
-  vpKey.textContent = "VIEWPOINT";
+  // 진행 상태
+  const progressFill = document.createElement("div");
+  progressFill.style.cssText =
+    "height:100%;background:#fff;transition:width 0.3s ease;width:0%;";
 
-  const vpNum = document.createElement("span");
-  vpNum.style.cssText =
-    "font-size:13px;font-weight:900;letter-spacing:0.02em;" +
-    "padding:5px 10px;border-radius:999px;" +
-    "background:rgba(255,255,255,0.12);" +
-    "border:1px solid rgba(255,255,255,0.18);";
-  vpNum.textContent = points.length ? `${index}` : "-";
-
-  viewLabel.append(vpKey, vpNum);
-  navWrap.append(btnPrev, viewLabel, btnNext);
+  progressBar.appendChild(progressFill);
+  navWrap.append(btnPrev, progressBar, btnNext);
 
   // ✅ 한 군데서 UI 갱신하도록 통일
   function syncViewUI(i: number) {
-    vpNum.textContent = points.length ? `${i}` : "-";
+    if (points.length > 0) {
+      const progress = ((i + 1) / points.length) * 100;
+      progressFill.style.width = `${progress}%`;
+    }
   }
 
   // 버튼 동작
@@ -692,7 +677,7 @@ export async function mountExhibitRoom(
       if (dist < CLOSE_THRESHOLD) showArtDetailModal(hit);
       else {
         goTo(vpIdx, 0.85);
-        viewLabel.textContent = `VIEWPOINT ${vpIdx}`;
+        syncViewUI(vpIdx);
       }
     }
   };
@@ -973,11 +958,11 @@ export async function mountExhibitRoom(
     if (e.code === "ArrowRight") {
       e.preventDefault();
       goTo(index + 1, 0.85, 1);
-      viewLabel.textContent = `VIEWPOINT ${index}`;
+      syncViewUI(index);
     } else if (e.code === "ArrowLeft") {
       e.preventDefault();
       goTo(index - 1, 0.85, -1);
-      viewLabel.textContent = `VIEWPOINT ${index}`;
+      syncViewUI(index);
     }
   };
 
