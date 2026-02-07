@@ -142,16 +142,8 @@ public class ArtworkServiceImpl implements ArtworkService{
     public List<ArtworkResponse> getArtworkList(String memberUuid) {
 
         List<UserLogActionDto> userLogs = logService.getUserLogs(memberUuid);
-        log.info("userLogs : {}, userLogs.em : {},  userLogs.size : {}",userLogs, userLogs.isEmpty(), userLogs.size());
         if(!memberUuid.equals("anonymousUser") && !userLogs.isEmpty()){
-
-            List<ArtworkResponse> response =
-                    recommend(memberUuid, userLogs);
-            response.forEach(r ->
-                    r.updateUrl(fileService.getBaseDir(FileType.ARTWORK))
-            );
-
-            return response;
+            return recommend(memberUuid, userLogs);
         }else{
             //비회원
             List<ArtworkResponse> response = repository.findAllOrderDesc();
