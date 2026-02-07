@@ -52,7 +52,6 @@ export default function YourPreferenceResult() {
         setErrorMsg("");
         setViewStep("ANALYZING");
 
-        // ✅ 라운드 순서대로 artworkIdList 구성
         const artworkIdList = selections
           .slice()
           .sort((a, b) => a.round - b.round)
@@ -63,7 +62,6 @@ export default function YourPreferenceResult() {
           throw new Error("선택한 작품 ID가 없습니다.");
         }
 
-        // ✅ 결과 코드 요청 + UX 최소 로딩
         const [mbtiCodeRaw] = await Promise.all([
           postPreference({ artworkIdList }, { skipAuth: !isLoggedIn }),
           sleep(900),
@@ -71,16 +69,13 @@ export default function YourPreferenceResult() {
 
         const mbtiCode = String(mbtiCodeRaw ?? "").trim().toUpperCase();
 
-        // mbtiCode가 비어있으면 서버 응답 파싱/키 불일치 가능성 큼
         if (!mbtiCode) {
           console.warn("[YourPreferenceResult] Empty MBTI code from server:", mbtiCodeRaw);
         }
 
-        // ✅ resolve 1회만 수행
         const resolved = resolveMbtiProfile(mbtiCode);
         const profile = resolved ?? buildFallbackProfile(mbtiCode);
 
-        // 프로필 누락이면 콘솔 경고만 남김(UX는 살림)
         if (!resolved) {
           console.warn("[YourPreferenceResult] MBTI profile missing:", mbtiCode);
         }
@@ -122,33 +117,37 @@ export default function YourPreferenceResult() {
       <div className="pref-result fade-in">
         <div className="result-card">
           <div className="result-header">YOUR ART MBTI</div>
+
           <h1 className="result-type gold-text">{resultData?.mbti}</h1>
           <h2 className="result-title">{resultData?.title}</h2>
 
-          <p className="result-desc" style={{ whiteSpace: "pre-line", opacity: 0.9 }}>
-            {resultData?.tagline}
-          </p>
-          <p className="result-desc" style={{ whiteSpace: "pre-line" }}>
-            {resultData?.description}
-          </p>
+          <p className="result-desc result-tagline">{resultData?.tagline}</p>
+          <p className="result-desc result-description">{resultData?.description}</p>
 
-          <div style={{ marginTop: 16, textAlign: "left" }}>
-            <h3 style={{ margin: "12px 0 6px" }}>강점</h3>
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {resultData?.strengths?.map((s) => (
-                <li key={s}>{s}</li>
-              ))}
-            </ul>
+          {/* ✅ 여기: 클래스 부여해서 CSS로 공간/타이포 제어 */}
+          <div className="result-details">
+            <section className="result-section">
+              <h3 className="result-section-title">강점</h3>
+              <ul className="result-list">
+                {resultData?.strengths?.map((s) => (
+                  <li key={s}>{s}</li>
+                ))}
+              </ul>
+            </section>
 
-            <h3 style={{ margin: "12px 0 6px" }}>주의점</h3>
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {resultData?.watchouts?.map((s) => (
-                <li key={s}>{s}</li>
-              ))}
-            </ul>
+            <section className="result-section">
+              <h3 className="result-section-title">주의점</h3>
+              <ul className="result-list">
+                {resultData?.watchouts?.map((s) => (
+                  <li key={s}>{s}</li>
+                ))}
+              </ul>
+            </section>
 
-            <h3 style={{ margin: "12px 0 6px" }}>팁</h3>
-            <p style={{ margin: 0, whiteSpace: "pre-line" }}>{resultData?.tip}</p>
+            <section className="result-section">
+              <h3 className="result-section-title">팁</h3>
+              <p className="result-tip">{resultData?.tip}</p>
+            </section>
           </div>
 
           <div className="result-keywords">
@@ -177,7 +176,7 @@ export default function YourPreferenceResult() {
         </div>
       </div>
     );
-  }, [isLoggedIn, resultData]);
+  }, [isLoggedIn, resultData, navigate]);
 
   const AnalyzingView = (
     <div className="pref-analyzing fade-in">
@@ -194,11 +193,9 @@ export default function YourPreferenceResult() {
   const ErrorView = (
     <div className="pref-analyzing fade-in">
       <h2 className="analyzing-text">결과를 불러오지 못했습니다</h2>
-      <p className="analyzing-sub" style={{ whiteSpace: "pre-line" }}>
-        {errorMsg || "잠시 후 다시 시도해주세요."}
-      </p>
+      <p className="analyzing-sub error-sub">{errorMsg || "잠시 후 다시 시도해주세요."}</p>
 
-      <div className="result-actions" style={{ marginTop: 16 }}>
+      <div className="result-actions result-actions--error">
         <button className="pref-btn-secondary" onClick={retry}>
           다시 하기
         </button>
