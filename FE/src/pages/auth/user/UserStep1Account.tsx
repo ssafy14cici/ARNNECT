@@ -118,10 +118,23 @@ export default function Step1Account({
         value={value.phone}
         onChange={(e) => {
           const onlyDigits = e.target.value.replace(/[^0-9]/g, "");
-          onChange({ ...value, phone: onlyDigits });
+          if (onlyDigits.length <= 11) {
+            onChange({ ...value, phone: onlyDigits });
+          }
         }}
         placeholder="01012345678"
         inputMode="numeric"
+        maxLength={11}
+      />
+
+      <label className="auth-label">
+        생년월일 <span className="req">*</span>
+      </label>
+      <input
+        className="auth-dark-input"
+        type="date"
+        value={value.birth}
+        onChange={(e) => onChange({ ...value, birth: e.target.value })}
       />
 
       {error ? <div className="auth-error">{error}</div> : null}

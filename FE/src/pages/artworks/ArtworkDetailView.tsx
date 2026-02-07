@@ -364,7 +364,7 @@ export default function ArtworkDetailView(props: Props) {
                     type="button"
                     onClick={onToggleFavorite}
                   >
-                    {isLiked ? "?" : "?"} {likeCount}
+                    {isLiked ? "♥" : "?"} {likeCount}
                   </button>
                 </>
               ) : (

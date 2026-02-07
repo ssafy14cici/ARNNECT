@@ -106,8 +106,15 @@ export default function Step1Account({
       <input
         className="auth-dark-input"
         value={value.phone}
-        onChange={(e) => onChange({ ...value, phone: e.target.value })}
-        placeholder="010-1234-5678"
+        onChange={(e) => {
+          const onlyDigits = e.target.value.replace(/[^0-9]/g, "");
+          if (onlyDigits.length <= 11) {
+            onChange({ ...value, phone: onlyDigits });
+          }
+        }}
+        placeholder="01012345678"
+        inputMode="numeric"
+        maxLength={11}
       />
 
       {error ? <div className="auth-error">{error}</div> : null}

@@ -16,7 +16,7 @@ export default function UserSignup({ onBack }: { onBack: () => void }) {
   const [step, setStep] = useState<1 | 2>(1);
 
   const [u1, setU1] = useState<AccountStepValue>({
-    email: "", name: "", nickname: "", password: "", phone: "",
+    email: "", name: "", nickname: "", password: "", phone: "", birth: "",
   });
   const [pw2, setPw2] = useState("");
 
@@ -83,9 +83,9 @@ export default function UserSignup({ onBack }: { onBack: () => void }) {
         email: u1.email.trim(),
         password: u1.password,
         name: u1.name.trim(),
-        nickname: u1.nickname.trim(),                // ✅ 아직 UI 없으면 name으로 대체 OK
-        phone: u1.phone.replace(/[^0-9]/g, ""),  // ✅ 하이픈/공백 제거
-        birth: "2000-01-01",                     // TODO: UI에서 받기
+        nickname: u1.nickname.trim(),
+        phone: u1.phone.replace(/[^0-9]/g, ""),
+        birth: u1.birth,
         isAgree: privacyConsent,
         // image: 선택 구현하면 File 넣기
       });

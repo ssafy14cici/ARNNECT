@@ -36,7 +36,6 @@ export default function DancePinkTicket({ data }: TicketDesignProps) {
           justifyContent: "space-between",
           boxSizing: "border-box",
           minHeight: 0,
-          gap: 12,
         }}
       >
         {/* TOP */}
@@ -47,23 +46,26 @@ export default function DancePinkTicket({ data }: TicketDesignProps) {
                 fontSize: "44px",
                 fontWeight: 900,
                 margin: 0,
-                lineHeight: 0.9,
+                lineHeight: 0.85,
                 letterSpacing: "-2px",
                 fontFamily: "Arial Black, sans-serif",
-                wordBreak: "break-word",
-                overflowWrap: "anywhere",
+                wordBreak: "keep-all",
               }}
             >
               {title}
             </h1>
+            <div style={{ fontSize: "11px", fontWeight: 900, marginTop: 8, lineHeight: 1.2 }}>
+              PERFORMANCE ART<br />& CEREMONY
+            </div>
           </div>
 
-          {/* DATE/TIME */}
-          <div style={{ textAlign: "right", fontSize: 14, fontWeight: 900, lineHeight: 1.25, flex: "0 0 auto" }}>
+          {/* 날짜/시간(끝나는 날짜 포함) */}
+          <div style={{ textAlign: "right", fontSize: 14, fontWeight: 900, lineHeight: 1.25 }}>
             <div>{startDate || "DATE"}</div>
             {endDate && <div style={{ fontSize: 12, opacity: 0.9 }}>~ {endDate}</div>}
-            <div style={{ marginTop: 4, fontSize: 12 }}>
-              {startTime || "--:--"} {endTime ? `- ${endTime}` : ""}
+            <div style={{ marginTop: 4 }}>
+              <span style={{ fontSize: 12 }}>{startTime || "--:--"}</span>
+              {endTime ? <span style={{ fontSize: 12 }}> - {endTime}</span> : null}
             </div>
           </div>
         </div>
@@ -77,13 +79,14 @@ export default function DancePinkTicket({ data }: TicketDesignProps) {
             flexDirection: "column",
             justifyContent: "center",
             gap: 10,
+            margin: "12px 0",
           }}
         >
-          {/* ✅ IMAGE (테두리 제거) */}
           <div
             style={{
               width: "100%",
-              height: 180, // 기존 120 -> 크게
+              height: 120,
+              border: "3px solid #000",
               backgroundColor: "#fff",
               overflow: "hidden",
               display: "flex",
@@ -91,62 +94,46 @@ export default function DancePinkTicket({ data }: TicketDesignProps) {
               justifyContent: "center",
               position: "relative",
               boxSizing: "border-box",
-              borderRadius: 10,
-              boxShadow: "0 10px 24px rgba(0,0,0,0.10)",
+              flex: "0 0 auto",
             }}
           >
             {data.posterUrl ? (
-              <img
-                src={data.posterUrl}
-                alt="dance"
-                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-              />
+              <img src={data.posterUrl} alt="dance" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
             ) : (
-              <div style={{ fontSize: 12, fontWeight: 900, textAlign: "center", opacity: 0.65 }}>PHOTO</div>
+              <div style={{ fontSize: 12, fontWeight: 900, textAlign: "center" }}>PHOTO AREA</div>
             )}
           </div>
 
-          {/* ✅ LOCATION: 더 잘 보이게 + 2줄 허용 */}
+          {/* LOCATION (반드시 보이도록) */}
           <div
             style={{
               backgroundColor: "#000",
               color: "#FF7EB3",
-              padding: "10px 12px",
-              fontSize: 14,
+              padding: "6px 10px",
+              fontSize: 13,
               fontWeight: 900,
               width: "100%",
               boxSizing: "border-box",
-              borderRadius: 10,
-              lineHeight: 1.25,
-
-              // 2줄까지 표시
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
+              whiteSpace: "nowrap",
               overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
-            <span style={{ opacity: 0.9, marginRight: 6 }}>LOCATION</span>
-            {address || "LOCATION"}
+            LOCATION: {address || "LOCATION"}
           </div>
         </div>
 
-        {/* BOTTOM: 의미없는 멘트 정리 → 최소 정보만 남김(선택) */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-start",
-            alignItems: "flex-end",
-            gap: 10,
-            borderTop: "2px solid rgba(0,0,0,0.5)",
-            paddingTop: 8,
-            fontSize: 11,
-            fontWeight: 900,
-            opacity: 0.85,
-          }}
-        >
-          {/* 필요없으면 이 줄도 통째로 삭제 가능 */}
-          {endDate ? `${startDate} ~ ${endDate}` : startDate || "DATE"}
+        {/* BOTTOM */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 900, borderTop: "2px solid #000", paddingTop: 6 }}>
+            ADMIT ONE ONLY
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontFamily: "serif", fontSize: 16, fontStyle: "italic", lineHeight: 1 }}>
+              Special Dance
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: 1 }}>AWARD CEREMONIES</div>
+          </div>
         </div>
       </div>
 
@@ -159,18 +146,30 @@ export default function DancePinkTicket({ data }: TicketDesignProps) {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          justifyContent: "center", // ✅ 가운데 정렬
+          justifyContent: "space-between",
           padding: "16px 0",
           boxSizing: "border-box",
-          gap: 10,
         }}
       >
-        <div style={{ background: "#000", padding: 5, borderRadius: 6 }}>
-          <TicketQR size={74} variant="light" />
+        <div style={{ background: "#000", padding: 4, borderRadius: 4 }}>
+          <TicketQR size={68} variant="light" />
         </div>
+
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+          <div
+            style={{
+              width: 50,
+              height: 92,
+              background:
+                "repeating-linear-gradient(180deg, #000 0px, #000 2px, transparent 2px, transparent 4px, #000 4px, #000 5px)",
+            }}
+          />
+          <span style={{ fontSize: 9, fontWeight: "bold" }}>STUB-2026-VOID</span>
+        </div>
+
+        <div style={{ fontWeight: 900, fontSize: 11, letterSpacing: "-0.5px" }}>@TICKET_DESIGN</div>
       </div>
 
-      {/* perforation */}
       <div
         style={{
           position: "absolute",

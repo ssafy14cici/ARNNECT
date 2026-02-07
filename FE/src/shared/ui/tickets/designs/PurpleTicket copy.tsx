@@ -25,7 +25,7 @@ export default function WorldMusicTicket({ data }: TicketDesignProps) {
         overflow: "hidden",
       }}
     >
-      {/* STUB (QR only) */}
+      {/* STUB */}
       <div
         style={{
           width: "120px",
@@ -34,13 +34,21 @@ export default function WorldMusicTicket({ data }: TicketDesignProps) {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          justifyContent: "center", // ✅ 멘트 삭제했으니 중앙 정렬
+          justifyContent: "space-between",
           padding: "16px 10px",
           boxSizing: "border-box",
         }}
       >
-        <div style={{ background: "#E2D1F9", padding: 6, borderRadius: 6 }}>
-          <TicketQR size={88} variant="dark" /> {/* ✅ 약간 키움 */}
+        <div style={{ writingMode: "vertical-rl", fontSize: 10, opacity: 0.8, letterSpacing: 1 }}>
+          ADMIT ONE / TICKET STUB
+        </div>
+
+        <div style={{ background: "#E2D1F9", padding: 5, borderRadius: 4 }}>
+          <TicketQR size={78} variant="dark" />
+        </div>
+
+        <div style={{ fontSize: 12, fontWeight: "bold", transform: "rotate(-90deg)", whiteSpace: "nowrap" }}>
+          #{Math.floor(Math.random() * 90000) + 10000}
         </div>
       </div>
 
@@ -57,39 +65,23 @@ export default function WorldMusicTicket({ data }: TicketDesignProps) {
           boxSizing: "border-box",
         }}
       >
-        {/* TOP */}
-        <div style={{ flex: 1, minHeight: 0, display: "flex", gap: 16, alignItems: "center" }}>
-          {/* ✅ 이미지 크게 */}
+        {/* TOP (flex:1, minHeight:0 로 하단이 밀려도 잘리지 않게) */}
+        <div style={{ flex: 1, minHeight: 0, display: "flex", gap: 14, alignItems: "center" }}>
           <div
             style={{
-              width: 210,
-              height: 210,
+              width: 150,
+              height: 150,
               backgroundColor: "#D1BEEB",
-              borderRadius: 10,
+              borderRadius: 8,
               overflow: "hidden",
-              boxShadow: "0 10px 22px rgba(0,32,194,0.12)",
+              boxShadow: "0 8px 18px rgba(0,32,194,0.10)",
               flex: "0 0 auto",
             }}
           >
             {data.posterUrl ? (
-              <img
-                src={data.posterUrl}
-                alt="poster"
-                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-              />
+              <img src={data.posterUrl} alt="poster" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
             ) : (
-              <div
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 12,
-                  opacity: 0.6,
-                  letterSpacing: 1,
-                }}
-              >
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, opacity: 0.6 }}>
                 IMAGE
               </div>
             )}
@@ -99,24 +91,20 @@ export default function WorldMusicTicket({ data }: TicketDesignProps) {
             <h1
               style={{
                 fontSize: 38,
-                lineHeight: 1.05,
-                margin: "0 0 10px 0",
+                lineHeight: 1,
+                margin: "0 0 8px 0",
                 fontWeight: 900,
                 letterSpacing: "-1px",
-
-                // ✅ 길면 알아서 줄바꿈
-                whiteSpace: "pre-wrap",
-                overflowWrap: "anywhere",
-                wordBreak: "break-word",
+                wordBreak: "keep-all",
               }}
             >
               {title}
             </h1>
-            <div style={{ width: 64, height: 6, backgroundColor: "#0020C2" }} />
+            <div style={{ width: 56, height: 6, backgroundColor: "#0020C2" }} />
           </div>
         </div>
 
-        {/* BOTTOM */}
+        {/* BOTTOM (반드시 보이도록 padding/폰트 조정) */}
         <div
           style={{
             flex: "0 0 auto",
@@ -130,15 +118,7 @@ export default function WorldMusicTicket({ data }: TicketDesignProps) {
         >
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 11, fontWeight: "bold", opacity: 0.85 }}>LOCATION</div>
-            <div
-              style={{
-                fontSize: 14,
-                fontWeight: "bold",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
+            <div style={{ fontSize: 14, fontWeight: "bold", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {address || "LOCATION"}
             </div>
           </div>
@@ -154,15 +134,7 @@ export default function WorldMusicTicket({ data }: TicketDesignProps) {
           </div>
         </div>
 
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            top: "10%",
-            bottom: "10%",
-            borderLeft: "2px dashed rgba(0,32,194,0.2)",
-          }}
-        />
+        <div style={{ position: "absolute", left: 0, top: "10%", bottom: "10%", borderLeft: "2px dashed rgba(0,32,194,0.2)" }} />
       </div>
     </div>
   );
