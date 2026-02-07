@@ -142,8 +142,8 @@ public class ArtworkServiceImpl implements ArtworkService{
     public List<ArtworkResponse> getArtworkList(String memberUuid) {
 
         List<UserLogActionDto> userLogs = logService.getUserLogs(memberUuid);
-
-        if(!memberUuid.equals("anonymousUser") || !userLogs.isEmpty()){
+        log.info("userLogs : {}, userLogs.em : {},  userLogs.size : {}",userLogs, userLogs.isEmpty(), userLogs.size());
+        if(!memberUuid.equals("anonymousUser") && !userLogs.isEmpty()){
 
             List<ArtworkResponse> response =
                     recommend(memberUuid, userLogs);
