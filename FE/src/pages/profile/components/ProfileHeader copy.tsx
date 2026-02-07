@@ -1,4 +1,3 @@
-// FE/src/pages/profile/components/ProfileHeader.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../profile.css";
@@ -35,36 +34,6 @@ function clampFeaturedIds(profile: ProfileModel, max = 3) {
   return Array.from(new Set(ids)).slice(0, max);
 }
 
-// ✅ 동일 매핑(상단 표시용) — public/badges/badges1~9.png
-const ID_TO_NO: Record<string, number> = {
-  review_lv1: 1,
-  review_lv2: 2,
-  review_lv3: 3,
-  ticket_lv1: 4,
-  ticket_lv2: 5,
-  ticket_lv3: 6,
-  social_lv1: 7,
-  social_lv2: 8,
-  social_lv3: 9,
-};
-
-const ID_TO_LABEL: Record<string, string> = {
-  review_lv1: "첫 리뷰",
-  review_lv2: "리뷰러",
-  review_lv3: "리뷰 마스터",
-  ticket_lv1: "첫 티켓",
-  ticket_lv2: "컬렉터",
-  ticket_lv3: "슈퍼 컬렉터",
-  social_lv1: "첫 팔로워",
-  social_lv2: "인기 유저",
-  social_lv3: "인플루언서",
-};
-
-function badgeImageSrc(id: string) {
-  const no = ID_TO_NO[id] ?? 1;
-  return `${import.meta.env.BASE_URL}badges/badges${no}.png`;
-}
-
 export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Props) {
   const navigate = useNavigate();
 
@@ -82,25 +51,13 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
   const isArtist = isArtistProfile(profile);
 
-  // ✅ 서버가 내려준 earnedBadges (없으면 [])
   const earnedBadges = useMemo<Badge[]>(() => profile.badges ?? [], [profile.badges]);
-
-  // ✅ 초기 featured ids
   const initialFeaturedIds = useMemo(() => clampFeaturedIds(profile, 3), [profile]);
 
-  // ✅ 상단 표시용: profile.badges가 비어도 featuredBadgeIds 기반으로 fallback label을 만들어 표시
   const featuredBadges = useMemo(() => {
     const ids = clampFeaturedIds(profile, 3);
     const map = new Map((profile.badges ?? []).map((b) => [b.id, b]));
-
-    return ids
-      .map((id) => {
-        const fromServer = map.get(id);
-        if (fromServer) return fromServer;
-        // fallback
-        return { id, label: ID_TO_LABEL[id] ?? id } as Badge;
-      })
-      .filter(Boolean) as Badge[];
+    return ids.map((id) => map.get(id)).filter(Boolean) as Badge[];
   }, [profile]);
 
   const genre = useMemo(() => (isArtist ? (profile as ArtistProfile).genre : undefined), [isArtist, profile]);
@@ -162,7 +119,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
       if (prev.isFollowing) await profileApi.unfollow(prev.id);
       else await profileApi.follow(prev.id);
 
-      // ✅ 서버 값으로 다시 동기화(카운트/상태 확정)
+      // ✅ 핵심: 서버 값으로 다시 동기화(카운트/상태 확정)
       const latest = await profileApi.getProfile(prev.id);
       onProfileUpdated(latest as ProfileModel);
     } catch (e) {
@@ -200,15 +157,10 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
     setBusy(true);
     try {
-      // 1) 프로필(닉/비번/이미지) 업데이트
       const updated = await profileApi.updateMyProfile(profile.role, payload);
+      onProfileUpdated(updated as ProfileModel);
 
-      // ✅ 즉시 반영: featuredBadgeIds도 같이 합쳐서 UI 갱신 (새로고침 없이 상단 뱃지 바뀜)
-      onProfileUpdated({ ...(updated as ProfileModel), featuredBadgeIds: nextFeaturedIds } as ProfileModel);
-
-      // 2) 대표 뱃지 저장 (서버에 별도 API)
-      await profileApi.updateFeaturedBadges(profile.role, (updated as any).id ?? profile.id, nextFeaturedIds);
-
+      await profileApi.updateFeaturedBadges(profile.role, updated.id, nextFeaturedIds);
       return true;
     } catch (e) {
       alert(e instanceof Error ? e.message : "프로필 저장 실패");
@@ -243,13 +195,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
             <div className="profileBadges">
               {featuredBadges.map((b) => (
-                <span key={b.id} className="profileBadge" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                  <img
-                    src={badgeImageSrc(b.id)}
-                    alt=""
-                    style={{ width: 16, height: 16, objectFit: "contain" }}
-                    loading="lazy"
-                  />
+                <span key={b.id} className="profileBadge">
                   {b.label}
                 </span>
               ))}
@@ -308,12 +254,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
                       로그아웃
                     </button>
 
-                    <button
-                      className="profileMenuItem"
-                      onClick={() => setManageOpen(false)}
-                      role="menuitem"
-                      type="button"
-                    >
+                    <button className="profileMenuItem" onClick={() => setManageOpen(false)} role="menuitem" type="button">
                       닫기
                     </button>
                   </div>

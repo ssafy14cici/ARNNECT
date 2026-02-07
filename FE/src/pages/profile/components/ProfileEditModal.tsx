@@ -3,7 +3,7 @@ import type { UpdateMyProfilePatch } from "../../../features/profile/api";
 import type { ArtistProfile, UserProfile, Badge } from "../../../features/profile/types";
 
 import ArtistProfileEditModal from "./ArtistProfileEditModal";
-import UserProfileEditModal from "./UserProfileEditModal";
+import UserProfileEditModal from "./UserProfileEditModal_403";
 
 type ProfileModel = ArtistProfile | UserProfile;
 
