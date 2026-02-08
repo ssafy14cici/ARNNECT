@@ -310,3 +310,26 @@
   font-size: 11px;
   cursor: pointer;
 }
+
+.star-hedron-theme {
+  /* 배경 그라데이션: CodePen의 어두운 청보라 느낌 */
+  background: linear-gradient(135deg, #000 0%, #011 40%, #102 100%) !important;
+  transition: filter 1.5s ease;
+}
+
+/* 활성화 시 색상이 일렁이는 효과 */
+.visible-on-content.star-hedron-theme {
+  animation: star-hue 5s ease-in-out infinite alternate;
+}
+
+@keyframes star-hue {
+  0% { filter: saturate(1.5) hue-rotate(0deg); }
+  100% { filter: saturate(2.5) hue-rotate(30deg); }
+}
+
+.model-area {
+  width: 100%;
+  height: 80vh;
+  /* 보석 주위를 은은하게 감싸는 마스크 효과 */
+  mask-image: radial-gradient(circle, black 40%, transparent 90%);
+}

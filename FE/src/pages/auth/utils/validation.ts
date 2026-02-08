@@ -34,6 +34,7 @@ export function validateAccountStep(args: {
     return "비밀번호는 8자 이상으로 입력해주세요.";
   if (v.password !== password2) return "비밀번호 확인이 일치하지 않습니다.";
   if (!v.phone.trim()) return "전화번호를 입력해주세요.";
+  if (v.phone.trim().length < 3) return "전화번호는 최소 3자리 이상 입력해주세요.";
   return null;
 }
 
