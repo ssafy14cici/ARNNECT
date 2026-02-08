@@ -526,3 +526,219 @@
   border: 1px solid rgba(255,255,255,0.15);
   background: #111;
 }
+
+/* ======================================================================
+   USER EDIT MODAL (Typography + Sections) - scoped by .profileModal--user
+   ====================================================================== */
+
+.profileModal.profileModal--user {
+  width: min(760px, 100%);
+  max-width: 760px;
+  padding: 0; /* 기존 30px 제거 -> 내부에서 섹션별로 패딩 */
+  border: 1px solid rgba(255,255,255,0.12); /* var(--accent) 라인보다 덜 과함 */
+  border-radius: 16px;
+  background: rgba(16,16,16,0.94);
+  overflow: hidden;
+}
+
+/* Header */
+.profileModalHeader.profileModalHeader--user {
+  margin-bottom: 0;
+  padding: 18px 18px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.profileModalTitleWrap { min-width: 0; }
+
+.profileModalTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: rgba(255,255,255,0.92);
+}
+
+.profileModalSubtitle {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
+  letter-spacing: 0;
+  color: rgba(255,255,255,0.55);
+}
+
+.profileTextBtn.profileTextBtn--close {
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.86);
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+
+.profileTextBtn.profileTextBtn--cta {
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.88);
+  padding: 8px 12px;
+  border-radius: 12px;
+}
+
+/* Body scroll area */
+.profileForm.profileForm--user {
+  padding: 14px 18px 10px;
+  gap: 12px;
+}
+
+/* Section blocks */
+.profileSection {
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+  border-radius: 14px;
+  padding: 14px 14px 12px;
+}
+
+.profileSectionHead {
+  margin-bottom: 10px;
+}
+
+.profileSectionTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: rgba(255,255,255,0.86);
+}
+
+.profileSectionDesc {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(255,255,255,0.56);
+}
+
+/* Fields */
+.profileField {
+  display: grid;
+  gap: 8px;
+}
+
+.profileFieldLabel {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0;
+  color: rgba(255,255,255,0.70);
+}
+
+/* Input override (기존 underline input 말고 '필드'로 보이게) */
+.profileModal--user .profileInput.profileInput--modal {
+  border: 1px solid rgba(255,255,255,0.14);
+  border-bottom: 1px solid rgba(255,255,255,0.14);
+  background: rgba(0,0,0,0.28);
+  padding: 12px 12px;
+  border-radius: 12px;
+  font-size: 1rem;
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+
+.profileModal--user .profileInput.profileInput--modal:focus {
+  border-color: rgba(255,255,255,0.28);
+}
+
+/* Help text */
+.profileHelp {
+  font-size: 12px;
+  line-height: 1.55;
+  letter-spacing: 0;
+  color: rgba(255,255,255,0.52);
+  margin: 0;
+}
+
+.profileHelp.profileHelp--hint {
+  margin-top: 8px;
+  opacity: 0.88;
+}
+
+/* Image row */
+.profileImagePreviewRow.profileImagePreviewRow--modal {
+  margin-top: 8px;
+  align-items: center;
+}
+
+.profileImagePreview.profileImagePreview--modal {
+  width: 72px;
+  height: 72px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.14);
+}
+
+.profileImageMeta {
+  display: grid;
+  gap: 6px;
+}
+
+/* Badges */
+.profileBadgePreview {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.profileBadgePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.22);
+  color: rgba(255,255,255,0.86);
+}
+
+.profileBadgeIcon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.profileBadgeLabel {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+/* Actions */
+.profileModalActions.profileModalActions--user {
+  margin-top: 0;
+  padding: 12px 18px 16px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* 모달 안의 버튼만 별도 스타일 (기존 .profileBtn과 충돌 차단) */
+.profileModal--user .profileBtn {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.86);
+}
+
+.profileModal--user .profileBtn.profileBtn--primary {
+  background: rgba(255,255,255,0.92);
+  color: #0c0c0c;
+  font-weight: 800;
+}
+
+.profileModal--user .profileBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
