@@ -201,3 +201,99 @@
     transform: translateY(0);
   }
 }
+
+/* --- Fan Letter Cards --- */
+.tab-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.fan-letter-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+  transition: border-color 0.3s, transform 0.3s;
+}
+
+.fan-letter-card:hover {
+  border-color: var(--accent, #fff);
+  transform: translateY(-2px);
+}
+
+.fan-letter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.fan-letter-from {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.fan-letter-date {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.fan-letter-artwork {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  border-left: 3px solid var(--accent, rgba(255, 255, 255, 0.3));
+}
+
+.fan-letter-question,
+.fan-letter-answer {
+  margin-bottom: 16px;
+}
+
+.fan-letter-question:last-child,
+.fan-letter-answer:last-child {
+  margin-bottom: 0;
+}
+
+.fan-letter-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 8px;
+}
+
+.fan-letter-content {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.8);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.fan-letter-answer .fan-letter-label {
+  color: var(--accent, rgba(255, 255, 255, 0.7));
+}
+
+.fan-letter-answer .fan-letter-content {
+  background: rgba(255, 255, 255, 0.02);
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 3px solid var(--accent, rgba(255, 255, 255, 0.3));
+}
+
+.tab-loading,
+.tab-error {
+  text-align: center;
+  padding: 60px 20px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1rem;
+}

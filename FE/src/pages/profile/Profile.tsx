@@ -111,12 +111,20 @@ export default function Profile() {
             </NavLink>
 
             {viewedIsArtist ? (
-              <NavLink
-                to="portfolio"
-                className={({ isActive }) => `profile-tab ${isActive ? "active" : ""}`}
-              >
-                포트폴리오
-              </NavLink>
+              <>
+                <NavLink
+                  to="portfolio"
+                  className={({ isActive }) => `profile-tab ${isActive ? "active" : ""}`}
+                >
+                  포트폴리오
+                </NavLink>
+                <NavLink
+                  to="fanletters"
+                  className={({ isActive }) => `profile-tab ${isActive ? "active" : ""}`}
+                >
+                  팬레터
+                </NavLink>
+              </>
             ) : (
               <NavLink
                 to="collection"

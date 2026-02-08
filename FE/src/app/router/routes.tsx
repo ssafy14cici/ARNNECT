@@ -45,6 +45,7 @@ import Profile from "../../pages/profile/Profile";
 import FeedTab from "../../pages/profile/tabs/FeedTab";
 import CollectionTab from "../../pages/profile/tabs/CollectionTab";
 import PortfolioTab from "../../pages/profile/tabs/PortfolioTab";
+import FanLetterTab from "../../pages/profile/tabs/FanLetterTab";
 import Exhibit from "../../pages/exhibit/Exhibit";
 
 import ArtworkCreate from "../../pages/artworks/ArtworkCreate";
@@ -204,6 +205,7 @@ export const routes: RouteObject[] = [
                       { path: "feed", element: <FeedTab /> },
                       { path: "collection", element: <CollectionTab /> },
                       { path: "portfolio", element: <PortfolioTab /> },
+                      { path: "fanletters", element: <FanLetterTab /> },
                     ],
                   },
                 ],
