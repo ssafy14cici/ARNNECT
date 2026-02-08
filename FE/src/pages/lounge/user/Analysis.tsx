@@ -191,9 +191,9 @@ export default function Analysis() {
       setTopArtists(artists.map((a) => ({ name: a.name, score: a.score })));
 
       setActivitySummary([
-        { name: "좋아요", score: activity.favorite, hint: "누적/기간 기준은 BE 정의" },
-        { name: "댓글", score: activity.comment, hint: "누적/기간 기준은 BE 정의" },
-        { name: "발급티켓", score: activity.ticket, hint: "누적/기간 기준은 BE 정의" },
+        { name: "좋아요", score: activity.favorite },
+        { name: "댓글", score: activity.comment },
+        { name: "발급티켓", score: activity.ticket },
       ]);
 
       setState("ready");
