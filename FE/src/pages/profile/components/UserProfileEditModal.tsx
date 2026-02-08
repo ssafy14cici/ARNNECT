@@ -162,17 +162,13 @@ export default function UserProfileEditModal({
   return (
     <>
       <div className="profileModalOverlay" role="dialog" aria-modal="true">
-        {/* ✅ 스코프용 클래스 추가 */}
         <div className="profileModal profileModal--user">
           <div className="profileModalHeader profileModalHeader--user">
             <div className="profileModalTitleWrap">
               <h2 className="profileModalTitle">유저 프로필 편집</h2>
               <p className="profileModalSubtitle">닉네임, 비밀번호, 이미지, 대표 뱃지를 설정합니다.</p>
             </div>
-
-            <button className="profileTextBtn profileTextBtn--close" onClick={close} type="button">
-              닫기
-            </button>
+            {/* ✅ 헤더 닫기 버튼 제거 (하단 '취소'만 사용) */}
           </div>
 
           <div className="profileForm profileForm--user">
@@ -264,12 +260,23 @@ export default function UserProfileEditModal({
                   <p className="profileSectionDesc">최대 3개까지 선택할 수 있습니다.</p>
                 </div>
 
-                <button type="button" className="profileTextBtn profileTextBtn--cta" onClick={() => setPickerOpen(true)}>
-                  선택하기
-                </button>
+                {/* ✅ 버튼 자리로 안내 문구 이동: badgeHint 있으면 문구, 없으면 버튼 */}
+                {badgeHint ? (
+                  <span className="profileHelp profileHelp--hint" style={{ textAlign: "right" }}>
+                    {badgeHint}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className="profileTextBtn profileTextBtn--cta"
+                    onClick={() => setPickerOpen(true)}
+                  >
+                    선택하기
+                  </button>
+                )}
               </div>
 
-              {badgeHint && <div className="profileHelp profileHelp--hint">{badgeHint}</div>}
+              {/* ✅ 기존 badgeHint 아래 출력은 제거 (중복 방지) */}
 
               <div className="profileBadgePreview">
                 {draftBadgeObjects.length > 0 ? (
@@ -297,7 +304,6 @@ export default function UserProfileEditModal({
         </div>
       </div>
 
-      {/* ✅ 핵심: earnedIds가 비어있지 않도록(전체 or prop) 보장 */}
       <BadgePicker open={pickerOpen} onClose={() => setPickerOpen(false)} earnedIds={earnedIds} />
     </>
   );
