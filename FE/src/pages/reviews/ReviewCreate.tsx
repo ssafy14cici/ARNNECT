@@ -7,7 +7,7 @@ import { useAuthStore } from "../../features/auth/store";
 import { createReview } from "../../features/reviews/api";
 import { USE_MOCK } from "../../shared/config/env";
 
-// ✅ 여기만 바뀜: origin 말고 실제 ReviewForm 사용
+// ✅ 중요: origin 말고 실제 ReviewForm 사용
 import ReviewForm from "../../features/reviews/ui/ReviewForm";
 import type { ReviewCreateReq } from "../../features/reviews/model/types";
 
@@ -18,7 +18,6 @@ export default function ReviewCreate() {
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async (req: ReviewCreateReq) => {
-    // ✅ mock 개발 중엔 로그인 없어도 테스트 가능하게
     if (!USE_MOCK && !user?.memberUuid) {
       alert("로그인 후 이용해주세요.");
       return;
