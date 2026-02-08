@@ -123,8 +123,8 @@ export default function CollectionTab() {
 
       {!error && visibleItems.length === 0 ? (
         <div className="tab-empty">
-          <div className="tab-empty-title">Empty Collection</div>
-          <div>라운지에서 QR 스캔으로 티켓을 등록해보세요.</div>
+          <div className="tab-empty-title">No Tickets Yet</div>
+          <div>아직 등록한 티켓이 없습니다.</div>
         </div>
       ) : (
         <div className="tab-grid-2">
