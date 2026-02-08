@@ -45,9 +45,12 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
 
   const [previewUrl, setPreviewUrl] = useState<string>(defaultUrlRef.current);
 
+  // ✅ tags는 필수니까 UX상 빈 문자열로 시작하면 사용자가 입력하도록 유도됨
   const [tags, setTags] = useState<string>((initial?.tags ?? []).join(", "));
   const [reviewTitle, setReviewTitle] = useState(initial?.title ?? "");
   const [reviewText, setReviewText] = useState(initial?.content ?? "");
+
+  // ✅ artworkId는 선택이므로 기본값 "" 유지
   const [artworkId, setArtworkId] = useState(
     typeof initial?.artworkId === "number" ? String(initial.artworkId) : "",
   );
@@ -97,9 +100,15 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
     if (!reviewTitle.trim()) return "제목을 입력해주세요.";
     if (!reviewText.trim()) return "내용을 입력해주세요.";
 
-    if (!artworkId.trim()) return "작품 ID를 입력해주세요.";
-    const n = Number(artworkId);
-    if (!Number.isFinite(n)) return "작품 ID는 숫자여야 합니다.";
+    // ✅ tags 필수
+    if (parsedTags.length === 0) return "태그를 1개 이상 입력해주세요.";
+
+    // ✅ artworkId 선택: 입력한 경우에만 숫자 검증
+    if (artworkId.trim()) {
+      const n = Number(artworkId);
+      if (!Number.isFinite(n)) return "작품 ID는 숫자여야 합니다.";
+      if (n <= 0) return "작품 ID는 1 이상의 숫자여야 합니다.";
+    }
 
     return null;
   };
@@ -128,12 +137,14 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
       }
     }
 
+    // ✅ artworkId 선택: 값이 있을 때만 payload에 포함
+    const trimmedArtworkId = artworkId.trim();
     const payload: ReviewCreateReq = {
       title: reviewTitle.trim(),
       content: reviewText.trim(),
-      artworkId: Number(artworkId),
       tags: parsedTags,
-      imageFile: finalImageFile, // ✅ 항상 포함(유저 파일 or 기본 파일)
+      imageFile: finalImageFile,
+      ...(trimmedArtworkId ? { artworkId: Number(trimmedArtworkId) } : {}),
     };
 
     await onSubmit(payload);
@@ -178,15 +189,14 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
             />
           </div>
 
+          {/* ✅ Artwork ID: 선택 항목으로 변경 */}
           <div className="pc-input-group">
-            <label className="pc-label">
-              Artwork ID <span className="req">*</span>
-            </label>
+            <label className="pc-label">Artwork ID</label>
             <input
               className="pc-input"
               value={artworkId}
               onChange={(e) => setArtworkId(e.target.value)}
-              placeholder="Target Artwork ID"
+              placeholder="(Optional) Target Artwork ID"
               type="number"
               disabled={!!submitting}
             />
@@ -206,8 +216,11 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
             />
           </div>
 
+          {/* ✅ Tags: 필수 */}
           <div className="pc-input-group">
-            <label className="pc-label">Tags</label>
+            <label className="pc-label">
+              Tags <span className="req">*</span>
+            </label>
             <input
               className="pc-input"
               value={tags}

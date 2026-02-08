@@ -13,11 +13,7 @@ const ARTWORK_FEED_PATH = "/api/v1/artworks/feed";
  * - 프로젝트/BE 구현에 맞는 실제 경로로 정리해서 하나만 남기는 걸 권장
  * - 전부 실패하면 리뷰는 머지되지 않고(=유저 글 안 뜸), 작품 피드만 반환함
  */
-const REVIEW_FEED_CANDIDATES = [
-  "/api/v1/reviews/feed",
-  "/api/v1/reviews",
-  "/api/v1/reviews/all",
-];
+const REVIEW_FEED_CANDIDATES = ["/api/v1/reviews/feed", "/api/v1/reviews", "/api/v1/reviews/all"];
 
 // ---------- helpers ----------
 type JsonObject = Record<string, unknown>;
@@ -117,10 +113,6 @@ function normalizeRole(rawRole: unknown, kind?: "ARTWORK" | "REVIEW" | "UNKNOWN"
 
 /**
  * ✅ Feed 전용 media url 정규화
- * - 공용 resolveMediaUrl을 건드리지 않고, Feed에서만 안정적으로 처리
- * - /artwork(s)/, /review(s)/ 모두 /src prefix 붙임 (DEV 프록시 환경 대응)
- * - DEV: 절대 URL이면 pathname으로 바꿔 프록시를 타게 함
- * - PROD: VITE_API_BASE_URL origin을 붙임
  */
 function resolveFeedMediaUrl(input?: string | null): string {
   const u0 = String(input ?? "").trim();
@@ -244,15 +236,10 @@ function toFeedItemFromArtwork(v: unknown): FeedItem | null {
   const createdAt = asString(x.createdAt, "") || asString(x.date, "");
 
   const authorId =
-    asString(x.artistMemberUuid, "") ||
-    asString(x.authorId, "") ||
-    asString(x.memberUuid, "");
+    asString(x.artistMemberUuid, "") || asString(x.authorId, "") || asString(x.memberUuid, "");
 
   const authorName =
-    asString(x.artistName, "") ||
-    asString(x.authorName, "") ||
-    asString(x.nickname, "") ||
-    "—";
+    asString(x.artistName, "") || asString(x.authorName, "") || asString(x.nickname, "") || "—";
 
   const authorRole = normalizeRole(x.authorRole ?? x.role, "ARTWORK");
 
@@ -264,7 +251,7 @@ function toFeedItemFromArtwork(v: unknown): FeedItem | null {
     authorName,
     authorId,
     createdAt: createdAt ? toIso(createdAt) : new Date().toISOString(),
-    imageUrl: imageUrl || undefined, // ✅ Feed 전용 정규화 적용
+    imageUrl: imageUrl || undefined,
     likes: asNumber(x.likes, 0),
     views: asNumber(x.views, 0),
     category: undefined,
@@ -285,13 +272,13 @@ function toFeedItemFromReview(v: unknown): FeedItem | null {
 
   return {
     id: `review-${reviewId}`,
-    authorRole: normalizeRole(x.authorRole ?? x.role, "REVIEW"), // 리뷰는 USER로 가정
+    authorRole: normalizeRole(x.authorRole ?? x.role, "REVIEW"),
     title: asString(x.title, "Review"),
     excerpt: asString(x.content, ""),
     authorName: asString(x.nickname, "—"),
     authorId: asString(x.memberUuid, ""),
     createdAt: createdAt ? toIso(createdAt) : new Date().toISOString(),
-    imageUrl: imageUrl || undefined, // ✅ Feed 전용 정규화 적용
+    imageUrl: imageUrl || undefined,
     likes: 0,
     views: 0,
     category: undefined,
@@ -306,10 +293,6 @@ async function fetchPayload(path: string): Promise<unknown> {
   return pickEnvelopeData(payload);
 }
 
-function sortByCreatedAtDesc(a: FeedItem, b: FeedItem): number {
-  return toEpochMs(b.createdAt) - toEpochMs(a.createdAt);
-}
-
 async function fetchReviewFeedBestEffort(): Promise<FeedItem[]> {
   for (const path of REVIEW_FEED_CANDIDATES) {
     try {
@@ -318,11 +301,41 @@ async function fetchReviewFeedBestEffort(): Promise<FeedItem[]> {
       // 성공하면(빈 배열이어도) 그걸로 종료
       return arr.map(toFeedItemFromReview).filter((x): x is FeedItem => x !== null);
     } catch {
-      // 다음 후보로 넘어감
       continue;
     }
   }
   return [];
+}
+
+// ---------- sorting (핵심) ----------
+function isArtworkItem(it: FeedItem): boolean {
+  return it.id.startsWith("artwork-");
+}
+
+function typeRank(it: FeedItem): number {
+  // ✅ 작품 먼저, 그 다음 리뷰
+  if (isArtworkItem(it)) return 0;
+  if (it.id.startsWith("review-")) return 1;
+  return 2;
+}
+
+function sortArtworkFirstThenCreatedAtDesc(a: FeedItem, b: FeedItem): number {
+  const t = typeRank(a) - typeRank(b);
+  if (t !== 0) return t;
+
+  // 같은 타입끼리는 최신순
+  const d = toEpochMs(b.createdAt) - toEpochMs(a.createdAt);
+  if (d !== 0) return d;
+
+  // 완전 동률이면 id로 고정(결과 안정화)
+  return a.id.localeCompare(b.id);
+}
+
+function sortByCreatedAtAsc(a: FeedItem, b: FeedItem): number {
+  // ✅ 오래된순(전체)
+  const d = toEpochMs(a.createdAt) - toEpochMs(b.createdAt);
+  if (d !== 0) return d;
+  return a.id.localeCompare(b.id);
 }
 
 // ---------- exported ----------
@@ -336,5 +349,9 @@ export async function getFeedListReal(): Promise<FeedItem[]> {
   const reviews = await fetchReviewFeedBestEffort();
 
   // 3) merge + sort
-  return [...artworks, ...reviews].sort(sortByCreatedAtDesc);
+  // ✅ 추천: 작품이 무조건 먼저 + (각 타입 내) 최신순
+  return [...artworks, ...reviews].sort(sortArtworkFirstThenCreatedAtDesc);
+
+  // ✅ 대안: 전체 오래된순(작품이 "무조건" 먼저는 아님)
+  // return [...artworks, ...reviews].sort(sortByCreatedAtAsc);
 }

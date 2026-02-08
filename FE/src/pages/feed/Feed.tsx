@@ -117,7 +117,7 @@ export default function Feed() {
           />
         ))}
 
-        {visible.length === 0 && <div style={{ padding: 24, opacity: 0.8 }}>아직 표시할 피드가 없습니다.</div>}
+        {visible.length === 0 && <div style={{ padding: 24, opacity: 0.8 }}>loading...</div>}
       </section>
 
       <div ref={sentinelRef} />
