@@ -200,17 +200,16 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
     setBusy(true);
     try {
-      // 1) 업데이트는 "성공 여부"만 본다 (artist는 Void)
+      // 1) 프로필 정보 업데이트
       await profileApi.updateMyProfile(profile.role, payload);
 
-      // 2) 최신 프로필 재조회로 화면 갱신 (핵심)
-      const latest = await profileApi.getMyProfile();
-
-      onProfileUpdated({ ...(latest as ProfileModel), featuredBadgeIds: nextFeaturedIds } as ProfileModel);
-
-      // 3) 대표 뱃지 저장은 id는 기존 profile.id를 우선 사용 (updated 의존 X)
-      const targetId = (latest as any).id ?? profile.id;
+      // 2) 대표 뱃지 업데이트
+      const targetId = profile.id;
       await profileApi.updateFeaturedBadges(profile.role, targetId, nextFeaturedIds);
+
+      // 3) 최신 프로필 재조회로 화면에 즉시 반영
+      const latest = await profileApi.getMyProfile();
+      onProfileUpdated({ ...(latest as ProfileModel), featuredBadgeIds: nextFeaturedIds } as ProfileModel);
 
       return true;
     } catch (e) {
@@ -267,7 +266,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
             <span>팔로잉 {profile.followingsCount}</span>
           </div>
 
-          <div className="profileBio">
+          {/* <div className="profileBio">
             {profile.bio ? (
               <span>{profile.bio}</span>
             ) : isOwner ? (
@@ -275,14 +274,14 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
             ) : (
               <span className="profileBioPlaceholder">소개글이 없습니다.</span>
             )}
-          </div>
+          </div> */}
 
           <div className="profileActionRow">
             {isOwner ? (
               <>
-                <button className="profileBtn" onClick={openEdit} type="button">
+                {/* <button className="profileBtn" onClick={openEdit} type="button">
                   편집
-                </button>
+                </button> */}
 
                 <button
                   ref={manageBtnRef}
