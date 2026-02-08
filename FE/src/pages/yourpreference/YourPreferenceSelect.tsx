@@ -138,11 +138,6 @@ export default function YourPreferenceSelect() {
               ROUND {currentRoundIdx + 1} / {total}
             </span>
             <h2 className="battle-title">어느 쪽이 더 끌리나요?</h2>
-
-            {/* ✅ 장르명 표시(원하면 삭제) */}
-            <p style={{ margin: "6px 0 0", opacity: 0.85 }}>
-              {round.genreName}
-            </p>
           </div>
 
           <div className="battle-arena">

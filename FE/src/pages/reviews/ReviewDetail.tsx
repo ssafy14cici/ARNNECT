@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "./reviewdetail.css";
 
-import { getReviewDetail } from "../../features/reviews/api";
+import { getReviewDetail, deleteReview } from "../../features/reviews/api";
 import { useAuthStore } from "../../features/auth/store";
 
 import { resolveMediaUrl, fetchImageAsObjectUrl, safeToInt } from "../artworks/detail/utils";
@@ -150,7 +150,16 @@ export default function ReviewDetail() {
     if (!isOwner) return alert("본인 리뷰만 삭제할 수 있습니다.");
     if (!window.confirm("정말 삭제하시겠습니까?")) return;
 
-    alert("삭제 API 연결 필요(현재 UI만 준비됨)");
+    try {
+      const idToDelete = numericReviewId ?? normalizedReviewId;
+      await deleteReview(idToDelete);
+
+      alert("삭제되었습니다.");
+      nav("/feed", { replace: true }); // 필요하면 nav(-1)로 변경
+    } catch (e) {
+      console.error(e);
+      alert("삭제 실패");
+    }
   };
 
   const onToggleFollow = async () => {

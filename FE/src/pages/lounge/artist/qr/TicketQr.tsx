@@ -139,6 +139,9 @@ export default function TicketQr() {
   const [code, setCode] = useState<string>(() => makeTicketCode());
   const [editingTicketId, setEditingTicketId] = useState<number | null>(null);
 
+  // ✅ "발급된 QR" 패널은 발급/수정 성공 or 기존 티켓 편집 진입시에만 노출
+  const [showIssuedQr, setShowIssuedQr] = useState(false);
+
   const [form, setForm] = useState<FormState>(() => toForm(null));
   const previewRef = useRef<HTMLDivElement | null>(null);
 
@@ -167,6 +170,9 @@ export default function TicketQr() {
     setTicketId(null);
     setCode(makeTicketCode());
     setForm(toForm(null));
+
+    // ✅ 새로 만들기 상태에서는 "발급된 QR" 숨김
+    setShowIssuedQr(false);
   }, []);
 
   const startEdit = useCallback((t: TicketItem) => {
@@ -176,6 +182,10 @@ export default function TicketQr() {
     setCode(t.ticketCode);
     setForm(toForm(t));
     setActiveTab("ISSUE");
+
+    // ✅ 기존 발급 티켓 편집 진입이면 QR 패널 노출
+    setShowIssuedQr(true);
+
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
@@ -229,6 +239,9 @@ export default function TicketQr() {
       setCode(nextCode);
 
       rememberDesign(nextCode, form.ticketDesign);
+
+      // ✅ 발급/수정 성공 후에만 "발급된 QR" 노출
+      setShowIssuedQr(true);
 
       alert(editingTicketId ? "수정되었습니다." : "QR이 발급되었습니다.");
       await reloadIssued();
@@ -321,7 +334,8 @@ export default function TicketQr() {
             </div>
           </div>
 
-          {code && <QrPanel ticketCode={code} busy={busy} />}
+          {/* ✅ 버튼 눌러 발급/수정 성공했거나, 기존 티켓 편집 진입일 때만 표시 */}
+          {showIssuedQr && code && <QrPanel ticketCode={code} busy={busy} />}
         </>
       )}
 

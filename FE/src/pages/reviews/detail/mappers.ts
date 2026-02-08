@@ -162,15 +162,27 @@ export function mapSingleComment(payload: unknown): LocalComment | null {
   };
 }
 
-export type FollowToggleResult = { isFollowing?: boolean };
+export type FollowToggleResult = { isFollowing?: boolean; followerCount?: number };
+
 export function parseFollowToggleResult(payload: unknown): FollowToggleResult {
   const body = pickEnvelopeData(payload);
   if (!isObject(body)) return {};
 
   const o = body as JsonObject;
-  const isFollowing = asBool(get(o, "isFollowing"), asBool(get(o, "following"), asBool(get(o, "isFollow"))));
+
+  const isFollowing = asBool(
+    get(o, "isFollowing"),
+    asBool(get(o, "following"), asBool(get(o, "isFollow")))
+  );
+
+  const followerCount = asNumber(
+    get(o, "followerCount"),
+    asNumber(get(o, "followers"), asNumber(get(o, "follower_count")))
+  );
 
   const out: FollowToggleResult = {};
   if (typeof isFollowing === "boolean") out.isFollowing = isFollowing;
+  if (Number.isFinite(followerCount)) out.followerCount = followerCount;
+
   return out;
 }
