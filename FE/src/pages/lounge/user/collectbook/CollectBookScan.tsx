@@ -1,3 +1,4 @@
+// FE/src/pages/lounge/user/collectbook/CollectBookScan.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
@@ -6,7 +7,8 @@ import { NotFoundException } from "@zxing/library";
 import "../../lounge.css";
 
 import { useAuthStore } from "../../../../features/auth/store";
-import { apiTicketScan } from "../../../../features/collectbook/api/real";
+import { apiTicketScan, apiCollectBookList } from "../../../../features/collectbook/api/real";
+import type { CollectBookResponse } from "../../../../features/tickets/api/realTickets";
 
 type Step = "scan" | "preview";
 
@@ -35,6 +37,40 @@ function getErrorMessage(e: unknown, fallback: string) {
   return fallback;
 }
 
+// ✅ KST 기준 YYYY-MM-DD
+function ymdKstFromIso(iso?: string) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return fmt.format(d); // "2026-02-08"
+}
+
+function todayYmdKst() {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return fmt.format(new Date());
+}
+
+function pickLatestForCode(list: CollectBookResponse[], code: string) {
+  const items = list.filter((x) => x.ticketCode === code);
+  items.sort((a, b) => {
+    const ta = new Date((a as any)?.createdAt ?? 0).getTime();
+    const tb = new Date((b as any)?.createdAt ?? 0).getTime();
+    return tb - ta;
+  });
+  return items[0] ?? null;
+}
+
 export default function CollectBookScan() {
   const nav = useNavigate();
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -50,7 +86,13 @@ export default function CollectBookScan() {
   const [busy, setBusy] = useState(false);
   const [scannerReady, setScannerReady] = useState(false);
 
-  const canRegister = useMemo(() => !!ticketCode && !!ownerUuid && !busy, [ticketCode, ownerUuid, busy]);
+  // ✅ 오늘 이미 같은 QR을 등록했는지
+  const [duplicateToday, setDuplicateToday] = useState(false);
+
+  const canRegister = useMemo(
+    () => !!ticketCode && !!ownerUuid && !busy && !duplicateToday,
+    [ticketCode, ownerUuid, busy, duplicateToday],
+  );
 
   useEffect(() => {
     if (step !== "scan") return;
@@ -116,10 +158,46 @@ export default function CollectBookScan() {
     };
   }, [step]);
 
+  // ✅ preview에 들어오면 “오늘 동일 ticketCode 등록 여부” 미리 계산
+  useEffect(() => {
+    if (step !== "preview") return;
+    if (!isLoggedIn || !ownerUuid || !ticketCode) {
+      setDuplicateToday(false);
+      return;
+    }
+
+    let alive = true;
+
+    (async () => {
+      try {
+        const list = await apiCollectBookList(ownerUuid);
+        if (!alive) return;
+
+        const today = todayYmdKst();
+        const exists = Array.isArray(list)
+          ? list.some((x) => x.ticketCode === ticketCode && ymdKstFromIso((x as any)?.createdAt) === today)
+          : false;
+
+        setDuplicateToday(exists);
+        if (exists) setError("같은 QR은 하루에 한 번만 등록 가능합니다.");
+      } catch {
+        // 리스트 조회 실패는 등록을 막을지 말지 정책인데,
+        // 여기서는 UX 상 '버튼은 열어두고' register에서 재검증하는 형태로 둠
+        if (!alive) return;
+        setDuplicateToday(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [step, ticketCode, isLoggedIn, ownerUuid]);
+
   const reset = () => {
     setError("");
     setTicketCode("");
     setBusy(false);
+    setDuplicateToday(false);
     lockedRef.current = false;
     setStep("scan");
   };
@@ -129,16 +207,34 @@ export default function CollectBookScan() {
       setError("로그인이 필요합니다.");
       return;
     }
-    if (!canRegister) return;
+    if (!ticketCode) return;
 
     setBusy(true);
     setError("");
 
     try {
+      // ✅ 최종 재검증(레이스 방지)
+      const listBefore = await apiCollectBookList(ownerUuid);
+      const today = todayYmdKst();
+      const existsToday = Array.isArray(listBefore)
+        ? listBefore.some((x) => x.ticketCode === ticketCode && ymdKstFromIso((x as any)?.createdAt) === today)
+        : false;
+
+      if (existsToday) {
+        setDuplicateToday(true);
+        setError("같은 QR은 하루에 한 번만 등록 가능합니다.");
+        return;
+      }
+
       await apiTicketScan(ticketCode);
 
-      // ✅ userTicketId 같은 게 없으니 “ticketCode로 상세”로 이동
-      nav(`/lounge/collectbook/${encodeURIComponent(ticketCode)}`, { replace: true });
+      // ✅ 등록 직후 최신 레코드 찾고, 그 createdAt으로 상세 고정
+      const listAfter = await apiCollectBookList(ownerUuid);
+      const latest = Array.isArray(listAfter) ? pickLatestForCode(listAfter, ticketCode) : null;
+      const at = latest && (latest as any)?.createdAt ? encodeURIComponent(String((latest as any).createdAt)) : "";
+
+      const url = `/lounge/collectbook/${encodeURIComponent(ticketCode)}${at ? `?at=${at}` : ""}`;
+      nav(url, { replace: true });
     } catch (e: unknown) {
       setError(getErrorMessage(e, "등록 실패"));
     } finally {
@@ -191,6 +287,10 @@ export default function CollectBookScan() {
             <p className="loungeSubHint">
               <strong>ticketCode</strong>: {ticketCode}
             </p>
+
+            {duplicateToday && (
+              <div className="loungeNotice">같은 QR은 하루에 한 번만 등록 가능합니다.</div>
+            )}
 
             {error && <div className="loungeNotice">{error}</div>}
 

@@ -1,5 +1,6 @@
+// FE/src/pages/lounge/user/collectbook/CollectBookDetail.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import "../../lounge.css";
 
 import TicketCardModern from "./TicketCardModern";
@@ -9,6 +10,7 @@ import { useAuthStore } from "../../../../features/auth/store";
 import { apiCollectBookList } from "../../../../features/collectbook/api/real";
 import type { CollectBookResponse } from "../../../../features/tickets/api/realTickets";
 import { http } from "../../../../shared/api/http";
+import { resolveMediaUrl } from "../../../../features/tickets/resolveTicketMedia";
 
 function formatDateRange(start?: string, end?: string) {
   const s = start?.trim() || "-";
@@ -36,6 +38,17 @@ function resolveMaybeRelativeUrl(url?: string) {
   if (!base) return url;
 
   return url.startsWith("/") ? `${base}${url}` : `${base}/${url}`;
+}
+
+/**
+ * collectbook 응답이
+ * - URL(/api/v1/... or https://...)로 올 수도 있고
+ * - 파일명(xxx.jpg)으로 올 수도 있어서 둘 다 처리
+ */
+function resolveTicketMediaAny(v?: string) {
+  if (!v) return "";
+  if (/^https?:\/\//i.test(v) || v.startsWith("/")) return resolveMaybeRelativeUrl(v);
+  return resolveMediaUrl(v);
 }
 
 /** <img>가 403/401로 깨질 때 Authorization 포함해서 blob로 재로딩 */
@@ -99,9 +112,19 @@ function AuthedImage({
 
 const PROFILE_PATH = (artistUuid: string) => `/members/${artistUuid}`;
 
+function pickLatestByCreatedAt(list: CollectBookResponse[]) {
+  const copy = [...list];
+  copy.sort((a, b) => {
+    const ta = new Date((a as any)?.createdAt ?? 0).getTime();
+    const tb = new Date((b as any)?.createdAt ?? 0).getTime();
+    return tb - ta;
+  });
+  return copy[0] ?? null;
+}
+
 export default function CollectBookDetail() {
-  // ✅ 라우트는 기존 :id 그대로 써도 됨 (여기서는 id를 ticketCode로 취급)
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
 
   const ownerUuid = useAuthStore((s) => s.user?.memberUuid ?? "");
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
@@ -115,6 +138,17 @@ export default function CollectBookDetail() {
       return raw;
     }
   }, [id]);
+
+  // ✅ 특정 등록건을 고르고 싶으면 ?at=createdAt(ISO)로 들어오게 함
+  const at = useMemo(() => {
+    const raw = searchParams.get("at");
+    if (!raw) return "";
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  }, [searchParams]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -140,9 +174,18 @@ export default function CollectBookDetail() {
         const list = await apiCollectBookList(ownerUuid);
         if (!alive) return;
 
-        const found = Array.isArray(list) ? list.find((x) => x.ticketCode === ticketCode) : undefined;
-        setItem(found ?? null);
-        if (!found) setError("해당 티켓을 찾을 수 없습니다. (ticketCode 불일치)");
+        const items = Array.isArray(list) ? list.filter((x) => x.ticketCode === ticketCode) : [];
+        if (items.length === 0) {
+          setItem(null);
+          setError("해당 티켓을 찾을 수 없습니다. (ticketCode 불일치)");
+          return;
+        }
+
+        // ✅ at가 있으면 그 createdAt을 우선 선택
+        const byAt = at ? items.find((x) => String((x as any)?.createdAt ?? "") === at) : null;
+        const picked = byAt ?? pickLatestByCreatedAt(items);
+
+        setItem(picked);
       } catch (e: any) {
         if (!alive) return;
         setError(e?.message ?? "티켓 상세를 불러오지 못했습니다.");
@@ -154,7 +197,28 @@ export default function CollectBookDetail() {
     return () => {
       alive = false;
     };
-  }, [ticketCode, isLoggedIn, ownerUuid]);
+  }, [ticketCode, at, isLoggedIn, ownerUuid]);
+
+  // ✅ 이미지 필드명/형태(Url vs Name) 흡수
+  const ticketImageSrc = useMemo(() => {
+    if (!item) return "";
+    const raw =
+      (item as any)?.ticketImageUrl ??
+      (item as any)?.ticketImageName ??
+      (item as any)?.ticketImage ??
+      "";
+    return resolveTicketMediaAny(raw);
+  }, [item]);
+
+  const qrImageSrc = useMemo(() => {
+    if (!item) return "";
+    const raw =
+      (item as any)?.qrImageUrl ??
+      (item as any)?.qrImageName ??
+      (item as any)?.qrImage ??
+      "";
+    return resolveTicketMediaAny(raw);
+  }, [item]);
 
   if (!ticketCode) {
     return (
@@ -203,9 +267,9 @@ export default function CollectBookDetail() {
               title={(item.title ?? "EXHIBITION").toUpperCase()}
               ticketCode={item.ticketCode}
               dateRangeText={formatDateRange(item.startDate, item.endDate)}
-              priceText={`RANK : ${item.collectRank ?? "-"}`}
-              // ✅ 선택한 디자인 결과 이미지
-              heroImageUrl={item.ticketImageUrl}
+              priceText={`RANK : ${(item as any).collectRank ?? "-"}`}
+              // ✅ 상세 카드도 동일한 src 사용
+              heroImageUrl={ticketImageSrc}
               metaLeft={item.addressDetail ? `${item.address} (${item.addressDetail})` : item.address}
               metaRight={"COLLECTED"}
             />
@@ -220,13 +284,12 @@ export default function CollectBookDetail() {
                 <br />
                 <strong>운영시간</strong>: {hhmm(item.startTime)} ~ {hhmm(item.endTime)}
                 <br />
-                <strong>랭크</strong>: {item.collectRank}
+                <strong>랭크</strong>: {(item as any).collectRank}
                 <br />
-                <strong>등록일</strong>: {formatKST(item.createdAt)}
+                <strong>등록일</strong>: {formatKST((item as any).createdAt)}
                 <br />
-                {/* ✅ UUID는 “출력”하지 말고 링크로만 사용 */}
                 <strong>아티스트</strong>:{" "}
-                <Link to={PROFILE_PATH(item.artistUuid)} style={{ textDecoration: "underline" }}>
+                <Link to={PROFILE_PATH((item as any).artistUuid)} style={{ textDecoration: "underline" }}>
                   프로필로 이동
                 </Link>
               </p>
@@ -236,9 +299,9 @@ export default function CollectBookDetail() {
               <h2 className="loungeSubPanelTitle" style={{ marginBottom: 10 }}>
                 티켓 이미지
               </h2>
-              {item.ticketImageUrl ? (
+              {ticketImageSrc ? (
                 <AuthedImage
-                  src={item.ticketImageUrl}
+                  src={ticketImageSrc}
                   alt="ticket"
                   style={{
                     width: "100%",
@@ -257,9 +320,9 @@ export default function CollectBookDetail() {
               <h2 className="loungeSubPanelTitle" style={{ marginBottom: 10 }}>
                 QR
               </h2>
-              {item.qrImageUrl ? (
+              {qrImageSrc ? (
                 <div style={{ background: "#fff", padding: 12, borderRadius: 12, display: "inline-block" }}>
-                  <AuthedImage src={item.qrImageUrl} alt="qr" style={{ width: 220, height: 220, display: "block" }} />
+                  <AuthedImage src={qrImageSrc} alt="qr" style={{ width: 220, height: 220, display: "block" }} />
                 </div>
               ) : (
                 <p className="loungeSubHint">QR 이미지가 제공되지 않았습니다.</p>
