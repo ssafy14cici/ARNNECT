@@ -1,30 +1,38 @@
-//FE\src\pages\lounge\user\collectbook\TicketCardModern.tsx
-import type { CSSProperties } from "react";
+// FE/src/pages/lounge/user/collectbook/TicketCardModern.tsx
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+} from "react";
 import "./ticketCardModern.css";
 
+import { http } from "../../../../shared/api/http";
+import { resolveMediaUrl } from "../../../../features/tickets/resolveTicketMedia";
 
 type Props = {
   title: string;
-  priceText?: string;          // 예: "15,00 € T.T.C."
-  ticketCode: string;          // 예: EXH_xxx
-  dateRangeText: string;       // 예: "21.10.2024 – 27.01.2025"
-  leftLabel?: string;          // 예: "FURNITURE"
-  leftLabel2?: string;         // 예: "EXHIBITION"
-  stubColor?: string;          // 예: "#8FB2D9"
-  heroImageUrl?: string;       // 전시 이미지(포스터)
-  metaLeft?: string;           // 작은 설명 텍스트
-  metaRight?: string;          // 작은 설명 텍스트
+  priceText?: string; // 예: "15,00 € T.T.C."
+  ticketCode: string; // 예: EXH_xxx
+  dateRangeText: string; // 예: "21.10.2024 – 27.01.2025"
+  leftLabel?: string; // 예: "FURNITURE"
+  leftLabel2?: string; // 예: "EXHIBITION"
+  stubColor?: string; // 예: "#8FB2D9"
+  heroImageUrl?: string; // 전시 이미지(포스터)
+  metaLeft?: string; // 작은 설명 텍스트
+  metaRight?: string; // 작은 설명 텍스트
   onClick?: () => void;
   showCode?: boolean;
 };
 
 function barcodeStyleFromCode(code: string): CSSProperties {
-  // code에 따라 바코드 느낌이 조금씩 달라지게(고정)
   let h = 0;
   for (let i = 0; i < code.length; i++) h = (h * 33 + code.charCodeAt(i)) >>> 0;
 
-  const thick = 2 + (h % 2);      // 2~3px
-  const thin = 1 + ((h >> 3) % 2);// 1~2px
+  const thick = 2 + (h % 2); // 2~3px
+  const thin = 1 + ((h >> 3) % 2); // 1~2px
   const gap = 1 + ((h >> 5) % 2); // 1~2px
 
   return {
@@ -42,6 +50,63 @@ function barcodeStyleFromCode(code: string): CSSProperties {
   };
 }
 
+/** 카드 내 이미지: 경로 정규화 + (필요 시) auth blob fallback */
+function HeroImage({ src, alt }: { src?: string; alt: string }) {
+  const resolved = useMemo(() => resolveMediaUrl(src), [src]);
+
+  const [displaySrc, setDisplaySrc] = useState<string>("");
+  const [triedBlob, setTriedBlob] = useState(false);
+  const blobUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    // src 바뀌면 초기화
+    setDisplaySrc(resolved);
+    setTriedBlob(false);
+
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
+  }, [resolved]);
+
+  if (!resolved || !displaySrc) return null;
+
+  const requestUrl =
+    /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
+
+  return (
+    <img
+      className="tcmHeroImg"
+      src={displaySrc}
+      alt={alt}
+      onError={async () => {
+        // 1) 일반 <img> 로드 실패 → 2) Authorization 포함 blob 시도 → 3) 실패면 숨김
+        if (triedBlob) {
+          setDisplaySrc("");
+          return;
+        }
+
+        try {
+          setTriedBlob(true);
+          const res = await http.get(requestUrl, { responseType: "blob" });
+          const objUrl = URL.createObjectURL(res.data);
+          blobUrlRef.current = objUrl;
+          setDisplaySrc(objUrl);
+        } catch {
+          setDisplaySrc("");
+        }
+      }}
+    />
+  );
+}
+
 export default function TicketCardModern({
   title,
   priceText = "TARIF : -",
@@ -56,8 +121,24 @@ export default function TicketCardModern({
   onClick,
   showCode = false,
 }: Props) {
+  const clickable = typeof onClick === "function";
+
+  const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+    if (!clickable) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onClick();
+    }
+  };
+
   return (
-    <article className="tcm" role="button" tabIndex={0} onClick={onClick}>
+    <article
+      className="tcm"
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={onKeyDown}
+    >
       {/* LEFT STUB */}
       <aside className="tcmStub" style={{ background: stubColor }}>
         <div className="tcmStubInner">
@@ -96,7 +177,7 @@ export default function TicketCardModern({
             <div className="tcmBubble tcmBubbleB" />
             <div className="tcmHeroMedia">
               {heroImageUrl ? (
-                <img className="tcmHeroImg" src={heroImageUrl} alt="exhibition" />
+                <HeroImage src={heroImageUrl} alt="exhibition" />
               ) : (
                 <div className="tcmHeroPh">IMAGE</div>
               )}
