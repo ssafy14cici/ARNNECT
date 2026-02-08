@@ -17,76 +17,127 @@
   overflow: hidden;
 }
 
-/* UI VISIBILITY CONTROL */
+/* =========================
+   UI VISIBILITY CONTROL
+   첫 화면과 그 이후 화면의 UI 표시 여부 제어
+========================= */
 .ui-transition {
   transition: opacity 0.4s ease-in-out, visibility 0.4s;
 }
+
+/* 첫 화면일 때 숨길 요소 (Footer, Header) */
 .ui-transition.hidden-on-intro {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
 }
+
+/* 두 번째 화면부터 보일 요소 */
 .ui-transition.visible-on-content {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
 }
 
-/* 1) FIXED LINES */
+/* =========================
+   1) FIXED LINES
+========================= */
 .fixed-lines {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
 }
+
 .line-vertical-center {
-  position: absolute; top: 0; bottom: 0; left: 50%; width: 1px;
-  background-color: var(--line); transform: translateX(-50%);
-}
-.line-horizontal-top {
-  position: absolute; top: 25%; left: 0; right: 0; height: 1px;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
   background-color: var(--line);
+  transform: translateX(-50%);
 }
-.line-horizontal-bottom {
-  position: absolute; top: 75%; left: 0; right: 0; height: 1px;
+
+.line-horizontal-top {
+  position: absolute;
+  top: 25%;
+  left: 0;
+  right: 0;
+  height: 1px;
   background-color: var(--line);
 }
 
-/* 2) FIXED HEADER (내부 헤더) */
+.line-horizontal-bottom {
+  position: absolute;
+  top: 75%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: var(--line);
+}
+
+/* =========================
+   2) FIXED HEADER (내부 헤더)
+========================= */
 .fixed-header {
   position: fixed;
-  top: 0; left: 0; width: 100%; height: 25%;
-  z-index: 9000;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 25%;
+  z-index: 9000; /* Main Scroll(5)보다 위, Navbar(9999)보다 아래 */
   display: flex;
-  pointer-events: none; /* 빈 공간 터치 통과 */
 }
 
-.header-left, .header-right {
-  width: 50%; height: 100%;
-  display: flex; align-items: center; justify-content: center;
+.header-left,
+.header-right {
+  width: 50%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   position: relative;
   z-index: 9001;
-  pointer-events: none; /* 빈 공간 터치 통과 */
-}
-
-/* 실제 버튼만 클릭 가능 */
-.logo-box, .hamburger {
-  pointer-events: auto;
   cursor: pointer;
 }
 
-.logo-box { border: 1px solid white; padding: 10px 8px; text-align: center; }
-.logo-box span {
-  font-family: var(--font-main); font-size: 10px; font-weight: 800; line-height: 1.1; letter-spacing: 1px;
+.logo-box {
+  border: 1px solid white;
+  padding: 10px 8px;
+  text-align: center;
 }
-.hamburger { width: 24px; height: 1px; background: white; position: relative; }
-.hamburger::before, .hamburger::after {
-  content: ""; position: absolute; left: 0; width: 100%; height: 1px; background: white;
+
+.logo-box span {
+  font-family: var(--font-main);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: 1px;
+}
+
+.hamburger {
+  width: 24px;
+  height: 1px;
+  background: white;
+  position: relative;
+}
+
+.hamburger::before,
+.hamburger::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: white;
 }
 .hamburger::before { top: -6px; }
 .hamburger::after { top: 6px; }
 
-/* 3) MAIN SNAP SCROLL (여기가 터치 핵심) */
+/* =========================
+   3) MAIN SNAP SCROLL
+========================= */
 .snap-container {
   position: relative;
   width: 100%;
@@ -94,10 +145,8 @@
   overflow-y: scroll;
   scroll-snap-type: y mandatory;
   scrollbar-width: none;
-  
-  /* ✅ Z-Index 50: 3D 모델(z:10)보다 위에 배치하여 터치 인식 보장 */
-  z-index: 50; 
-  
+  z-index: 5; /* 기본 레이어 */
+  /* 중요: 터치 스크롤 동작 보장 */
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
 }
@@ -112,130 +161,152 @@
   border-bottom: 1px solid var(--line);
 }
 
-/* Intro Background */
+/* ✅ 첫 화면 전용: 배경 꽉 채우기 */
 .intro-full-bg {
-  position: absolute; inset: 0; 
-  z-index: 1; 
+  position: absolute;
+  inset: 0;
+  z-index: 1; /* 가장 뒤 */
 }
+
+/* 그리드 스타일 */
 .intro-full-bg .introGrid {
-  width: 100%; height: 100%; display: grid;
+  width: 100%;
+  height: 100%;
+  display: grid;
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(4, 1fr);
-  gap: 0; padding: 0;
+  gap: 0;
+  padding: 0;
 }
+
 .intro-full-bg .introCell {
-  border: none; border-radius: 0; background: transparent;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 .intro-full-bg .introCell img {
-  width: 100%; height: 100%; object-fit: cover;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
+
+/* 네비바 가독성을 위한 약한 음영 */
 .vignette-overlay {
-  position: absolute; inset: 0;
+  position: absolute;
+  inset: 0;
   background: rgba(0,0,0,0.2);
   pointer-events: none;
 }
 
-/* ✅ 3D Model Area (FIXED) */
-.model-area-fixed {
-  position: fixed;
+/* =========================
+   Middle Area (3D Canvas)
+========================= */
+.model-area {
+  position: absolute;
   top: 25%;
-  height: 50%;
   width: 100%;
-  
-  /* ✅ Z-Index 10: 스크롤 컨테이너(z:50) 뒤로 보냄 */
-  z-index: 10; 
-  
-  pointer-events: none; /* 터치 무시 (스크롤 통과) */
-  transition: opacity 0.5s ease;
-  display: grid;
-}
-.model-area-fixed.hidden {
-  opacity: 0; visibility: hidden;
-}
-.model-area-fixed .homeCanvas {
-  width: 100%; height: 100%;
-  grid-area: 1 / 1;
+  height: 50%;
+  z-index: 10;
+  display: grid; 
+  overflow: hidden;
+  pointer-events: none; /* 스크롤 방해 금지 */
 }
 
-/* 4) FIXED FOOTER */
+.model-area > .homeCanvas {
+  grid-area: 1 / 1;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+}
+
+/* =========================
+   4) FIXED FOOTER
+========================= */
 .fixed-footer {
   position: fixed;
-  top: 75%; left: 0; width: 100%; height: 25%;
-  z-index: 60; /* 메뉴 클릭을 위해 최상단 근처 */
+  top: 75%;
+  left: 0;
+  width: 100%;
+  height: 25%;
+  z-index: 60;
   display: flex;
-  pointer-events: none; /* 빈 공간 터치 통과 */
 }
-.footer-left, .footer-right {
-  width: 50%; height: 100%; position: relative;
-  display: flex; align-items: center; justify-content: center;
+
+.footer-left,
+.footer-right {
+  width: 50%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
 .footer-left { pointer-events: none; }
 
-/* 메뉴 텍스트 영역만 클릭 허용 */
-.footer-right {
-  flex-direction: column; gap: 10px; padding: 10px 0;
-  pointer-events: auto; 
+.scroll-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.6;
 }
 
-.scroll-content {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 8px; opacity: 0.6;
-}
 .scroll-text { font-size: 9px; letter-spacing: 0.2em; }
 .scroll-line { width: 1px; height: 30px; background: white; }
 
-.menu-scroller {
-  width: 100%; height: 100%;
-  overflow-y: hidden; /* 사용자 직접 스크롤 막음 (메인 스크롤만 사용) */
+.footer-right {
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 0;
 }
 
-.menu-item {
-  height: 100%; width: 100%;
-  /* scroll-snap-align 제거 (직접 스크롤 안하므로) */
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  user-select: none; cursor: pointer;
-  opacity: 0.65; transition: opacity 0.15s ease;
+.menu-scroller {
+  width: 100%;
+  height: 100%;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
 }
+.menu-scroller::-webkit-scrollbar { display: none; }
+
+.menu-item {
+  height: 100%;
+  width: 100%;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  cursor: pointer;
+  opacity: 0.65;
+  transition: opacity 0.15s ease;
+}
+
 .menu-item.active { opacity: 1; }
 
 .main-title {
-  font-family: var(--font-main); font-size: 1.8rem;
-  font-weight: 500; text-transform: uppercase;
+  font-family: var(--font-main);
+  font-size: 1.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
 }
 .menu-item.active .main-title {
-  text-decoration: underline; text-underline-offset: 6px;
+  text-decoration: underline;
+  text-underline-offset: 6px;
 }
+
 .arrow-down { margin-top: 10px; font-size: 14px; opacity: 0.5; }
 
 .menu-enter {
-  position: absolute; right: 12px; bottom: 10px;
-  background: transparent; color: white;
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  background: transparent;
+  color: white;
   border: 1px solid rgba(255, 255, 255, 0.35);
   padding: 6px 10px;
   font-size: 11px;
   cursor: pointer;
-}
-
-.star-hedron-theme {
-  /* 배경 그라데이션: CodePen의 어두운 청보라 느낌 */
-  background: linear-gradient(135deg, #000 0%, #011 40%, #102 100%) !important;
-  transition: filter 1.5s ease;
-}
-
-/* 활성화 시 색상이 일렁이는 효과 */
-.visible-on-content.star-hedron-theme {
-  animation: star-hue 5s ease-in-out infinite alternate;
-}
-
-@keyframes star-hue {
-  0% { filter: saturate(1.5) hue-rotate(0deg); }
-  100% { filter: saturate(2.5) hue-rotate(30deg); }
-}
-
-.model-area {
-  width: 100%;
-  height: 80vh;
-  /* 보석 주위를 은은하게 감싸는 마스크 효과 */
-  mask-image: radial-gradient(circle, black 40%, transparent 90%);
 }
