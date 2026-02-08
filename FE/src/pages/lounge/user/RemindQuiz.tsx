@@ -200,7 +200,7 @@ export default function RemindQuiz() {
           </div>
 
           <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 12, color: "rgba(0,0,0,0.55)" }}>
+            <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.55)" }}>
               내 답(주관식)
             </div>
             <input
@@ -226,17 +226,13 @@ export default function RemindQuiz() {
               정답/내용 확인 (리뷰로 이동)
             </button>
           </div>
-
-          <div style={{ marginTop: 10, fontSize: 12, color: "rgba(0,0,0,0.55)" }}>
-            연결 리뷰 ID: {String(current.reviewId)}
-          </div>
         </section>
       )}
 
       {state === "playing" && current && submitted && (
         <section className="tasteCard" style={{ marginTop: 12 }}>
           <h3 className="tasteCardTitle">제출 완료</h3>
-          <div style={{ color: "rgba(0,0,0,0.60)" }}>
+          <div style={{ color: "rgba(255, 255, 255, 0.6)" }}>
             내 답: <b>{answerText || "(미입력)"}</b>
             <br />
             정답은 리뷰 상세에서 확인하세요.
