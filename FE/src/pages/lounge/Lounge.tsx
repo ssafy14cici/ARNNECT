@@ -38,7 +38,7 @@ export default function Lounge() {
         <div className="loungeTop">
           <div>
             <h1 className="loungeTitle">Lounge</h1>
-            <p className="loungeDesc">내 기능 허브 (Role Split)</p>
+            {/* <p className="loungeDesc">내 기능 허브 (Role Split)</p> */}
           </div>
           <div className="loungeRoleChip">{role}</div>
         </div>

@@ -77,7 +77,6 @@ export default function UserProfileEditModal({
   const [draftImageFile, setDraftImageFile] = useState<File | null>(null);
 
   const [earnedIdsFallback, setEarnedIdsFallback] = useState<string[]>([]);
-  const [badgeHint, setBadgeHint] = useState<string | null>(null);
 
   // ✅ store seeding
   useEffect(() => {
@@ -89,6 +88,7 @@ export default function UserProfileEditModal({
   /**
    * ✅ 핵심: 서버 카운트 API 호출은 완전히 끊는다.
    * - earnedBadges(prop)가 비어있으면 "전체 뱃지 선택 가능"으로 안전하게 처리
+   * - ❌ 안내 문구(badgeHint)는 아예 사용하지 않음 (요청사항)
    */
   useEffect(() => {
     if (!open) return;
@@ -97,12 +97,11 @@ export default function UserProfileEditModal({
 
     if (propIds.length > 0) {
       setEarnedIdsFallback([]);
-      setBadgeHint(null);
       return;
     }
 
+    // ✅ FE-only 안전모드: 활동량 조회 못하니 전체 뱃지 노출
     setEarnedIdsFallback(ALL_BADGE_IDS);
-    setBadgeHint("활동량 조회 API가 막혀 있어 전체 뱃지를 표시합니다. (추후 연동 시 '획득만'으로 변경 가능)");
   }, [open, (earnedBadges ?? []).length]);
 
   // ✅ 최종 earnedIds: prop 우선, 없으면 fallback
@@ -168,7 +167,7 @@ export default function UserProfileEditModal({
               <h2 className="profileModalTitle">유저 프로필 편집</h2>
               <p className="profileModalSubtitle">닉네임, 비밀번호, 이미지, 대표 뱃지를 설정합니다.</p>
             </div>
-            {/* ✅ 헤더 닫기 버튼 제거 (하단 '취소'만 사용) */}
+            {/* ✅ 헤더 '닫기' 버튼 제거 (하단 '취소'만 사용) */}
           </div>
 
           <div className="profileForm profileForm--user">
@@ -242,7 +241,7 @@ export default function UserProfileEditModal({
                 />
 
                 <div className="profileImageMeta">
-                  <p className="profileHelp">새 파일을 선택하면 업로드됩니다.</p>
+                  <p className="profileHelp">새 파일을 선택하면 업로드됩니다. (URL 입력 방식 X)</p>
                   {draftImageFile && (
                     <p className="profileHintMuted">
                       선택됨: {draftImageFile.name} · {(draftImageFile.size / 1024 / 1024).toFixed(2)}MB
@@ -260,23 +259,15 @@ export default function UserProfileEditModal({
                   <p className="profileSectionDesc">최대 3개까지 선택할 수 있습니다.</p>
                 </div>
 
-                {/* ✅ 버튼 자리로 안내 문구 이동: badgeHint 있으면 문구, 없으면 버튼 */}
-                {badgeHint ? (
-                  <span className="profileHelp profileHelp--hint" style={{ textAlign: "right" }}>
-                    {badgeHint}
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    className="profileTextBtn profileTextBtn--cta"
-                    onClick={() => setPickerOpen(true)}
-                  >
-                    선택하기
-                  </button>
-                )}
+                {/* ✅ 뱃지 선택 버튼 절대 유지 */}
+                <button
+                  type="button"
+                  className="profileTextBtn profileTextBtn--cta"
+                  onClick={() => setPickerOpen(true)}
+                >
+                  선택하기
+                </button>
               </div>
-
-              {/* ✅ 기존 badgeHint 아래 출력은 제거 (중복 방지) */}
 
               <div className="profileBadgePreview">
                 {draftBadgeObjects.length > 0 ? (
