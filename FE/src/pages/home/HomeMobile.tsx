@@ -23,9 +23,6 @@ export default function HomeMobile() {
   const snapRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   
-  // ✅ 스크롤 루프(서로 무한 호출) 방지용 Ref
-  const syncingRef = useRef(false);
-
   const [activeIndex, setActiveIndex] = useState(0);
 
   const sections: Section[] = useMemo(
@@ -40,7 +37,7 @@ export default function HomeMobile() {
     []
   );
 
-  // 1) 네비바 표시/숨김 로직
+  // 1) 네비바 표시/숨김 제어 (0번 페이지에서만 보임)
   useEffect(() => {
     const commonNavbar = document.querySelector(".nav") as HTMLElement;
     if (commonNavbar) {
@@ -55,87 +52,61 @@ export default function HomeMobile() {
     }
   }, [activeIndex]);
 
-  // Navbar 햄버거 트리거
+  // 2) 하단 텍스트 메뉴 위치 동기화 (메인이 움직이면 얘는 따라만 감)
+  useEffect(() => {
+    const menu = menuRef.current;
+    if (menu) {
+      // 텍스트 메뉴는 높이가 작으므로, 인덱스에 맞춰서 부드럽게 이동시킴
+      const targetTop = activeIndex * menu.clientHeight;
+      menu.scrollTo({
+        top: targetTop,
+        behavior: "smooth", 
+      });
+    }
+  }, [activeIndex]);
+
+  // 메인 스크롤 이벤트 핸들러 (여기가 핵심: 단순하게 현재 페이지만 계산)
+  useEffect(() => {
+    const snap = snapRef.current;
+    if (!snap) return;
+
+    let rafId: number | null = null;
+
+    const handleScroll = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        // 현재 스크롤 위치를 기준으로 activeIndex 계산
+        const idx = Math.round(snap.scrollTop / snap.clientHeight);
+        if (idx !== activeIndex) {
+          setActiveIndex(idx);
+        }
+        rafId = null;
+      });
+    };
+
+    snap.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      snap.removeEventListener("scroll", handleScroll);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [activeIndex]); // activeIndex가 의존성에 있어도 raf로 최적화됨
+
+  // 메뉴 클릭 시 해당 위치로 이동
+  const scrollToIndex = (idx: number) => {
+    const snap = snapRef.current;
+    if (!snap) return;
+    // 메인 화면을 해당 섹션으로 이동 -> 위 useEffect가 감지해서 activeIndex 업데이트 -> 텍스트 메뉴도 이동
+    snap.scrollTo({ top: idx * snap.clientHeight, behavior: "smooth" });
+  };
+
   const handleMenuTrigger = () => {
     const navbarMenuBtn = document.getElementById("menu4");
     if (navbarMenuBtn) navbarMenuBtn.click();
   };
 
-  // 특정 인덱스로 이동 (버튼 클릭 시)
-  const scrollToIndex = (idx: number) => {
-    const snap = snapRef.current;
-    const menu = menuRef.current;
-    if (!snap || !menu) return;
-
-    const clamped = Math.max(0, Math.min(idx, sections.length - 1));
-
-    syncingRef.current = true; // 동기화 락 걸기
-    snap.scrollTo({ top: clamped * snap.clientHeight, behavior: "auto" });
-    menu.scrollTo({ top: clamped * menu.clientHeight, behavior: "auto" });
-    
-    // 잠시 후 락 해제
-    setTimeout(() => { syncingRef.current = false; }, 100);
-
-    setActiveIndex(clamped);
-  };
-
-  /**
-   * ✅ 핵심: 양방향 스크롤 동기화 로직
-   * 메인 화면을 밀면 텍스트가 따라오고, 텍스트를 밀면 메인 화면이 따라옵니다.
-   */
-  useEffect(() => {
-    const snap = snapRef.current;
-    const menu = menuRef.current;
-    if (!snap || !menu) return;
-
-    // 1. 메인(Snap) -> 메뉴(Menu) 동기화
-    const handleSnapScroll = () => {
-      if (syncingRef.current) return; // 락이 걸려있으면 무시
-      syncingRef.current = true;      // 락 걸기
-
-      // 메인 스크롤 비율 계산
-      const ratio = snap.scrollTop / (snap.scrollHeight - snap.clientHeight);
-      // 메뉴 스크롤 위치 적용
-      if (menu.scrollHeight > menu.clientHeight) {
-         menu.scrollTop = ratio * (menu.scrollHeight - menu.clientHeight);
-      }
-
-      // 인덱스 업데이트
-      const idx = Math.round(snap.scrollTop / snap.clientHeight);
-      if (idx !== activeIndex) setActiveIndex(idx);
-
-      syncingRef.current = false;     // 락 해제
-    };
-
-    // 2. 메뉴(Menu) -> 메인(Snap) 동기화
-    const handleMenuScroll = () => {
-      if (syncingRef.current) return;
-      syncingRef.current = true;
-
-      // 메뉴 스크롤 비율 계산
-      const ratio = menu.scrollTop / (menu.scrollHeight - menu.clientHeight);
-      // 메인 스크롤 위치 적용
-      if (snap.scrollHeight > snap.clientHeight) {
-        snap.scrollTop = ratio * (snap.scrollHeight - snap.clientHeight);
-      }
-
-      // (선택) 메뉴 스크롤 시에도 인덱스 업데이트
-      // const idx = Math.round(snap.scrollTop / snap.clientHeight);
-      // if (idx !== activeIndex) setActiveIndex(idx);
-
-      syncingRef.current = false;
-    };
-
-    snap.addEventListener("scroll", handleSnapScroll, { passive: true });
-    menu.addEventListener("scroll", handleMenuScroll, { passive: true });
-
-    return () => {
-      snap.removeEventListener("scroll", handleSnapScroll);
-      menu.removeEventListener("scroll", handleMenuScroll);
-    };
-  }, [activeIndex, sections.length]); // 의존성
-
+  // UI 상태 클래스
   const uiClass = activeIndex === 0 ? "ui-transition hidden-on-intro" : "ui-transition visible-on-content";
+  const currentShape = sections[activeIndex]?.shape || "knot";
 
   return (
     <div className="mobile-wrapper">
@@ -158,38 +129,37 @@ export default function HomeMobile() {
         </div>
       </header>
 
-      {/* 메인 스크롤 영역 */}
+      {/* ✅ 3D 모델 영역 (Fixed - 중앙 고정) */}
+      {/* activeIndex가 0이면 CSS로 숨김(.hidden). 스크롤 상관없이 항상 중앙에 떠있음 */}
+      <div className={`model-area-fixed ${activeIndex === 0 ? "hidden" : ""}`}>
+        <Canvas className="homeCanvas" camera={{ position: [0, 0, 14], fov: 35 }}>
+          <ambientLight intensity={0.8} />
+          <pointLight position={[10, 10, 10]} intensity={1.5} />
+          <Suspense fallback={null}>
+            <group rotation={[0.5, 0.5, 0]} scale={0.55}>
+              <HoverModel color="#d0d0d0" shape={currentShape} />
+            </group>
+          </Suspense>
+        </Canvas>
+      </div>
+
+      {/* ✅ 메인 스크롤 영역 (여기가 터치를 받아서 움직임) */}
       <div ref={snapRef} className="snap-container">
-        {sections.map((item, i) => (
+        {sections.map((item) => (
           <section key={item.key} className="snap-section">
-            
-            {/* 첫 화면 전용: 배경 사진 꽉 채우기 */}
+            {/* 첫 화면일 때만 배경 사진 렌더링 */}
             {item.key === "intro" && (
               <div className="intro-full-bg">
                 <IntroArtworkGrid count={16} onClickArtwork={(id) => navigate(`/artworks/${id}`)} />
                 <div className="vignette-overlay" />
               </div>
             )}
-
-            {/* 3D 모델 영역 (첫 화면 제외) */}
-            <div className="model-area">
-              <Canvas className="homeCanvas" camera={{ position: [0, 0, 14], fov: 35 }}>
-                <ambientLight intensity={0.8} />
-                <pointLight position={[10, 10, 10]} intensity={1.5} />
-                <Suspense fallback={null}>
-                  <group rotation={[0.5, 0.5, 0]} scale={0.55}>
-                    {i !== 0 && (
-                      <HoverModel color="#d0d0d0" shape={item.shape} />
-                    )}
-                  </group>
-                </Suspense>
-              </Canvas>
-            </div>
+            {/* 3D 모델은 여기 없습니다 (model-area-fixed로 분리됨) */}
           </section>
         ))}
       </div>
 
-      {/* 하단 푸터 (메뉴 포함) */}
+      {/* 하단 푸터 (텍스트 메뉴) */}
       <footer className={`fixed-footer ${uiClass}`}>
         <div className="footer-left">
           <div className="scroll-content">
@@ -199,7 +169,6 @@ export default function HomeMobile() {
         </div>
 
         <div className="footer-right">
-          {/* 하단 메뉴 스크롤러 */}
           <div ref={menuRef} className="menu-scroller">
             {sections.map((item, idx) => (
               <div
@@ -207,7 +176,6 @@ export default function HomeMobile() {
                 className={`menu-item ${idx === activeIndex ? "active" : ""}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  // 활성 상태면 메뉴 열기, 아니면 이동
                   if (idx === activeIndex) handleMenuTrigger();
                   else scrollToIndex(idx);
                 }}

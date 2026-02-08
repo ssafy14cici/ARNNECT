@@ -33,7 +33,7 @@ export default function Lounge() {
   }, [role]);
 
   return (
-    <main className="loungePage">
+    <main className={`loungePage ${role === "artist" ? "artist-mode" : ""}`}>
       <section className="loungeWrap">
         <div className="loungeTop">
           <div>

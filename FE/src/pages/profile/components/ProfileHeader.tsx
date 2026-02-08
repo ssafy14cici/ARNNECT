@@ -200,14 +200,17 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
     setBusy(true);
     try {
-      // 1) 프로필(닉/비번/이미지) 업데이트
-      const updated = await profileApi.updateMyProfile(profile.role, payload);
+      // 1) 업데이트는 "성공 여부"만 본다 (artist는 Void)
+      await profileApi.updateMyProfile(profile.role, payload);
 
-      // ✅ 즉시 반영: featuredBadgeIds도 같이 합쳐서 UI 갱신 (새로고침 없이 상단 뱃지 바뀜)
-      onProfileUpdated({ ...(updated as ProfileModel), featuredBadgeIds: nextFeaturedIds } as ProfileModel);
+      // 2) 최신 프로필 재조회로 화면 갱신 (핵심)
+      const latest = await profileApi.getMyProfile();
 
-      // 2) 대표 뱃지 저장 (서버에 별도 API)
-      await profileApi.updateFeaturedBadges(profile.role, (updated as any).id ?? profile.id, nextFeaturedIds);
+      onProfileUpdated({ ...(latest as ProfileModel), featuredBadgeIds: nextFeaturedIds } as ProfileModel);
+
+      // 3) 대표 뱃지 저장은 id는 기존 profile.id를 우선 사용 (updated 의존 X)
+      const targetId = (latest as any).id ?? profile.id;
+      await profileApi.updateFeaturedBadges(profile.role, targetId, nextFeaturedIds);
 
       return true;
     } catch (e) {
@@ -217,6 +220,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
       setBusy(false);
     }
   };
+
 
   const doLogout = () => {
     logout();

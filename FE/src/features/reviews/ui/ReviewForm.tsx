@@ -23,7 +23,7 @@ function publicAssetUrl(path: string) {
 
 // ✅ URL(기본 이미지)을 File로 변환해서 서버에 업로드 가능하게
 async function urlToFile(url: string): Promise<File> {
-  const res = await fetch(url);
+  const res = await fetch(url, { cache: "no-store" }); // dev에서 캐시로 헷갈리면 no-store가 편함
   if (!res.ok) throw new Error(`Failed to fetch default image: ${url} (${res.status})`);
   const blob = await res.blob();
 
@@ -50,7 +50,11 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
   );
 
   const parsedTags = useMemo(
-    () => tags.split(",").map((t) => t.trim()).filter(Boolean),
+    () =>
+      tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
     [tags],
   );
 
@@ -100,6 +104,7 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
   };
 
   const submit = async () => {
+    if (submitting) return; // ✅ 중복 제출 방지
     const err = validate();
     if (err) return alert(err);
 
@@ -109,7 +114,8 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
       try {
         finalImageFile = await urlToFile(defaultUrlRef.current);
       } catch (error) {
-        console.error("Failed to load default image:", error);
+        console.error("[ReviewForm] Failed to load default image:", error);
+        console.error("[ReviewForm] defaultUrlRef.current =", defaultUrlRef.current);
         return alert("기본 이미지를 불러오는데 실패했습니다.");
       }
     }
@@ -121,6 +127,9 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
       tags: parsedTags, // ✅ 없으면 []
       imageFile: finalImageFile,
     };
+
+    // 디버그가 필요하면 잠깐 켜기
+    // console.log("[ReviewForm submit payload]", payload);
 
     await onSubmit(payload);
   };

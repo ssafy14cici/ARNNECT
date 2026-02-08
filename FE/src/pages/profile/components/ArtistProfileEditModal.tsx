@@ -7,7 +7,6 @@ import type { UpdateMyProfilePatch } from "../../../features/profile/api";
 import type { ArtistProfile, Badge } from "../../../features/profile/types";
 
 import BadgePicker from "../../../features/badge/ui/BadgePicker";
-import { resolveMediaUrl } from "../../artworks/detail/utils";
 
 // --------- helpers (no any) ---------
 type JsonObject = Record<string, unknown>;
@@ -63,14 +62,12 @@ export default function ArtistProfileEditModal({
 }: Props) {
   const { featured, setFeatured } = useBadgeStore();
 
-  // ✅ 모달은 open=false면 언마운트되므로 useState 초기값으로만 세팅하면 됨(=effect setState 불필요)
+  // ✅ 초기값 후보들(서버 키가 섞여도 안전)
   const initialNick = useMemo(() => {
-    // ArtistProfile에 nickname 없으므로, 혹시 서버가 내려주는 경우만 안전하게 읽고, 기본은 name
     return optStringFromObj(profile, "nickname") ?? asString((profile as { name?: string }).name, "");
   }, [profile]);
 
   const initialIntro = useMemo(() => {
-    // ArtistProfile에 있는 후보 키들만 안전하게 접근(없는 키는 optStringFromObj로)
     const bio = optStringFromObj(profile, "bio");
     const introduction = optStringFromObj(profile, "introduction");
     const artIntroduction = optStringFromObj(profile, "artIntroduction");
@@ -83,6 +80,12 @@ export default function ArtistProfileEditModal({
     return snsPage ?? sns ?? "";
   }, [profile]);
 
+  // ✅ 프로필 이미지 URL은 resolveMediaUrl로 가공하지 말고 "그대로" 사용
+  // - normalizeProfile에서 imageUrl에 imgUrl까지 흡수하지만, 혹시 직접 내려오는 경우까지 방어
+  const profileImageUrl = useMemo(() => {
+    return optStringFromObj(profile, "imageUrl") ?? optStringFromObj(profile, "imgUrl") ?? "";
+  }, [profile]);
+
   const [pickerOpen, setPickerOpen] = useState(false);
 
   // common
@@ -90,7 +93,7 @@ export default function ArtistProfileEditModal({
   const [draftPassword, setDraftPassword] = useState("");
   const [draftImageFile, setDraftImageFile] = useState<File | null>(null);
 
-  // artist only (존재하는 필드라고 가정되는 것들만 안전하게)
+  // artist only
   const [draftFieldId, setDraftFieldId] = useState<number | undefined>((profile as { fieldId?: number }).fieldId);
   const [draftGenreId, setDraftGenreId] = useState<number | undefined>((profile as { genreId?: number }).genreId);
   const [draftDebutYear, setDraftDebutYear] = useState<number | undefined>((profile as { debutYear?: number }).debutYear);
@@ -99,12 +102,27 @@ export default function ArtistProfileEditModal({
   const [draftAffiliation, setDraftAffiliation] = useState(asString((profile as { affiliation?: string }).affiliation, ""));
   const [draftIntroduction, setDraftIntroduction] = useState(initialIntro);
 
-  // ✅ store seeding (React setState 아님)
+  // ✅ 중요: 이 컴포넌트는 open=false여도 "언마운트"가 아님(그냥 null 렌더)
+  // 그래서 open이 true가 되는 시점에 draft/state를 확실히 리셋해줘야 함.
   useEffect(() => {
     if (!open) return;
+
     setFeatured(initialFeaturedIds);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+
+    setPickerOpen(false);
+
+    setDraftNickname(initialNick);
+    setDraftPassword("");
+    setDraftImageFile(null);
+
+    setDraftFieldId((profile as { fieldId?: number }).fieldId);
+    setDraftGenreId((profile as { genreId?: number }).genreId);
+    setDraftDebutYear((profile as { debutYear?: number }).debutYear);
+
+    setDraftSnsPage(initialSns);
+    setDraftAffiliation(asString((profile as { affiliation?: string }).affiliation, ""));
+    setDraftIntroduction(initialIntro);
+  }, [open, initialFeaturedIds, setFeatured, initialNick, initialSns, initialIntro, profile]);
 
   const draftBadgeObjects = useMemo(() => {
     const ids = featured ?? [];
@@ -153,6 +171,7 @@ export default function ArtistProfileEditModal({
     };
 
     // ✅ 서버가 sns / artIntroduction / bio 를 받는 경우 대비(타입 안전)
+    // (실제 UpdateArtistRequest에는 snsPage / introduction 만 있으므로 서버는 나머지 키는 무시)
     const payload: UpdateMyProfilePatch & Partial<ArtistPatchAliases> = {
       ...base,
       ...(snsPageTrim ? { sns: snsPageTrim } : {}),
@@ -165,9 +184,8 @@ export default function ArtistProfileEditModal({
 
   if (!open) return null;
 
-  const previewSrc =
-    imagePreviewUrl ??
-    resolveMediaUrl(asString((profile as { imageUrl?: string }).imageUrl, ""));
+  // ✅ preview는 blob 우선, 없으면 서버에서 내려온 프로필 URL 그대로 사용
+  const previewSrc = imagePreviewUrl ?? profileImageUrl;
 
   return (
     <>

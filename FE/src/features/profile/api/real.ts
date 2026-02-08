@@ -642,7 +642,8 @@ function buildUpdateFormData(role: ProfileRole, patch: UpdateMyProfilePatch): Fo
   if (isArtist) {
     putNum("fieldId", (patch as any).fieldId, { min: 1 });
     putNum("genreId", (patch as any).genreId, { min: 1 });
-    putNum("debutYear", (patch as any).debutYear, { min: 1, max: 2026 }); // 필요하면 2100으로 조정
+    putNum("debutYear", (patch as any).debutYear, { max: 2100 });
+ // 필요하면 2100으로 조정
 
     putStr("snsPage", (patch as any).snsPage);
     putStr("affiliation", (patch as any).affiliation);
@@ -661,15 +662,15 @@ export async function updateMyProfile(role: ProfileRole, patch: UpdateMyProfileP
   const isArtist = isArtistRoleLike(role);
 
   const paths = isArtist
-    ? ["/api/v1/member/artists/my", "/api/v1/member/artist/my"]
-    : ["/api/v1/member/users/my"];
-
-  const fd = buildUpdateFormData(role, patch);
+  ? ["/api/v1/member/artist/my"]
+  : ["/api/v1/member/users/my"];
 
   let lastErr: unknown = null;
 
   for (const path of paths) {
+
     try {
+      const fd = buildUpdateFormData(role, patch);
       await req<unknown>(path, {
         method: "PUT",
         body: fd,
