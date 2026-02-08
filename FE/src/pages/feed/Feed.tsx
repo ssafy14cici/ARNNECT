@@ -117,7 +117,7 @@ export default function Feed() {
           />
         ))}
 
-        {visible.length === 0 && <div style={{ padding: 24, opacity: 0.8 }}>loading...</div>}
+        {visible.length === 0 && <div style={{ padding: 24, opacity: 0.8, textAlign: "center" }}>loading...</div>}
       </section>
 
       <div ref={sentinelRef} />
