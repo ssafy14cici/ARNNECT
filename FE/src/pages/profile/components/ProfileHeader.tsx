@@ -145,27 +145,48 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
     };
   }, [manageOpen]);
 
+  /**
+   * ✅ 팔로우 실시간 반영 핵심 수정
+   * - 낙관 업데이트는 즉시 적용
+   * - follow/unfollow 실패 시에만 롤백
+   * - getProfile 재조회 실패는 무시(낙관 업데이트 유지) → "실시간 반영 안됨" 체감 방지
+   * - busy 중 중복 클릭 방지
+   */
   const toggleFollow = async () => {
+    if (busy) return;
     if (isOwner) return;
     if (!profile.id) return;
 
     const prev = profile;
 
-    const optimistic: ProfileModel = prev.isFollowing
-      ? { ...prev, isFollowing: false, followersCount: Math.max(0, prev.followersCount - 1) }
-      : { ...prev, isFollowing: true, followersCount: prev.followersCount + 1 };
+    const nextIsFollowing = !prev.isFollowing;
+    const nextFollowersCount = nextIsFollowing
+      ? prev.followersCount + 1
+      : Math.max(0, prev.followersCount - 1);
+
+    const optimistic: ProfileModel = {
+      ...prev,
+      isFollowing: nextIsFollowing,
+      followersCount: nextFollowersCount,
+    };
 
     setBusy(true);
     onProfileUpdated(optimistic);
 
     try {
+      // ✅ 1) 서버 토글 (이게 실패하면 롤백)
       if (prev.isFollowing) await profileApi.unfollow(prev.id);
       else await profileApi.follow(prev.id);
 
-      // ✅ 서버 값으로 다시 동기화(카운트/상태 확정)
-      const latest = await profileApi.getProfile(prev.id);
-      onProfileUpdated(latest as ProfileModel);
+      // ✅ 2) 재조회는 "베스트 에포트" (실패해도 롤백 금지)
+      try {
+        const latest = await profileApi.getProfile(prev.id);
+        onProfileUpdated(latest as ProfileModel);
+      } catch {
+        // 재조회 실패 → 낙관 업데이트 유지
+      }
     } catch (e) {
+      // follow/unfollow 자체가 실패한 경우만 롤백
       onProfileUpdated(prev);
       alert(e instanceof Error ? e.message : "팔로우 변경 실패");
     } finally {
@@ -174,6 +195,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
   };
 
   const submitFanLetter = async (message: string) => {
+    if (busy) return;
     if (!canSendFanLetter) return;
     if (!profile.id) return;
 
@@ -197,6 +219,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
   const saveProfileFromModal = async (payload: UpdateMyProfilePatch, nextFeaturedIds: string[]) => {
     if (!isOwner) return false;
+    if (busy) return false;
 
     const prev = profile;
     setBusy(true);
@@ -250,7 +273,6 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
     }
   };
 
-
   const doLogout = () => {
     logout();
     setManageOpen(false);
@@ -276,7 +298,11 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
             <div className="profileBadges">
               {featuredBadges.map((b) => (
-                <span key={b.id} className="profileBadge" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                <span
+                  key={b.id}
+                  className="profileBadge"
+                  style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
+                >
                   <img
                     src={badgeImageSrc(b.id)}
                     alt=""
@@ -296,23 +322,9 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
             <span>팔로잉 {profile.followingsCount}</span>
           </div>
 
-          {/* <div className="profileBio">
-            {profile.bio ? (
-              <span>{profile.bio}</span>
-            ) : isOwner ? (
-              <span className="profileBioPlaceholder">소개글을 추가해보세요.</span>
-            ) : (
-              <span className="profileBioPlaceholder">소개글이 없습니다.</span>
-            )}
-          </div> */}
-
           <div className="profileActionRow">
             {isOwner ? (
               <>
-                {/* <button className="profileBtn" onClick={openEdit} type="button">
-                  편집
-                </button> */}
-
                 <button
                   ref={manageBtnRef}
                   className="profileBtn"

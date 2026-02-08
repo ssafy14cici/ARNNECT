@@ -33,14 +33,12 @@ export default function CollectionTab() {
   const [items, setItems] = useState<TicketInfoResponse[]>([]);
 
   const reload = async () => {
-    // ✅ me인데 로그인 정보 없으면 스킵하지 말고 안내
     if (needsLoginForMe) {
       setItems([]);
       setError("로그인이 필요합니다. 로그인 후 다시 시도해주세요.");
       return;
     }
 
-    // ✅ 유효한 UUID가 없으면 방어
     if (!effectiveProfileId) {
       setItems([]);
       setError("프로필 식별자를 확인할 수 없습니다.");
@@ -61,8 +59,6 @@ export default function CollectionTab() {
   };
 
   useEffect(() => {
-    // ✅ 이전 코드처럼 'me'면 무조건 return 하지 말고,
-    //    me이면서 authUser가 있을 때는 정상적으로 reload
     if (needsLoginForMe) return;
     if (!effectiveProfileId) return;
     reload();
@@ -71,19 +67,25 @@ export default function CollectionTab() {
 
   const visibleItems = useMemo(() => {
     // 서버 응답에 scannedAt 같은 정렬키가 없어서, ticketId 기준 내림차순 정도로만 정렬
-    return [...items].sort((a, b) => Number(b.ticketId) - Number(a.ticketId));
+    return [...items].sort((a, b) => Number((b as any).ticketId ?? 0) - Number((a as any).ticketId ?? 0));
   }, [items]);
 
-  const goDetail = (ticketId: number) => {
+  // ✅ 상세는 ticketCode 기준 라우팅 (CollectBookDetail이 ticketCode로 찾음)
+  const goDetail = (ticketCode: string) => {
+    const code = String(ticketCode ?? "").trim();
+    if (!code) return;
+
+    const encoded = encodeURIComponent(code);
+
     if (!isLoggedIn) {
-      nav("/login", { state: { from: `/lounge/collectbook/${ticketId}` } });
+      nav("/login", { state: { from: `/lounge/collectbook/${encoded}` } });
       return;
     }
     if (viewerRole && viewerRole !== "general") {
       alert("콜렉트북 상세는 USER(General)만 접근 가능합니다.");
       return;
     }
-    nav(`/lounge/collectbook/${ticketId}`);
+    nav(`/lounge/collectbook/${encoded}`);
   };
 
   const goLogin = () => {
@@ -128,32 +130,39 @@ export default function CollectionTab() {
         </div>
       ) : (
         <div className="tab-grid-2">
-          {visibleItems.map((t) => (
-            <button
-              key={t.ticketId}
-              type="button"
-              className="tab-card"
-              onClick={() => goDetail(Number(t.ticketId))}
-              style={{ textAlign: "left", cursor: "pointer" }}
-            >
-              <div className="tab-card-body">
-                <div className="tab-card-header">
-                  <div className="tab-card-title">{t.title ?? "Untitled"}</div>
-                  
-                </div>
+          {visibleItems.map((t) => {
+            const code = String((t as any).ticketCode ?? "").trim(); // ✅ 응답에 ticketCode가 있다고 가정
+            return (
+              <button
+                key={(t as any).ticketId ?? code}
+                type="button"
+                className="tab-card"
+                onClick={() => goDetail(code)}
+                style={{ textAlign: "left", cursor: "pointer" }}
+                disabled={!code}
+                title={!code ? "ticketCode가 없어 상세로 이동할 수 없습니다." : undefined}
+              >
+                <div className="tab-card-body">
+                  <div className="tab-card-header">
+                    <div className="tab-card-title">{t.title ?? "Untitled"}</div>
+                  </div>
 
-                <div className="tab-card-info">
-                  <div>📍 {t.address ?? "-"}</div>
-                  <div>
-                    📅 {t.startDate ?? "-"} ~ {t.endDate ?? "-"}
-                  </div>
-                  <div>
-                    ⏰ {hhmm(t.startTime)} ~ {hhmm(t.endTime)}
+                  <div className="tab-card-info">
+                    <div>📍 {t.address ?? "-"}</div>
+                    <div>
+                      📅 {t.startDate ?? "-"} ~ {t.endDate ?? "-"}
+                    </div>
+                    <div>
+                      ⏰ {hhmm(t.startTime)} ~ {hhmm(t.endTime)}
+                    </div>
+
+                    {/* (선택) 디버깅/가시성용 ticketCode 표시 */}
+                    {/* <div style={{ opacity: 0.7, marginTop: 6 }}>CODE: {code || "-"}</div> */}
                   </div>
                 </div>
-              </div>
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

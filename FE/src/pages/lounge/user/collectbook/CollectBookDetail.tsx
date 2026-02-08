@@ -1,5 +1,5 @@
 // FE/src/pages/lounge/user/collectbook/CollectBookDetail.tsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import "../../lounge.css";
 
@@ -34,6 +34,11 @@ function resolveMaybeRelativeUrl(url?: string) {
   if (!url) return "";
   if (/^https?:\/\//i.test(url)) return url;
 
+  // ✅ DEV에서는 프록시 타게 "그대로" 반환 (baseURL 붙이지 않음)
+  if (import.meta.env.DEV) {
+    return url.startsWith("/") ? url : `/${url}`;
+  }
+
   const base = String(import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
   if (!base) return url;
 
@@ -51,7 +56,11 @@ function resolveTicketMediaAny(v?: string) {
   return resolveMediaUrl(v);
 }
 
-/** <img>가 403/401로 깨질 때 Authorization 포함해서 blob로 재로딩 */
+/**
+ * ✅ TicketCardModern(HeroImage)랑 동일한 패턴으로 맞춤
+ * - <img> 로드 실패 시: Authorization 포함 blob 재시도
+ * - relative 경로면 window.location.origin 붙여서 "같은 오리진"으로 요청 (axios baseURL 영향 제거)
+ */
 function AuthedImage({
   src,
   alt,
@@ -59,16 +68,22 @@ function AuthedImage({
 }: {
   src?: string;
   alt: string;
-  style?: React.CSSProperties;
+  style?: CSSProperties;
 }) {
-  const resolved = useMemo(() => resolveMaybeRelativeUrl(src), [src]);
+  // ✅ src가 상대경로인데 "/"가 없으면 붙여줌 (Router 현재 경로 영향 방지)
+  const normalized = useMemo(() => {
+    const s = String(src ?? "").trim();
+    if (!s) return "";
+    if (/^https?:\/\//i.test(s) || s.startsWith("/")) return s;
+    return `/${s}`;
+  }, [src]);
 
   const [displaySrc, setDisplaySrc] = useState<string>("");
   const [triedBlob, setTriedBlob] = useState(false);
   const blobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    setDisplaySrc(resolved);
+    setDisplaySrc(normalized);
     setTriedBlob(false);
 
     if (blobUrlRef.current) {
@@ -82,9 +97,13 @@ function AuthedImage({
         blobUrlRef.current = null;
       }
     };
-  }, [resolved]);
+  }, [normalized]);
 
-  if (!resolved || !displaySrc) return null;
+  if (!normalized || !displaySrc) return null;
+
+  const requestUrl = /^https?:\/\//i.test(normalized)
+    ? normalized
+    : `${window.location.origin}${normalized}`;
 
   return (
     <img
@@ -98,7 +117,7 @@ function AuthedImage({
         }
         try {
           setTriedBlob(true);
-          const res = await http.get(resolved, { responseType: "blob" });
+          const res = await http.get(requestUrl, { responseType: "blob" }); // ✅ absolute URL이라 baseURL 무시됨
           const objUrl = URL.createObjectURL(res.data);
           blobUrlRef.current = objUrl;
           setDisplaySrc(objUrl);
@@ -263,38 +282,7 @@ export default function CollectBookDetail() {
           </div>
         ) : (
           <div style={{ display: "grid", gap: 14 }}>
-            <TicketCardModern
-              title={(item.title ?? "EXHIBITION").toUpperCase()}
-              ticketCode={item.ticketCode}
-              dateRangeText={formatDateRange(item.startDate, item.endDate)}
-              priceText={`RANK : ${(item as any).collectRank ?? "-"}`}
-              // ✅ 상세 카드도 동일한 src 사용
-              heroImageUrl={ticketImageSrc}
-              metaLeft={item.addressDetail ? `${item.address} (${item.addressDetail})` : item.address}
-              metaRight={"COLLECTED"}
-            />
-
-            <div className="loungeSubPanel">
-              <p className="loungeSubHint" style={{ lineHeight: 1.75 }}>
-                <strong>전시명</strong>: {item.title}
-                <br />
-                <strong>장소</strong>: {item.address} {item.addressDetail ? `(${item.addressDetail})` : ""}
-                <br />
-                <strong>기간</strong>: {item.startDate} ~ {item.endDate}
-                <br />
-                <strong>운영시간</strong>: {hhmm(item.startTime)} ~ {hhmm(item.endTime)}
-                <br />
-                <strong>랭크</strong>: {(item as any).collectRank}
-                <br />
-                <strong>등록일</strong>: {formatKST((item as any).createdAt)}
-                <br />
-                <strong>아티스트</strong>:{" "}
-                <Link to={PROFILE_PATH((item as any).artistUuid)} style={{ textDecoration: "underline" }}>
-                  프로필로 이동
-                </Link>
-              </p>
-            </div>
-
+            {/* ✅ 티켓 이미지 먼저 */}
             <div className="loungeSubPanel">
               <h2 className="loungeSubPanelTitle" style={{ marginBottom: 10 }}>
                 티켓 이미지
@@ -316,6 +304,40 @@ export default function CollectBookDetail() {
               )}
             </div>
 
+            {/* ✅ 카드 */}
+            <TicketCardModern
+              title={(item.title ?? "EXHIBITION").toUpperCase()}
+              ticketCode={item.ticketCode}
+              dateRangeText={formatDateRange(item.startDate, item.endDate)}
+              priceText={`RANK : ${(item as any).collectRank ?? "-"}`}
+              heroImageUrl={ticketImageSrc}
+              metaLeft={item.addressDetail ? `${item.address} (${item.addressDetail})` : item.address}
+              metaRight={"COLLECTED"}
+            />
+
+            {/* ✅ 상세 정보 */}
+            <div className="loungeSubPanel">
+              <p className="loungeSubHint" style={{ lineHeight: 1.75 }}>
+                <strong>전시명</strong>: {item.title}
+                <br />
+                <strong>장소</strong>: {item.address} {item.addressDetail ? `(${item.addressDetail})` : ""}
+                <br />
+                <strong>기간</strong>: {item.startDate} ~ {item.endDate}
+                <br />
+                <strong>운영시간</strong>: {hhmm(item.startTime)} ~ {hhmm(item.endTime)}
+                <br />
+                <strong>랭크</strong>: {(item as any).collectRank}
+                <br />
+                <strong>등록일</strong>: {formatKST((item as any).createdAt)}
+                <br />
+                <strong>아티스트</strong>:{" "}
+                <Link to={PROFILE_PATH((item as any).artistUuid)} style={{ textDecoration: "underline" }}>
+                  프로필로 이동
+                </Link>
+              </p>
+            </div>
+
+            {/* ✅ QR */}
             <div className="loungeSubPanel">
               <h2 className="loungeSubPanelTitle" style={{ marginBottom: 10 }}>
                 QR

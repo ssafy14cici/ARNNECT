@@ -180,9 +180,7 @@ export default function RemindQuiz() {
 
       {state === "error" && (
         <div className="loungeEmpty">
-          퀴즈 데이터를 불러올 수 없습니다.
-          <br />
-          (1) /api/v1/remind 응답 확인 (2) 로그인/토큰 (3) PATH(baseURL) 점검
+          리뷰를 작성해주세요!
         </div>
       )}
 
