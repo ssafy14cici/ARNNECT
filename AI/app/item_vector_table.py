@@ -62,3 +62,36 @@ class ItemVectorTable:
             self._mmap.flush()
         except Exception:
             pass
+
+    def ensure_capacity(self, needed_num_items: int) -> None:
+        needed_num_items = int(needed_num_items)
+        if needed_num_items <= self.num_items:
+            return
+
+        # ✅ grow size (2배 확장 등)
+        new_num_items = max(needed_num_items, self.num_items * 2)
+
+        # 기존 mmap 닫기
+        try:
+            self._mmap.flush()
+        except Exception:
+            pass
+        del self._mmap
+
+        # 파일 크기 확장 + 새 영역 0으로
+        arr = np.memmap(self.path, dtype=np.float32, mode="r+", shape=(self.num_items, self.dim))
+        arr.flush()
+        del arr
+
+        new_arr = np.memmap(self.path, dtype=np.float32, mode="r+", shape=(new_num_items, self.dim))
+        new_arr[self.num_items:new_num_items, :] = 0.0
+        new_arr.flush()
+
+        self.num_items = new_num_items
+        self.meta_path.write_text(
+            json.dumps({"num_items": self.num_items, "dim": self.dim}, indent=2),
+            encoding="utf-8",
+        )
+
+        # 새 mmap 다시 열기
+        self._mmap = np.memmap(self.path, dtype=np.float32, mode="r+", shape=(self.num_items, self.dim))

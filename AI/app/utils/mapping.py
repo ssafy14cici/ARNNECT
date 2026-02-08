@@ -9,16 +9,12 @@ from pathlib import Path
 
 @dataclass
 class IdMapping:
-    piece2idx: Dict[str, int]
-    idx2piece: Dict[int, str]
+    # [수정] Key와 Value의 타입을 명확히 int로 변경
+    piece2idx: Dict[int, int]  # artworkId(int) -> index(int)
+    idx2piece: Dict[int, int]  # index(int) -> artworkId(int)
 
 
 def _atomic_write_json(path: str, obj) -> None:
-    """Best-effort atomic JSON write.
-
-    - Same directory에 임시 파일을 만든 뒤 os.replace(...)로 교체합니다.
-    - 멀티프로세스 동시 쓰기까지 완벽하게 막지는 못하지만, 파일 깨짐은 방지합니다.
-    """
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(prefix=p.name + ".", suffix=".tmp", dir=str(p.parent))
@@ -27,7 +23,6 @@ def _atomic_write_json(path: str, obj) -> None:
             json.dump(obj, f, ensure_ascii=False, indent=2)
         os.replace(tmp_path, str(p))
     finally:
-        # tmp가 남아있으면 정리
         try:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
@@ -36,18 +31,6 @@ def _atomic_write_json(path: str, obj) -> None:
 
 
 def load_or_init_mapping(mapping_dir: str) -> IdMapping:
-    """Load mapping files if exist, otherwise create default mapping.
-
-    Files created/used:
-      - piece_index.json (artwork_id -> index)
-      - idx_to_piece.json (index -> artwork_id)
-
-    Compatibility aliases (same content):
-      - piece_to_index.json
-      - index_to_piece.json
-
-    Index 0 is reserved for PAD.
-    """
     mapping_dir = str(mapping_dir)
     p_piece_index = os.path.join(mapping_dir, "piece_index.json")
     p_idx_to_piece = os.path.join(mapping_dir, "idx_to_piece.json")
@@ -55,35 +38,61 @@ def load_or_init_mapping(mapping_dir: str) -> IdMapping:
     if os.path.exists(p_piece_index) and os.path.exists(p_idx_to_piece):
         return load_mapping(p_piece_index, p_idx_to_piece)
 
-    # default mapping
-    m = IdMapping(piece2idx={"__PAD__": 0}, idx2piece={0: "__PAD__"})
+    # [수정] PAD ID는 0(int)으로 유지, artworkId 매핑 없음
+    m = IdMapping(piece2idx={}, idx2piece={0: 0}) 
+    # 주의: 0번 인덱스는 PAD용으로 쓰지만, 실제 artworkId '0'과 겹칠 수 있으므로
+    # 보통 artworkId 0은 시스템상 예약하거나 사용하지 않는 것이 안전합니다.
+    # 여기서는 artworkId=0이 들어오면 index=0(PAD)과 충돌할 수 있으니 주의 필요.
+    
     save_mapping(p_piece_index, p_idx_to_piece, m)
     return m
 
 def load_mapping(piece_index_path: str, idx_to_piece_path: str) -> IdMapping:
-    p2i = json.loads(Path(piece_index_path).read_text(encoding="utf-8"))
+    p2i_raw = json.loads(Path(piece_index_path).read_text(encoding="utf-8"))
     i2p_raw = json.loads(Path(idx_to_piece_path).read_text(encoding="utf-8"))
-    # idx_to_piece.json이 {"0":"PAD", "1":"..."} 처럼 string key일 수 있으니 int로 변환
-    i2p = {int(k): v for k, v in i2p_raw.items()}
+    
+    # [수정] JSON Key는 무조건 String이므로, 로드 후 int로 변환
+    # piece2idx: Key(artworkId_str) -> Value(index_int)
+    p2i = {}
+    for k, v in p2i_raw.items():
+        if k == "__PAD__": continue # 레거시 호환
+        p2i[int(k)] = int(v)
+
+    # idx2piece: Key(index_str) -> Value(artworkId_int)
+    i2p = {}
+    for k, v in i2p_raw.items():
+        if v == "__PAD__": 
+            i2p[int(k)] = 0
+        else:
+            i2p[int(k)] = int(v)
+            
     return IdMapping(piece2idx=p2i, idx2piece=i2p)
 
 def save_mapping(piece_index_path: str, idx_to_piece_path: str, mapping: IdMapping):
-    # primary files
-    _atomic_write_json(piece_index_path, mapping.piece2idx)
-    idx2piece_str = {str(k): v for k, v in mapping.idx2piece.items()}
-    _atomic_write_json(idx_to_piece_path, idx2piece_str)
+    # [수정] JSON 저장을 위해 Key를 String으로 변환
+    # piece2idx: artworkId(int) -> index(int)
+    p2i_str_key = {str(k): v for k, v in mapping.piece2idx.items()}
+    
+    # idx2piece: index(int) -> artworkId(int)
+    i2p_str_key = {str(k): v for k, v in mapping.idx2piece.items()}
 
-    # compatibility aliases (some code/users prefer these names)
+    _atomic_write_json(piece_index_path, p2i_str_key)
+    _atomic_write_json(idx_to_piece_path, i2p_str_key)
+
+    # 호환성 파일 저장
     mapping_dir = str(Path(piece_index_path).parent)
-    _atomic_write_json(os.path.join(mapping_dir, "piece_to_index.json"), mapping.piece2idx)
-    _atomic_write_json(os.path.join(mapping_dir, "index_to_piece.json"), idx2piece_str)
+    _atomic_write_json(os.path.join(mapping_dir, "piece_to_index.json"), p2i_str_key)
+    _atomic_write_json(os.path.join(mapping_dir, "index_to_piece.json"), i2p_str_key)
 
-def ensure_artwork(mapping: IdMapping, artwork_id: str) -> Tuple[IdMapping, int, bool]:
-    """Ensure artwork_id exists in mapping. Return (mapping, idx, created?)."""
+def ensure_artwork(mapping: IdMapping, artwork_id: int) -> Tuple[IdMapping, int, bool]:
+    """Ensure artwork_id(int) exists in mapping."""
     if artwork_id in mapping.piece2idx:
-        return mapping, int(mapping.piece2idx[artwork_id]), False
-    # index 0 is PAD, new ids start from 1
-    new_idx = max(mapping.idx2piece.keys()) + 1 if mapping.idx2piece else 1
-    mapping.piece2idx[artwork_id] = int(new_idx)
-    mapping.idx2piece[int(new_idx)] = artwork_id
-    return mapping, int(new_idx), True
+        return mapping, mapping.piece2idx[artwork_id], False
+    
+    # index 0 is PAD
+    current_max_idx = max(mapping.idx2piece.keys()) if mapping.idx2piece else 0
+    new_idx = current_max_idx + 1
+    
+    mapping.piece2idx[artwork_id] = new_idx
+    mapping.idx2piece[new_idx] = artwork_id
+    return mapping, new_idx, True
