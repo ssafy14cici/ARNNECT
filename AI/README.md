@@ -12,11 +12,8 @@
 - [로컬 환경 테스트](#-로컬-환경-테스트)
 - [Docker 이미지 빌드 및 배포](#-docker-이미지-빌드-및-배포)
 - [RunPod 배포](#-runpod-배포)
-- [운영 환경 구성](#-운영-환경-구성)
 - [배포 후 검증](#-배포-후-검증)
-- [트러블슈팅](#-트러블슈팅)
 - [Best Practices](#-best-practices)
-- [FAQ](#-faq)
 
 ---
 
@@ -64,10 +61,21 @@ AI/
 ├── requirements.txt                # Python 의존성
 ├── service.py                      # BentoML 서비스 엔트리포인트
 ├── app/                            # 추천 로직 모듈
-│   ├── recommenders/
-│   ├── embeddings/
-│   ├── repositories/
-│   └── schemas.py
+│   ├── _pychace_/
+│   ├── models/
+│       ├── __init__.py
+│       ├── loader.py               # 데이터를 로드
+│       ├── sasrec_twotower.py      # TwoTower 모델
+│       └── README.md
+│   ├── utils/
+│       ├── __init__.py
+│       ├── chroma_store.py         # chromaDB 저장 로직
+│       ├── clip_embedder.py        # 작품 임베딩 벡터
+│       ├── config.py               # 환경 설정
+│       ├── item_vector_table.py    # 아이템 벡터 저장 테이블
+│       ├── mapping_store.py        # idx <=> artwork 맵핑
+│       ├── recommender.py          # 추천 시스템
+│       └── schemas.py              # chromaDB 데이터 형식
 └── artifacts/                      # ⚠️ 런타임 필수 아티팩트
     ├── checkpoints/
     │   ├── BEST_SASRec_model.pth
@@ -127,13 +135,6 @@ curl -s http://localhost:8000/health
 
 ## 🐳 Docker 이미지 빌드 및 배포
 
-### 배포 방식 비교
-
-| 방식 | 장점 | 단점 | 추천 |
-|------|------|------|------|
-| **A) Registry Push** | 재현성 ⭐⭐⭐<br>속도 ⭐⭐⭐<br>운영 적합 | Registry 필요 | ✅ **강력 권장** |
-| **B) Pod 내부 빌드** | Registry 불필요 | 느림<br>재현성 낮음 | ⚠️ 비권장 |
-
 ### Registry에 이미지 Push (권장)
 
 ```bash
@@ -161,7 +162,15 @@ RunPod 콘솔에서 새 Pod 생성:
 | **GPU Type** | 서비스 요구사항에 맞게 선택 (예: RTX 4090, A100) |
 | **Volume** | `/workspace/artifacts` (영속 스토리지 마운트) |
 
-### Step 2: 환경 변수 설정
+### Step 2: Local => RunPod 저장소 이전
+Runpod 실행 시 Container image 밑에 Container Start Command 명령어 다음과 같이 등록
+'''
+bash -c "mkdir -p /workspace/artifacts && \
+cp -r /opt/artifacts_base/* /workspace/artifacts/ && \
+bentoml serve service:RecoService --host 0.0.0.0 --port 8000"
+'''
+
+### (또는) Step 3: 환경 변수 설정
 
 RunPod UI의 **Environment Variables**에 아래 추가:
 
@@ -174,10 +183,6 @@ SASREC_CKPT=/workspace/artifacts/checkpoints/BEST_SASRec_model.pth
 TWOTOWER_CKPT=/workspace/artifacts/checkpoints/BEST_BestRecommend_model.pth
 DEVICE=cuda:0
 ```
-
-> ⚠️ **주의**: 절대 경로 사용으로 컨테이너 내부 기본값과의 충돌 방지
-
----
 
 ## 🗄️ 운영 환경 구성
 
@@ -250,7 +255,29 @@ curl -s http://<runpod-url>:8000/health
 }
 ```
 
-### 2. 추천 API 테스트
+### 2. 작품 임베딩
+```bash
+curl -X POST "http://<runpod-url>:8000/embed_artwork" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "artworkId" : 1,
+    "artistId" : 2,
+    "category" : 3,
+    "image" : "원본 이미지 전송"
+  }'
+```
+
+**예상 응답**:
+```json
+{
+  "artworkId" : 1,
+  "artistId" : 2,
+  "category" : 3,
+  "artworkVector" : [0,00000...., ... , 0.00000] (512D Vector)
+}
+```
+
+### 3. 추천 API 테스트
 
 ```bash
 curl -X POST "http://<runpod-url>:8000/recommend" \
@@ -258,8 +285,8 @@ curl -X POST "http://<runpod-url>:8000/recommend" \
   -d '{
     "memberId": 123,
     "logs": [
-      {"artworkId": 111, "action": 1},
-      {"artworkId": 222, "action": 3}
+      {"artworkId": 111, "action": "VIEW"},
+      {"artworkId": 222, "action": "VIEW"}
     ]
   }'
 ```
@@ -268,8 +295,10 @@ curl -X POST "http://<runpod-url>:8000/recommend" \
 ```json
 {
   "recommendations": [
-    {"artworkId": 333, "score": 0.92},
-    {"artworkId": 444, "score": 0.87}
+    {"rank" : 1, "artworkId": 333},
+    {"rank" : 2, "artworkId": 444},
+    ... ,
+    {"rank" : 500, "artworkId": 3210},
   ]
 }
 ```
@@ -409,53 +438,6 @@ BATCH_SIZE=64
 
 ---
 
-## ❓ FAQ
-
-### Q1. 컨테이너 이미지에 artifacts를 넣으면 안 되나요?
-
-**A**: 테스트/데모 환경에서는 가능하지만, 운영 환경에서는 비추천합니다.
-
-**이유**:
-- 모델/매핑 업데이트 시 10GB 이상의 이미지 재빌드/재배포 필요
-- ChromaDB는 운영 중 계속 변경되므로 이미지에 포함 시 데이터 손실
-- Volume 사용 시 Pod 재시작/교체 시에도 데이터 유지
-
----
-
-### Q2. Volume 없이 운영 가능한가요?
-
-**A**: 기술적으로는 가능하지만 강력히 비추천합니다.
-
-**문제점**:
-- Pod 재시작 시 ChromaDB/매핑/벡터 초기화
-- 학습된 추천 품질 손실
-- 매 재배포마다 artifacts 다시 업로드 필요
-
----
-
-### Q3. GPU 메모리 부족 에러 발생 시
-
-**A**: 배치 크기 조정 또는 모델 경량화 고려
-
-```bash
-# 환경변수로 배치 크기 제어
-INFERENCE_BATCH_SIZE=32
-
-# 또는 Mixed Precision 사용
-ENABLE_FP16=true
-```
-
----
-
-### Q4. 여러 Pod에서 동일한 Volume 공유 가능한가요?
-
-**A**: RunPod Volume은 기본적으로 단일 Pod 마운트만 지원합니다.
-
-**다중 Pod 운영 시**:
-- 각 Pod마다 독립적인 Volume 사용
-- 또는 S3/GCS 같은 공유 스토리지 활용
-
----
 
 ## 📚 빠른 시작 요약
 
@@ -493,17 +475,3 @@ docker push <username>/reco-service:latest
 curl http://<runpod-url>:8000/health
 curl -X POST http://<runpod-url>:8000/recommend -H "Content-Type: application/json" -d '{"memberId":123,"logs":[]}'
 ```
-
----
-
-## 📞 지원
-
-문제 발생 시:
-1. [RunPod Logs] 확인
-2. [트러블슈팅 섹션](#-트러블슈팅) 참고
-3. GitHub Issues 등록
-
----
-
-**Last Updated**: 2026-02-08  
-**Version**: 1.0.0
