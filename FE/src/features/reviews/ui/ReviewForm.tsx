@@ -21,19 +21,16 @@ function publicAssetUrl(path: string) {
   return `${import.meta.env.BASE_URL}${p}`;
 }
 
-/**
- * ✅ (참고) 기존에는 기본이미지를 서버에 업로드하려고 urlToFile을 썼는데,
- * "이미지 없이도 글 등록" 요구사항이면 서버 업로드는 하지 않는 게 맞음.
- * - 지금은 미리보기용 기본 이미지 표시만 하고, 업로드는 사용자가 파일 선택했을 때만 함.
- */
-// async function urlToFile(url: string): Promise<File> {
-//   const res = await fetch(url, { cache: "no-store" });
-//   if (!res.ok) throw new Error(`Failed to fetch default image: ${url} (${res.status})`);
-//   const blob = await res.blob();
-//   const filename = url.split("/").pop()?.split("?")[0] || "default.jpg";
-//   const mime = blob.type && blob.type.length > 0 ? blob.type : "image/jpeg";
-//   return new File([blob], filename, { type: mime });
-// }
+// ✅ URL(기본 이미지)을 File로 변환해서 서버에 업로드 가능하게
+async function urlToFile(url: string): Promise<File> {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch default image: ${url} (${res.status})`);
+  const blob = await res.blob();
+
+  const filename = url.split("/").pop()?.split("?")[0] || "default.jpg";
+  const mime = blob.type && blob.type.length > 0 ? blob.type : "image/jpeg";
+  return new File([blob], filename, { type: mime });
+}
 
 export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
   const [imageFile, setImageFile] = useState<File | null>(initial?.imageFile ?? null);
@@ -42,6 +39,9 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
   const defaultUrlRef = useRef(
     publicAssetUrl(DEFAULT_IMAGES[Math.floor(Math.random() * DEFAULT_IMAGES.length)]),
   );
+
+  // ✅ 기본이미지 File도 한 번만 만들고 캐시(등록 버튼 여러번 눌러도 fetch 반복 방지)
+  const defaultFileRef = useRef<File | null>(null);
 
   const [previewUrl, setPreviewUrl] = useState<string>(defaultUrlRef.current);
 
@@ -66,7 +66,6 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
 
   // ✅ 미리보기: 파일 있으면 blob URL, 없으면 기본 이미지 URL
   useEffect(() => {
-    // 이전 blob URL 정리
     if (blobUrlRef.current) {
       URL.revokeObjectURL(blobUrlRef.current);
       blobUrlRef.current = null;
@@ -95,7 +94,6 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
   };
 
   const validate = () => {
-    // ✅ 이미지 없이도 등록 가능 (검증에서 이미지 체크 제거)
     if (!reviewTitle.trim()) return "제목을 입력해주세요.";
     if (!reviewText.trim()) return "내용을 입력해주세요.";
 
@@ -106,18 +104,36 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
     return null;
   };
 
+  const ensureDefaultFile = async () => {
+    if (defaultFileRef.current) return defaultFileRef.current;
+    const f = await urlToFile(defaultUrlRef.current);
+    defaultFileRef.current = f;
+    return f;
+  };
+
   const submit = async () => {
-    if (submitting) return; // ✅ 중복 제출 방지
+    if (submitting) return;
     const err = validate();
     if (err) return alert(err);
 
-    // ✅ 이미지 없이도 payload가 만들어지도록: 파일 선택한 경우에만 imageFile 포함
+    // ✅ 파일 없으면 기본 이미지 File을 만들어서 같이 보냄(백엔드가 이미지 필수일 때)
+    let finalImageFile = imageFile;
+    if (!finalImageFile) {
+      try {
+        finalImageFile = await ensureDefaultFile();
+      } catch (error) {
+        console.error("[ReviewForm] Failed to load default image:", error);
+        console.error("[ReviewForm] defaultUrlRef.current =", defaultUrlRef.current);
+        return alert("기본 이미지를 불러오는데 실패했습니다.");
+      }
+    }
+
     const payload: ReviewCreateReq = {
       title: reviewTitle.trim(),
       content: reviewText.trim(),
       artworkId: Number(artworkId),
-      tags: parsedTags, // ✅ 없으면 []
-      ...(imageFile ? { imageFile } : {}), // ✅ 핵심: 선택 시에만 포함
+      tags: parsedTags,
+      imageFile: finalImageFile, // ✅ 항상 포함(유저 파일 or 기본 파일)
     };
 
     await onSubmit(payload);
@@ -136,7 +152,7 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
               disabled={!!submitting}
             />
 
-            {/* ✅ 기본이미지도 미리보기로 항상 보이게 (서버 업로드는 아님) */}
+            {/* ✅ 기본이미지도 미리보기로 항상 보이게 */}
             <img
               src={previewUrl}
               alt="Preview"
