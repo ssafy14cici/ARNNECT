@@ -198,21 +198,51 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
   const saveProfileFromModal = async (payload: UpdateMyProfilePatch, nextFeaturedIds: string[]) => {
     if (!isOwner) return false;
 
+    const prev = profile;
     setBusy(true);
-    try {
-      // 1) 프로필 정보 업데이트
-      await profileApi.updateMyProfile(profile.role, payload);
 
-      // 2) 대표 뱃지 업데이트
+    try {
+      // ✅ 낙관적 업데이트: 서버 응답 전에 UI부터 즉시 업데이트
+      const optimisticProfile: ProfileModel = { ...prev } as ProfileModel;
+
+      // 닉네임 즉시 반영 (name 필드는 화면 표시용)
+      if (payload.nickname) {
+        optimisticProfile.name = payload.nickname;
+        // UserProfile인 경우 nickname도 업데이트
+        if (optimisticProfile.role === "USER") {
+          (optimisticProfile as UserProfile).nickname = payload.nickname;
+        }
+      }
+
+      // 이미지 즉시 반영 (File 객체를 ObjectURL로 변환)
+      if (payload.image && payload.image instanceof File) {
+        const imageUrl = URL.createObjectURL(payload.image);
+        optimisticProfile.imageUrl = imageUrl;
+      }
+
+      // 대표 뱃지 즉시 반영
+      optimisticProfile.featuredBadgeIds = nextFeaturedIds;
+
+      // UI 즉시 업데이트
+      onProfileUpdated(optimisticProfile);
+
+      // 백그라운드로 서버 업데이트 시도
+      await profileApi.updateMyProfile(profile.role, payload);
       const targetId = profile.id;
       await profileApi.updateFeaturedBadges(profile.role, targetId, nextFeaturedIds);
 
-      // 3) 최신 프로필 재조회로 화면에 즉시 반영
-      const latest = await profileApi.getMyProfile();
-      onProfileUpdated({ ...(latest as ProfileModel), featuredBadgeIds: nextFeaturedIds } as ProfileModel);
+      // 서버에서 최신 프로필 재조회 (성공 시에만)
+      try {
+        const latest = await profileApi.getMyProfile();
+        onProfileUpdated({ ...(latest as ProfileModel), featuredBadgeIds: nextFeaturedIds } as ProfileModel);
+      } catch {
+        // 재조회 실패해도 낙관적 업데이트는 유지
+      }
 
       return true;
     } catch (e) {
+      // 서버 요청 실패 시 이전 상태로 롤백
+      onProfileUpdated(prev);
       alert(e instanceof Error ? e.message : "프로필 저장 실패");
       return false;
     } finally {
