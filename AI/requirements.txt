@@ -1,6 +1,9 @@
-bentoml==1.4.34
-torch==2.10.0
-torchvision==0.25.0
-numpy==2.4.1
-open-clip-torch==3.2.0
-pillow==12.1.0
+bentoml>=1.4,<2.0
+torch>=2.1
+numpy>=1.24
+pillow>=10.0
+pydantic>=2.0
+requests>=2.31
+chromadb>=0.5
+transformers>=4.41
+mlflow>=2.10

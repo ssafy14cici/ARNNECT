@@ -1,0 +1,21 @@
+# 1. 사용자 요청 제외 폴더
+data/
+scripts/
+
+# 2. 파이썬 필수 제외 (캐시 파일 등)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 3. 가상환경 (venv 등을 쓴다면)
+venv/
+.venv/
+env/
+
+# 4. 환경변수 및 보안 (절대 올리면 안 됨!)
+.env
+.DS_Store
+
+# 5. IDE 설정 (VSCode 등)
+.vscode/
+.idea/
