@@ -1,6 +1,8 @@
 package com.ssafy.arnnect.preference.application.service;
 
 import com.ssafy.arnnect.artwork.application.service.ArtworkService;
+import com.ssafy.arnnect.common.logs.UserLogAction;
+import com.ssafy.arnnect.common.logs.UserLoggable;
 import com.ssafy.arnnect.preference.application.dto.request.ResultArtworkIdRequest;
 import com.ssafy.arnnect.preference.application.dto.response.ArtworkResponse;
 import com.ssafy.arnnect.preference.application.dto.response.GenreWithArtworksResponse;
@@ -59,6 +61,7 @@ public class PreferenceService {
     }
 
     @Transactional
+    @UserLoggable(action = UserLogAction.SELECT)
     public String saveMBTIResult(String memberUuid, ResultArtworkIdRequest request){
         List<Long> genreIds = artworkService.findGenreIdsByArtworkIds(request.getArtworkIdList());
         String type = calculate(genreIds);
