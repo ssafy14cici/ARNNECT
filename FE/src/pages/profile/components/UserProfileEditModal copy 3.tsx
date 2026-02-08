@@ -95,12 +95,16 @@ export default function UserProfileEditModal({
 
     const propIds = (earnedBadges ?? []).map((b) => b.id);
 
+    console.log("[badge] earnedBadges(prop) =", earnedBadges);
+    console.log("[badge] earnedIds(prop) =", propIds);
+
     if (propIds.length > 0) {
       setEarnedIdsFallback([]);
       setBadgeHint(null);
       return;
     }
 
+    // ✅ FE-only 안전모드: 활동량 조회 못하니 전체 뱃지 노출
     setEarnedIdsFallback(ALL_BADGE_IDS);
     setBadgeHint("활동량 조회 API가 막혀 있어 전체 뱃지를 표시합니다. (추후 연동 시 '획득만'으로 변경 가능)");
   }, [open, (earnedBadges ?? []).length]);
@@ -162,68 +166,40 @@ export default function UserProfileEditModal({
   return (
     <>
       <div className="profileModalOverlay" role="dialog" aria-modal="true">
-        {/* ✅ 스코프용 클래스 추가 */}
-        <div className="profileModal profileModal--user">
-          <div className="profileModalHeader profileModalHeader--user">
-            <div className="profileModalTitleWrap">
-              <h2 className="profileModalTitle">유저 프로필 편집</h2>
-              <p className="profileModalSubtitle">닉네임, 비밀번호, 이미지, 대표 뱃지를 설정합니다.</p>
-            </div>
-
-            <button className="profileTextBtn profileTextBtn--close" onClick={close} type="button">
+        <div className="profileModal">
+          <div className="profileModalHeader">
+            <strong>유저 프로필 편집</strong>
+            <button className="profileTextBtn" onClick={close} type="button">
               닫기
             </button>
           </div>
 
-          <div className="profileForm profileForm--user">
-            {/* 기본정보 */}
-            <section className="profileSection">
-              <div className="profileSectionHead">
-                <h3 className="profileSectionTitle">기본정보</h3>
-              </div>
+          <div className="profileForm">
+            <label className="profileLabel">
+              닉네임
+              <input
+                className="profileInput"
+                value={draftNickname}
+                onChange={(e) => setDraftNickname(e.target.value)}
+                placeholder="닉네임(최대 50자)"
+              />
+            </label>
 
-              <div className="profileField">
-                <label className="profileFieldLabel" htmlFor="nickname">
-                  닉네임
-                </label>
-                <input
-                  id="nickname"
-                  className="profileInput profileInput--modal"
-                  value={draftNickname}
-                  onChange={(e) => setDraftNickname(e.target.value)}
-                  placeholder="닉네임(최대 50자)"
-                  maxLength={50}
-                />
-              </div>
-            </section>
+            <label className="profileLabel">
+              비밀번호 변경(선택)
+              <input
+                className="profileInput"
+                type="password"
+                value={draftPassword}
+                onChange={(e) => setDraftPassword(e.target.value)}
+                placeholder="8자 이상"
+              />
+              <span className="profileHelp">비워두면 변경하지 않습니다.</span>
+            </label>
 
-            {/* 보안 */}
-            <section className="profileSection">
-              <div className="profileSectionHead">
-                <h3 className="profileSectionTitle">보안</h3>
-              </div>
-
-              <div className="profileField">
-                <label className="profileFieldLabel" htmlFor="password">
-                  비밀번호 변경 (선택)
-                </label>
-                <input
-                  id="password"
-                  className="profileInput profileInput--modal"
-                  type="password"
-                  value={draftPassword}
-                  onChange={(e) => setDraftPassword(e.target.value)}
-                  placeholder="8자 이상"
-                />
-                <p className="profileHelp">비워두면 변경하지 않습니다.</p>
-              </div>
-            </section>
-
-            {/* 프로필 이미지 */}
-            <section className="profileSection">
-              <div className="profileSectionHead profileRowBetween">
-                <h3 className="profileSectionTitle">프로필 이미지</h3>
-
+            <div className="profileLabel">
+              <div className="profileRowBetween">
+                <span>프로필 이미지</span>
                 <label className="profileFileBtn">
                   파일 선택
                   <input
@@ -235,62 +211,62 @@ export default function UserProfileEditModal({
                 </label>
               </div>
 
-              <div className="profileImagePreviewRow profileImagePreviewRow--modal">
+              <div className="profileImagePreviewRow">
                 <img
-                  className="profileImagePreview profileImagePreview--modal"
+                  className="profileImagePreview"
                   src={previewSrc}
                   alt="프로필 미리보기"
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).style.display = "none";
                   }}
                 />
-
-                <div className="profileImageMeta">
-                  <p className="profileHelp">새 파일을 선택하면 업로드됩니다. (URL 입력 방식 X)</p>
-                  {draftImageFile && (
-                    <p className="profileHintMuted">
-                      선택됨: {draftImageFile.name} · {(draftImageFile.size / 1024 / 1024).toFixed(2)}MB
-                    </p>
-                  )}
-                </div>
+                <span className="profileHelp">새 파일을 선택하면 업로드됩니다. (URL 입력 방식 X)</span>
               </div>
-            </section>
+            </div>
 
-            {/* 대표 뱃지 */}
-            <section className="profileSection">
-              <div className="profileSectionHead profileRowBetween">
-                <div>
-                  <h3 className="profileSectionTitle">대표 뱃지</h3>
-                  <p className="profileSectionDesc">최대 3개까지 선택할 수 있습니다.</p>
-                </div>
-
-                <button type="button" className="profileTextBtn profileTextBtn--cta" onClick={() => setPickerOpen(true)}>
-                  선택하기
+            <div className="profileLabel">
+              <div className="profileRowBetween">
+                <span>대표 뱃지 (최대 3개)</span>
+                <button type="button" className="profileTextBtn" onClick={() => setPickerOpen(true)}>
+                  선택하기 &gt;
                 </button>
               </div>
 
-              {badgeHint && <div className="profileHelp profileHelp--hint">{badgeHint}</div>}
+              {badgeHint && (
+                <div className="profileHelp" style={{ opacity: 0.85 }}>
+                  {badgeHint}
+                </div>
+              )}
 
               <div className="profileBadgePreview">
                 {draftBadgeObjects.length > 0 ? (
                   draftBadgeObjects.map((b) => (
-                    <span key={b.id} className="profileBadgePill">
-                      <img src={badgeImageSrc(b.id)} alt="" className="profileBadgeIcon" loading="lazy" />
-                      <span className="profileBadgeLabel">{b.label}</span>
+                    <span
+                      key={b.id}
+                      className="profileBadgePill"
+                      style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
+                    >
+                      <img
+                        src={badgeImageSrc(b.id)}
+                        alt=""
+                        style={{ width: 16, height: 16, objectFit: "contain" }}
+                        loading="lazy"
+                      />
+                      {b.label}
                     </span>
                   ))
                 ) : (
                   <span className="profileHintMuted">선택된 뱃지가 없습니다.</span>
                 )}
               </div>
-            </section>
+            </div>
           </div>
 
-          <div className="profileModalActions profileModalActions--user">
-            <button className="profileBtn profileBtn--ghost" onClick={close} type="button">
+          <div className="profileModalActions">
+            <button className="profileBtn" onClick={close} type="button">
               취소
             </button>
-            <button className="profileBtn profileBtn--primary" disabled={busy} onClick={handleSave} type="button">
+            <button className="profileBtn" disabled={busy} onClick={handleSave} type="button">
               저장
             </button>
           </div>
