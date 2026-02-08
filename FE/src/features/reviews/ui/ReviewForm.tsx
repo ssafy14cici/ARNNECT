@@ -21,16 +21,19 @@ function publicAssetUrl(path: string) {
   return `${import.meta.env.BASE_URL}${p}`;
 }
 
-// ✅ URL(기본 이미지)을 File로 변환해서 서버에 업로드 가능하게
-async function urlToFile(url: string): Promise<File> {
-  const res = await fetch(url, { cache: "no-store" }); // dev에서 캐시로 헷갈리면 no-store가 편함
-  if (!res.ok) throw new Error(`Failed to fetch default image: ${url} (${res.status})`);
-  const blob = await res.blob();
-
-  const filename = url.split("/").pop()?.split("?")[0] || "default.jpg";
-  const mime = blob.type && blob.type.length > 0 ? blob.type : "image/jpeg";
-  return new File([blob], filename, { type: mime });
-}
+/**
+ * ✅ (참고) 기존에는 기본이미지를 서버에 업로드하려고 urlToFile을 썼는데,
+ * "이미지 없이도 글 등록" 요구사항이면 서버 업로드는 하지 않는 게 맞음.
+ * - 지금은 미리보기용 기본 이미지 표시만 하고, 업로드는 사용자가 파일 선택했을 때만 함.
+ */
+// async function urlToFile(url: string): Promise<File> {
+//   const res = await fetch(url, { cache: "no-store" });
+//   if (!res.ok) throw new Error(`Failed to fetch default image: ${url} (${res.status})`);
+//   const blob = await res.blob();
+//   const filename = url.split("/").pop()?.split("?")[0] || "default.jpg";
+//   const mime = blob.type && blob.type.length > 0 ? blob.type : "image/jpeg";
+//   return new File([blob], filename, { type: mime });
+// }
 
 export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
   const [imageFile, setImageFile] = useState<File | null>(initial?.imageFile ?? null);
@@ -92,7 +95,7 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
   };
 
   const validate = () => {
-    // ✅ 이미지는 선택사항 (없으면 기본 이미지로 대체 업로드)
+    // ✅ 이미지 없이도 등록 가능 (검증에서 이미지 체크 제거)
     if (!reviewTitle.trim()) return "제목을 입력해주세요.";
     if (!reviewText.trim()) return "내용을 입력해주세요.";
 
@@ -108,28 +111,14 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
     const err = validate();
     if (err) return alert(err);
 
-    // ✅ 파일 없으면(=유저가 업로드 안함) 기본이미지를 File로 변환해 업로드
-    let finalImageFile = imageFile;
-    if (!finalImageFile) {
-      try {
-        finalImageFile = await urlToFile(defaultUrlRef.current);
-      } catch (error) {
-        console.error("[ReviewForm] Failed to load default image:", error);
-        console.error("[ReviewForm] defaultUrlRef.current =", defaultUrlRef.current);
-        return alert("기본 이미지를 불러오는데 실패했습니다.");
-      }
-    }
-
+    // ✅ 이미지 없이도 payload가 만들어지도록: 파일 선택한 경우에만 imageFile 포함
     const payload: ReviewCreateReq = {
       title: reviewTitle.trim(),
       content: reviewText.trim(),
       artworkId: Number(artworkId),
       tags: parsedTags, // ✅ 없으면 []
-      imageFile: finalImageFile,
+      ...(imageFile ? { imageFile } : {}), // ✅ 핵심: 선택 시에만 포함
     };
-
-    // 디버그가 필요하면 잠깐 켜기
-    // console.log("[ReviewForm submit payload]", payload);
 
     await onSubmit(payload);
   };
@@ -147,13 +136,12 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
               disabled={!!submitting}
             />
 
-            {/* ✅ 기본이미지도 미리보기로 항상 보이게 */}
+            {/* ✅ 기본이미지도 미리보기로 항상 보이게 (서버 업로드는 아님) */}
             <img
               src={previewUrl}
               alt="Preview"
               className="pc-preview-img"
               onError={(e) => {
-                // 기본 이미지 로드 실패 시에도 안전하게 (경로 문제 등)
                 e.currentTarget.src = defaultUrlRef.current;
               }}
             />
