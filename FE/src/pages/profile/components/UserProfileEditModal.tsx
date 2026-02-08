@@ -242,7 +242,7 @@ export default function UserProfileEditModal({
                 />
 
                 <div className="profileImageMeta">
-                  <p className="profileHelp">새 파일을 선택하면 업로드됩니다. (URL 입력 방식 X)</p>
+                  <p className="profileHelp">새 파일을 선택하면 업로드됩니다.</p>
                   {draftImageFile && (
                     <p className="profileHintMuted">
                       선택됨: {draftImageFile.name} · {(draftImageFile.size / 1024 / 1024).toFixed(2)}MB
