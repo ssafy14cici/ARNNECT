@@ -87,7 +87,6 @@ public class ArtworkServiceImpl implements ArtworkService{
     public void updateArtwork(String memberUuid, Long artworkId, UpdateArtworkRequest request) {
         Map<String, String> imageName = null;
         Long memberId = memberService.getMemberId(memberUuid);
-        log.info("member : {}, artwork : {}",memberId, artworkId);
         Artwork artwork = repository.findByArtworkIdAndMemberIdAndIsDeleted(artworkId, memberId, false).orElseThrow(
                 ()-> new BusinessException(ErrorCode.ARTWORK_NOT_FOUND));
 
@@ -131,7 +130,6 @@ public class ArtworkServiceImpl implements ArtworkService{
         List<UserLogActionDto> userLogs = logService.getUserLogs(memberUuid);
         if(!memberUuid.equals("anonymousUser") && !userLogs.isEmpty()){
             List<ArtworkResponse> recommend = recommend(memberUuid, userLogs);
-            log.info("recommend : {}",recommend);
             return recommend;
         }else{
             //비회원
@@ -251,13 +249,13 @@ public class ArtworkServiceImpl implements ArtworkService{
         AiWrapperRequestDto request =
                 new AiWrapperRequestDto(inputData);
 
-        log.info("request : {}", request.toString());
+
         AiRecommendResponseDto aiResponse = restClient.post()
                 .uri("/recommend")
                 .body(request)
                 .retrieve()
                 .body(AiRecommendResponseDto.class);
-        log.info("aiResponse : {}", aiResponse.getRecommends().toString());
+
         // 방어 코드
         if (aiResponse == null || aiResponse.getRecommends() == null) {
             return List.of();
