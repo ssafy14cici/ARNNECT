@@ -1,648 +1,406 @@
 
-# FE (Vite + React + TypeScript)
+````md
+<div align="center">
 
-E107 SSATY 프론트엔드 프로젝트 기본 뼈대(라우팅/레이아웃/가드/전체화면 메뉴) 및 협업 규칙
+<img src="https://via.placeholder.com/150" alt="ARNNECT FE Logo" width="120" height="120" />
+
+# ARNNECT Frontend (FE)
+
+**React + TypeScript + Vite 기반 프론트엔드**  
+작품 탐색/커뮤니티/수집(콜렉트북)/취향 분석/3D 전시관까지 사용자 경험을 담당합니다.
+
+<img src="https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=React&logoColor=black">
+<img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=TypeScript&logoColor=white">
+<img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=Vite&logoColor=white">
+<br/>
+<img src="https://img.shields.io/badge/React%20Router-CA4245?style=for-the-badge&logo=ReactRouter&logoColor=white">
+<img src="https://img.shields.io/badge/Zustand-orange?style=for-the-badge&logo=Rss&logoColor=white">
+<img src="https://img.shields.io/badge/Axios-5A29E4?style=for-the-badge&logo=Axios&logoColor=white">
+<br/>
+<img src="https://img.shields.io/badge/Three.js-000000?style=for-the-badge&logo=Three.js&logoColor=white">
+<img src="https://img.shields.io/badge/React%20Three%20Fiber-000000?style=for-the-badge&logo=react&logoColor=white">
+<img src="https://img.shields.io/badge/Blender-E87D0D?style=for-the-badge&logo=Blender&logoColor=white">
+
+<!-- 필요하면 교체 -->
+[🚀 Live Demo](https://i14e107.p.ssafy.io:8001)
+
+</div>
+
+<br/>
+
+## 📋 Table of Contents
+- [About FE](#-about-fe)
+- [Key Features (FE Scope)](#-key-features-fe-scope)
+- [Tech Stack](#-tech-stack)
+- [Project Structure](#-project-structure)
+- [Running Locally](#-running-locally)
+- [Environment Variables](#-environment-variables)
+- [Routing Overview](#-routing-overview)
+- [Frontend Conventions](#-frontend-conventions)
+- [Troubleshooting](#-troubleshooting)
+- [Contribution Strategy](#-contribution-strategy)
+
 ---
 
-## 1) 기술 스택
-- Vite + React + TypeScript
-- React Router DOM (라우팅)
-- Zustand (상태 관리)
-- ESLint (기본 린트)
+## 🖼 About FE
+ARNNECT Frontend는 다음 기능을 제공합니다.
+
+- **Auth**: 로그인/회원가입(이메일 인증 포함), 세션 처리, 권한 분기(일반/아티스트)
+- **Discover**: 작품 피드/상세/검색, 정렬/토글/무한 스크롤 등 탐색 UX
+- **Community**: 리뷰·댓글 CRUD, 댓글 카운트/타겟 기반 조회
+- **Interaction**: 팔로우, 팬레터(작성/조회/아티스트 답변)
+- **CollectBook**: QR 티켓 발급(아티스트) / 스캔 수집(유저) → 콜렉트북 리스트/상세
+- **Personalization**: ‘너의 취향은’(취향 분석/MBTI), 리마인드 퀴즈
+- **3D**: R3F/Three.js 기반 3D 전시관(Hall/Exhibit), Blender GLB 에셋 활용
 
 ---
 
-## 2) 실행 환경
-- Node.js 18+ 권장
-- npm 사용 (package-lock.json 커밋)
+## ✨ Key Features (FE Scope)
+
+### 1) Auth & Role
+- 로그인/회원가입 UI 및 **세션/토큰 흐름**
+- `Guard` 기반 접근 제어
+  - `guestOnly`: 로그인 상태면 접근 차단
+  - `requireAuth`: 인증 필요
+  - `requireRole="artist" | "general"`: 역할별 페이지 제한
+
+### 2) Discover & Search
+- 작품 피드/상세/검색 화면
+- 정렬/토글/무한 스크롤 등 콘텐츠 소비 UX
+
+### 3) Community
+- 리뷰 CRUD (작성/조회/수정/삭제)
+- 댓글 CRUD + 댓글 카운트/타겟 기반 조회
+
+### 4) Interaction
+- 팔로우 토글/목록
+- 팬레터 작성/조회 + 아티스트 답변 플로우
+
+### 5) CollectBook (QR Ticket)
+- 아티스트: QR 티켓 발급/관리(라운지 내부 탭)
+- 유저: QR 스캔 수집 → 콜렉트북 리스트/상세
+
+### 6) Personalization
+- ‘너의 취향은’ 플로우 + MBTI 결과 페이지 매핑
+- 리마인드 퀴즈
+
+### 7) 3D Exhibition
+- `/hall`, `/exhibit`, `/exhibit/:artistId` 기반 3D 전시 경험
+- GLB(Blender) 에셋 로딩 및 전시 패널 앵커 기반 작품 노출
 
 ---
 
-## 3) 설치 및 실행
+## 🧩 Tech Stack
+| Category | Stack |
+|:---:|:---|
+| Core | React, TypeScript |
+| Build | Vite |
+| Routing | React Router (createBrowserRouter) |
+| State | Zustand |
+| Network | Axios |
+| 3D | React Three Fiber, Three.js (Drei) |
+| UX | ScrollToTop(라우터 컨텍스트 내부 1회 렌더), AppLayout, Navbar 변형(navVariant) |
 
-### 3-1. 의존성 설치
+---
+
+## 📂 Project Structure
+> 실제 레포 구조에 맞춘 대표 예시
+
+```bash
+FE/src
+├── app
+│   ├── layouts                 # AppLayout
+│   └── router                  # routes.tsx, Guard, guards.ts
+├── components
+│   ├── layout                  # Navbar 등 전역 UI
+│   └── charts                  # Radar6 등 차트
+├── features
+│   ├── auth                    # store / api / model
+│   ├── artworks                # api / model / ui
+│   ├── reviews                 # api / model / ui
+│   ├── tickets                 # api + resolveTicketMedia
+│   ├── collectbook             # api / ui
+│   └── fanLetter               # api / ui
+├── pages
+│   ├── home                    # Home / HomePC / HomeMobile
+│   ├── hall                    # Hall
+│   ├── exhibit                 # Exhibit
+│   ├── search                  # Search
+│   ├── guide                   # Guide
+│   ├── feed                    # Feed
+│   ├── auth                    # Login / Signup
+│   ├── artworks                # ArtworkCreate/Edit/Detail
+│   ├── reviews                 # ReviewCreate/Edit/Detail
+│   ├── lounge                  # Lounge / LoungeIndex / user/artist
+│   ├── yourpreference          # YourPreference / Select / Result
+│   ├── profile                 # Profile + tabs
+│   ├── fanLetter               # FanLetterCompose / MyFanLetters
+│   ├── legal                   # PrivacyPolicy / TermsOfService
+│   └── notfound                # NotFound
+├── museum                      # three viewer scripts
+└── shared
+    ├── api                     # http wrapper
+    └── utils                   # ScrollToTop 등 공통 유틸
+````
+
+---
+
+## 🛠 Running Locally
+
+### 1) Install
+
 ```bash
 cd FE
 npm install
-````
+```
 
-### 3-2. 개발 서버 실행
+### 2) Env
+
+```bash
+# FE/ 루트에 .env 생성
+VITE_API_BASE_URL=http://localhost:8080/api/v1
+
+# mock mode (optional)
+VITE_USE_MOCK=false
+```
+
+### 3) Run
 
 ```bash
 npm run dev
 ```
 
-* 기본 접속: [http://localhost:5173](http://localhost:5173)
-
-### 3-3. 빌드
+### 4) Build
 
 ```bash
 npm run build
 ```
 
-### 3-4. 빌드 결과 미리보기
+---
 
-```bash
-npm run preview
-```
+## 🔐 Environment Variables
+
+| Key                 | Example                        | Description                         |
+| ------------------- | ------------------------------ | ----------------------------------- |
+| `VITE_API_BASE_URL` | `http://localhost:8080/api/v1` | API 서버 base url                     |
+| `VITE_USE_MOCK`     | `false`                        | mock 모드 토글(목업에서만 localStorage 사용 등) |
 
 ---
 
-## 4) 이번 기본 세팅(추가 설치된 패키지)
+## 🧭 Routing Overview
 
-라우팅/상태관리 세팅을 위해 아래 패키지를 설치합니다.
+### Layout & Global UX
 
-```bash
-npm i axios
-npm i react-router-dom zustand
-npm i gsap @studio-freight/lenis
-npm i react-qr-code @zxing/browser
-npm install three @types/three @react-three/fiber @react-three/drei
+* `RootLayout`에서 **ScrollToTop을 라우터 컨텍스트 내부에서 1회 렌더**
+* `AppLayout`에서 전역 레이아웃/네비게이션 적용
+* 일부 라우트는 `handle.navVariant`로 Navbar 변형에 사용
 
-```
+  * `/` → `home`
+  * `/home/mobile` → `home-mobile`
+  * `/exhibit`, `/exhibit/:artistId` → `exhibit`
 
----
+### Public Routes
 
-## 5) 프로젝트 구조(뼈대) / 더 추가 예정
+| Path                 | Page           | Notes                     |
+| -------------------- | -------------- | ------------------------- |
+| `/`                  | Home           | `navVariant: home`        |
+| `/home/pc`           | HomePC         | `navVariant: home`        |
+| `/home/mobile`       | HomeMobile     | `navVariant: home-mobile` |
+| `/search`            | Search         |                           |
+| `/guide`             | Guide          |                           |
+| `/hall`              | Hall           |                           |
+| `/main-hall`         | HomePC         | alias                     |
+| `/exhibit`           | Exhibit        | `navVariant: exhibit`     |
+| `/exhibit/:artistId` | Exhibit        | `navVariant: exhibit`     |
+| `/feed`              | Feed           |                           |
+| `/legal/privacy`     | PrivacyPolicy  |                           |
+| `/legal/terms`       | TermsOfService |                           |
+| `/privacy`           | redirect       | → `/legal/privacy`        |
+| `/terms`             | redirect       | → `/legal/terms`          |
 
+### Guest Only (로그인 상태면 차단)
 
-### Root
+> `Guard guestOnly redirectTo="/hall"`
 
-```
-FE/
- ├─ public/
- ├─ src/
- ├─ index.html
- ├─ vite.config.ts
- ├─ tsconfig*.json
- ├─ eslint.config.js
- └─ Dockerfile
-```
+| Path      | Page   |
+| --------- | ------ |
+| `/login`  | Login  |
+| `/signup` | Signup |
 
-* `public/` : 빌드 시 정적 자원 (favicon, 이미지 등)
+### Preference Flow (비로그인 1회 제한 Loader 포함)
 
-  * `public/art/` : 전시/작품 관련 정적 리소스
-  * `arnnect_logo_ver1.png`, `NotFound.png`, `vite.svg`
+* `/preference`는 비로그인 상태에서 “1회만” 진입 허용
+* mock 모드(`VITE_USE_MOCK=true`)면 `localStorage`, 아니면 `sessionStorage` 사용
+* 이미 사용한 경우 `/login`으로 redirect
 
----
+| Path                 | Page                 |
+| -------------------- | -------------------- |
+| `/preference`        | YourPreference       |
+| `/preference/select` | YourPreferenceSelect |
+| `/preference/result` | YourPreferenceResult |
 
-### `src/` Overview
+### Protected Routes (requireAuth)
 
-```
-src/
- ├─ api/
- ├─ app/
- ├─ assets/
- ├─ components/
- ├─ data/
- ├─ hooks/
- ├─ layouts/
- ├─ mocks/
- ├─ pages/
- ├─ router/
- ├─ stores/
- ├─ styles/
- ├─ types/
- ├─ utils/
- ├─ App.tsx
- └─ main.tsx
-```
+> `Guard requireAuth`
 
----
+#### Artworks
 
-### `src/api/` — API layer (HTTP 요청 모듈)
+| Path                        | Page          | Role                 |
+| --------------------------- | ------------- | -------------------- |
+| `/artworks/create`          | ArtworkCreate | artist               |
+| `/artworks/new`             | redirect      | → `/artworks/create` |
+| `/artworks/:artworkId`      | ArtworkDetail | all(auth)            |
+| `/artworks/:artworkId/edit` | ArtworkEdit   | artist               |
 
-```
-src/api/
- ├─ http.ts
- ├─ auth.ts
- ├─ feed.ts
- ├─ lounge.ts
- ├─ fanLetter.ts
- └─ tickets.ts
-```
+#### Reviews
 
-* `http.ts` : axios 인스턴스/인터셉터/공통 에러 처리의 엔트리 포인트(권장)
-* 각 도메인별 API 파일:
+| Path                      | Page         | Role                |
+| ------------------------- | ------------ | ------------------- |
+| `/reviews/create`         | ReviewCreate | general             |
+| `/reviews/new`            | redirect     | → `/reviews/create` |
+| `/reviews/:reviewId`      | ReviewDetail | all(auth)           |
+| `/reviews/:reviewId/edit` | ReviewEdit   | general             |
 
-  * `auth.ts` : 로그인/회원가입/토큰 관련
-  * `feed.ts` : 메인/피드
-  * `lounge.ts` : 라운지(마이페이지 성격 기능)
-  * `fanLetter.ts` : 팬레터
-  * `tickets.ts` : 티켓/QR
+#### Members(Profile)
 
-**규칙**
+| Path                              | Page          | Notes                |
+| --------------------------------- | ------------- | -------------------- |
+| `/members`                        | redirect      | → `/members/me`      |
+| `/members/:memberUuid`            | Profile       | `memberUuid="me"` 허용 |
+| `/members/:memberUuid/feed`       | FeedTab       | default              |
+| `/members/:memberUuid/collection` | CollectionTab |                      |
+| `/members/:memberUuid/portfolio`  | PortfolioTab  |                      |
+| `/members/:memberUuid/fanletters` | FanLetterTab  |                      |
 
-* API 함수는 “UI 로직” 없이 **순수 요청/응답 변환만** 담당
-* 요청/응답 타입은 `src/types/`에서 import
+#### Analysis / RemindQuiz (Canonical)
 
----
+> 현재 라우팅 상 경로가 대문자(`Analysis`, `RemindQuiz`)로 존재
 
-### `src/app/` — App-level providers
+| Path          | Page       |
+| ------------- | ---------- |
+| `/Analysis`   | Analysis   |
+| `/RemindQuiz` | RemindQuiz |
 
-```
-src/app/
- └─ {providers.tsx}
-```
+#### Tickets / CollectBook / Fanletters (Canonical)
 
-* 전역 Provider(예: Router/QueryClient/Theme 등)를 한 곳에서 관리
+* Tickets는 “페이지 따로 뜨는 문제”를 막기 위해 lounge로 redirect 포함
 
----
+| Path                 | Page              | Role                            |
+| -------------------- | ----------------- | ------------------------------- |
+| `/tickets`           | redirect          | artist → `/lounge/ticket`       |
+| `/tickets/issue`     | redirect          | artist → `/lounge/ticket/issue` |
+| `/tickets/scan`      | CollectBookScan   | general                         |
+| `/tickets/portfolio` | Portfolio         | artist                          |
+| `/collectbook`       | CollectBook       | general                         |
+| `/collectbook/:id`   | CollectBookDetail | general                         |
+| `/fanletters`        | FanLetter         | artist                          |
 
-### `src/assets/` — Bundled assets
+### Lounge (내부 렌더링 / role 분기)
 
-```
-src/assets/
- ├─ basicprofile.png
- └─ react.svg
-```
+`/lounge`는 role에 따라 탭이 분기되며, 내부 라우트로 화면이 렌더링됩니다.
 
-* 번들에 포함되는 이미지/아이콘 보관 (`import ... from` 형태로 사용)
+#### general
 
----
+| Path                       | Page              |
+| -------------------------- | ----------------- |
+| `/lounge/collectbook`      | CollectBook       |
+| `/lounge/collectbook/scan` | CollectBookScan   |
+| `/lounge/collectbook/:id`  | CollectBookDetail |
+| `/lounge/Analysis`         | Analysis          |
+| `/lounge/RemindQuiz`       | RemindQuiz        |
+| `/lounge/my-fanletters`    | MyFanLetters      |
 
-### `src/components/` — Reusable UI components
+#### artist
 
-도메인/기능별로 재사용 가능한 컴포넌트를 모아둔다.
+| Path                   | Page      | Notes                    |
+| ---------------------- | --------- | ------------------------ |
+| `/lounge/ticket`       | QrEntry   |                          |
+| `/lounge/ticket/issue` | TicketQr  | ✅ ticket 아래 issue 중첩     |
+| `/lounge/qr/issue`     | redirect  | → `/lounge/ticket/issue` |
+| `/lounge/portfolio`    | Portfolio |                          |
+| `/lounge/fan-letter`   | FanLetter |                          |
 
-#### `components/artwork/` (댓글 UI)
+#### fanletter compose (general)
 
-```
-components/artwork/
- ├─ CommentForm.tsx
- ├─ CommentItem.tsx
- ├─ CommentList.tsx
- └─ ReplyList.tsx
-```
+| Path                             | Page             |
+| -------------------------------- | ---------------- |
+| `/lounge/fanletters/compose/:id` | FanLetterCompose |
 
-#### `components/feed/` (피드 카드)
+### Legacy Redirects
 
-```
-components/feed/
- ├─ FeedCard.tsx
- └─ FeedCard.css
-```
+* `/profile/:id` → `/members/:id` (또는 `/members/me`)
+* `/posts/*`는 삭제되었고 기존 링크는 redirect 처리
 
-#### `components/common/` (공통)
-
-```
-components/common/
- └─ Guard.tsx
-```
-
-* `Guard.tsx` : 인증/권한 라우팅 가드
-
-#### `components/charts/` (차트)
-
-```
-components/charts/
- └─ Radar6.tsx
-```
-
-#### `components/legal/` (약관/정책)
-
-```
-components/legal/
- ├─ PrivacyPolicyContent.tsx
- └─ TermsOfServiceContent.tsx
-```
-
-#### `components/lounge/` (라운지 재사용 컴포넌트)
-
-```
-components/lounge/
- ├─ TicketCardModern.tsx
- └─ ticketCardModern.css
-```
-
-#### `components/main/` (홈 섹션 구성요소)
-
-```
-components/main/
- ├─ Hero.tsx
- ├─ AboutSection.tsx
- ├─ ShowcaseStage.tsx
- ├─ ScrollIndicator.tsx
- └─ HerRingLoader.tsx
-```
-
-**규칙**
-
-* 페이지에 종속되지 않는 UI는 무조건 `components/`로 올린다.
-* CSS는 해당 컴포넌트 옆에 붙이거나(`*.css`), 전역 스타일은 `styles/`로.
+  * `/posts/create` → `/members/me`
+  * `/posts/create/artist` → `/artworks/create`
+  * `/posts/create/user` → `/reviews/create`
+  * `/posts/:id` → `/feed`
 
 ---
 
-### `src/data/` — Local dummy/mock data
+## 📐 Frontend Conventions
 
-```
-src/data/
- ├─ artworks.ts
- ├─ users.ts
- ├─ mockFeeds.ts
- └─ mockPosts.ts
-```
+### 1) Guard 사용 규칙
 
-* 백엔드 미연동/개발 테스트용 데이터
+* 공개 페이지: Public 라우트에 추가
+* 로그인/회원가입: `guestOnly`
+* 로그인 필수: `requireAuth`
+* 역할 제한: `requireRole="artist"` 또는 `requireRole="general"`
 
----
+### 2) Navbar 변형(navVariant)
 
-### `src/hooks/` — Custom hooks
+* 라우트 `handle.navVariant`로 Navbar 스타일/노출 변형을 제어합니다.
+* `home` / `home-mobile` / `exhibit` 등을 기준으로 UI를 분기합니다.
 
-```
-src/hooks/
- └─ useReveal.js
-```
+### 3) Preference Once Loader
 
----
+* 비로그인에서 `/preference` 진입을 1회로 제한합니다.
+* mock 모드: localStorage / real 모드: sessionStorage(탭 단위)
 
-### `src/layouts/` — Layout components
+### 4) API/Type 안정성
 
-```
-src/layouts/
- ├─ AppLayout.tsx
- ├─ Navbar.tsx
- ├─ Footer.tsx
- └─ ...
-```
+* Axios 공통 래퍼를 통해 `/api/v1` 호출을 통일합니다.
+* 응답 DTO가 불안정한 경우 mapper/type-guard로 안전 파싱합니다.
 
-* 페이지 골격(네비/푸터/공통 프레임)을 담당
+### 5) Media URL
+
+* 이미지 경로는 `resolveMediaUrl` 계열 유틸로 정규화하여 환경(dev/prod), 절대/상대 경로 혼재를 흡수합니다.
 
 ---
 
-### `src/mocks/` — Mock auth & utilities
+## 🧯 Troubleshooting
 
-```
-src/mocks/
- └─ authMock.ts
-```
+### 이미지가 깨질 때
 
----
+* 응답 imageUrl이 절대/상대/경로 prefix가 섞여 들어오는지 확인
+* `resolveMediaUrl` 적용 여부 확인
+* dev 환경에서 프록시/BASE_URL 영향 여부 확인
 
-### `src/pages/` — Route-level pages (화면 단위)
+### 라운지에서 티켓이 새 페이지로 뜰 때
 
-라우트와 1:1로 매핑되는 “페이지” 컴포넌트들.
+* `/tickets`, `/tickets/issue`는 canonical로 남겨두고 lounge로 redirect 처리 중
+* 실제 사용 경로는 `/lounge/ticket`, `/lounge/ticket/issue` 사용
 
-#### `pages/auth/`
+### 권한 페이지 접근이 막힐 때
 
-```
-pages/auth/
- ├─ Login.tsx
- ├─ Signup.tsx
- ├─ UserSignup.tsx
- ├─ ArtistSignup.tsx
- ├─ Recover.tsx
- ├─ auth.css
- ├─ components/
- └─ utils/
-     ├─ validation.ts
-     └─ emailDupCheck.ts
-```
-
-#### `pages/feed/`
-
-```
-pages/feed/
- ├─ Feed.tsx
- └─ feed.css
-```
-
-#### `pages/lounge/` (라운지/마이페이지 성격)
-
-```
-pages/lounge/
- ├─ Lounge.tsx
- ├─ LoungeIndex.tsx
- ├─ LoungeLayout.tsx
- ├─ lounge.css
- ├─ artist/
- │   ├─ Portfolio.tsx
- │   ├─ FanLetter.tsx
- │   ├─ TicketQr.tsx
- │   └─ qr/
- │       └─ QrEntry.tsx
- └─ user/
-     ├─ CollectBook.tsx
-     ├─ CollectBookDetail.tsx
-     ├─ CollectBookScan.tsx
-     ├─ Quiz.tsx
-     └─ Taste.tsx
-```
-
-#### `pages/artwork/`
-
-```
-pages/artwork/
- ├─ ArtworkDetail.tsx
- ├─ ArtworkDetailView.tsx
- ├─ artworkDetail.helpers.ts
- └─ artworkDetail.css
-```
-
-#### `pages/profile/`
-
-```
-pages/profile/
- ├─ Profile.tsx
- ├─ profile.css
- ├─ types.ts
- ├─ api.ts
- ├─ components/
- │   ├─ ProfileHeader.tsx
- │   ├─ ArtistInfo.tsx
- │   └─ UserInfo.tsx
- └─ tabs/
-     ├─ FeedTab.tsx
-     ├─ CollectionTab.tsx
-     ├─ PortfolioTab.tsx
-     └─ (PortfolioTab 2.tsx)   // 중복 파일 정리 필요
-```
-
-#### `pages/search/`
-
-```
-pages/search/
- ├─ Search.tsx
- └─ search.css
-```
-
-#### `pages/posts/`
-
-```
-pages/posts/
- ├─ PostCreate.tsx
- ├─ PostCreateRedirect.tsx
- ├─ PostDetail.tsx
- └─ postCreate.css
-```
-
-#### `pages/notfound/`
-
-```
-pages/notfound/
- └─ NotFound.tsx
-```
-
-**규칙**
-
-* “라우트 단위 화면”은 `pages/`에만 둔다.
-* 페이지에서만 쓰이는 조각 UI는 `pages/**/components`에 둔다.
-* 페이지 로직/뷰 분리는 이미 `ArtworkDetail.tsx + ArtworkDetailView.tsx` 패턴으로 적용됨.
+* auth store의 role 값이 `"general" | "artist"`인지 확인
+* Guard 조건(`requireRole`)과 라우트 위치 확인
 
 ---
 
-### `src/router/` — Routing
+## 🤝 Contribution Strategy
 
+* Branch: `main`(배포) → `develop`(개발) → `feat/기능명`
+* Commit: Conventional Commits
+
+  * `feat`: 기능 추가
+  * `fix`: 버그 수정
+  * `style`: 스타일 변경(로직 변경 없음)
+  * `refactor`: 리팩토링
+  * `chore`: 설정/빌드/패키지
+
+<div align="center">
+ARNNECT Frontend README | ⓒ 2026
+</div>
 ```
-src/router/
- ├─ index.tsx
- ├─ routes.tsx
- └─ guards.ts
-```
-
-* `routes.tsx`: RouteObject 구성
-* `guards.ts`: Role 타입 및 가드 정책(현재 Role: `"general" | "artist"`)
-
----
-
-### `src/stores/` — State management
-
-```
-src/stores/
- ├─ authStore.ts
- └─ uiStore.ts
-```
-
----
-
-### `src/styles/` — Global styles
-
-```
-src/styles/
- ├─ global.css
- ├─ theme.css
- ├─ navbar.css
- ├─ footer.css
- ├─ home.css
- ├─ hero.css
- ├─ legal.css
- └─ notfound.css
-```
-
-* 레이아웃/공통 UI/테마 관련 전역 스타일
-
----
-
-### `src/types/` — Type definitions
-
-```
-src/types/
- ├─ auth.ts
- ├─ collectbook.ts
- ├─ fanLetter.ts
- ├─ models.ts
- └─ vendor.d.ts
-```
-
-* API request/response + 도메인 모델 타입 정의
-
----
-
-### `src/utils/` — Utilities
-
-```
-src/utils/
- ├─ collectbookStorage.ts
- ├─ issuedTicketsStorage.ts
- ├─ ticketMockStorage.ts
- ├─ localPosts.ts
- ├─ qrDownload.ts
- └─ networkProgress.ts
-```
-
-* localStorage 기반 임시 저장/목업 로직이 여기로 모여 있음
-
-
----
-
-## 6) Git 협업 규칙
-
-### 6-1. 브랜치 구조 (3단계)
-
-* `master`: 최종 통합 브랜치 (**직접 작업 금지**)
-* 역할 브랜치: `FE`, `BE`, `AI`, `CI-CD`, `STUDY`
-* 기능 브랜치: 각자 실제 개발 브랜치 (완료 후 역할 브랜치로 MR)
-
-### 6-2. 브랜치 네이밍 (⚠️ FE/feat 충돌 방지 포함)
-
-역할 브랜치가 이미 `FE`로 존재하므로, 기능 브랜치는 `FE/feat/...` 형태를 사용하지 않습니다.
-
-✅ 권장
-
-* `FE-feat/<feature>`
-* `FE-fix/<bug>`
-* `FE-refactor/<target>`
-
-예시
-
-* `FE-feat/scaffold-router-menu`
-* `FE-feat/search-tabs-sort`
-* `FE-fix/login-redirect`
-
-❌ 금지
-
-* `FE/feat/...` (Git ref 충돌 발생)
-* `[FE]/feat/...` (특수문자 → CI/URL/스크립트 문제 가능)
-
-### 6-3. 작업 흐름 (기능 브랜치 → FE → master)
-
-1. 기능 브랜치 생성
-
-```bash
-git switch FE
-git pull origin FE
-git switch -c FE-feat/<feature>
-```
-
-2. 커밋 & 푸시
-
-```bash
-git add FE
-git commit -m "FEAT: (한글 제목)
-
-- 변경 내용 1
-- 변경 내용 2"
-git push -u origin FE-feat/<feature>
-```
-
-3. GitLab Merge Request
-
-* `FE-feat/<feature>` → `FE` 로 MR
-* FE에서 통합/테스트 후, **리더가** `FE` → `master` 로 MR
-
----
-
-## 7) 커밋 메시지 컨벤션
-
-### 7-1. 커밋 타입(대문자)
-
-| 타입                 | 의미                             |
-| ------------------ | ------------------------------ |
-| `FEAT`             | 새로운 기능 추가                      |
-| `FIX`              | 버그 수정                          |
-| `DOCS`             | 문서 수정                          |
-| `STYLE`            | formatting/세미콜론 누락 등(로직 변경 없음) |
-| `REFACTOR`         | 리팩토링                           |
-| `TEST`             | 테스트 코드                         |
-| `CHORE`            | 패키지/설정/.gitignore 등 기타         |
-| `DESIGN`           | CSS 등 UI 디자인 변경                |
-| `COMMENT`          | 주석 추가/변경                       |
-| `RENAME`           | 파일/폴더명 변경                      |
-| `REMOVE`           | 파일 삭제                          |
-| `!BREAKING CHANGE` | 큰 API 변경                       |
-| `!HOTFIX`          | 치명 버그 긴급 수정                    |
-
-### 7-2. 작성 규칙
-
-* 제목/본문은 **빈 줄로 분리**
-* 제목은 **한글**, 50자 이내, 끝에 `.` 금지
-* 본문은 “무엇 & 왜” 중심, 글머리 기호 사용
-
-### 7-3. 예시
-
-```bash
-git commit -m "FEAT: 프론트 초기 뼈대 구조 추가
-
-- Vite+TS 기반 폴더 구조 생성
-- 라우터/레이아웃/가드 기본 연결
-- 전체화면 메뉴 기본 틀 추가"
-```
-
----
-
-## 8) 주의사항
-
-* `node_modules/`, `dist/`, `.env*` 는 커밋하지 않습니다. (`.gitignore` 적용)
-* Windows 환경에서 `LF will be replaced by CRLF` 경고는 일반적으로 무시해도 됩니다(동작 문제 없음).
-
-```
-
-# Museum App 통합 규칙 (UI Layer / Scene Lifecycle)
-
-## 목적
-이 프로젝트는 씬 전환(인트로 → 홀 → 전시장 → 홀 → 외부)을 반복해도
-UI/이벤트/style 누수 없이 안정적으로 동작하도록 통합되어야 한다.
-
-특히 "3D 캔버스 + DOM UI"가 서로 다른 곳(document.body/head)에 흩어져 붙으면,
-씬 전환 후에도 이전 UI가 남거나 pointer lock / click 이벤트가 꼬이는 문제가 발생한다.
-
----
-
-## 핵심 구조
-- 앱 레벨에서 `#museum-ui-layer`(uiLayer)를 만든다.
-- 이후 모든 씬(인트로/홀/전시장/exit overlay)의 DOM UI는 **반드시 uiMount(uiLayer)에만** 붙인다.
-- 씬이 종료될 때(runtime destroy/dispose) 해당 씬이 만든 UI는 스코프 표식을 기반으로 전부 제거한다.
-
-> 단, `<style>` 태그는 예외로 `document.head`에 붙인다.
-> 대신 반드시 스코프 표식 + destroy 시 제거를 보장한다.
-
----
-
-## 공통 규칙 1: UI는 uiMount에만 append
-### ✅ OK
-- uiMount.appendChild(el)
-- mountEl(el) 래퍼 사용 (추천)
-
-### ❌ 금지
-- document.body.appendChild(...)
-- document.querySelector(...).appendChild(...) (uiMount가 아닌 곳)
-- body/head에 직접 UI 노드 붙이기
-
----
-
-## 공통 규칙 2: 표식(dataset) 필수
-모든 씬 UI는 아래 dataset을 반드시 갖는다.
-
-- data-museum-ui="1"
-- data-museum-ui-scope="<scopeName>"
-
-예시:
-- intro: scope="intro"
-- mainHallFree: scope="mainHallFree"
-- exhibitRoom: scope="exhibitRoom"
-
----
-
-## 공통 규칙 3: <style>은 head 허용 (단, 추적/정리 필수)
-CSS를 런타임으로 삽입해야 할 경우 `<style>` 태그는 head에 붙이는 것이 정상이다.
-
-### ✅ 허용 패턴
-- styleEl에 dataset 표식 추가
-- mountedStyleEls 배열로 추적
-- destroy에서 mountedStyleEls 전부 제거
-- (추가 안전장치) head에서 scope selector로 제거
-
-### ❌ 금지 패턴
-- head에 style append하고 추적/제거 안 함 (재진입 시 CSS 누수/중복)
-
----
-
-## 추천 구현 패턴(템플릿)
-
-### UI 붙이기 (uiMount)
-```ts
-const UI_SCOPE = "exhibitRoom";
-
-function markUi<T extends HTMLElement>(el: T): T {
-  el.dataset.museumUi = "1";
-  el.dataset.museumUiScope = UI_SCOPE;
-  return el;
-}
-
-function mountEl<T extends HTMLElement>(el: T, uiMount: HTMLElement, clickable = false): T {
-  markUi(el);
-  if (clickable) el.style.pointerEvents = "auto";
-  uiMount.appendChild(el);
-  return el;
-}
 
