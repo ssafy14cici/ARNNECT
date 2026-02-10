@@ -128,9 +128,8 @@ async function makeTicketImageFile(previewEl: HTMLElement | null, ticketCode: st
 
 export default function TicketQr() {
   const nav = useNavigate();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams(); // ✅ setter도 사용
 
-  // ✅ issue 페이지는 기본적으로 ISSUE 탭이 자연스러움
   const [activeTab, setActiveTab] = useState<TabMode>("ISSUE");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -148,6 +147,18 @@ export default function TicketQr() {
   const artistUuid = useAuthStore((s) => s.user?.memberUuid ?? "");
   const { issued, reloadIssued, removeIssued } = useIssuedTickets(artistUuid);
   const issuedCount = issued?.length ?? 0;
+
+  // ✅ URL에 남은 ?edit= 파라미터가 있으면 reset 후에도 다시 startEdit 되는 문제 방지
+  const clearEditParam = useCallback(() => {
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("edit");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [setParams]);
 
   useEffect(() => {
     if (!artistUuid) return;
@@ -173,21 +184,30 @@ export default function TicketQr() {
 
     // ✅ 새로 만들기 상태에서는 "발급된 QR" 숨김
     setShowIssuedQr(false);
-  }, []);
 
-  const startEdit = useCallback((t: TicketItem) => {
-    setError("");
-    setEditingTicketId(t.ticketId);
-    setTicketId(t.ticketId);
-    setCode(t.ticketCode);
-    setForm(toForm(t));
-    setActiveTab("ISSUE");
+    // ✅ 쿼리 edit 제거 (안 지우면 effect가 다시 startEdit 함)
+    clearEditParam();
+  }, [clearEditParam]);
 
-    // ✅ 기존 발급 티켓 편집 진입이면 QR 패널 노출
-    setShowIssuedQr(true);
+  const startEdit = useCallback(
+    (t: TicketItem) => {
+      setError("");
+      setEditingTicketId(t.ticketId);
+      setTicketId(t.ticketId);
+      setCode(t.ticketCode);
+      setForm(toForm(t));
+      setActiveTab("ISSUE");
 
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+      // ✅ 기존 발급 티켓 편집 진입이면 QR 패널 노출
+      setShowIssuedQr(true);
+
+      // ✅ 스스로 edit 모드로 들어오면 URL edit는 굳이 유지할 이유 없음
+      clearEditParam();
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [clearEditParam],
+  );
 
   useEffect(() => {
     const editIdRaw = params.get("edit");
@@ -201,6 +221,7 @@ export default function TicketQr() {
     if (!found) return;
 
     startEdit(found);
+    // startEdit 안에서 clearEditParam 처리됨
   }, [params, issued, startEdit]);
 
   const submit = async () => {
@@ -274,15 +295,21 @@ export default function TicketQr() {
       <div className="loungeSubTop" style={{ position: "relative", zIndex: 10, pointerEvents: "auto" }}>
         <h1 className="loungeSubTitle">QR Ticket Manager</h1>
 
-        <button
-          type="button"
-          className="loungeBackLink"
-          // ✅ /lounge/ticket/issue -> .. => /lounge/ticket
-          onClick={() => nav("..")}
-          style={{ background: "none", border: "none", cursor: "pointer" }}
-        >
-          ← Back
-        </button>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          {/* ✅ 신규/편집/발급 후 어떤 상태든 초기화 가능하게 항상 노출 */}
+          <button type="button" className="loungeTextBtn" onClick={resetForm} disabled={busy}>
+            새로 만들기
+          </button>
+
+          <button
+            type="button"
+            className="loungeBackLink"
+            onClick={() => nav("..")}
+            style={{ background: "none", border: "none", cursor: "pointer" }}
+          >
+            ← Back
+          </button>
+        </div>
       </div>
 
       <div className="loungeSegmentNav" style={{ position: "relative", zIndex: 10, pointerEvents: "auto" }}>
@@ -309,12 +336,6 @@ export default function TicketQr() {
               <h2 className="loungeSubPanelTitle" style={{ margin: 0 }}>
                 {editingTicketId ? "전시 정보 수정" : "새 전시 등록"}
               </h2>
-
-              {editingTicketId && (
-                <button type="button" className="loungeTextBtn" onClick={resetForm}>
-                  새로 만들기
-                </button>
-              )}
             </div>
 
             <TicketForm
@@ -335,7 +356,17 @@ export default function TicketQr() {
           </div>
 
           {/* ✅ 버튼 눌러 발급/수정 성공했거나, 기존 티켓 편집 진입일 때만 표시 */}
-          {showIssuedQr && code && <QrPanel ticketCode={code} busy={busy} />}
+          {showIssuedQr && code && (
+            <>
+              <QrPanel ticketCode={code} busy={busy} />
+              {/* ✅ 발급된 QR 보고 난 뒤 바로 새로 만들기 동선 */}
+              <div className="loungeSubActions" style={{ marginTop: 12 }}>
+                <button className="loungeSubBtn" type="button" onClick={resetForm} disabled={busy}>
+                  새 티켓 만들기
+                </button>
+              </div>
+            </>
+          )}
         </>
       )}
 

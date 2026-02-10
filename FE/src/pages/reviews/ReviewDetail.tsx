@@ -10,6 +10,7 @@ import { resolveMediaUrl, fetchImageAsObjectUrl, safeToInt } from "../artworks/d
 import { PROFILE_PATH, type ReviewDetailData } from "./detail/types";
 import CommentThread from "./detail/CommentThread";
 import { toggleFollow } from "./detail/api";
+import { profileApi } from "../../features/profile/api"; // ✅ 추가
 
 function normalizeId(raw: unknown): string {
   const s = String(raw ?? "").trim();
@@ -26,7 +27,6 @@ function toSafeNumber(v: unknown, fallback = 0): number {
   return fallback;
 }
 
-// ✅ public/basic_review.png (Vite: public은 루트로 서빙됨)
 const FALLBACK_IMG = "/basic_review.png";
 
 export default function ReviewDetail() {
@@ -60,6 +60,7 @@ export default function ReviewDetail() {
 
   // 팔로우
   const [isFollowing, setIsFollowing] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
 
   const isOwner = useMemo(() => {
     const me = String(user?.memberUuid ?? "").trim();
@@ -67,7 +68,9 @@ export default function ReviewDetail() {
     return !!me && !!owner && me === owner;
   }, [user?.memberUuid, review?.memberUuid]);
 
-  // ✅ 좋아요 카운트(필드명 흔들림 대비)
+  // ✅ 팔로우 대상: 리뷰 작성자 UUID로 고정
+  const followTargetUuid = useMemo(() => String(review?.memberUuid ?? "").trim(), [review?.memberUuid]);
+
   const likeCount = useMemo(() => {
     const r: any = review as any;
     if (!r) return 0;
@@ -97,6 +100,9 @@ export default function ReviewDetail() {
         setImageObjectUrl(null);
         setImageFallbackTried(false);
 
+        setIsFollowing(false);
+        setFollowBusy(false);
+
         if (!normalizedReviewId) throw new Error("리뷰 ID가 없습니다.");
 
         const data = (await getReviewDetail(normalizedReviewId)) as ReviewDetailData;
@@ -115,6 +121,38 @@ export default function ReviewDetail() {
       cancelled = true;
     };
   }, [normalizedReviewId]);
+
+  // ✅ 팔로우 초기 동기화
+  useEffect(() => {
+    if (!review) return;
+
+    const fromReview = (review as any)?.isFollowing;
+    if (typeof fromReview === "boolean") {
+      setIsFollowing(fromReview);
+      return;
+    }
+
+    if (!followTargetUuid) return;
+    if (meUuid && followTargetUuid === meUuid) {
+      setIsFollowing(false);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const p = await profileApi.getProfile(followTargetUuid);
+        const s = (p as any)?.isFollowing;
+        if (!cancelled && typeof s === "boolean") setIsFollowing(s);
+      } catch {
+        // ignore
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [review, followTargetUuid, meUuid]);
 
   useEffect(() => {
     return () => {
@@ -155,7 +193,7 @@ export default function ReviewDetail() {
       await deleteReview(idToDelete);
 
       alert("삭제되었습니다.");
-      nav("/feed", { replace: true }); // 필요하면 nav(-1)로 변경
+      nav("/feed", { replace: true });
     } catch (e) {
       console.error(e);
       alert("삭제 실패");
@@ -165,12 +203,14 @@ export default function ReviewDetail() {
   const onToggleFollow = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
     if (isOwner) return;
+    if (followBusy) return;
 
-    const target = String(review?.artistUuid || review?.memberUuid || "").trim();
+    const target = followTargetUuid;
     if (!target) return;
 
     const prev = isFollowing;
     setIsFollowing(!prev);
+    setFollowBusy(true);
 
     try {
       const res = await toggleFollow(target);
@@ -179,16 +219,11 @@ export default function ReviewDetail() {
       console.error(e);
       setIsFollowing(prev);
       alert("팔로우 처리 실패");
+    } finally {
+      setFollowBusy(false);
     }
   };
 
-  /**
-   * ✅ 표시할 src 결정
-   * 우선순위:
-   * 1) blob(objectURL)
-   * 2) review.imageUrl 정규화
-   * 3) 없으면 fallback
-   */
   const resolvedImgSrc = useMemo(() => {
     if (imageObjectUrl) return imageObjectUrl;
 
@@ -197,14 +232,12 @@ export default function ReviewDetail() {
   }, [imageObjectUrl, review?.imageUrl]);
 
   const onImgError = async () => {
-    // 이미 fallback 상태면 더 할 게 없음
     if (resolvedImgSrc === FALLBACK_IMG) {
-      setImageError(false); // fallback은 정상 취급
+      setImageError(false);
       return;
     }
 
     if (imageFallbackTried) {
-      // blob도 실패 → fallback로 끝
       setImageError(false);
       setImageObjectUrl(null);
       return;
@@ -214,7 +247,6 @@ export default function ReviewDetail() {
 
     const raw = String(review?.imageUrl ?? "").trim();
     if (!raw) {
-      // 원본이 없음 → fallback
       setImageError(false);
       setImageObjectUrl(null);
       return;
@@ -231,7 +263,6 @@ export default function ReviewDetail() {
       console.error(e);
     }
 
-    // blob 실패 → fallback
     setImageError(false);
     setImageObjectUrl(null);
   };
@@ -294,7 +325,7 @@ export default function ReviewDetail() {
 
           <div className="rd-actions">
             {!isOwner && (
-              <button type="button" className="rd-btn" onClick={onToggleFollow}>
+              <button type="button" className="rd-btn" onClick={onToggleFollow} disabled={followBusy}>
                 {isFollowing ? "Following" : "Follow"}
               </button>
             )}
@@ -337,7 +368,12 @@ export default function ReviewDetail() {
           </div>
         </section>
 
-        <CommentThread reviewId={numericReviewId} isLoggedIn={isLoggedIn} meUuid={meUuid} myDisplayName={myDisplayName} />
+        <CommentThread
+          reviewId={numericReviewId}
+          isLoggedIn={isLoggedIn}
+          meUuid={meUuid}
+          myDisplayName={myDisplayName}
+        />
       </div>
     </div>
   );

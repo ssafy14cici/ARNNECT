@@ -36,9 +36,7 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
   const [imageFile, setImageFile] = useState<File | null>(initial?.imageFile ?? null);
 
   // ✅ 이 폼 인스턴스에서 사용할 기본이미지 1개를 고정(렌더마다 바뀌지 않게)
-  const defaultUrlRef = useRef(
-    publicAssetUrl(DEFAULT_IMAGES[Math.floor(Math.random() * DEFAULT_IMAGES.length)]),
-  );
+  const defaultUrlRef = useRef(publicAssetUrl(DEFAULT_IMAGES[Math.floor(Math.random() * DEFAULT_IMAGES.length)]));
 
   // ✅ 기본이미지 File도 한 번만 만들고 캐시(등록 버튼 여러번 눌러도 fetch 반복 방지)
   const defaultFileRef = useRef<File | null>(null);
@@ -103,11 +101,11 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
     // ✅ tags 필수
     if (parsedTags.length === 0) return "태그를 1개 이상 입력해주세요.";
 
-    // ✅ artworkId 선택: 입력한 경우에만 숫자 검증
+    // ✅ artworkId 선택: 입력한 경우에만 숫자 검증 + 1 이상
     if (artworkId.trim()) {
       const n = Number(artworkId);
       if (!Number.isFinite(n)) return "작품 ID는 숫자여야 합니다.";
-      if (n <= 0) return "작품 ID는 1 이상의 숫자여야 합니다.";
+      if (n < 1) return "작품 ID는 1 이상의 숫자여야 합니다.";
     }
 
     return null;
@@ -137,17 +135,38 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
       }
     }
 
-    // ✅ artworkId 선택: 값이 있을 때만 payload에 포함
+    // ✅ artworkId 선택: 값이 있을 때만 payload에 포함 (1 이상만)
     const trimmedArtworkId = artworkId.trim();
     const payload: ReviewCreateReq = {
       title: reviewTitle.trim(),
       content: reviewText.trim(),
       tags: parsedTags,
       imageFile: finalImageFile,
-      ...(trimmedArtworkId ? { artworkId: Number(trimmedArtworkId) } : {}),
+      ...(trimmedArtworkId ? { artworkId: Math.max(1, Number(trimmedArtworkId)) } : {}),
     };
 
     await onSubmit(payload);
+  };
+
+  // ✅ Artwork ID 입력값: 1 미만은 입력 단계에서 차단
+  const onChangeArtworkId = (v: string) => {
+    // 빈 값은 허용(선택 항목이므로)
+    if (!v) {
+      setArtworkId("");
+      return;
+    }
+
+    // 숫자 외 입력 방지 (type="number"여도 브라우저별 예외가 있어서 방어)
+    const n = Number(v);
+    if (!Number.isFinite(n)) return;
+
+    // 1 미만은 반영하지 않음 (아예 내려가지 않게)
+    if (n < 1) {
+      setArtworkId("1");
+      return;
+    }
+
+    setArtworkId(String(Math.trunc(n)));
   };
 
   return (
@@ -155,13 +174,7 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
       <div className="pc-content">
         <div className="pc-upload-section">
           <label className="pc-upload-box">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              hidden
-              disabled={!!submitting}
-            />
+            <input type="file" accept="image/*" onChange={handleImageChange} hidden disabled={!!submitting} />
 
             {/* ✅ 기본이미지도 미리보기로 항상 보이게 */}
             <img
@@ -189,15 +202,18 @@ export default function ReviewForm({ initial, submitting, onSubmit }: Props) {
             />
           </div>
 
-          {/* ✅ Artwork ID: 선택 항목으로 변경 */}
+          {/* ✅ Artwork ID: 선택 항목 + 1부터 시작(1 미만 내려가지 않게) */}
           <div className="pc-input-group">
             <label className="pc-label">Artwork ID</label>
             <input
               className="pc-input"
               value={artworkId}
-              onChange={(e) => setArtworkId(e.target.value)}
+              onChange={(e) => onChangeArtworkId(e.target.value)}
               placeholder="(Optional) Target Artwork ID"
               type="number"
+              min={1}
+              step={1}
+              inputMode="numeric"
               disabled={!!submitting}
             />
           </div>

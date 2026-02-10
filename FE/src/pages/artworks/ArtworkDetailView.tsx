@@ -24,6 +24,7 @@ type Props = {
   isLiked: boolean;
   likeCount: number;
   isFollowing: boolean;
+  followBusy?: boolean; // ✅ 추가
   onToggleFavorite: () => void;
   onToggleFollow: () => void;
 
@@ -35,12 +36,12 @@ type Props = {
 
   // review
   onGoReview: (id: string | number) => void;
-  reviews: ReviewSummary[] | undefined | null; // ✅ 방어적으로
+  reviews: ReviewSummary[] | undefined | null;
   reviewsLoading: boolean;
   reviewsError: string | null;
 
   // comments
-  comments: UiComment[] | undefined | null; // ✅ 방어적으로
+  comments: UiComment[] | undefined | null;
   commentsLoading: boolean;
   commentsError: string | null;
 
@@ -103,6 +104,7 @@ export default function ArtworkDetailView(props: Props) {
     isLiked,
     likeCount,
     isFollowing,
+    followBusy,
     onToggleFavorite,
     onToggleFollow,
 
@@ -142,10 +144,8 @@ export default function ArtworkDetailView(props: Props) {
     onSubmitReply,
   } = props;
 
-  // 이미지 확대 모달 상태
   const [zoomOpen, setZoomOpen] = useState(false);
 
-  // ✅ 여기서부터 전부 "undefined 들어와도 안 터지게" 정규화
   const safeReviews = useMemo(() => asArray<ReviewSummary>(reviews), [reviews]);
   const safeComments = useMemo(() => asArray<UiComment>(comments), [comments]);
 
@@ -155,14 +155,11 @@ export default function ArtworkDetailView(props: Props) {
   const safeTags = useMemo(() => {
     const raw = (artwork as any)?.tags;
 
-    // tags가 배열이면 그대로
     if (Array.isArray(raw)) return raw;
 
-    // tags가 문자열이면 한 개 태그로 취급(또는 공백/쉼표 분리)
     if (typeof raw === "string") {
       const s = raw.trim();
       if (!s) return [];
-      // "#햄스터 #고양이" / "햄스터, 고양이" 같은 케이스까지 커버
       return s
         .replaceAll("#", " ")
         .split(/[,\s]+/g)
@@ -301,8 +298,6 @@ export default function ArtworkDetailView(props: Props) {
 
   return (
     <div className="artwork-detail-page">
-      {/* 상단 고정 헤더 - 작가(소유자)만 표시 */}
-      
       {/* HERO */}
       <section className="artwork-hero">
         <div className="hero-content">
@@ -345,7 +340,6 @@ export default function ArtworkDetailView(props: Props) {
       {/* BODY */}
       <main className="artwork-body">
         <div className="content-wrapper">
-          {/* 액션바 */}
           <div className="action-bar">
             <div className="action-left">
               <h2>{title}</h2>
@@ -355,7 +349,7 @@ export default function ArtworkDetailView(props: Props) {
             <div className="action-right">
               {!isOwner ? (
                 <>
-                  <button className="btn-icon" type="button" onClick={onToggleFollow}>
+                  <button className="btn-icon" type="button" onClick={onToggleFollow} disabled={!!followBusy}>
                     {isFollowing ? "Following" : "Follow"}
                   </button>
 
@@ -388,11 +382,8 @@ export default function ArtworkDetailView(props: Props) {
             </div>
           </div>
 
-          {/* 설명/태그 */}
           <section className="info-section">
-            {(artwork as any)?.description ? (
-              <p className="description">{String((artwork as any).description)}</p>
-            ) : null}
+            {(artwork as any)?.description ? <p className="description">{String((artwork as any).description)}</p> : null}
 
             {safeTags.length > 0 ? (
               <div className="tags-row">
@@ -405,7 +396,6 @@ export default function ArtworkDetailView(props: Props) {
             ) : null}
           </section>
 
-          {/* 감상평 */}
           <section className="discovery-section">
             <h3 className="section-title">감상평</h3>
 
@@ -435,7 +425,6 @@ export default function ArtworkDetailView(props: Props) {
             ) : null}
           </section>
 
-          {/* 댓글 */}
           <section className="comments-container">
             <h3 className="section-title">댓글</h3>
 
@@ -466,7 +455,6 @@ export default function ArtworkDetailView(props: Props) {
         </div>
       </main>
 
-      {/* 이미지 확대 모달 */}
       {zoomOpen && !imageError && (
         <div
           className="image-zoom-overlay"

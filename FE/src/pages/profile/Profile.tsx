@@ -1,17 +1,19 @@
 // FE/src/pages/profile/Profile.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useParams, useLocation } from "react-router-dom";
 
 import ProfileHeader from "./components/ProfileHeader";
 import "./profile.css";
 
-import { profileApi } from "../../features/profile/api";
+import { profileApi } from "../../features/profile/api/index";
 import type { ProfileModel } from "../../features/profile/types";
 import { useAuthStore } from "../../features/auth/store";
 
 export type ProfileOutletContext = {
   profile: ProfileModel;
   isOwner: boolean;
+  // ✅ 필요하면 탭/자식에서 강제 재조회용으로 사용 가능 (선택)
+  refreshProfile?: () => void;
 };
 
 export default function Profile() {
@@ -31,8 +33,15 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // ✅ 같은 uuid로 재진입했을 때도 재조회 되도록 (location.key 변화 감지)
+  const location = useLocation();
+
   // 빠른 라우팅 이동 시 오래된 응답 무시
   const reqSeq = useRef(0);
+
+  // ✅ 외부(탭/자식)에서 강제로 리프레시할 수 있게 키 제공 (선택)
+  const [reloadKey, setReloadKey] = useState(0);
+  const refreshProfile = () => setReloadKey((k) => k + 1);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,6 +55,7 @@ export default function Profile() {
       try {
         if (!profileId) throw new Error("프로필 ID가 없습니다.");
 
+        // ✅ 내 프로필
         if (profileId === "me") {
           const p = await profileApi.getMyProfile();
           if (cancelled || reqSeq.current !== mySeq) return;
@@ -53,15 +63,25 @@ export default function Profile() {
           return;
         }
 
-        // 타인 프로필: artist -> user fallback
+        // ✅ 타인 프로필: "단일 진실" getProfile 우선
+        // - ProfileHeader에서도 getProfile을 쓰고 있으니, 여기서도 동일 기준으로 맞춰야
+        //   팔로우/카운트/상태가 화면 간 즉시 일치함.
         try {
-          const a = await profileApi.getArtistProfile(profileId);
+          const p = await profileApi.getProfile(profileId);
           if (cancelled || reqSeq.current !== mySeq) return;
-          setProfile(a);
+          setProfile(p as ProfileModel);
+          return;
         } catch {
-          const u = await profileApi.getUserProfile(profileId);
-          if (cancelled || reqSeq.current !== mySeq) return;
-          setProfile(u);
+          // ✅ fallback: 기존 로직 유지 (혹시 getProfile이 특정 role에서만 될 때 대비)
+          try {
+            const a = await profileApi.getArtistProfile(profileId);
+            if (cancelled || reqSeq.current !== mySeq) return;
+            setProfile(a as ProfileModel);
+          } catch {
+            const u = await profileApi.getUserProfile(profileId);
+            if (cancelled || reqSeq.current !== mySeq) return;
+            setProfile(u as ProfileModel);
+          }
         }
       } catch (e) {
         if (cancelled || reqSeq.current !== mySeq) return;
@@ -74,7 +94,9 @@ export default function Profile() {
     return () => {
       cancelled = true;
     };
-  }, [profileId]);
+    // ✅ 같은 profileId여도 location.key가 바뀌면 재조회 가능
+    // ✅ refreshProfile()로 reloadKey 증가 시에도 재조회 가능
+  }, [profileId, location.key, reloadKey]);
 
   const navigate = useNavigate();
 
@@ -102,7 +124,11 @@ export default function Profile() {
     <div className={`profile-page ${themeClass}`}>
       <div className="profile-bg-glow" />
       <div className="profile-container">
-        <ProfileHeader profile={profile} isOwner={isOwner} onProfileUpdated={setProfile} />
+        <ProfileHeader
+          profile={profile}
+          isOwner={isOwner}
+          onProfileUpdated={(next) => setProfile(next)}
+        />
 
         <div className="profile-tabs-wrapper">
           <nav className="profile-tabs">
@@ -112,24 +138,15 @@ export default function Profile() {
 
             {viewedIsArtist ? (
               <>
-                <NavLink
-                  to="portfolio"
-                  className={({ isActive }) => `profile-tab ${isActive ? "active" : ""}`}
-                >
+                <NavLink to="portfolio" className={({ isActive }) => `profile-tab ${isActive ? "active" : ""}`}>
                   포트폴리오
                 </NavLink>
-                <NavLink
-                  to="fanletters"
-                  className={({ isActive }) => `profile-tab ${isActive ? "active" : ""}`}
-                >
+                <NavLink to="fanletters" className={({ isActive }) => `profile-tab ${isActive ? "active" : ""}`}>
                   팬레터
                 </NavLink>
               </>
             ) : (
-              <NavLink
-                to="collection"
-                className={({ isActive }) => `profile-tab ${isActive ? "active" : ""}`}
-              >
+              <NavLink to="collection" className={({ isActive }) => `profile-tab ${isActive ? "active" : ""}`}>
                 콜렉션
               </NavLink>
             )}
@@ -137,7 +154,7 @@ export default function Profile() {
         </div>
 
         <main className="profile-content">
-          <Outlet context={{ profile, isOwner } as ProfileOutletContext} />
+          <Outlet context={{ profile, isOwner, refreshProfile } as ProfileOutletContext} />
         </main>
 
         {/* ✅ 내 프로필에서만 + 노출, 클릭 시 role에 따라 create 라우팅 */}
