@@ -1,21 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+// FE/src/pages/lounge/user/collectbook/CollectBook.tsx
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useNavigate } from "react-router-dom";
 import "../../lounge.css";
-
-import TicketCardModern from "./TicketCardModern";
 import "./ticketCardModern.css";
 
 import { useAuthStore } from "../../../../features/auth/store";
 import { apiCollectBookList } from "../../../../features/collectbook/api/real";
 import type { CollectBookResponse } from "../../../../features/tickets/api/realTickets";
 
-const STUB_COLORS = ["#8FB2D9", "#E9A9B0", "#D7C08A", "#9FD3C7", "#B7A6F6"];
-
-function pickColor(key: string) {
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-  return STUB_COLORS[h % STUB_COLORS.length];
-}
+import { http } from "../../../../shared/api/http";
+import { resolveMediaUrl } from "../../../../features/tickets/resolveTicketMedia";
 
 function formatDateRange(start?: string, end?: string) {
   const s = start?.trim() || "-";
@@ -28,6 +22,75 @@ function formatKST(iso?: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
+}
+
+/**
+ * ✅ TicketCardModern(HeroImage) 패턴 그대로:
+ * - resolveMediaUrl로 /src prefix 포함 정규화
+ * - <img> 실패 시 Authorization 포함 blob 재시도
+ */
+function AuthedImage({
+  src,
+  alt,
+  className,
+  style,
+}: {
+  src?: string;
+  alt: string;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  const resolved = useMemo(() => resolveMediaUrl(src), [src]);
+
+  const [displaySrc, setDisplaySrc] = useState<string>("");
+  const [triedBlob, setTriedBlob] = useState(false);
+  const blobUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    setDisplaySrc(resolved);
+    setTriedBlob(false);
+
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
+  }, [resolved]);
+
+  if (!resolved || !displaySrc) return null;
+
+  // resolved가 상대경로면 같은 오리진으로 강제(axios baseURL 영향 제거)
+  const requestUrl = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
+
+  return (
+    <img
+      className={className}
+      src={displaySrc}
+      alt={alt}
+      style={style}
+      onError={async () => {
+        if (triedBlob) {
+          setDisplaySrc("");
+          return;
+        }
+        try {
+          setTriedBlob(true);
+          const res = await http.get(requestUrl, { responseType: "blob" });
+          const objUrl = URL.createObjectURL(res.data);
+          blobUrlRef.current = objUrl;
+          setDisplaySrc(objUrl);
+        } catch {
+          setDisplaySrc("");
+        }
+      }}
+    />
+  );
 }
 
 export default function CollectBook() {
@@ -70,7 +133,6 @@ export default function CollectBook() {
   return (
     <main className="loungePage">
       <section className="loungeWrap">
-
         <div style={{ display: "flex", justifyContent: "flex-end", margin: "10px 0 14px" }}>
           <button
             type="button"
@@ -105,22 +167,81 @@ export default function CollectBook() {
             <p className="loungeSubHint">아직 등록된 티켓이 없습니다. “티켓 스캔”으로 추가해보세요.</p>
           </div>
         ) : (
-          <div style={{ display: "grid", gap: 14 }}>
-            {items.map((it) => (
-              <TicketCardModern
-                key={it.ticketCode}
-                title={(it.title ?? "EXHIBITION").toUpperCase()}
-                ticketCode={it.ticketCode}
-                dateRangeText={formatDateRange(it.startDate, it.endDate)}
-                priceText={`RANK : ${it.collectRank ?? "-"}`}
-                stubColor={pickColor(it.ticketCode)}
-                // ✅ 여기 핵심: 선택한 디자인 결과 이미지
-                heroImageUrl={it.ticketImageUrl}
-                metaLeft={it.addressDetail ? `${it.address} (${it.addressDetail})` : it.address}
-                metaRight={`등록일: ${formatKST(it.createdAt)}`}
-                onClick={() => nav(`/lounge/collectbook/${encodeURIComponent(it.ticketCode)}`)}
-              />
-            ))}
+          <div
+            style={{
+              display: "grid",
+              gap: 14,
+              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+              alignItems: "start",
+            }}
+          >
+            {items.map((it, idx) => {
+              const createdAt = (it as any).createdAt as string | undefined;
+              const ticketImgRaw =
+                (it as any).ticketImageUrl ?? (it as any).ticketImageName ?? (it as any).ticketImage ?? "";
+
+              // ✅ 상세에서 정확히 하나 고르도록 at=createdAt 넘김 (중복 ticketCode 대응)
+              const toDetail = `/lounge/collectbook/${encodeURIComponent(it.ticketCode)}${
+                createdAt ? `?at=${encodeURIComponent(createdAt)}` : ""
+              }`;
+
+              return (
+                <button
+                  key={`${it.ticketCode}_${createdAt ?? idx}`} // ✅ 중복 ticketCode 대응
+                  type="button"
+                  onClick={() => nav(toDetail)}
+                  style={{
+                    textAlign: "left",
+                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.14)",
+                    borderRadius: 14,
+                    padding: 10,
+                    cursor: "pointer",
+                  }}
+                >
+                  {ticketImgRaw ? (
+                    <AuthedImage
+                      src={ticketImgRaw}
+                      alt="ticket"
+                      style={{
+                        width: "100%",
+                        aspectRatio: "16/10",
+                        objectFit: "cover",
+                        borderRadius: 12,
+                        display: "block",
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: "100%",
+                        aspectRatio: "16/10",
+                        borderRadius: 12,
+                        background: "rgba(255,255,255,0.06)",
+                        display: "grid",
+                        placeItems: "center",
+                        color: "rgba(255,255,255,0.65)",
+                        fontSize: 12,
+                      }}
+                    >
+                      NO IMAGE
+                    </div>
+                  )}
+
+                  <div style={{ padding: "10px 4px 2px" }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>
+                      {(it.title ?? "EXHIBITION").toUpperCase()}
+                    </div>
+                    <div style={{ fontSize: 12, opacity: 0.85 }}>
+                      {formatDateRange(it.startDate, it.endDate)}
+                    </div>
+                    <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
+                      RANK : {(it as any).collectRank ?? "-"} · 등록일: {formatKST(createdAt)}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </section>

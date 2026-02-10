@@ -285,13 +285,15 @@ function toFeedItemFromReview(v: unknown): FeedItem | null {
   };
 }
 
-// ---------- fetch ----------
 async function fetchPayload(path: string): Promise<unknown> {
-  const res = await http.get(path);
-  // http wrapper가 {data} 형태거나 data를 바로 주는 경우 모두 대응
+  const res = await http.get(path, {
+    headers: { "x-skip-auth": "1" }, // ✅ 피드는 공개: 로그인해도 토큰 안 보냄
+  });
+
   const payload = isObject(res) && "data" in res ? (res as { data: unknown }).data : res;
   return pickEnvelopeData(payload);
 }
+
 
 async function fetchReviewFeedBestEffort(): Promise<FeedItem[]> {
   for (const path of REVIEW_FEED_CANDIDATES) {

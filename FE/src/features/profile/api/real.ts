@@ -294,15 +294,32 @@ function normalizeProfile(
    * ✅ imageUrl: null/undefined 절대 금지(항상 string)
    * - BE가 imgUrl로 내려주는 케이스 포함
    */
-  const imageUrl =
-    asNonEmptyString((rec as any).profileImageUrl) ||
-    asNonEmptyString((rec as any).profileImage) ||
-    asNonEmptyString((rec as any).imgUrl) || // ✅ 스샷 응답에 있음
-    asNonEmptyString((rec as any).savedProfileImageName) ||
-    asNonEmptyString((rec as any).saved_profile_image_name) ||
-    asNonEmptyString((rec as any).imageUrl) ||
-    asNonEmptyString((rec as any).image) ||
-    "";
+    let imageUrl =
+      asNonEmptyString((rec as any).profileImageUrl) ||
+      asNonEmptyString((rec as any).profileImage) ||
+      asNonEmptyString((rec as any).imgUrl) ||
+      asNonEmptyString((rec as any).savedProfileImageName) ||
+      asNonEmptyString((rec as any).saved_profile_image_name) ||
+      asNonEmptyString((rec as any).imageUrl) ||
+      asNonEmptyString((rec as any).image) ||
+      "";
+
+    // ✅ [추가] 파일명/경로 보정 → resolveProfileMediaUrl 규칙(/profile/)에 맞춰줌
+    if (imageUrl) {
+      // "profile/xxx.jpg" -> "/profile/xxx.jpg"
+      if (!imageUrl.startsWith("http") && !imageUrl.startsWith("/") && imageUrl.startsWith("profile/")) {
+        imageUrl = `/${imageUrl}`;
+      }
+
+      // "xxx.jpg" 같은 파일명만 내려오는 경우 -> "/profile/xxx.jpg"
+      const looksLikeFilenameOnly =
+        !imageUrl.includes("/") && !imageUrl.startsWith("data:") && !imageUrl.startsWith("blob:");
+
+      if (looksLikeFilenameOnly) {
+        imageUrl = `/profile/${imageUrl}`;
+      }
+    }
+
 
   /** ✅ bio: null/undefined 절대 금지(항상 string) */
   const bio =

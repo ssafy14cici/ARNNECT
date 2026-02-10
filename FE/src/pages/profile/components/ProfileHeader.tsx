@@ -14,6 +14,9 @@ import type { ArtistProfile, UserProfile, Badge } from "../../../features/profil
 import ProfileEditModal from "./ProfileEditModal";
 import FanLetterSendModal from "../../../features/fanLetter/ui/FanLetterSendModal";
 
+// ✅ 프로필 전용 미디어 URL 리졸버
+import { resolveProfileMediaUrl } from "../../../features/profile/resolveProfileMedia";
+
 type ProfileModel = ArtistProfile | UserProfile;
 
 type Props = {
@@ -64,6 +67,14 @@ function badgeImageSrc(id: string) {
   return `${import.meta.env.BASE_URL}badges/badges${no}.png`;
 }
 
+export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: PropsProps) {}
+
+type Props = {
+  profile: ProfileModel;
+  isOwner: boolean;
+  onProfileUpdated: (next: ProfileModel) => void;
+};
+
 export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Props) {
   const navigate = useNavigate();
 
@@ -106,10 +117,10 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
   const canSendFanLetter = !isOwner && isArtist && contactEnabled && viewerRole === "general";
 
+  // ✅ 프로필 이미지: resolveProfileMediaUrl 적용
   const avatarSrc = useMemo(() => {
-    const u = String(profile.imageUrl ?? "").trim();
-    if (!u || u === "null" || u === "undefined") return basicProfile;
-    return u;
+    const u = resolveProfileMediaUrl(profile.imageUrl ?? "");
+    return u ? u : basicProfile;
   }, [profile.imageUrl]);
 
   useEffect(() => {
@@ -152,9 +163,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
     const prev = profile;
 
     const nextIsFollowing = !prev.isFollowing;
-    const nextFollowersCount = nextIsFollowing
-      ? prev.followersCount + 1
-      : Math.max(0, prev.followersCount - 1);
+    const nextFollowersCount = nextIsFollowing ? prev.followersCount + 1 : Math.max(0, prev.followersCount - 1);
 
     const optimistic: ProfileModel = {
       ...prev,
@@ -223,6 +232,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
         }
       }
 
+      // ✅ 모달에서 선택한 File은 미리보기용 objectUrl 사용
       if (payload.image && payload.image instanceof File) {
         const imageUrl = URL.createObjectURL(payload.image);
         optimisticProfile.imageUrl = imageUrl;
@@ -276,7 +286,11 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
             <div className="profileBadges">
               {featuredBadges.map((b) => (
-                <span key={b.id} className="profileBadge" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                <span
+                  key={b.id}
+                  className="profileBadge"
+                  style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
+                >
                   <img
                     src={badgeImageSrc(b.id)}
                     alt=""
@@ -327,7 +341,12 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
                       로그아웃
                     </button>
 
-                    <button className="profileMenuItem" onClick={() => setManageOpen(false)} role="menuitem" type="button">
+                    <button
+                      className="profileMenuItem"
+                      onClick={() => setManageOpen(false)}
+                      role="menuitem"
+                      type="button"
+                    >
                       닫기
                     </button>
                   </div>

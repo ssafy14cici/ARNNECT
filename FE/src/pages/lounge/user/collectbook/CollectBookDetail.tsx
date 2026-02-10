@@ -275,18 +275,6 @@ export default function CollectBookDetail() {
                 <p className="loungeSubHint">티켓 이미지가 제공되지 않았습니다.</p>
               )}
             </div>
-
-            {/* ✅ 카드 */}
-            <TicketCardModern
-              title={(item.title ?? "EXHIBITION").toUpperCase()}
-              ticketCode={item.ticketCode}
-              dateRangeText={formatDateRange(item.startDate, item.endDate)}
-              priceText={`RANK : ${(item as any).collectRank ?? "-"}`}
-              heroImageUrl={ticketImageSrc}
-              metaLeft={item.addressDetail ? `${item.address} (${item.addressDetail})` : item.address}
-              metaRight={"COLLECTED"}
-            />
-
             {/* ✅ 상세 정보 */}
             <div className="loungeSubPanel">
               <p className="loungeSubHint" style={{ lineHeight: 1.75 }}>
@@ -307,20 +295,6 @@ export default function CollectBookDetail() {
                   프로필로 이동
                 </Link>
               </p>
-            </div>
-
-            {/* ✅ QR */}
-            <div className="loungeSubPanel">
-              <h2 className="loungeSubPanelTitle" style={{ marginBottom: 10 }}>
-                QR
-              </h2>
-              {qrImageSrc ? (
-                <div style={{ background: "#fff", padding: 12, borderRadius: 12, display: "inline-block" }}>
-                  <AuthedImage src={qrImageSrc} alt="qr" style={{ width: 220, height: 220, display: "block" }} />
-                </div>
-              ) : (
-                <p className="loungeSubHint">QR 이미지가 제공되지 않았습니다.</p>
-              )}
             </div>
           </div>
         )}

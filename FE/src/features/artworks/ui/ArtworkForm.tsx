@@ -140,6 +140,8 @@ export default function ArtworkForm(props: Props) {
     if (mode === "create" && !image) return "이미지를 선택해주세요.";
     if (!title.trim()) return "작품 제목을 입력해주세요.";
     if (!genreId) return "장르를 선택해주세요.";
+    if (parsedTags.length === 0) return "태그를 1개 이상 입력해주세요.";
+
 
     // ✅ 연도만 필수(숫자만, 최대 4자리)
     const y = productionYear.trim();

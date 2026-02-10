@@ -75,22 +75,33 @@ function appendTags(fd: FormData, tags?: string[]) {
 }
 
 
-export function toArtworkUpdateFormData(data: ArtworkUpdateReq): FormData {
+export function toArtworkUpdateFormData(data: ArtworkUpdateReq) {
   const fd = new FormData();
 
-  fd.append("title", data.title);
-  fd.append("description", data.description);
+  fd.append("title", String(data.title ?? ""));
+  fd.append("description", String(data.description ?? ""));
+  fd.append("fieldId", String(data.fieldId ?? 1));
+  fd.append("genreId", String(data.genreId ?? 1));
+  fd.append("productionDate", String(data.productionDate ?? ""));
+  fd.append("size", String(data.size ?? ""));
 
-  fd.append("fieldId", String(data.fieldId));
-  if (typeof data.genreId === "number") fd.append("genreId", String(data.genreId));
+  // ✅ tags는 update에서도 항상 전송해서 BE null 방지
+  const tags = Array.isArray(data.tags) ? data.tags : [];
 
-  fd.append("productionDate", data.productionDate);
-  fd.append("size", data.size);
+  if (tags.length > 0) {
+    for (const t of tags) {
+      const s = String(t ?? "").trim();
+      if (s) fd.append("tags", s);
+    }
+  } else {
+    // ✅ 이 경우엔 BE 쪽에서 tags null-safe 처리 필요 (근데 지금은 FE에서 막는 게 목표라 위 방식 추천)
+  }
 
-  if (data.tags?.length) appendTags(fd, data.tags);
 
-  // ✅ 새 이미지 선택했을 때만 보냄(안 보내면 null로 들어가서 기존 이미지 유지 처리 가능해야 함)
-  if (data.image) fd.append("image", data.image);
+  // ✅ edit에서는 image 선택(optional)
+  if (data.image instanceof File) {
+    fd.append("image", data.image);
+  }
 
   return fd;
 }

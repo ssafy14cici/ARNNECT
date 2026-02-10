@@ -1,3 +1,4 @@
+//FE\src\features\artworks\api\feed.ts
 import { http } from "../../../shared/api/http";
 
 type JsonRecord = Record<string, unknown>;
@@ -104,11 +105,11 @@ function mapFeedRow(row: unknown): FeedArtwork | null {
 }
 
 export async function fetchFeedArtworksOnly(): Promise<FeedArtwork[]> {
-  const res = await http.get("/api/v1/artworks/feed");
+  const res = await http.get("/api/v1/artworks/feed", {
+    headers: { "x-skip-auth": "1" }, // ✅ 공개 피드
+  });
   const raw = unwrapEnvelope<unknown>(unwrapAxios(res));
   const list = toArray(raw);
-
-  // ✅ 작품만 필터링 + 중복 제거(artworkId 기준)
   const mapped = list
     .map(mapFeedRow)
     .filter((v): v is FeedArtwork => !!v);
