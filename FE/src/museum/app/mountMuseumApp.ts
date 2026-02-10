@@ -294,7 +294,6 @@ export function mountMuseumApp(args: {
         introRuntime = rt;
       })
       .catch((e) => {
-        console.error("[museum] startIntro failed:", e);
         toastHere("INTRO FAILED");
       });
   }
@@ -328,7 +327,6 @@ export function mountMuseumApp(args: {
           toastHere("HALL READY");
         },
         onOpenExhibit: (payload) => {
-          console.log("[APP] onOpenExhibit fired", payload);
           toastHere(`OPEN EXHIBIT: ${payload.artist}`);
           startExhibit(payload);
         },
@@ -345,7 +343,6 @@ export function mountMuseumApp(args: {
         exitUiDispose = mountExitOverlay({
           label: "Back to exterior",
           onExit: () => {
-            console.log("[APP] Exit overlay clicked -> startIntro() (no reload)");
             sessionStorage.setItem(SKIP_KEY, "1");
             startIntro();
           },
@@ -353,7 +350,6 @@ export function mountMuseumApp(args: {
         });
       }
     } catch (e) {
-      console.error("[museum] startMainHall failed:", e);
       toastHere("HALL FAILED (콘솔 확인)");
     }
   }
@@ -381,7 +377,6 @@ export function mountMuseumApp(args: {
       exitUiDispose = null;
     }
 
-    console.log("[museum] startExhibit()", payload);
     toastHere(`ENTER EXHIBIT: ${payload.artist}`);
 
     // ✅ panelItems에 artworkId 포함 (중요)
@@ -433,9 +428,7 @@ export function mountMuseumApp(args: {
         }));
       }
 
-      console.log("[museum] exhibit panelItems:", panelItems);
     } catch (e) {
-      console.warn("[museum] artist artworks failed -> placeholder", e);
       toastHere("EXHIBIT LOAD FAILED → PLACEHOLDER");
 
       panelItems = Array.from({ length: EXHIBIT_PANEL_COUNT }, (_, i) => ({
@@ -467,7 +460,6 @@ export function mountMuseumApp(args: {
 
       // ✅ exhibitRoom 모달의 "작품 상세보기" → 여기로 들어옴 → React 라우팅 콜백 실행
       onOpenArtwork: (artworkId) => {
-        console.log("[museum] onOpenArtwork:", artworkId);
         args.onOpenArtwork?.(artworkId);
       },
     });

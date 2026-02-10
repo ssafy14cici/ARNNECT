@@ -51,7 +51,7 @@ public class MyInfoResponse {
                 .nickname(artist.getMember().getNickname())
                 .birth(artist.getMember().getBirth())
                 .phone(artist.getMember().getPhone())
-                .imgUrl(artist.getMember().getOriginProfileImageName() != null? imgUrl + artist.getMember().getOriginProfileImageName() : null)
+                .imgUrl(artist.getMember().getSavedProfileImageName() != null? imgUrl + artist.getMember().getSavedProfileImageName() : null)
                 .document(artist.getDocument())
                 .fieldId(artist.getFieldId())
                 .debutYear(artist.getDebutYear())

@@ -180,7 +180,6 @@ async function loadTextureSafe(loader: THREE.TextureLoader, url: string, labelFo
     tuneTexture(tex);
     return tex;
   } catch (e) {
-    console.warn("[panelArt] texture load failed:", url, e);
     return makeFallbackTexture(labelForFallback);
   }
 }
@@ -210,14 +209,12 @@ export async function attachPanelArt(args: AttachPanelArtArgs): Promise<AttachPa
 
     const panelObj = findByNameLoose(args.sceneRoot, it.panelName);
     if (!panelObj) {
-      console.warn("[panelArt] panel not found:", it.panelName);
       missing.push(it.panelName);
       continue;
     }
 
     const panelMesh = getFirstMesh(panelObj);
     if (!panelMesh) {
-      console.warn("[panelArt] found but mesh missing:", it.panelName, "=>", panelObj.name);
       missing.push(it.panelName);
       continue;
     }

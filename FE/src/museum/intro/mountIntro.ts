@@ -113,7 +113,6 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
       scene.background = hdriBg;
       scene.environment = hdriEnv;
     } catch (e) {
-      console.warn("[Intro] HDRI load failed:", e);
       scene.background = new THREE.Color("#0f1115");
       scene.environment = null;
     }
@@ -244,7 +243,6 @@ export async function mountIntro(canvas: HTMLCanvasElement, opts: MountIntroOpti
       scene.fog = new THREE.Fog(fogColor, tileWorld * (WAVE_HALF_TILES * 0.9), tileWorld * (WAVE_HALF_TILES * 2.2));
     }
   } catch (e) {
-    console.warn("[Intro] wave load failed:", e);
     wave = null;
   }
   

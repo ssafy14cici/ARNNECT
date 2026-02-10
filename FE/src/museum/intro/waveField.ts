@@ -2,7 +2,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-console.log("[waveField] loaded ver=PATCH_VER_6");
 
 export type WaveFieldHandle = {
   root: THREE.Group;

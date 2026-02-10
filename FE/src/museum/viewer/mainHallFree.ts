@@ -285,15 +285,6 @@ export function mountMainHallFree(canvas: HTMLCanvasElement, opts: Options = {})
 
   /* Pose logging (P) */
   function logCameraPose() {
-    const e = new THREE.Euler().setFromQuaternion(camera.quaternion, "YXZ");
-    console.log(
-      "[CAM]",
-      JSON.stringify({
-        pos: [camera.position.x, camera.position.y, camera.position.z],
-        yaw: e.y,
-        pitch: e.x,
-      })
-    );
   }
 
   /* ===== NAV wobble (cursor-follow) ===== */
@@ -666,9 +657,7 @@ function resolveNewArtistImageUrl(r: any) {
   // ✅ 토큰 제거 버전
   async function loadNewArtistItems(): Promise<ArtworkItem[]> {
     try {
-      console.log("[mainHallFree] fetchNewArtists 호출 시작...(public)");
       const rows = await fetchNewArtists(); // ✅ 토큰 없이
-      console.log("[mainHallFree] fetchNewArtists 결과:", rows?.length ?? 0, "건");
 
       if (!rows?.length) return DEFAULT_ART_ITEMS;
 
@@ -685,11 +674,6 @@ function resolveNewArtistImageUrl(r: any) {
           artworkTitle: (r.title ?? "").trim() || "작품",
           imageUrl: (() => {
             const url = resolveNewArtistImageUrl(r);
-            if (!url) {
-              console.warn(`[mainHallFree] ⚠️ image url empty (no imageUrl/savedImageName)`, r);
-            } else {
-              console.log(`[mainHallFree] ART_${i + 1} imageUrl:`, url);
-            }
             // ✅ 여기서도 a1.jpg로 떨어지지 말고 placeholder
             return url || makePlaceholderDataUrl(`NO IMG ${i + 1}`);
           })(),
@@ -701,7 +685,6 @@ function resolveNewArtistImageUrl(r: any) {
 
       return items;
     } catch (e) {
-      console.warn("[newArtists] fetch failed -> fallback to local images", e);
       return DEFAULT_ART_ITEMS;
     }
   }
@@ -720,8 +703,6 @@ function resolveNewArtistImageUrl(r: any) {
       if (!url) throw new Error("empty url");
       tex = await texLoader.loadAsync(url);
     } catch (e) {
-      console.warn("[mainHallFree] texture load failed -> placeholder:", url, e);
-
       // ✅ placeholder texture (CanvasTexture)
       const dataUrl = makePlaceholderDataUrl(label);
       // TextureLoader로 dataUrl도 로드 가능하지만, 여기선 바로 CanvasTexture 써도 됨
@@ -973,7 +954,6 @@ function resolveNewArtistImageUrl(r: any) {
       }
     }
 
-    if (missing.length) console.warn("[art] missing planes:", missing);
   }
 
   let logoMesh: THREE.Mesh | null = null;
@@ -981,7 +961,6 @@ function resolveNewArtistImageUrl(r: any) {
   async function attachLogoToWall(root: THREE.Object3D) {
     const wall = findObjectByName(root, LOGO.wallName);
     if (!wall || !(wall as any).isMesh) {
-      console.warn("[logo] wall not found or not mesh:", LOGO.wallName);
       return null;
     }
     const wallMesh = wall as THREE.Mesh;
@@ -1179,7 +1158,7 @@ function resolveNewArtistImageUrl(r: any) {
       opts.onReady?.();
     },
     undefined,
-    (err) => console.error("[viewer] GLB load failed:", err)
+    () => {}
   );
 
   /* ===== Raycast click on artwork ===== */
@@ -1232,8 +1211,6 @@ function resolveNewArtistImageUrl(r: any) {
       // ✅ 이미 locked → 화면 중앙으로 raycast (FREE 모드에서도 작품 클릭 가능)
       const cx = window.innerWidth / 2;
       const cy = window.innerHeight / 2;
-      console.log("[mainHallFree] FREE mode click (locked) → raycast at center");
-
       if (raycastGuide(cx, cy)) {
         showTutorialOverlay();
         return;
@@ -1241,7 +1218,6 @@ function resolveNewArtistImageUrl(r: any) {
 
       const hit = raycastArtwork(cx, cy);
       if (hit) {
-        console.log("[mainHallFree] FREE mode → artwork hit:", hit.userData);
         const artist = hit.userData?.__artist as string | undefined;
         const artistId = hit.userData?.__artistId as string | undefined;
         const artworkTitle = hit.userData?.__artworkTitle as string | undefined;
@@ -1255,8 +1231,6 @@ function resolveNewArtistImageUrl(r: any) {
     }
 
     // ✅ NAV 모드: 기존 로직
-    console.log("[mainHallFree] NAV mode click at", e.clientX, e.clientY);
-
     if (raycastGuide(e.clientX, e.clientY)) {
       showTutorialOverlay();
       return;
@@ -1264,8 +1238,6 @@ function resolveNewArtistImageUrl(r: any) {
 
     const hit = raycastArtwork(e.clientX, e.clientY);
     if (!hit) return;
-
-    console.log("[mainHallFree] NAV mode → artwork hit:", hit.userData);
 
     const wpId = hit.userData?.__wpId as number | undefined;
     const artist = hit.userData?.__artist as string | undefined;
@@ -1496,7 +1468,6 @@ function resolveNewArtistImageUrl(r: any) {
     exhibitBtn.textContent = "전시보러가기";
 
     const openExhibit = (e: Event) => {
-      console.log("[mainHallFree] 전시보러가기 클릭 → openExhibit payload:", JSON.stringify(payload));
       e.preventDefault();
       e.stopPropagation();
 

@@ -89,7 +89,7 @@ public class MemberServiceImpl implements MemberService{
                 profileImageName = fileStorageService.saveFile(request.getImage(), FileType.PROFILE);
             }
             if(request.getPassword() != null && !request.getPassword().isEmpty()){
-                member.encodePassword(passwordEncoder.encode(member.getPassword()));
+                member.encodePassword(passwordEncoder.encode(request.getPassword()));
             }
             member.updateNickname(request.getNickname());
             if(profileImageName != null){

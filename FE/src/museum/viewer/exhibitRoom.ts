@@ -77,15 +77,6 @@ function applyTexFix(tex: THREE.Texture, panelName: string, debug?: boolean) {
   }
 
   tex.needsUpdate = true;
-
-  if (debug) {
-    console.log("[exhibit] tex fix", panelName, {
-      rotation: tex.rotation,
-      repeat: tex.repeat.toArray(),
-      offset: tex.offset.toArray(),
-      flipY: tex.flipY,
-    });
-  }
 }
 
 export async function mountExhibitRoom(
@@ -137,13 +128,7 @@ export async function mountExhibitRoom(
     return { w, h };
   };
 
-  console.log("[exhibit] mountExhibitRoom entered", { glbUrl: opts.glbUrl, debug });
 
-  if (debug) {
-    fetch(opts.glbUrl, { cache: "no-store" })
-      .then((r) => console.log("[glb check]", r.status, r.headers.get("content-type"), opts.glbUrl))
-      .catch((e) => console.error("[glb check] fetch failed", e));
-  }
 
   /* ===== Renderer ===== */
   const renderer = new THREE.WebGLRenderer({
@@ -604,17 +589,14 @@ export async function mountExhibitRoom(
       e.stopPropagation();
 
       if (artworkId === undefined || artworkId === null || String(artworkId).trim() === "") {
-        console.warn("[exhibit] missing artworkId:", { panelName, title, imageUrl, artworkId });
         toast("artworkId가 없어서 이동 불가 (콘솔 확인)");
         return;
       }
       if (!opts.onOpenArtwork) {
-        console.warn("[exhibit] opts.onOpenArtwork is missing");
         toast("onOpenArtwork 콜백이 없음 (React 연결 필요)");
         return;
       }
 
-      console.log("[exhibit] open artwork:", artworkId);
       overlay.remove();
 
       // ✅ 여기 핵심: 라우팅 전에 3D를 확실히 종료해야 라우트가 깔끔히 전환됨
@@ -720,15 +702,7 @@ export async function mountExhibitRoom(
 
           scene.add(glbRoot);
 
-          if (debug) {
-            const box = new THREE.Box3().setFromObject(glbRoot);
-            console.log("[exhibit] GLB loaded OK", opts.glbUrl);
-            console.log("[exhibit] bbox", {
-              center: box.getCenter(new THREE.Vector3()).toArray(),
-              size: box.getSize(new THREE.Vector3()).toArray(),
-            });
-          }
-
+        
           applyPoseInstant(index);
 
           if (autoFitIfOff && glbRoot) {
@@ -738,7 +712,7 @@ export async function mountExhibitRoom(
             const dist = box.distanceToPoint(camera.position);
 
             if (diag > 0 && dist > diag * 2.0) {
-              if (debug) console.warn("[exhibit] viewpoint off -> autoFit", { dist, diag });
+              // if (debug) console.warn("[exhibit] viewpoint off -> autoFit", { dist, diag });
               fitCameraToBox(camera, box);
               lookTarget.copy(box.getCenter(new THREE.Vector3()));
               camera.lookAt(lookTarget);
@@ -828,18 +802,9 @@ export async function mountExhibitRoom(
                 mesh.userData.__imageUrl = item.imageUrl;
                 mesh.userData.__artworkId = item.artworkId; // ✅ 타입에서 가져옴
 
-                if (debug) {
-                  console.log("[exhibit] bind userData", item.panelName, {
-                    artworkId: item.artworkId,
-                    title: item.title,
-                    imageUrl: item.imageUrl,
-                  });
-                }
-
                 clickableArtMeshes.push(mesh);
                 attached++;
               } catch (e) {
-                if (debug) console.warn("[exhibit] texture load failed:", item.panelName, e);
                 missing.push(item.panelName);
               }
             }
@@ -861,13 +826,11 @@ export async function mountExhibitRoom(
               }
             }
 
-            if (debug) console.log("[exhibit] panels attached:", attached, "missing:", missing);
           }
 
           loading.remove();
           resolve(true);
         } catch (err) {
-          console.error("[exhibit] post-load error:", err);
           loading.textContent = "GALLERY LOAD FAILED (post-load). Check Console.";
           resolve(false);
         }
@@ -879,7 +842,6 @@ export async function mountExhibitRoom(
         loading.textContent = `LOADING GALLERY… ${pct}%`;
       },
       (err) => {
-        console.error("[exhibit] GLB load error:", err);
         loading.textContent = "GALLERY LOAD FAILED. Check Network/Console.";
         resolve(false);
       }
@@ -887,7 +849,6 @@ export async function mountExhibitRoom(
   });
 
   if (!loadOk) {
-    if (debug) console.warn("[exhibit] loadOk=false");
   }
 
   /* ===== Render loop ===== */

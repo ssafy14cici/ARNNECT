@@ -34,3 +34,6 @@ coverage/
 
 # === misc ===
 *.local
+
+nul
+.claude/
