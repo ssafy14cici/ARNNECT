@@ -30,60 +30,29 @@ function formatKST(iso?: string) {
   return d.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 }
 
-function resolveMaybeRelativeUrl(url?: string) {
-  if (!url) return "";
-  if (/^https?:\/\//i.test(url)) return url;
-
-  // ✅ DEV에서는 프록시 타게 "그대로" 반환 (baseURL 붙이지 않음)
-  if (import.meta.env.DEV) {
-    return url.startsWith("/") ? url : `/${url}`;
-  }
-
-  const base = String(import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-  if (!base) return url;
-
-  return url.startsWith("/") ? `${base}${url}` : `${base}/${url}`;
-}
-
 /**
- * collectbook 응답이
- * - URL(/api/v1/... or https://...)로 올 수도 있고
- * - 파일명(xxx.jpg)으로 올 수도 있어서 둘 다 처리
- */
-function resolveTicketMediaAny(v?: string) {
-  if (!v) return "";
-  if (/^https?:\/\//i.test(v) || v.startsWith("/")) return resolveMaybeRelativeUrl(v);
-  return resolveMediaUrl(v);
-}
-
-/**
- * ✅ TicketCardModern(HeroImage)랑 동일한 패턴으로 맞춤
+ * ✅ TicketCardModern(HeroImage)와 동일 패턴
+ * - src 해석은 resolveMediaUrl()로만 통일 (우회 로직 제거)
  * - <img> 로드 실패 시: Authorization 포함 blob 재시도
- * - relative 경로면 window.location.origin 붙여서 "같은 오리진"으로 요청 (axios baseURL 영향 제거)
+ * - relative면 window.location.origin 붙여 "same-origin absolute"로 요청 (axios baseURL 영향 제거)
  */
 function AuthedImage({
   src,
   alt,
   style,
 }: {
-  src?: string;
+  src?: string | null;
   alt: string;
   style?: CSSProperties;
 }) {
-  // ✅ src가 상대경로인데 "/"가 없으면 붙여줌 (Router 현재 경로 영향 방지)
-  const normalized = useMemo(() => {
-    const s = String(src ?? "").trim();
-    if (!s) return "";
-    if (/^https?:\/\//i.test(s) || s.startsWith("/")) return s;
-    return `/${s}`;
-  }, [src]);
+  const resolved = useMemo(() => resolveMediaUrl(src ?? ""), [src]);
 
   const [displaySrc, setDisplaySrc] = useState<string>("");
   const [triedBlob, setTriedBlob] = useState(false);
   const blobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    setDisplaySrc(normalized);
+    setDisplaySrc(resolved);
     setTriedBlob(false);
 
     if (blobUrlRef.current) {
@@ -97,13 +66,14 @@ function AuthedImage({
         blobUrlRef.current = null;
       }
     };
-  }, [normalized]);
+  }, [resolved]);
 
-  if (!normalized || !displaySrc) return null;
+  if (!resolved || !displaySrc) return null;
 
-  const requestUrl = /^https?:\/\//i.test(normalized)
-    ? normalized
-    : `${window.location.origin}${normalized}`;
+  const requestUrl =
+    /^https?:\/\//i.test(resolved)
+      ? resolved
+      : `${window.location.origin}${resolved.startsWith("/") ? "" : "/"}${resolved}`;
 
   return (
     <img
@@ -111,13 +81,15 @@ function AuthedImage({
       alt={alt}
       style={style}
       onError={async () => {
+        // 1) 일반 <img> 로드 실패 → 2) Authorization 포함 blob 시도 → 3) 실패면 숨김
         if (triedBlob) {
           setDisplaySrc("");
           return;
         }
+
         try {
           setTriedBlob(true);
-          const res = await http.get(requestUrl, { responseType: "blob" }); // ✅ absolute URL이라 baseURL 무시됨
+          const res = await http.get(requestUrl, { responseType: "blob" }); // ✅ absolute라 baseURL 무시됨
           const objUrl = URL.createObjectURL(res.data);
           blobUrlRef.current = objUrl;
           setDisplaySrc(objUrl);
@@ -218,7 +190,7 @@ export default function CollectBookDetail() {
     };
   }, [ticketCode, at, isLoggedIn, ownerUuid]);
 
-  // ✅ 이미지 필드명/형태(Url vs Name) 흡수
+  // ✅ 이미지 필드명/형태(Url vs Name) 흡수 + resolveMediaUrl()로만 최종 해석 통일
   const ticketImageSrc = useMemo(() => {
     if (!item) return "";
     const raw =
@@ -226,7 +198,7 @@ export default function CollectBookDetail() {
       (item as any)?.ticketImageName ??
       (item as any)?.ticketImage ??
       "";
-    return resolveTicketMediaAny(raw);
+    return resolveMediaUrl(String(raw ?? ""));
   }, [item]);
 
   const qrImageSrc = useMemo(() => {
@@ -236,7 +208,7 @@ export default function CollectBookDetail() {
       (item as any)?.qrImageName ??
       (item as any)?.qrImage ??
       "";
-    return resolveTicketMediaAny(raw);
+    return resolveMediaUrl(String(raw ?? ""));
   }, [item]);
 
   if (!ticketCode) {

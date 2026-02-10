@@ -5,6 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAuthStore } from "../../features/auth/store";
 import { http } from "../../shared/api/http";
 import { sendFanLetter } from "../../features/fanLetter/api";
+import { profileApi } from "../../features/profile/api"; // ✅ 추가
 
 import "./artworkDetail.css";
 
@@ -97,7 +98,10 @@ export default function ArtworkDetail() {
   const [imageError, setImageError] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+
+  // ✅ follow
   const [isFollowing, setIsFollowing] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
 
   const [commentText, setCommentText] = useState("");
   const [fanLetterText, setFanLetterText] = useState("");
@@ -119,6 +123,10 @@ export default function ArtworkDetail() {
     return Number.isFinite(n) ? n : undefined;
   }, [normalizedArtworkId]);
 
+  const artistUuid = useMemo(() => {
+    return String((artwork as any)?.artistMemberUuid ?? "").trim();
+  }, [artwork]);
+
   const isOwner = useMemo(() => {
     const me = String(user?.memberUuid ?? "").trim();
     const owner = String((artwork as any)?.artistMemberUuid ?? (artwork as any)?.artistId ?? "").trim();
@@ -138,7 +146,6 @@ export default function ArtworkDetail() {
     setFanLetterOpen(true);
   };
 
-
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [normalizedArtworkId]);
@@ -157,7 +164,7 @@ export default function ArtworkDetail() {
     });
   };
 
-  // 상세
+  // ✅ 상세
   useEffect(() => {
     let cancelled = false;
 
@@ -175,6 +182,10 @@ export default function ArtworkDetail() {
         setEditingText("");
         setReplyingParentId(null);
         setReplyText("");
+
+        // ✅ follow 초기화
+        setIsFollowing(false);
+        setFollowBusy(false);
 
         if (blobUrlRef.current) {
           URL.revokeObjectURL(blobUrlRef.current);
@@ -201,6 +212,34 @@ export default function ArtworkDetail() {
         if (typeof (mapped as any)?.likeCount === "number" && Number.isFinite((mapped as any).likeCount)) {
           setLikeCount((mapped as any).likeCount);
         }
+
+        // ✅ follow 상태: 1) detail에서 내려주면 그걸 우선
+        const fromDetail =
+          (mapped as any)?.isFollowing ??
+          (mapped as any)?.following ??
+          (mapped as any)?.followed ??
+          (mapped as any)?.isFollowed;
+
+        if (typeof fromDetail === "boolean") {
+          setIsFollowing(fromDetail);
+        } else {
+          // ✅ 2) 없으면 프로필로 best-effort 동기화
+          const target = String((mapped as any)?.artistMemberUuid ?? "").trim();
+          const me = String(user?.memberUuid ?? "").trim();
+
+          if (!target || (me && target === me)) {
+            setIsFollowing(false);
+          } else {
+            try {
+              const p = await profileApi.getProfile(target);
+              if (cancelled) return;
+              const s = (p as any)?.isFollowing;
+              if (typeof s === "boolean") setIsFollowing(s);
+            } catch {
+              // 실패해도 화면은 유지
+            }
+          }
+        }
       } catch (e) {
         console.error(e);
         if (!cancelled) {
@@ -217,9 +256,9 @@ export default function ArtworkDetail() {
     return () => {
       cancelled = true;
     };
-  }, [normalizedArtworkId, retryKey]);
+  }, [normalizedArtworkId, retryKey, user?.memberUuid]);
 
-  // 리뷰
+  // ✅ 리뷰
   useEffect(() => {
     let cancelled = false;
 
@@ -253,7 +292,7 @@ export default function ArtworkDetail() {
     };
   }, [numericArtworkId, artwork, detailError]);
 
-  // 댓글
+  // ✅ 댓글
   useEffect(() => {
     let cancelled = false;
 
@@ -295,7 +334,7 @@ export default function ArtworkDetail() {
     };
   }, []);
 
-  // handlers
+  // ✅ 좋아요
   const onToggleFavorite = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
 
@@ -322,6 +361,41 @@ export default function ArtworkDetail() {
       setIsLiked(prevLiked);
       setLikeCount(prevCount);
       alert("좋아요 처리 실패");
+    }
+  };
+
+  // ✅ 팔로우(서버 연동)
+  const onToggleFollow = async () => {
+    if (!isLoggedIn) return alert("로그인이 필요합니다.");
+    if (isOwner) return;
+    if (followBusy) return;
+
+    const target = String((artwork as any)?.artistMemberUuid ?? artistUuid ?? "").trim();
+    if (!target) return;
+    if (meUuid && target === meUuid) return;
+
+    const prev = isFollowing;
+    setIsFollowing(!prev);
+    setFollowBusy(true);
+
+    try {
+      if (prev) await profileApi.unfollow(target);
+      else await profileApi.follow(target);
+
+      // best-effort resync
+      try {
+        const latest = await profileApi.getProfile(target);
+        const s = (latest as any)?.isFollowing;
+        if (typeof s === "boolean") setIsFollowing(s);
+      } catch {
+        // ignore
+      }
+    } catch (e) {
+      console.error(e);
+      setIsFollowing(prev);
+      alert("팔로우 처리 실패");
+    } finally {
+      setFollowBusy(false);
     }
   };
 
@@ -558,7 +632,6 @@ export default function ArtworkDetail() {
     navigate(`/artworks/${normalizedArtworkId}/edit`);
   };
 
-
   const onSendFanLetter = async (content: string) => {
     if (!isLoggedIn || !user?.memberUuid) return alert("로그인 후 이용해주세요.");
     if (!artwork) return;
@@ -651,8 +724,9 @@ export default function ArtworkDetail() {
         isLiked={isLiked}
         likeCount={likeCount}
         isFollowing={isFollowing}
+        followBusy={followBusy} // ✅ 추가
         onToggleFavorite={onToggleFavorite}
-        onToggleFollow={() => setIsFollowing((v) => !v)}
+        onToggleFollow={onToggleFollow} // ✅ 교체
         onOpenFanLetter={onOpenFanLetter}
         onGoEdit={onGoEdit}
         onDeleteArtwork={onDeleteArtwork}

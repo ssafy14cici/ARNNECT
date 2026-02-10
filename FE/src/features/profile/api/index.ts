@@ -7,7 +7,10 @@ export type { UpdateMyProfilePatch };
 
 export const profileApi: {
   getMyProfile: () => Promise<ProfileModel>;
+
+  // ✅ 통합 조회(artist -> user fallback)
   getProfile: (memberUuid: string) => Promise<ProfileModel>;
+
   getArtistProfile: (memberUuid: string) => Promise<ProfileModel>;
   getUserProfile: (memberUuid: string) => Promise<ProfileModel>;
 
@@ -23,7 +26,16 @@ export const profileApi: {
   updateFeaturedBadges: (role: ProfileRole, profileId: string, badgeIds: string[]) => Promise<void>;
 } = {
   getMyProfile: real.getMyProfile,
-  getProfile: real.getProfile,
+
+  // ✅ 여기서 fallback 처리 (real.getProfile 의존 제거)
+  getProfile: async (memberUuid: string) => {
+    try {
+      return await real.getArtistProfile(memberUuid);
+    } catch {
+      return await real.getUserProfile(memberUuid);
+    }
+  },
+
   getArtistProfile: real.getArtistProfile,
   getUserProfile: real.getUserProfile,
 

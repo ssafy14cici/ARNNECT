@@ -35,7 +35,6 @@ function clampFeaturedIds(profile: ProfileModel, max = 3) {
   return Array.from(new Set(ids)).slice(0, max);
 }
 
-// ✅ 동일 매핑(상단 표시용) — public/badges/badges1~9.png
 const ID_TO_NO: Record<string, number> = {
   review_lv1: 1,
   review_lv2: 2,
@@ -82,13 +81,9 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
   const isArtist = isArtistProfile(profile);
 
-  // ✅ 서버가 내려준 earnedBadges (없으면 [])
   const earnedBadges = useMemo<Badge[]>(() => profile.badges ?? [], [profile.badges]);
-
-  // ✅ 초기 featured ids
   const initialFeaturedIds = useMemo(() => clampFeaturedIds(profile, 3), [profile]);
 
-  // ✅ 상단 표시용: profile.badges가 비어도 featuredBadgeIds 기반으로 fallback label을 만들어 표시
   const featuredBadges = useMemo(() => {
     const ids = clampFeaturedIds(profile, 3);
     const map = new Map((profile.badges ?? []).map((b) => [b.id, b]));
@@ -97,7 +92,6 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
       .map((id) => {
         const fromServer = map.get(id);
         if (fromServer) return fromServer;
-        // fallback
         return { id, label: ID_TO_LABEL[id] ?? id } as Badge;
       })
       .filter(Boolean) as Badge[];
@@ -145,17 +139,15 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
     };
   }, [manageOpen]);
 
-  /**
-   * ✅ 팔로우 실시간 반영 핵심 수정
-   * - 낙관 업데이트는 즉시 적용
-   * - follow/unfollow 실패 시에만 롤백
-   * - getProfile 재조회 실패는 무시(낙관 업데이트 유지) → "실시간 반영 안됨" 체감 방지
-   * - busy 중 중복 클릭 방지
-   */
+  // ✅ targetId 보정 (id가 uuid가 아닐 수도 있는 케이스 방어)
+  const targetId = useMemo(() => {
+    return String((profile as any).id ?? (profile as any).memberUuid ?? "").trim();
+  }, [profile]);
+
   const toggleFollow = async () => {
     if (busy) return;
     if (isOwner) return;
-    if (!profile.id) return;
+    if (!targetId) return;
 
     const prev = profile;
 
@@ -174,19 +166,16 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
     onProfileUpdated(optimistic);
 
     try {
-      // ✅ 1) 서버 토글 (이게 실패하면 롤백)
-      if (prev.isFollowing) await profileApi.unfollow(prev.id);
-      else await profileApi.follow(prev.id);
+      if (prev.isFollowing) await profileApi.unfollow(targetId);
+      else await profileApi.follow(targetId);
 
-      // ✅ 2) 재조회는 "베스트 에포트" (실패해도 롤백 금지)
       try {
-        const latest = await profileApi.getProfile(prev.id);
+        const latest = await profileApi.getProfile(targetId);
         onProfileUpdated(latest as ProfileModel);
       } catch {
         // 재조회 실패 → 낙관 업데이트 유지
       }
     } catch (e) {
-      // follow/unfollow 자체가 실패한 경우만 롤백
       onProfileUpdated(prev);
       alert(e instanceof Error ? e.message : "팔로우 변경 실패");
     } finally {
@@ -197,11 +186,11 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
   const submitFanLetter = async (message: string) => {
     if (busy) return;
     if (!canSendFanLetter) return;
-    if (!profile.id) return;
+    if (!targetId) return;
 
     setBusy(true);
     try {
-      await profileApi.sendFanLetter(profile.id, message);
+      await profileApi.sendFanLetter(targetId, message);
       alert("팬레터 전송 완료");
       setFanLetterOpen(false);
     } catch (e) {
@@ -225,46 +214,35 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
     setBusy(true);
 
     try {
-      // ✅ 낙관적 업데이트: 서버 응답 전에 UI부터 즉시 업데이트
       const optimisticProfile: ProfileModel = { ...prev } as ProfileModel;
 
-      // 닉네임 즉시 반영 (name 필드는 화면 표시용)
       if (payload.nickname) {
         optimisticProfile.name = payload.nickname;
-        // UserProfile인 경우 nickname도 업데이트
         if (optimisticProfile.role === "USER") {
           (optimisticProfile as UserProfile).nickname = payload.nickname;
         }
       }
 
-      // 이미지 즉시 반영 (File 객체를 ObjectURL로 변환)
       if (payload.image && payload.image instanceof File) {
         const imageUrl = URL.createObjectURL(payload.image);
         optimisticProfile.imageUrl = imageUrl;
       }
 
-      // 대표 뱃지 즉시 반영
       optimisticProfile.featuredBadgeIds = nextFeaturedIds;
 
-      // UI 즉시 업데이트
       onProfileUpdated(optimisticProfile);
 
-      // 백그라운드로 서버 업데이트 시도
       await profileApi.updateMyProfile(profile.role, payload);
-      const targetId = profile.id;
-      await profileApi.updateFeaturedBadges(profile.role, targetId, nextFeaturedIds);
+      const target = targetId;
+      await profileApi.updateFeaturedBadges(profile.role, target, nextFeaturedIds);
 
-      // 서버에서 최신 프로필 재조회 (성공 시에만)
       try {
         const latest = await profileApi.getMyProfile();
         onProfileUpdated({ ...(latest as ProfileModel), featuredBadgeIds: nextFeaturedIds } as ProfileModel);
-      } catch {
-        // 재조회 실패해도 낙관적 업데이트는 유지
-      }
+      } catch {}
 
       return true;
     } catch (e) {
-      // 서버 요청 실패 시 이전 상태로 롤백
       onProfileUpdated(prev);
       alert(e instanceof Error ? e.message : "프로필 저장 실패");
       return false;
@@ -298,11 +276,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
 
             <div className="profileBadges">
               {featuredBadges.map((b) => (
-                <span
-                  key={b.id}
-                  className="profileBadge"
-                  style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
-                >
+                <span key={b.id} className="profileBadge" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
                   <img
                     src={badgeImageSrc(b.id)}
                     alt=""
@@ -353,12 +327,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
                       로그아웃
                     </button>
 
-                    <button
-                      className="profileMenuItem"
-                      onClick={() => setManageOpen(false)}
-                      role="menuitem"
-                      type="button"
-                    >
+                    <button className="profileMenuItem" onClick={() => setManageOpen(false)} role="menuitem" type="button">
                       닫기
                     </button>
                   </div>
