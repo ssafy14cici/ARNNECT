@@ -4,8 +4,8 @@ import { useNavigate } from "react-router-dom";
 import "../profile.css";
 
 import type { UpdateMyProfilePatch } from "../../../features/profile/api";
-import { useAuthStore } from "../../../features/auth/store";
 import { profileApi } from "../../../features/profile/api";
+import { useAuthStore } from "../../../features/auth/store";
 import { useBadgeStore } from "../../../features/badge/store";
 
 import basicProfile from "../../../assets/basicprofile.png";
@@ -19,7 +19,7 @@ import { resolveProfileMediaUrl } from "../../../features/profile/resolveProfile
 
 type ProfileModel = ArtistProfile | UserProfile;
 
-type Props = {
+type ProfileHeaderProps = {
   profile: ProfileModel;
   isOwner: boolean;
   onProfileUpdated: (next: ProfileModel) => void;
@@ -67,15 +67,7 @@ function badgeImageSrc(id: string) {
   return `${import.meta.env.BASE_URL}badges/badges${no}.png`;
 }
 
-export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: PropsProps) {}
-
-type Props = {
-  profile: ProfileModel;
-  isOwner: boolean;
-  onProfileUpdated: (next: ProfileModel) => void;
-};
-
-export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Props) {
+export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: ProfileHeaderProps) {
   const navigate = useNavigate();
 
   const { logout, role: viewerRole } = useAuthStore();
@@ -291,12 +283,7 @@ export default function ProfileHeader({ profile, isOwner, onProfileUpdated }: Pr
                   className="profileBadge"
                   style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
                 >
-                  <img
-                    src={badgeImageSrc(b.id)}
-                    alt=""
-                    style={{ width: 16, height: 16, objectFit: "contain" }}
-                    loading="lazy"
-                  />
+                  <img src={badgeImageSrc(b.id)} alt="" style={{ width: 16, height: 16, objectFit: "contain" }} />
                   {b.label}
                 </span>
               ))}

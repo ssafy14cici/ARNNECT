@@ -3,6 +3,14 @@ import { http } from "../../../shared/api/http";
 import type { FeedItem, FeedAuthorRole } from "../model/types";
 
 /**
+ * ✅ 공개 피드 정책
+ * - 피드는 로그인 여부와 무관하게 누구나 볼 수 있어야 함
+ * - 로그인 상태에서 Authorization 붙으면 BE가 500 내는 이슈가 있어서,
+ *   피드 요청은 항상 x-skip-auth=1로 "토큰 없이" 호출한다.
+ */
+const PUBLIC_HEADERS = { "x-skip-auth": "1" as const };
+
+/**
  * ✅ NOTE
  * - http의 baseURL이 이미 "/api/v1" 포함이면, 아래 PATH에서 "/api/v1" 제거
  */
@@ -11,7 +19,7 @@ const ARTWORK_FEED_PATH = "/api/v1/artworks/feed";
 /**
  * ✅ REVIEW LIST API 후보들
  * - 프로젝트/BE 구현에 맞는 실제 경로로 정리해서 하나만 남기는 걸 권장
- * - 전부 실패하면 리뷰는 머지되지 않고(=유저 글 안 뜸), 작품 피드만 반환함
+ * - 전부 실패하면 리뷰는 머지되지 않고, 작품 피드만 반환함
  */
 const REVIEW_FEED_CANDIDATES = ["/api/v1/reviews/feed", "/api/v1/reviews", "/api/v1/reviews/all"];
 
@@ -42,7 +50,6 @@ function asNumber(v: unknown, fallback = 0): number {
 }
 
 function toEpochMs(v: unknown): number {
-  // createdAt이 ISO string / number / Timestamp-string 등 섞여올 수 있어서 방어
   if (typeof v === "number" && Number.isFinite(v)) return v;
 
   if (typeof v === "string") {
@@ -53,7 +60,6 @@ function toEpochMs(v: unknown): number {
     if (Number.isFinite(n)) return n;
   }
 
-  // 객체일 경우(드물게) valueOf()/toString() 시도
   if (isObject(v)) {
     const s = asString((v as any).toString?.(), "");
     const parsed = Date.parse(s);
@@ -66,7 +72,6 @@ function toEpochMs(v: unknown): number {
 function toIso(v: unknown): string {
   const ms = toEpochMs(v);
   if (ms > 0) return new Date(ms).toISOString();
-  // fallback: 지금 시간
   return new Date().toISOString();
 }
 
@@ -107,7 +112,6 @@ function normalizeRole(rawRole: unknown, kind?: "ARTWORK" | "REVIEW" | "UNKNOWN"
   if (kind === "REVIEW") return "USER";
   if (kind === "ARTWORK") return "ARTIST";
 
-  // 통합피드 기준 기본값은 USER가 더 안전(필터가 비어보이는 현상 방지)
   return "USER";
 }
 
@@ -192,7 +196,7 @@ type RawArtworkFeed = {
   nickname?: string;
   authorName?: string;
 
-  role?: string; // 가끔 들어오는 경우 방어
+  role?: string;
   authorRole?: string;
 };
 
@@ -210,11 +214,10 @@ type RawReviewFeed = {
 
   createdAt?: string | number;
 
-  memberUuid?: string; // 작성자(유저)
+  memberUuid?: string;
   nickname?: string;
 
-  // 리뷰에 딸려오는 작품의 작가 정보(작성자와 다름)
-  artistUuid?: string; // memberUuid
+  artistUuid?: string;
   artistName?: string;
 
   role?: string;
@@ -241,11 +244,10 @@ function toFeedItemFromArtwork(v: unknown): FeedItem | null {
   const authorName =
     asString(x.artistName, "") || asString(x.authorName, "") || asString(x.nickname, "") || "—";
 
-  const authorRole = normalizeRole(x.authorRole ?? x.role, "ARTWORK");
-
+  // 작품은 기본적으로 ARTIST로 고정(필터 안정)
   return {
     id: `artwork-${artworkId}`,
-    authorRole: authorRole === "ARTIST" ? "ARTIST" : "ARTIST", // 작품은 기본 ARTIST로 고정하는 게 안전
+    authorRole: "ARTIST",
     title: asString(x.title, "Untitled"),
     excerpt: asString(x.content, ""),
     authorName,
@@ -285,22 +287,20 @@ function toFeedItemFromReview(v: unknown): FeedItem | null {
   };
 }
 
-async function fetchPayload(path: string): Promise<unknown> {
-  const res = await http.get(path, {
-    headers: { "x-skip-auth": "1" }, // ✅ 피드는 공개: 로그인해도 토큰 안 보냄
-  });
+// ---------- fetch (public only) ----------
+async function fetchPayloadPublic(path: string): Promise<unknown> {
+  const res = await http.get(path, { headers: PUBLIC_HEADERS });
 
+  // axios response면 res.data가 본문
   const payload = isObject(res) && "data" in res ? (res as { data: unknown }).data : res;
   return pickEnvelopeData(payload);
 }
 
-
-async function fetchReviewFeedBestEffort(): Promise<FeedItem[]> {
+async function fetchReviewFeedBestEffortPublic(): Promise<FeedItem[]> {
   for (const path of REVIEW_FEED_CANDIDATES) {
     try {
-      const body = await fetchPayload(path);
+      const body = await fetchPayloadPublic(path);
       const arr = extractArray(body);
-      // 성공하면(빈 배열이어도) 그걸로 종료
       return arr.map(toFeedItemFromReview).filter((x): x is FeedItem => x !== null);
     } catch {
       continue;
@@ -309,7 +309,7 @@ async function fetchReviewFeedBestEffort(): Promise<FeedItem[]> {
   return [];
 }
 
-// ---------- sorting (핵심) ----------
+// ---------- sorting ----------
 function isArtworkItem(it: FeedItem): boolean {
   return it.id.startsWith("artwork-");
 }
@@ -333,27 +333,29 @@ function sortArtworkFirstThenCreatedAtDesc(a: FeedItem, b: FeedItem): number {
   return a.id.localeCompare(b.id);
 }
 
-function sortByCreatedAtAsc(a: FeedItem, b: FeedItem): number {
-  // ✅ 오래된순(전체)
-  const d = toEpochMs(a.createdAt) - toEpochMs(b.createdAt);
-  if (d !== 0) return d;
-  return a.id.localeCompare(b.id);
-}
-
 // ---------- exported ----------
 export async function getFeedListReal(): Promise<FeedItem[]> {
-  // 1) 작품 피드는 필수
-  const artworkBody = await fetchPayload(ARTWORK_FEED_PATH);
-  const artworkArr = extractArray(artworkBody);
-  const artworks = artworkArr.map(toFeedItemFromArtwork).filter((x): x is FeedItem => x !== null);
+  // 1) 작품 피드 (공개 + best-effort)
+  let artworks: FeedItem[] = [];
+  try {
+    const artworkBody = await fetchPayloadPublic(ARTWORK_FEED_PATH);
+    const artworkArr = extractArray(artworkBody);
+    artworks = artworkArr.map(toFeedItemFromArtwork).filter((x): x is FeedItem => x !== null);
+  } catch (e) {
+    // 작품 피드가 터져도 화면이 완전 흰화면 되는 건 막기
+    console.error("[feed] artwork feed failed:", e);
+    artworks = [];
+  }
 
-  // 2) 리뷰 피드는 best-effort (없으면 실패해도 작품만 보여줌)
-  const reviews = await fetchReviewFeedBestEffort();
+  // 2) 리뷰 피드 (공개 + best-effort)
+  let reviews: FeedItem[] = [];
+  try {
+    reviews = await fetchReviewFeedBestEffortPublic();
+  } catch (e) {
+    console.error("[feed] review feed failed:", e);
+    reviews = [];
+  }
 
   // 3) merge + sort
-  // ✅ 추천: 작품이 무조건 먼저 + (각 타입 내) 최신순
   return [...artworks, ...reviews].sort(sortArtworkFirstThenCreatedAtDesc);
-
-  // ✅ 대안: 전체 오래된순(작품이 "무조건" 먼저는 아님)
-  // return [...artworks, ...reviews].sort(sortByCreatedAtAsc);
 }
