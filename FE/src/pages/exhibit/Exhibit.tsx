@@ -233,7 +233,7 @@ export default function Exhibit() {
 
       {!showGuide && (
         <img
-          src={asset("info_ex.png")}
+          src={asset("/settings/info_ex.png")}
           alt="가이드 보기"
           className="exhibit-guide-overlay"
           onClick={() => setShowGuide(true)}
@@ -277,7 +277,7 @@ export default function Exhibit() {
 
       {showGuide && (
         <img
-          src={asset("how_ex.png")}
+          src={asset("/settings/how_ex.png")}
           alt="조작 가이드"
           className="exhibit-guide-overlay"
           onClick={() => setShowGuide(false)}

@@ -113,7 +113,7 @@ export default function Hall() {
       {/* 가이드 토글 버튼 */}
       {!showGuide && (
         <img
-          src={asset("info.png")}
+          src={asset("/settings/info.png")}
           alt="가이드 보기"
           className="hall-guide-overlay"
           onClick={() => setShowGuide(true)}
@@ -159,7 +159,7 @@ export default function Hall() {
       {/* 조작 가이드 오버레이 */}
       {showGuide && (
         <img
-          src={asset("how.png")}
+          src={asset("/settings/how.png")}
           alt="조작 가이드"
           className="hall-guide-overlay"
           onClick={() => setShowGuide(false)}
