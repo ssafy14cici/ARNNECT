@@ -30,7 +30,10 @@ function asNumber(v: unknown, fallback = 0): number {
 }
 function asStringArray(v: unknown): string[] {
   if (Array.isArray(v)) {
-    return v.map((x) => asString(x, "")).map((s) => s.trim()).filter(Boolean);
+    return v
+      .map((x) => asString(x, ""))
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
   if (typeof v === "string") {
     return v.split(",").map((s) => s.trim()).filter(Boolean);
@@ -46,6 +49,29 @@ function normalizeId(raw: unknown): string {
   const s = String(raw ?? "").trim();
   if (!s) return "";
   return s.replace(/^review-/, "").replace(/^artwork-/, "");
+}
+
+// ✅ axios 응답에서 본문 꺼내기
+function unwrapAxiosData(res: unknown): unknown {
+  return isObject(res) && "data" in res ? (res as { data: unknown }).data : res;
+}
+
+// ✅ 서버가 200이어도 {success:false,...}로 실패를 내려주는 케이스 방어
+function ensureApiSuccess(payload: unknown): unknown {
+  if (!isObject(payload)) return payload;
+
+  const success = get(payload, "success");
+  const isSuccess = get(payload, "isSuccess");
+  const ok = get(payload, "ok");
+
+  const explicitFail = success === false || isSuccess === false || ok === false;
+  if (explicitFail) {
+    const msg = asString(get(payload, "message"), "요청이 실패했습니다.");
+    const code = asString(get(payload, "code"), "");
+    throw new Error(code ? `${msg} (${code})` : msg);
+  }
+
+  return payload;
 }
 
 // ------------------- API PATHS -------------------
@@ -230,7 +256,7 @@ export default function ReviewEdit() {
         setLoading(true);
 
         const res = await http.get(`${REVIEW_BASE}/${normalizedReviewId}`);
-        const payload = isObject(res) && "data" in res ? (res as { data: unknown }).data : res;
+        const payload = unwrapAxiosData(res);
 
         const mapped = mapReviewDetail(payload);
         if (cancelled) return;
@@ -289,26 +315,43 @@ export default function ReviewEdit() {
 
     setSaving(true);
     try {
-      // ✅ Create처럼 파일 기반 업로드/수정: multipart/form-data
-      const fd = new FormData();
-      fd.append("title", nextTitle);
-      fd.append("content", nextContent);
-      fd.append("artworkId", String(origin.artworkId));
+      // ✅ 이미지 파일 없으면 JSON (서버가 @RequestBody로 받는 경우가 많음)
+      if (!imageFile) {
+        const res = await http.put(`${REVIEW_BASE}/${normalizedReviewId}`, {
+          title: nextTitle,
+          content: nextContent,
+          artworkId: origin.artworkId,
+          tags: parsedTags, // 배열
+          // 기존 이미지 유지가 서버에서 필요하면 같이 보내기(무시해도 OK)
+          imageUrl: imageUrl.trim() || null,
+        });
 
-      // tags는 BE 바인딩 방식에 따라 달라질 수 있음.
-      // - 가장 무난한 방식: JSON string으로 1개 키에 담기 (BE에서 파싱)
-      fd.append("tags", JSON.stringify(parsedTags.length ? parsedTags : []));
+        ensureApiSuccess(res.data);
+      } else {
+        // ✅ 이미지 파일 있으면 multipart
+        const fd = new FormData();
+        fd.append("title", nextTitle);
+        fd.append("content", nextContent);
+        fd.append("artworkId", String(origin.artworkId));
 
-      // ✅ 새 파일을 선택한 경우에만 전송(안 보내면 기존 이미지 유지)
-      if (imageFile) fd.append("imageFile", imageFile);
+        // tags: List<String> 바인딩 호환 (반복 append)
+        parsedTags.forEach((t) => fd.append("tags", t));
+        // fallback: JSON 문자열도 같이(서버가 tagsJson을 파싱하는 케이스 대비)
+        fd.append("tagsJson", JSON.stringify(parsedTags.length ? parsedTags : []));
 
-      await http.put(`${REVIEW_BASE}/${normalizedReviewId}`, fd);
+        // ✅ 파일 키 이름은 서버 스펙과 동일해야 함 (imageFile이 맞는지 BE 확인 필요)
+        fd.append("imageFile", imageFile);
+
+        const res = await http.put(`${REVIEW_BASE}/${normalizedReviewId}`, fd);
+        ensureApiSuccess(res.data);
+      }
 
       alert("수정되었습니다.");
       nav(`/reviews/${normalizedReviewId}`);
     } catch (e) {
       console.error(e);
-      alert("수정 실패");
+      const msg = e instanceof Error ? e.message : "수정 실패";
+      alert(msg);
     } finally {
       setSaving(false);
     }
@@ -323,13 +366,16 @@ export default function ReviewEdit() {
 
     setDeleting(true);
     try {
-      await http.delete(`${REVIEW_BASE}/${normalizedReviewId}`);
+      const res = await http.delete(`${REVIEW_BASE}/${normalizedReviewId}`);
+      // ✅ 삭제도 success:false 형태면 실패로 처리
+      ensureApiSuccess(res.data);
 
       alert("삭제되었습니다.");
       nav("/reviews", { replace: true });
     } catch (e) {
       console.error(e);
-      alert("삭제 실패");
+      const msg = e instanceof Error ? e.message : "삭제 실패";
+      alert(msg);
     } finally {
       setDeleting(false);
     }
@@ -500,10 +546,7 @@ export default function ReviewEdit() {
             </div>
           )}
 
-          {/* 기존 imageUrl은 유지용(표시/정규화)으로만 사용 */}
-          <div style={{ fontSize: 12, opacity: 0.65 }}>
-            * 새 이미지를 선택하지 않으면 기존 이미지를 유지합니다.
-          </div>
+          <div style={{ fontSize: 12, opacity: 0.65 }}>* 새 이미지를 선택하지 않으면 기존 이미지를 유지합니다.</div>
         </div>
 
         <div style={{ display: "grid", gap: 6 }}>
@@ -526,12 +569,6 @@ export default function ReviewEdit() {
           )}
         </div>
       </section>
-
-      <div style={{ marginTop: 26, opacity: 0.7, fontSize: 12 }}>
-        * 수정 API가 multipart(FormData)로 파일을 받는다는 가정으로 구현했습니다. (키: imageFile / tags는 JSON string)
-        <br />
-        * BE가 다른 키를 쓰면(createReview와 동일 키로) fd.append(...) 부분만 맞추면 됩니다.
-      </div>
     </div>
   );
 }

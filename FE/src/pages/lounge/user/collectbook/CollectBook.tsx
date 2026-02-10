@@ -205,8 +205,10 @@ export default function CollectBook() {
                       alt="ticket"
                       style={{
                         width: "100%",
+                        height: "100%",
                         aspectRatio: "16/10",
-                        objectFit: "cover",
+                        objectFit: "contain",                
+                        background: "rgba(0,0,0,0.35)",      
                         borderRadius: 12,
                         display: "block",
                       }}

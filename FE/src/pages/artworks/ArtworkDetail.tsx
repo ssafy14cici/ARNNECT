@@ -103,6 +103,9 @@ export default function ArtworkDetail() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
 
+  // ✅ 빠른 연타/중복 요청 방지(상태 업데이트 레이스 차단)
+  const followLockRef = useRef(false);
+
   const [commentText, setCommentText] = useState("");
   const [fanLetterText, setFanLetterText] = useState("");
 
@@ -364,31 +367,33 @@ export default function ArtworkDetail() {
     }
   };
 
-  // ✅ 팔로우(서버 연동)
+  // ✅ 팔로우(서버 연동) - ✅ 여기만 수정 핵심
   const onToggleFollow = async () => {
     if (!isLoggedIn) return alert("로그인이 필요합니다.");
     if (isOwner) return;
-    if (followBusy) return;
+    if (followBusy || followLockRef.current) return;
 
     const target = String((artwork as any)?.artistMemberUuid ?? artistUuid ?? "").trim();
     if (!target) return;
     if (meUuid && target === meUuid) return;
 
     const prev = isFollowing;
-    setIsFollowing(!prev);
+    const optimistic = !prev;
+
+    setIsFollowing(optimistic);
     setFollowBusy(true);
+    followLockRef.current = true;
 
     try {
-      if (prev) await profileApi.unfollow(target);
-      else await profileApi.follow(target);
+      // ✅ 서버 토글 호출 (POST /api/v1/follow/{uuid})
+      const result = await profileApi.toggleFollow(target);
 
-      // best-effort resync
-      try {
-        const latest = await profileApi.getProfile(target);
-        const s = (latest as any)?.isFollowing;
-        if (typeof s === "boolean") setIsFollowing(s);
-      } catch {
-        // ignore
+      // ✅ 서버가 상태를 내려주면 그걸로 확정
+      const s = (result as any)?.isFollowing;
+      if (typeof s === "boolean") {
+        setIsFollowing(s);
+      } else {
+        // ✅ 서버가 상태를 안 주는 경우: 낙관값 유지 (되돌리지 않음)
       }
     } catch (e) {
       console.error(e);
@@ -396,6 +401,7 @@ export default function ArtworkDetail() {
       alert("팔로우 처리 실패");
     } finally {
       setFollowBusy(false);
+      followLockRef.current = false;
     }
   };
 
