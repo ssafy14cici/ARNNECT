@@ -31,7 +31,7 @@
 ## 시스템 아키텍처
 ---
 ### System Architecture
-<img src="./CICD/System Architecture.png"/>
+<img src="./CICD/System_Architecture.png"/>
 
 ### CI/CD Sequence Diagram
 <img src="./CICD/CICD_Sequence_Diagram.png"/>
