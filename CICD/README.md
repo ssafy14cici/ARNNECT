@@ -17,7 +17,7 @@
 | **RAM** | 16 GB |
 | **Storage (Disk)**  | SSD: 320 GB |
 
-#### 사용 술
+#### 사용 기술
 | **기술** | **버전** |
 |------|------|
 | **Jenkins** | 2.528.3 |
@@ -31,7 +31,7 @@
 ## 시스템 아키텍처
 ---
 ### System Architecture
-<img src="./CICD/System_Architecture.png"/>
+<img src="CICD/System_Architecture.png"/>
 
 ### CI/CD Sequence Diagram
-<img src="./CICD/CICD_Sequence_Diagram.png"/>
+<img src="CICD/CICD_Sequence_Diagram.png"/>
