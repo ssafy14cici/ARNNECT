@@ -1,4 +1,5 @@
 ## 🚀 Tech Stack
+<div align="center">
 
 ![IntelliJ IDEA](https://img.shields.io/badge/IntelliJ_IDEA-black?style=flat-square&logo=intellijidea)
 ![Java](https://img.shields.io/badge/Java-orange?style=flat-square&logo=openjdk)
@@ -11,7 +12,7 @@
 ![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis)
 ![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=flat-square&logo=swagger)
 ![OpenAI](https://img.shields.io/badge/OpenAI-black?style=flat-square&logo=openai)
-
+</div>
 
 | Category | Stack |
 | --- | --- |
