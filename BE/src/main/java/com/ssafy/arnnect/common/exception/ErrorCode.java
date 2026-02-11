@@ -7,6 +7,7 @@ public enum ErrorCode {
     /** COMMON **/
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "COMMON_001", "잘못된 요청입니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_002", "서버 오류가 발생했습니다."),
+    DB_SAVE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_003", "DB 오류가 발생했습니다."),
 
     /** AUTH **/
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "AUTH_001", "인증에 실패했습니다."),

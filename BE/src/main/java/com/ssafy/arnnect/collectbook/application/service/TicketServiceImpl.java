@@ -15,6 +15,8 @@ import com.ssafy.arnnect.common.file.FileType;
 import com.ssafy.arnnect.member.application.service.MemberService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -22,7 +24,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TicketServiceImpl implements TicketService{
@@ -96,19 +98,17 @@ public class TicketServiceImpl implements TicketService{
     @Transactional
     public void createCollect(String memberUuid, String ticketCode) {
         Long memberId = memberService.getMemberId(memberUuid);
-
+        log.info("memberId : {}",memberId);
         String key = "ticket_" + ticketCode;
+        TicketInfo ticketInfo = repository.findByTicketCode(ticketCode).orElseThrow(
+                () -> new BusinessException(ErrorCode.TICKET_NOT_FOUND));
 
         try {
-            TicketInfo ticketInfo = repository.findByTicketCode(ticketCode).orElseThrow(
-                    () -> new BusinessException(ErrorCode.TICKET_NOT_FOUND));
-
-
-            String value = redisTemplate.opsForValue().get(key);
-            if (value == null) throw new BusinessException(ErrorCode.INVALID_TICKET_CODE);
-
-
             Long sequence = redisTemplate.opsForValue().increment(key);
+
+            if(sequence <= 0) {
+                throw new BusinessException(ErrorCode.INVALID_TICKET_CODE);
+            }
 
             collectionRepository.save(CollectBook.builder()
                     .ticketId(ticketInfo.getTicketId())
@@ -116,8 +116,14 @@ public class TicketServiceImpl implements TicketService{
                     .collectRank(sequence)
                     .createdAt(LocalDateTime.now())
                     .build());
-        }catch (Exception e){
+        } catch (DataAccessException e) {
             redisTemplate.opsForValue().decrement(key);
+            log.error("DB 저장 실패 롤백: ticketCode={}, sequence 롤백됨", ticketCode, e);
+            throw new BusinessException(ErrorCode.DB_SAVE_FAILED);
+
+        } catch (Exception e) {
+            log.error("예상치 못한 오류 (sequence 유지): {}", e.getMessage());
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
 
     }
