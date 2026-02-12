@@ -44,92 +44,129 @@
 
 <div align="center">
 
-<div align="center">
-<table>
+<table width="100%">
     <tr>
-        <td width="33%" align="center"> <a href="https://github.com/LOIS-N">
-            <img src="./readme-assets/suwon.jpg" width="160px" /> <br> 최수원 <br>(Leader & Infra & Backend) </a> <br></td>
-        <td width="33%" align="center"> <a href="https://github.com/sujin31">
-            <img src="./readme-assets/sujin.png" width="160px" /> <br> 이수진 <br>(Backend Leader) </a> <br></td>
-        <td width="33%" align="center"> <a href="https://github.com/mathmatice180521">
-            <img src="./readme-assets/minseong.png" width="160px" /> <br> 김민성 <br>(AI Leader) </a> <br></td>
+        <td width="33%" align="center"> 
+            <a href="https://github.com/LOIS-N">
+                <img src="./readme-assets/suwon.jpg" width="160px" height="200px" style="object-fit: cover;" />
+            </a>
+            <hr> <a href="https://github.com/LOIS-N">
+                <b>최수원</b><br>(Leader & Infra & Backend & AI) 
+            </a> 
+        </td>
+        <td width="33%" align="center"> 
+            <a href="https://github.com/sujin31">
+                <img src="./readme-assets/sujin.png" width="160px" height="200px" style="object-fit: cover;" />
+            </a>
+            <hr> <a href="https://github.com/sujin31">
+                <b>이수진</b><br>(Backend Leader) 
+            </a> 
+        </td>
+        <td width="33%" align="center"> 
+            <a href="https://github.com/mathmatice180521">
+                <img src="./readme-assets/minseong.png" width="160px" height="200px" style="object-fit: cover;" />
+            </a>
+            <hr> <a href="https://github.com/mathmatice180521">
+                <b>김민성</b><br>(AI Leader) 
+            </a> 
+        </td>
     </tr>
     <tr>
-      <td width="280px">
-        <sub>
-          - Jenkins 기반의 빌드/배포 파이프라인구축 <br>
-          - Docker compose 멀티 컨테이너 서비스 구조 설계 및 배포 <br>
-          - Spring: 회원 관리, 댓글, 좋아요 API 구현
-        </sub>
-      </td>
-      <td width="280px">
-        <sub>
-          - 사용자 로그 기반 추천용 데이터 전처리 및 AI 서버·OpenAI REST 연동 구조 설계 <br>
-          - AOP + 비동기·독립 트랜잭션으로 로그 자동 수집 처리 <br>
-          - 로그 집계 취향 분석 구현, Redis로 동시성 및 정합성 확보 <br>
-          - 회원관리, 작품, 감상평, 팬레터, 콜렉트북 등 API 전반 구현 <br>
-          - API 명세서 & 요구사항 정의서 설계
-        </sub>
-      </td>
-      <td width="280px">
-        <sub>
-          - 작품 추천 시스템 파이프 라인 설계 <br>
-          - 사진 더미 데이터 생산 및 추천 알고리즘 학습을 위한 유저 로그 로직 설정 <br>
-          - CLIP, SASRec을 사용한 데이터 임베딩 <br>
-          - TwoTower을 사용하여 사용자 로그 기반 추천 모델 설계/학습 <br>
-          - Runpod, BentoML을 이용한 외부 AI 추론 서버 구축
-        </sub>
-      </td>
+        <td width="33%" valign="top">
+            <sub>
+                - 프로젝트 총괄 및 전체 서비스 아키텍처 설계 <br>
+                - Jenkins 기반의 빌드/배포 파이프라인구축 <br>
+                - Docker compose 멀티 컨테이너 서비스 구조 설계 및 배포 <br>
+                - Spring: 회원 관리, 댓글, 좋아요 API 구현, 파일 저장 로직 구현 <br>
+                - 작품 추천 시스템 파이프라인 설계
+            </sub>
+        </td>
+        <td width="33%" valign="top">
+            <sub>
+                - 사용자 로그 기반 추천용 데이터 전처리 및 AI 서버·OpenAI REST 연동 구조 설계 <br>
+                - AOP + 비동기·독립 트랜잭션으로 로그 자동 수집 처리 <br>
+                - 로그 집계 취향 분석 구현, Redis로 동시성 및 정합성 확보 <br>
+                - 회원관리, 작품, 감상평, 팬레터, 콜렉트북 등 API 전반 구현 <br>
+                - API 명세서 & 요구사항 정의서 설계
+            </sub>
+        </td>
+        <td width="33%" valign="top">
+            <sub>
+                - 작품 추천 시스템 파이프 라인 설계 <br>
+                - 사진 더미 데이터 생산 및 추천 알고리즘 학습을 위한 유저 로그 로직 설정 <br>
+                - CLIP, SASRec을 사용한 데이터 임베딩 <br>
+                - TwoTower을 사용하여 사용자 로그 기반 추천 모델 설계/학습 <br>
+                - Runpod, BentoML을 이용한 외부 AI 추론 서버 구축
+            </sub>
+        </td>
     </tr>
-
 </table>
 
-<table>
-    <tr>
-        <td width="33%" align="center"> <a href="https://github.com/yooneverse">
-        <img src="./readme-assets/jiyoon.jpg" width="160px" /> <br> 김지윤 <br> (Frontend Sub & Presentation & Media Production) </a> <br></td>
-        <td width="33%" align="center"> <a href="https://github.com/hyeryeongeda">
-        <img src="./readme-assets/hyeryeong.jpg" width="160px" /> <br> 김혜령 <br> (Frontend Leader & Docs) </a> <br></td>
-        <td width="33%" align="center"> <a href="https://github.com/ssafy14cici">
-        <img src="./readme-assets/chaea.jpg" width="160px" /> <br> 김채아 <br>(Frontend Sub & Design) </a> <br></td>
-    </tr>
-    <tr>
-        <td width="280px">
-          <sub>
-            - React 기반 작품상세 페이지 API 연동 및 상태 기반 UI 설계·구현 <br>
-            - 서비스 운영 필수 이용자 지침·약관 페이지→ 구조 설계 및 UI 일관성 정비 <br>
-            - 중간·최종 발표 발표자 및 PR 리딩 <br>
-            - Premiere, Movavi 기반 영상 포트폴리오 제작 및 PowerPoint·Canva 활용 발표 자료 기획·디자인 총괄 <br>
-            - Grok 및 Veo, Sora 활용 AI 영상 및 이미지 콘텐츠 제작
-          </sub>
-        </td>
-        <td width="280px">
-          <sub>
-            - React + TypeScript + Vite 기반 FE 아키텍처 설계, 라우팅/전역 상태(Zustand) 구축 <br>
-            - 로그인/회원가입(이메일 인증 포함) 및 role 기반 Guard로 인증·권한 플로우 구현 <br>
-            - AppLayout·Navbar 전역 UI 구현(라우트 기반 navVariant 분기, 반응형, 모달/전환 UX 정리) <br>
-            - 작품 피드/상세/검색 + 정렬/토글/무한 스크롤로 탐색 UX 완성 <br>
-            - 리뷰·댓글 CRUD, 팔로우·팬레터(답변 포함) 등 커뮤니티/상호작용 기능 연동 <br>
-            - QR 티켓 발급·스캔 수집 → 콜렉트북 + ‘너의 취향은’(MBTI)·리마인드 퀴즈 기능 구현
-          </sub>
-        </td>
-        <td width="280px">
-          <sub>
-            - Three.js + React Three Fiber(@react-three/drei) 기반 3D 전시장 FE 구현, 씬 구조/카메라·조명/환경(HDRI) 세팅 <br>
-            - Blender로 에셋 커스텀, 간판/패널 등 오브젝트 제작 후 GLB 통합 <br>
-            - 웨이포인트 동선 설계로 관람 흐름 최적화, 조작법 오버레이로 초기 진입 UX 보완 <br>
-            - 대용량 GLB/텍스처 로딩 병목을 에셋/텍스처 최적화 + 브라우저 캐싱으로 개선 <br>
-            - AppLayout·Navbar/메뉴 IA 정리로 전역 탐색 흐름·화면 일관성 개선, 팬레터·티켓(디자인 추가)·프로필·회원가입 등 주요 페이지 UI(CSS) 구현 및 전역 스크롤/BGM/폰트/푸터 설정 반영
-          </sub>
-        </td>
-    </tr>
+<br>
 
+<table width="100%">
+    <tr>
+        <td width="33%" align="center"> 
+            <a href="https://github.com/yooneverse">
+                <img src="./readme-assets/jiyoon.jpg" width="160px" height="200px" style="object-fit: cover;" />
+            </a>
+            <hr> <a href="https://github.com/yooneverse">
+                <b>김지윤</b><br>(Frontend Sub & Presentation & Media Production) 
+            </a> 
+        </td>
+        <td width="33%" align="center"> 
+            <a href="https://github.com/hyeryeongeda">
+                <img src="./readme-assets/hyeryeong.jpg" width="160px" height="200px" style="object-fit: cover;" />
+            </a>
+            <hr> <a href="https://github.com/hyeryeongeda">
+                <b>김혜령</b><br>(Frontend Leader & Docs) 
+            </a> 
+        </td>
+        <td width="33%" align="center"> 
+            <a href="https://github.com/ssafy14cici">
+                <img src="./readme-assets/chaea.jpg" width="160px" height="200px" style="object-fit: cover;" />
+            </a>
+            <hr> <a href="https://github.com/ssafy14cici">
+                <b>김채아</b><br>(Frontend Sub & Design) 
+            </a> 
+        </td>
+    </tr>
+    <tr>
+        <td width="33%" valign="top">
+            <sub>
+                - React 기반 작품상세 페이지 설계 및 상태 기반 UI 구현 <br>
+                - 서비스 운영 필수 이용자 지침·약관 페이지 구조 설계 및 구현 <br>
+                - 중간·최종 발표 발표자 및 PR 리딩 <br>
+                - Premiere, Movavi 기반 영상 포트폴리오 제작 및 PowerPoint·Canva 활용 발표 자료 기획·디자인 총괄 <br>
+                - Grok 및 Veo, Sora 활용 AI 영상 및 이미지 콘텐츠 제작
+            </sub>
+        </td>
+        <td width="33%" valign="top">
+            <sub>
+                - React + TypeScript + Vite 기반 FE 아키텍처 설계, 라우팅/전역 상태(Zustand) 구축 <br>
+                - 로그인/회원가입(이메일 인증 포함) 및 role 기반 Guard로 인증·권한 플로우 구현 <br>
+                - AppLayout·Navbar 전역 UI 구현(라우트 기반 navVariant 분기, 반응형, 모달/전환 UX 정리) <br>
+                - 작품 피드/상세/검색 + 정렬/토글/무한 스크롤로 탐색 UX 완성 <br>
+                - 리뷰·댓글 CRUD, 팔로우·팬레터(답변 포함) 등 커뮤니티/상호작용 기능 연동 <br>
+                - QR 티켓 발급·스캔 수집 → 콜렉트북 + ‘너의 취향은’(MBTI)·리마인드 퀴즈 기능 구현
+            </sub>
+        </td>
+        <td width="33%" valign="top">
+            <sub>
+                - Three.js + React Three Fiber(@react-three/drei) 기반 3D 전시장 FE 구현, 씬 구조/카메라·조명/환경(HDRI) 세팅 <br>
+                - Blender로 에셋 커스텀, 간판/패널 등 오브젝트 제작 후 GLB 통합 <br>
+                - 웨이포인트 동선 설계로 관람 흐름 최적화, 조작법 오버레이로 초기 진입 UX 보완 <br>
+                - 대용량 GLB/텍스처 로딩 병목을 에셋/텍스처 최적화 + 브라우저 캐싱으로 개선 <br>
+                - AppLayout·Navbar/메뉴 IA 정리로 전역 탐색 흐름·화면 일관성 개선, 팬레터·티켓(디자인 추가)·프로필·회원가입 등 주요 페이지 UI(CSS) 구현 및 전역 스크롤/BGM/폰트/푸터 설정 반영
+            </sub>
+        </td>
+    </tr>
 </table>
+
 </div>
 <br>
 
 </div>
-
 ## 🛠️ 기술 스택
 
 <a name="techStack"></a>
@@ -138,17 +175,19 @@
 
 <div align="center">
 
-![VSCode](https://img.shields.io/badge/VisualStudioCode-007ACC?style=for-the-badge&logo=VisualStudioCode&logoColor=white)<br>
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
-![HTML5](https://img.shields.io/badge/html5-%23E34F26.svg?style=for-the-badge&logo=html5&logoColor=white)
-![CSS3](https://img.shields.io/badge/css3-%231572B6.svg?style=for-the-badge&logo=css3&logoColor=white)<br>
-![React](https://img.shields.io/badge/react-61DAFB?style=for-the-badge&logo=react&logoColor=white)
-![Vite](https://img.shields.io/badge/vite-%23646CFF.svg?style=for-the-badge&logo=vite&logoColor=white)
-![React Router](https://img.shields.io/badge/React_Router-CA4245?style=for-the-badge&logo=react-router&logoColor=white)
-![Zustand](https://img.shields.io/badge/Zustand-orange?style=for-the-badge&logo=Rss&logoColor=white)<br>
-![Three.js](https://img.shields.io/badge/Three.js-000000?style=for-the-badge&logo=Three.js&logoColor=white)
-![React Three Fiber](https://img.shields.io/badge/React%20Three%20Fiber-000000?style=for-the-badge&logo=react&logoColor=white)
-![Blender](https://img.shields.io/badge/Blender-E87D0D?style=for-the-badge&logo=Blender&logoColor=white)
+<img src="https://img.shields.io/badge/VisualStudioCode-007ACC?style=for-the-badge&logo=VisualStudioCode&logoColor=white">
+<img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white">
+<img src="https://img.shields.io/badge/html5-%23E34F26.svg?style=for-the-badge&logo=html5&logoColor=white">
+<img src="https://img.shields.io/badge/css3-%231572B6.svg?style=for-the-badge&logo=css3&logoColor=white">
+<br>
+<img src="https://img.shields.io/badge/react-61DAFB?style=for-the-badge&logo=react&logoColor=white">
+<img src="https://img.shields.io/badge/vite-%23646CFF.svg?style=for-the-badge&logo=vite&logoColor=white">
+<img src="https://img.shields.io/badge/React_Router-CA4245?style=for-the-badge&logo=react-router&logoColor=white">
+<img src="https://img.shields.io/badge/Zustand-orange?style=for-the-badge&logo=Rss&logoColor=white">
+<br>
+<img src="https://img.shields.io/badge/Three.js-000000?style=for-the-badge&logo=Three.js&logoColor=white">
+<img src="https://img.shields.io/badge/React%20Three%20Fiber-000000?style=for-the-badge&logo=react&logoColor=white">
+<img src="https://img.shields.io/badge/Blender-E87D0D?style=for-the-badge&logo=Blender&logoColor=white">
 
 <br>
 
@@ -166,40 +205,47 @@
 
 <div align="center">
 
-![IntelliJ IDEA](https://img.shields.io/badge/IntelliJ_IDEA-black?style=for-the-badge&logo=intellijidea)
-![Java](https://img.shields.io/badge/Java-orange?style=for-the-badge&logo=openjdk)
-![Gradle](https://img.shields.io/badge/Gradle-02303A?style=for-the-badge&logo=gradle)<br>
-![Spring Boot](https://img.shields.io/badge/Spring_Boot-6DB33F?style=for-the-badge&logo=springboot)
-![Spring Security](https://img.shields.io/badge/Spring_Security-6DB33F?style=for-the-badge&logo=springsecurity)
-![JWT](https://img.shields.io/badge/JWT-black?style=for-the-badge&logo=jsonwebtokens)<br>
-![Hibernate](https://img.shields.io/badge/Hibernate-59666C?style=for-the-badge&logo=hibernate)
-![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql)
-![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis)<br>
-![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=for-the-badge&logo=swagger)
-![OpenAI](https://img.shields.io/badge/OpenAI-black?style=for-the-badge&logo=openai)
+<img src="https://img.shields.io/badge/IntelliJ_IDEA-black?style=for-the-badge&logo=intellijidea">
+<img src="https://img.shields.io/badge/Java-orange?style=for-the-badge&logo=openjdk">
+<img src="https://img.shields.io/badge/Gradle-02303A?style=for-the-badge&logo=gradle">
+<br>
+<img src="https://img.shields.io/badge/Spring_Boot-6DB33F?style=for-the-badge&logo=springboot">
+<img src="https://img.shields.io/badge/Spring_Security-6DB33F?style=for-the-badge&logo=springsecurity">
+<img src="https://img.shields.io/badge/JWT-black?style=for-the-badge&logo=jsonwebtokens">
+<br>
+<img src="https://img.shields.io/badge/Hibernate-59666C?style=for-the-badge&logo=hibernate">
+<img src="https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql">
+<img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis">
+<br>
+<img src="https://img.shields.io/badge/Swagger-85EA2D?style=for-the-badge&logo=swagger">
+<img src="https://img.shields.io/badge/OpenAI-black?style=for-the-badge&logo=openai">
 
-</div>
+<br>
 
 | **Category** | **Stack** |
 |:---:|:---|
 | **Language** | Java 17 |
 | **Framework** | Spring Boot 3.5.9 |
-| **Library** | Spring Security, Spring Data JPA, Spring Data Redis, Spring Batch, Spring Validation, Springdoc OpenAPI, JWT (jjwt), Lombok |
+| **Library** | Spring Security, Spring Data JPA, Spring Data Redis, <br> Spring Batch, Spring Validation, Springdoc OpenAPI, <br> JWT (jjwt), Lombok |
 | **Build Tool** | Gradle 8.14.3 |
 | **Database** | MySQL 8.0, Redis 7.4 |
 | **IDE** | IntelliJ IDEA 2023.3.8 (Ultimate Edition) |
+
+</div>
 
 ### 🤖 AI
 
 <div align="center">
 
-![VSCode](https://img.shields.io/badge/VisualStudioCode-007ACC?style=for-the-badge&logo=VisualStudioCode&logoColor=white)
-![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)<br>
-![PyTorch](https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=for-the-badge&logo=PyTorch&logoColor=white)
-![NumPy](https://img.shields.io/badge/numpy-%23013243.svg?style=for-the-badge&logo=numpy&logoColor=white)<br>
-![BentoML](https://img.shields.io/badge/BentoML-FF6F00?style=for-the-badge&logo=bentoml&logoColor=white)
-![ChromaDB](https://img.shields.io/badge/ChromaDB-orange?style=for-the-badge&logo=database&logoColor=white)
-![RunPod](https://img.shields.io/badge/RunPod-purple?style=for-the-badge&logo=serverless&logoColor=white)
+<img src="https://img.shields.io/badge/VisualStudioCode-007ACC?style=for-the-badge&logo=VisualStudioCode&logoColor=white">
+<img src="https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54">
+<br>
+<img src="https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=for-the-badge&logo=PyTorch&logoColor=white">
+<img src="https://img.shields.io/badge/numpy-%23013243.svg?style=for-the-badge&logo=numpy&logoColor=white">
+<br>
+<img src="https://img.shields.io/badge/BentoML-FF6F00?style=for-the-badge&logo=bentoml&logoColor=white">
+<img src="https://img.shields.io/badge/ChromaDB-orange?style=for-the-badge&logo=database&logoColor=white">
+<img src="https://img.shields.io/badge/RunPod-purple?style=for-the-badge&logo=serverless&logoColor=white">
 
 <br>
 
@@ -219,15 +265,17 @@
 
 <div align="center">
 
-![GitLab](https://img.shields.io/badge/GitLab-FC6D26?style=for-the-badge&logo=gitlab&logoColor=white)
-![Git](https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white)
-![Jenkins](https://img.shields.io/badge/Jenkins-D24939?style=for-the-badge&logo=jenkins&logoColor=white)<br>
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![Docker Compose](https://img.shields.io/badge/Docker_Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![Nginx](https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white)<br>
-![SSH](https://img.shields.io/badge/SSH-4D4D4D?style=for-the-badge&logo=openssh&logoColor=white)
-![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=for-the-badge&logo=ubuntu&logoColor=white)
-![Mattermost](https://img.shields.io/badge/Mattermost-0058CC?style=for-the-badge&logo=mattermost&logoColor=white)
+<img src="https://img.shields.io/badge/GitLab-FC6D26?style=for-the-badge&logo=gitlab&logoColor=white">
+<img src="https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white">
+<img src="https://img.shields.io/badge/Jenkins-D24939?style=for-the-badge&logo=jenkins&logoColor=white">
+<br>
+<img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white">
+<img src="https://img.shields.io/badge/Docker_Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white">
+<img src="https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white">
+<br>
+<img src="https://img.shields.io/badge/SSH-4D4D4D?style=for-the-badge&logo=openssh&logoColor=white">
+<img src="https://img.shields.io/badge/Ubuntu-E95420?style=for-the-badge&logo=ubuntu&logoColor=white">
+<img src="https://img.shields.io/badge/Mattermost-0058CC?style=for-the-badge&logo=mattermost&logoColor=white">
 
 <br>
 
@@ -237,6 +285,8 @@
 | **CPU** | 4vCPUs |
 | **RAM** | 16 GB |
 | **Storage (Disk)** | SSD: 320 GB |
+
+<br>
 
 #### 사용 기술
 | **기술** | **버전** |
@@ -250,6 +300,7 @@
 | **Mattermost** | 10.11.9 |
 
 </div>
+
 
 ## 🌐 시스템 아키텍처
 
@@ -455,9 +506,9 @@
     <td align="center" width="33%"><b>36. 유저 티켓 등록 2</b></td>
   </tr>
   <tr>
+    <td align="center"><img src="./readme-assets/usescreen/capture/37_user_lounge_ticket_registration_2.png"/></td>
     <td align="center"><img src="./readme-assets/usescreen/capture/35_user_lounge_personahexagon.png"/></td>
     <td align="center"><img src="./readme-assets/usescreen/capture/36_user_lounge_ticket_registration_1.png"/></td>
-    <td align="center"><img src="./readme-assets/usescreen/capture/37_user_lounge_ticket_registration_2.png"/></td>
   </tr>
 
   <tr>
@@ -709,10 +760,14 @@
 <a name="projectDeliverables"></a>
 
 <h3>🖼️ 화면 설계서</h3>
-<div align="center">
 
-<img src="./readme-assets/Screen_Mockup.png"/>
-</div>
+<details>
+  <summary><strong>화면 설계서</strong></summary>
+  <br>
+  <div align="left">
+    <img src="./readme-assets/Screen_Mockup.png" width="100%" />
+  </div>
+</details>
 
 <h3>🗄️ ERD</h3>
 <div align="center">
