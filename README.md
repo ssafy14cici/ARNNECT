@@ -46,29 +46,37 @@
 
 <table width="100%">
     <tr>
-        <td width="33%" align="center"> 
+        <td width="33%" align="center" valign="bottom">
             <a href="https://github.com/LOIS-N">
-                <img src="./readme-assets/suwon.jpg" width="160px" height="200px" style="object-fit: cover;" />
+                <img src="./readme-assets/suwon.jpg" width="160px" />
             </a>
-            <hr> <a href="https://github.com/LOIS-N">
-                <b>최수원</b><br>(Leader & Infra & Backend & AI) 
-            </a> 
         </td>
-        <td width="33%" align="center"> 
+        <td width="33%" align="center" valign="bottom">
             <a href="https://github.com/sujin31">
-                <img src="./readme-assets/sujin.png" width="160px" height="200px" style="object-fit: cover;" />
+                <img src="./readme-assets/sujin.png" width="160px" />
             </a>
-            <hr> <a href="https://github.com/sujin31">
-                <b>이수진</b><br>(Backend Leader) 
-            </a> 
         </td>
-        <td width="33%" align="center"> 
+        <td width="33%" align="center" valign="bottom">
             <a href="https://github.com/mathmatice180521">
-                <img src="./readme-assets/minseong.png" width="160px" height="200px" style="object-fit: cover;" />
+                <img src="./readme-assets/minseong.png" width="160px" />
             </a>
+        </td>
+    </tr>
+    <tr>
+        <td width="33%" align="center" valign="top">
+            <hr> <a href="https://github.com/LOIS-N">
+                <b>최수원</b><br>(Leader & Infra & Backend & AI)
+            </a>
+        </td>
+        <td width="33%" align="center" valign="top">
+            <hr> <a href="https://github.com/sujin31">
+                <b>이수진</b><br>(Backend Leader)
+            </a>
+        </td>
+        <td width="33%" align="center" valign="top">
             <hr> <a href="https://github.com/mathmatice180521">
-                <b>김민성</b><br>(AI Leader) 
-            </a> 
+                <b>김민성</b><br>(AI Leader)
+            </a>
         </td>
     </tr>
     <tr>
@@ -106,36 +114,47 @@
 
 <table width="100%">
     <tr>
-        <td width="33%" align="center"> 
+        <td width="33%" align="center" valign="bottom">
             <a href="https://github.com/yooneverse">
-                <img src="./readme-assets/jiyoon.jpg" width="160px" height="200px" style="object-fit: cover;" />
+                <img src="./readme-assets/jiyoon.jpg" width="160px" />
             </a>
-            <hr> <a href="https://github.com/yooneverse">
-                <b>김지윤</b><br>(Frontend Sub & Presentation & Media Production) 
-            </a> 
         </td>
-        <td width="33%" align="center"> 
+        <td width="33%" align="center" valign="bottom">
             <a href="https://github.com/hyeryeongeda">
-                <img src="./readme-assets/hyeryeong.jpg" width="160px" height="200px" style="object-fit: cover;" />
+                <img src="./readme-assets/hyeryeong.jpg" width="160px" />
             </a>
-            <hr> <a href="https://github.com/hyeryeongeda">
-                <b>김혜령</b><br>(Frontend Leader & Docs) 
-            </a> 
         </td>
-        <td width="33%" align="center"> 
+        <td width="33%" align="center" valign="bottom">
             <a href="https://github.com/ssafy14cici">
-                <img src="./readme-assets/chaea.jpg" width="160px" height="200px" style="object-fit: cover;" />
+                <img src="./readme-assets/chaea.jpg" width="160px" />
             </a>
-            <hr> <a href="https://github.com/ssafy14cici">
-                <b>김채아</b><br>(Frontend Sub & Design) 
-            </a> 
+        </td>
+    </tr>
+    <tr>
+        <td width="33%" align="center" valign="top">
+            <hr>
+            <a href="https://github.com/yooneverse">
+                <b>김지윤</b><br>(Frontend Sub & Presentation & Media Production)
+            </a>
+        </td>
+        <td width="33%" align="center" valign="top">
+            <hr>
+            <a href="https://github.com/hyeryeongeda">
+                <b>김혜령</b><br>(Frontend Leader & Docs)
+            </a>
+        </td>
+        <td width="33%" align="center" valign="top">
+            <hr>
+            <a href="https://github.com/ssafy14cici">
+                <b>김채아</b><br>(Frontend Sub & Design)
+            </a>
         </td>
     </tr>
     <tr>
         <td width="33%" valign="top">
             <sub>
-                - React 기반 작품상세 페이지 설계 및 상태 기반 UI 구현 <br>
-                - 서비스 운영 필수 이용자 지침·약관 페이지 구조 설계 및 구현 <br>
+                - React 기반 작품상세 페이지 API 연동 및 상태 기반 UI 설계·구현 <br>
+                - 서비스 운영 필수 이용자 지침·약관 페이지 구조 설계 및 UI 일관성 정비 <br>
                 - 중간·최종 발표 발표자 및 PR 리딩 <br>
                 - Premiere, Movavi 기반 영상 포트폴리오 제작 및 PowerPoint·Canva 활용 발표 자료 기획·디자인 총괄 <br>
                 - Grok 및 Veo, Sora 활용 AI 영상 및 이미지 콘텐츠 제작
