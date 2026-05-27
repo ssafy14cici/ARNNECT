@@ -1,5 +1,7 @@
 //FE\src\features\artworks\api\feed.ts
 import { http } from "../../../shared/api/http";
+import { USE_MOCK } from "../../../shared/config/env";
+import { getDemoArtworkImage } from "./demoArtworks";
 
 type JsonRecord = Record<string, unknown>;
 function isRecord(v: unknown): v is JsonRecord {
@@ -105,6 +107,16 @@ function mapFeedRow(row: unknown): FeedArtwork | null {
 }
 
 export async function fetchFeedArtworksOnly(): Promise<FeedArtwork[]> {
+  if (USE_MOCK) {
+    return Array.from({ length: 6 }, (_, idx) => ({
+      artworkId: 9001 + idx,
+      title: `Demo Artwork ${idx + 1}`,
+      image: getDemoArtworkImage(idx),
+      artistName: "ARNNECT Demo",
+      artistId: "demo-artist",
+    }));
+  }
+
   const res = await http.get("/api/v1/artworks/feed", {
     headers: { "x-skip-auth": "1" }, // ✅ 공개 피드
   });

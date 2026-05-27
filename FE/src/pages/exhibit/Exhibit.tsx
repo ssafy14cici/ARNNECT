@@ -9,6 +9,7 @@ import { bgmIsOn, bgmToggle, bgmForcePlayOnInteraction } from "../../shared/audi
 
 // ✅ API
 import { fetchArtworksByArtist, buildNewArtistImageUrl } from "../../features/artworks/api/newArtists";
+import { getDemoArtworkImage } from "../../features/artworks/api/demoArtworks";
 
 function asset(path: string) {
   const p = path.replace(/^\/+/, "");
@@ -31,45 +32,16 @@ const PANEL_NAMES = [
 
 const EXHIBIT_PANEL_COUNT = PANEL_NAMES.length;
 
-/** ✅ placeholder (data URL) */
-function makePlaceholderDataUrl(label: string, w = 768, h = 768) {
-  const c = document.createElement("canvas");
-  c.width = w;
-  c.height = h;
-
-  const ctx = c.getContext("2d");
-  if (!ctx) return "";
-
-  ctx.fillStyle = "#111318";
-  ctx.fillRect(0, 0, w, h);
-
-  ctx.strokeStyle = "rgba(255,255,255,0.15)";
-  ctx.lineWidth = Math.max(6, Math.floor(w * 0.01));
-  ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, w - ctx.lineWidth, h - ctx.lineWidth);
-
-  ctx.fillStyle = "rgba(255,255,255,0.92)";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = `700 ${Math.floor(w * 0.07)}px ui-sans-serif, system-ui, -apple-system`;
-  ctx.fillText(label, w / 2, h / 2);
-
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.font = `500 ${Math.floor(w * 0.035)}px ui-sans-serif, system-ui, -apple-system`;
-  ctx.fillText("ARNNECT EXHIBIT", w / 2, h / 2 + Math.floor(h * 0.1));
-
-  return c.toDataURL("image/png");
-}
-
 /** ✅ 작가 작품 목록 → 패널 아이템 변환 */
 async function buildPanelsByArtist(artistId: string | null): Promise<PanelArtItem[]> {
   // artistId 없으면 전부 placeholder
   if (!artistId) {
     return PANEL_NAMES.map((panelName, idx) => ({
       panelName,
-      title: `EMPTY ${idx + 1}`,
-      imageUrl: makePlaceholderDataUrl(`EMPTY ${idx + 1}`),
-      // ✅ placeholder는 artworkId 없음 (상세보기 막기)
-      artworkId: undefined,
+      title: `Demo Artwork ${idx + 1}`,
+      imageUrl: getDemoArtworkImage(idx),
+      // Demo artwork ids keep the frontend-only exhibit navigable.
+      artworkId: 9001 + idx,
     }));
   }
 
@@ -79,9 +51,9 @@ async function buildPanelsByArtist(artistId: string | null): Promise<PanelArtIte
     if (!list.length) {
       return PANEL_NAMES.map((panelName, idx) => ({
         panelName,
-        title: `EMPTY ${idx + 1}`,
-        imageUrl: makePlaceholderDataUrl(`EMPTY ${idx + 1}`),
-        artworkId: undefined,
+        title: `Demo Artwork ${idx + 1}`,
+        imageUrl: getDemoArtworkImage(idx),
+        artworkId: 9001 + idx,
       }));
     }
 
@@ -90,7 +62,7 @@ async function buildPanelsByArtist(artistId: string | null): Promise<PanelArtIte
       const a = list[idx % list.length];
 
       const url = buildNewArtistImageUrl(a.imageUrl || a.savedImageName);
-      const safeUrl = url || makePlaceholderDataUrl(`NO IMG ${idx + 1}`);
+      const safeUrl = url || getDemoArtworkImage(idx);
 
       return {
         panelName,
@@ -107,9 +79,9 @@ async function buildPanelsByArtist(artistId: string | null): Promise<PanelArtIte
     console.warn("[Exhibit] fetchArtworksByArtist failed -> placeholder", e);
     return PANEL_NAMES.map((panelName, idx) => ({
       panelName,
-      title: `OFFLINE ${idx + 1}`,
-      imageUrl: makePlaceholderDataUrl(`OFFLINE ${idx + 1}`),
-      artworkId: undefined,
+      title: `Demo Artwork ${idx + 1}`,
+      imageUrl: getDemoArtworkImage(idx),
+      artworkId: 9001 + idx,
     }));
   }
 }

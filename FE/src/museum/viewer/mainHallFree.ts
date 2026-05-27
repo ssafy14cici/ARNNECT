@@ -9,6 +9,7 @@ import { createWaypointNavigator } from "./navigator";
 
 // ✅ NEW: 신진예술인 6명 API
 import { fetchNewArtists, buildNewArtistImageUrl, type NewArtistArtwork } from "../../features/artworks/api/newArtists"
+import { getDemoArtworkImage } from "../../features/artworks/api/demoArtworks";
 
 type ExhibitPayload = {
   artId?: number;
@@ -638,9 +639,9 @@ function resolveNewArtistImageUrl(r: any) {
   artistId: "fallback",
   anchorName: a.anchorName,
   nameAnchor: a.nameAnchor,
-  artist: "작가",
-  artworkTitle: `EMPTY ${i + 1}`,
-  imageUrl: makePlaceholderDataUrl(`EMPTY ${i + 1}`), // ✅ a1.jpg 제거
+  artist: "ARNNECT Demo",
+  artworkTitle: `Demo Artwork ${i + 1}`,
+  imageUrl: getDemoArtworkImage(i),
 }));
 
 
@@ -674,8 +675,7 @@ function resolveNewArtistImageUrl(r: any) {
           artworkTitle: (r.title ?? "").trim() || "작품",
           imageUrl: (() => {
             const url = resolveNewArtistImageUrl(r);
-            // ✅ 여기서도 a1.jpg로 떨어지지 말고 placeholder
-            return url || makePlaceholderDataUrl(`NO IMG ${i + 1}`);
+            return url || getDemoArtworkImage(i);
           })(),
 
           anchorName: ANCHORS[i].anchorName,
@@ -695,7 +695,7 @@ function resolveNewArtistImageUrl(r: any) {
   let artTexturePromises: Promise<void>[] = [];
 
   const texLoader = new THREE.TextureLoader();
-  async function loadTexture(url: string, flipV = true, label = "NO IMAGE") {
+  async function loadTexture(url: string, flipV = true, label = "NO IMAGE", flipH = false) {
     let tex: THREE.Texture;
 
     try {
@@ -718,11 +718,11 @@ function resolveNewArtistImageUrl(r: any) {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.flipY = false;
 
-    if (flipV) {
-      tex.wrapS = THREE.ClampToEdgeWrapping;
+    if (flipV || flipH) {
+      tex.wrapS = THREE.RepeatWrapping;
       tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(1, -1);
-      tex.offset.set(0, 1);
+      tex.repeat.set(flipH ? -1 : 1, flipV ? -1 : 1);
+      tex.offset.set(flipH ? 1 : 0, flipV ? 1 : 0);
     }
 
     tex.needsUpdate = true;
@@ -734,7 +734,7 @@ function resolveNewArtistImageUrl(r: any) {
   function startPreload(items: ArtworkItem[]) {
     preloadedTextures.clear();
     artTexturePromises = items.map((item) =>
-      loadTexture(item.imageUrl, true, `${item.artist} — ${item.artworkTitle}`)
+      loadTexture(item.imageUrl, true, `${item.artist} — ${item.artworkTitle}`, true)
 
         .then((tex) => {
           if (!alive) return;
@@ -860,7 +860,7 @@ function resolveNewArtistImageUrl(r: any) {
     if (!alive) return;
 
     const tex = 
-      preloadedTextures.get(item.imageUrl) ?? (await loadTexture(item.imageUrl, true, `${item.artist} — ${item.artworkTitle}`));
+      preloadedTextures.get(item.imageUrl) ?? (await loadTexture(item.imageUrl, true, `${item.artist} — ${item.artworkTitle}`, true));
 
     if (!alive) return;
 

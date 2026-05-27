@@ -1,6 +1,8 @@
 // FE/src/pages/home/IntroArtworkGrid.tsx
 import { useEffect, useMemo, useState } from "react";
 import { http } from "../../shared/api/http";
+import { USE_MOCK } from "../../shared/config/env";
+import { getDemoArtworkImage } from "../../features/artworks/api/demoArtworks";
 
 // ✅ 너가 쓰는 “무조건 되는” 함수로 통일
 // 경로는 HomeMobile 위치 기준: FE/src/pages/home -> FE/src/pages/artworks/detail/utils.ts
@@ -87,6 +89,13 @@ function pickGridItem(row: unknown): GridItem | null {
 }
 
 async function fetchFeedCandidates(): Promise<GridItem[]> {
+  if (USE_MOCK) {
+    return Array.from({ length: 6 }, (_, idx) => ({
+      artworkId: 9001 + idx,
+      imageRaw: getDemoArtworkImage(idx),
+    }));
+  }
+
   const res = await http.get("/api/v1/artworks/feed");
   const raw = unwrapEnvelope<unknown>(unwrapAxios(res));
   const list = toArray(raw);

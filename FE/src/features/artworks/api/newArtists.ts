@@ -1,4 +1,6 @@
 // FE/src/features/artworks/api/newArtists.ts
+import { USE_MOCK } from "../../../shared/config/env";
+import { getDemoArtworkImage } from "./demoArtworks";
 
 export type NewArtistArtwork = {
   memberUuid: string;
@@ -8,6 +10,7 @@ export type NewArtistArtwork = {
   description: string;
   productionDate: string;
   savedImageName: string;
+  imageUrl?: string;
 };
 
 /** 전시홀(작가별 작품 리스트)용: 서버 응답이 조금 달라도 흡수할 타입 */
@@ -98,6 +101,10 @@ function parseNewArtists(raw: unknown): NewArtistArtwork[] {
         pick(it, ["savedImageName", "saved_image_name", "savedImage", "saved_image", "imageName", "image_name"]),
         ""
       ).trim();
+      const imageUrl = asString(
+        pick(it, ["imageUrl", "image_url", "thumbnail", "thumbnailUrl", "artworkImage", "pieceImage", "image", "src"]),
+        ""
+      ).trim();
 
       if (!Number.isFinite(artworkId)) return null;
       if (!memberUuid) return null;
@@ -110,6 +117,7 @@ function parseNewArtists(raw: unknown): NewArtistArtwork[] {
         description,
         productionDate,
         savedImageName,
+        imageUrl: imageUrl || undefined,
       } as NewArtistArtwork;
     })
     .filter(Boolean) as NewArtistArtwork[];
@@ -133,7 +141,19 @@ function parseArtistArtworks(raw: unknown): ArtistArtwork[] {
       ).trim();
 
       const imageUrl = asString(
-        pick(it, ["imageUrl", "imgUrl", "thumbnailUrl", "thumbUrl", "savedImageUrl"]),
+        pick(it, [
+          "imageUrl",
+          "image_url",
+          "imgUrl",
+          "thumbnail",
+          "thumbnailUrl",
+          "thumbUrl",
+          "artworkImage",
+          "pieceImage",
+          "image",
+          "src",
+          "savedImageUrl",
+        ]),
         ""
       ).trim();
 
@@ -155,6 +175,30 @@ function parseArtistArtworks(raw: unknown): ArtistArtwork[] {
       } as ArtistArtwork;
     })
     .filter(Boolean) as ArtistArtwork[];
+}
+
+function buildDemoNewArtists(): NewArtistArtwork[] {
+  return Array.from({ length: 6 }, (_, idx) => ({
+    memberUuid: "demo-artist",
+    nickname: "ARNNECT Demo",
+    artworkId: 9001 + idx,
+    title: `Demo Artwork ${idx + 1}`,
+    description: "Portfolio demo artwork for frontend-only deployment.",
+    productionDate: "2026",
+    savedImageName: "",
+    imageUrl: getDemoArtworkImage(idx),
+  }));
+}
+
+function buildDemoArtistArtworks(): ArtistArtwork[] {
+  return Array.from({ length: 6 }, (_, idx) => ({
+    artworkId: 9001 + idx,
+    title: `Demo Artwork ${idx + 1}`,
+    savedImageName: "",
+    imageUrl: getDemoArtworkImage(idx),
+    description: "Portfolio demo artwork for frontend-only deployment.",
+    productionDate: "2026",
+  }));
 }
 
 /** baseURL + path 결합 (base가 없으면 path 그대로) */
@@ -189,6 +233,8 @@ async function fetchJson(url: string): Promise<unknown> {
  * - 혹시 경로가 흔들릴 수 있어서 후보 몇 개 유지
  */
 export async function fetchNewArtists(): Promise<NewArtistArtwork[]> {
+  if (USE_MOCK) return buildDemoNewArtists();
+
   const base = getFetchBase();
 
   const candidates = ["/api/v1/artworks/new", "/api/v1/artwork/new"].map((p) => joinUrl(base, p));
@@ -213,6 +259,8 @@ export async function fetchNewArtists(): Promise<NewArtistArtwork[]> {
  * - 서버: /api/v1/artworks?artist={memberUuid}
  */
 export async function fetchArtworksByArtist(memberUuid: string): Promise<ArtistArtwork[]> {
+  if (USE_MOCK) return buildDemoArtistArtworks();
+
   const base = getFetchBase();
   const uuid = String(memberUuid ?? "").trim();
   if (!uuid) return [];

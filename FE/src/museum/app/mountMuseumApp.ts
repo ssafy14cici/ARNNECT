@@ -3,6 +3,7 @@ import "../styles/style.css";
 import "../styles/intro.css";
 
 import { fetchArtworksByArtist, buildNewArtistImageUrl } from "../../features/artworks/api/newArtists";
+import { getDemoArtworkImage } from "../../features/artworks/api/demoArtworks";
 import { mountIntro, type CameraPose } from "../intro/mountIntro";
 import { mountExitOverlay } from "../viewer/exitOverlay";
 import { mountExhibitRoom } from "../viewer/exhibitRoom";
@@ -166,14 +167,18 @@ async function resolveArtworkImageUrl(
   artwork: { artworkId: number | string; imageUrl?: string; savedImageName?: string },
   idxForLabel: number
 ): Promise<string> {
-  // 1) artworkId 기반 우선
+  const demoImageUrl = getDemoArtworkImage(idxForLabel);
+  const raw = String(artwork.imageUrl ?? artwork.savedImageName ?? "").trim();
+
+  // Portfolio demo fallback images for frontend-only deployment.
+  // These are used when backend artwork image data is unavailable.
+  if (raw.startsWith("/demo-artworks/")) return raw;
+
   const idCandidates = buildArtworkIdImageCandidates(artwork.artworkId);
   for (const u of idCandidates) {
     if (await isImageUrlOk(u)) return u;
   }
 
-  // 2) fallback (기존 규칙: imageUrl or savedImageName)
-  const raw = String(artwork.imageUrl ?? artwork.savedImageName ?? "").trim();
   if (raw) {
     const legacy = buildNewArtistImageUrl(raw);
     if (legacy && (legacy.startsWith("data:") || legacy.startsWith("blob:") || (await isImageUrlOk(legacy)))) {
@@ -181,8 +186,7 @@ async function resolveArtworkImageUrl(
     }
   }
 
-  // 3) placeholder
-  return makePlaceholderDataUrl(`NO IMG ${idxForLabel + 1}`);
+  return demoImageUrl;
 }
 
 export function mountMuseumApp(args: {
@@ -394,9 +398,9 @@ export function mountMuseumApp(args: {
       if (!list.length) {
         panelItems = Array.from({ length: EXHIBIT_PANEL_COUNT }, (_, i) => ({
           panelName: `EX_PANEL_${i + 1}`,
-          imageUrl: makePlaceholderDataUrl(`EMPTY ${i + 1}`),
-          title: `EMPTY ${i + 1}`,
-          artworkId: undefined,
+          imageUrl: getDemoArtworkImage(i),
+          title: `Demo Artwork ${i + 1}`,
+          artworkId: 9001 + i,
         }));
       } else {
         // ✅ URL “실제 로드 가능” 판별해서 안전하게 채우기
@@ -433,9 +437,9 @@ export function mountMuseumApp(args: {
 
       panelItems = Array.from({ length: EXHIBIT_PANEL_COUNT }, (_, i) => ({
         panelName: `EX_PANEL_${i + 1}`,
-        imageUrl: makePlaceholderDataUrl(`OFFLINE ${i + 1}`),
-        title: `OFFLINE ${i + 1}`,
-        artworkId: undefined,
+        imageUrl: getDemoArtworkImage(i),
+        title: `Demo Artwork ${i + 1}`,
+        artworkId: 9001 + i,
       }));
     }
 
