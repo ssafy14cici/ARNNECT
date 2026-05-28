@@ -19,3 +19,10 @@ FE/tsconfig.node.json -filter -diff -merge text
 FE/vite.config.ts -filter -diff -merge text
 FE/eslint.config.js -filter -diff -merge text
 FE/index.html -filter -diff -merge text
+
+# Keep portfolio demo 3D assets as regular Git files for Vercel deployment
+FE/public/museum/models/museum/intro_53.glb -filter -diff -merge -text
+FE/public/museum/models/museum/mh.glb -filter -diff -merge -text
+FE/public/museum/models/museum/mh_add_5.glb -filter -diff -merge -text
+FE/public/museum/models/museum/wave.glb -filter -diff -merge -text
+FE/public/museum/models/gallery/gallery5.glb -filter -diff -merge -text
