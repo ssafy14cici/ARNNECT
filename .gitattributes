@@ -9,3 +9,13 @@
 # Keep frontend package metadata as normal Git text files
 FE/package.json -filter -diff -merge text
 FE/package-lock.json -filter -diff -merge text
+
+# Keep frontend config/package files as normal Git text files
+FE/package.json -filter -diff -merge text
+FE/package-lock.json -filter -diff -merge text
+FE/tsconfig.json -filter -diff -merge text
+FE/tsconfig.app.json -filter -diff -merge text
+FE/tsconfig.node.json -filter -diff -merge text
+FE/vite.config.ts -filter -diff -merge text
+FE/eslint.config.js -filter -diff -merge text
+FE/index.html -filter -diff -merge text
